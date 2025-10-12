@@ -1,0 +1,594 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		26CAF2702E781EFE003FE378 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 26CAF2562E781EFB003FE378 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 26CAF25D2E781EFB003FE378;
+			remoteInfo = OralableApp;
+		};
+		26CAF27A2E781EFE003FE378 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 26CAF2562E781EFB003FE378 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 26CAF25D2E781EFB003FE378;
+			remoteInfo = OralableApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		26CAF25E2E781EFB003FE378 /* OralableApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OralableApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		26CAF2812E781EFE003FE378 /* Exceptions for "OralableApp" folder in "OralableApp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		26CAF2602E781EFB003FE378 /* OralableApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				26CAF2812E781EFE003FE378 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
+			);
+			path = OralableApp;
+			sourceTree = "<group>";
+		};
+		26CAF2722E781EFE003FE378 /* OralableAppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OralableAppTests;
+			sourceTree = "<group>";
+		};
+		26CAF27C2E781EFE003FE378 /* OralableAppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OralableAppUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		26CAF25B2E781EFB003FE378 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26CAF26C2E781EFE003FE378 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26CAF2762E781EFE003FE378 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		26CAF2552E781EFB003FE378 = {
+			isa = PBXGroup;
+			children = (
+				26CAF2602E781EFB003FE378 /* OralableApp */,
+				26CAF2722E781EFE003FE378 /* OralableAppTests */,
+				26CAF27C2E781EFE003FE378 /* OralableAppUITests */,
+				26CAF25F2E781EFB003FE378 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		26CAF25F2E781EFB003FE378 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				26CAF25E2E781EFB003FE378 /* OralableApp.app */,
+				26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */,
+				26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		26CAF25D2E781EFB003FE378 /* OralableApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26CAF2822E781EFE003FE378 /* Build configuration list for PBXNativeTarget "OralableApp" */;
+			buildPhases = (
+				26CAF25A2E781EFB003FE378 /* Sources */,
+				26CAF25B2E781EFB003FE378 /* Frameworks */,
+				26CAF25C2E781EFB003FE378 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				26CAF2602E781EFB003FE378 /* OralableApp */,
+			);
+			name = OralableApp;
+			packageProductDependencies = (
+			);
+			productName = OralableApp;
+			productReference = 26CAF25E2E781EFB003FE378 /* OralableApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		26CAF26E2E781EFE003FE378 /* OralableAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26CAF2872E781EFE003FE378 /* Build configuration list for PBXNativeTarget "OralableAppTests" */;
+			buildPhases = (
+				26CAF26B2E781EFE003FE378 /* Sources */,
+				26CAF26C2E781EFE003FE378 /* Frameworks */,
+				26CAF26D2E781EFE003FE378 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				26CAF2712E781EFE003FE378 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				26CAF2722E781EFE003FE378 /* OralableAppTests */,
+			);
+			name = OralableAppTests;
+			packageProductDependencies = (
+			);
+			productName = OralableAppTests;
+			productReference = 26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		26CAF2782E781EFE003FE378 /* OralableAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26CAF28A2E781EFE003FE378 /* Build configuration list for PBXNativeTarget "OralableAppUITests" */;
+			buildPhases = (
+				26CAF2752E781EFE003FE378 /* Sources */,
+				26CAF2762E781EFE003FE378 /* Frameworks */,
+				26CAF2772E781EFE003FE378 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				26CAF27B2E781EFE003FE378 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				26CAF27C2E781EFE003FE378 /* OralableAppUITests */,
+			);
+			name = OralableAppUITests;
+			packageProductDependencies = (
+			);
+			productName = OralableAppUITests;
+			productReference = 26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		26CAF2562E781EFB003FE378 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					26CAF25D2E781EFB003FE378 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					26CAF26E2E781EFE003FE378 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 26CAF25D2E781EFB003FE378;
+					};
+					26CAF2782E781EFE003FE378 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 26CAF25D2E781EFB003FE378;
+					};
+				};
+			};
+			buildConfigurationList = 26CAF2592E781EFB003FE378 /* Build configuration list for PBXProject "OralableApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 26CAF2552E781EFB003FE378;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 26CAF25F2E781EFB003FE378 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				26CAF25D2E781EFB003FE378 /* OralableApp */,
+				26CAF26E2E781EFE003FE378 /* OralableAppTests */,
+				26CAF2782E781EFE003FE378 /* OralableAppUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		26CAF25C2E781EFB003FE378 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26CAF26D2E781EFE003FE378 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26CAF2772E781EFE003FE378 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		26CAF25A2E781EFB003FE378 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26CAF26B2E781EFE003FE378 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26CAF2752E781EFE003FE378 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		26CAF2712E781EFE003FE378 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
+			targetProxy = 26CAF2702E781EFE003FE378 /* PBXContainerItemProxy */;
+		};
+		26CAF27B2E781EFE003FE378 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
+			targetProxy = 26CAF27A2E781EFE003FE378 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		26CAF2832E781EFE003FE378 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = OralableApp/OralableApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OralableApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Oralable;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Oralable needs Bluetooth to connect to your TGM device for monitoring sensor data";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Oralable needs Bluetooth to connect to your TGM device for monitoring sensor data";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Oralable would like to share your sleep and heart rate data with HealthKit for comprehensive health tracking.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Oralable would like to save your sleep and heart rate data to HealthKit for health tracking.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "armv7 bluetooth-le";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jacdentalsolutions.OralableApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		26CAF2842E781EFE003FE378 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = OralableApp/OralableApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OralableApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Oralable;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Oralable needs Bluetooth to connect to your TGM device for monitoring sensor data";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Oralable needs Bluetooth to connect to your TGM device for monitoring sensor data";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Oralable would like to share your sleep and heart rate data with HealthKit for comprehensive health tracking.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Oralable would like to save your sleep and heart rate data to HealthKit for health tracking.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "armv7 bluetooth-le";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jacdentalsolutions.OralableApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		26CAF2852E781EFE003FE378 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		26CAF2862E781EFE003FE378 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		26CAF2882E781EFE003FE378 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jacdentalsolutions.OralableAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OralableApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OralableApp";
+			};
+			name = Debug;
+		};
+		26CAF2892E781EFE003FE378 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jacdentalsolutions.OralableAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OralableApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OralableApp";
+			};
+			name = Release;
+		};
+		26CAF28B2E781EFE003FE378 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jacdentalsolutions.OralableAppUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OralableApp;
+			};
+			name = Debug;
+		};
+		26CAF28C2E781EFE003FE378 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jacdentalsolutions.OralableAppUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OralableApp;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		26CAF2592E781EFB003FE378 /* Build configuration list for PBXProject "OralableApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26CAF2852E781EFE003FE378 /* Debug */,
+				26CAF2862E781EFE003FE378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26CAF2822E781EFE003FE378 /* Build configuration list for PBXNativeTarget "OralableApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26CAF2832E781EFE003FE378 /* Debug */,
+				26CAF2842E781EFE003FE378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26CAF2872E781EFE003FE378 /* Build configuration list for PBXNativeTarget "OralableAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26CAF2882E781EFE003FE378 /* Debug */,
+				26CAF2892E781EFE003FE378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26CAF28A2E781EFE003FE378 /* Build configuration list for PBXNativeTarget "OralableAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26CAF28B2E781EFE003FE378 /* Debug */,
+				26CAF28C2E781EFE003FE378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 26CAF2562E781EFB003FE378 /* Project object */;
+}
