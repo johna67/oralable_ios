@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleGetInfoString</key>
+	<string></string>
+	<key>CFBundleSignature</key>
+	<string></string>
 	<key>NSUbiquitousContainer</key>
 	<dict>
 		<key>iCloud.com.yourcompany.oralable</key>
@@ -12,37 +16,15 @@
 			<true/>
 		</dict>
 	</dict>
-	<key>CFBundleDisplayName</key>
-	<string></string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>bluetooth-central</string>
-	</array>
-	<key>CFBundleName</key>
-	<string></string>
-	<key>CFBundleVersion</key>
-	<string></string>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.healthcare-fitness</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Oralable needs Bluetooth to connect to your TGM device for monitoring sensor data</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Oralable needs Bluetooth to connect to your TGM device for monitoring sensor data</string>
-	<key>CFBundleExecutable</key>
-	<string></string>
-	<key>CFBundleIdentifier</key>
-	<string></string>
-	<key>CFBundleGetInfoString</key>
-	<string></string>
-	<key>CFBundleSignature</key>
-	<string></string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<true/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchScreen</key>

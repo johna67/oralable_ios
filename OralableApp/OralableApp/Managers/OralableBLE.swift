@@ -316,7 +316,7 @@ extension OralableBLE: CBCentralManagerDelegate {
         if let name = peripheral.name, !name.isEmpty {
             addLog("📱 Found: \(name) RSSI: \(RSSI)dB", level: .debug)
             
-            if name == "TGM" {
+            if name == "Oralable" {
                 addLog("🎯 FOUND TGM DEVICE!", level: .success)
                 self.peripheral = peripheral
                 self.peripheral?.delegate = self

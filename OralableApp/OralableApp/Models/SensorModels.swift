@@ -11,7 +11,7 @@ struct BLEConstants {
     static let FW_VERSION_CHAR = "3A0FF006-98C4-46B2-94AF-1AEE0FD4C48E"
     static let MUSCLE_SITE_CHAR = "3A0FF102-98C4-46B2-94AF-1AEE0FD4C48E"
     
-    static let DEVICE_NAME = "TGM"
+    static let DEVICE_NAME = "Oralable"
     static let PPG_SAMPLES_PER_FRAME = 20
     static let ACC_SAMPLES_PER_FRAME = 25
 }
