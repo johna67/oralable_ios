@@ -234,29 +234,3 @@ struct SubscriptionSettingsView: View {
     }
 }
 
-// Keep the existing LogsView from SettingsView
-struct LogsView: View {
-    let logs: [String]
-    @State private var searchText = ""
-    
-    var filteredLogs: [String] {
-        if searchText.isEmpty {
-            return logs
-        } else {
-            return logs.filter { $0.localizedCaseInsensitiveContains(searchText) }
-        }
-    }
-    
-    var body: some View {
-        List {
-            ForEach(filteredLogs.reversed(), id: \.self) { log in
-                Text(log)
-                    .font(.caption)
-                    .lineLimit(nil)
-            }
-        }
-        .searchable(text: $searchText)
-        .navigationTitle("Logs")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
