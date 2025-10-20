@@ -3,6 +3,7 @@ import Charts
 
 struct DataView: View {
     @ObservedObject var ble: OralableBLE
+    var isViewerMode: Bool = false  // NEW: Flag to indicate Viewer Mode
     @State private var selectedDataType = "PPG"
     
     let dataTypes = ["PPG", "Accelerometer", "Temperature"]
@@ -18,18 +19,40 @@ struct DataView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
+                .disabled(isViewerMode && !ble.isConnected) // Disable if in viewer mode and no connection
                 
-                // Data Visualization
-                ScrollView {
-                    switch selectedDataType {
-                    case "PPG":
-                        PPGChartView(ppgData: ble.sensorData.ppg)
-                    case "Accelerometer":
-                        AccelerometerChartView(accData: ble.sensorData.accelerometer)
-                    case "Temperature":
-                        TemperatureView(temperature: ble.sensorData.temperature)
-                    default:
-                        EmptyView()
+                // Viewer Mode Notice (if not connected)
+                if isViewerMode && !ble.isConnected {
+                    VStack(spacing: 12) {
+                        Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                            .font(.system(size: 40))
+                            .foregroundColor(.secondary)
+                        
+                        Text("Real-time data unavailable in Viewer Mode")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Switch to Subscription Mode to connect your device and view live sensor data")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .padding()
+                } else {
+                    // Data Visualization (works in both modes if device is connected)
+                    ScrollView {
+                        switch selectedDataType {
+                        case "PPG":
+                            PPGChartView(ppgData: ble.sensorData.ppg)
+                        case "Accelerometer":
+                            AccelerometerChartView(accData: ble.sensorData.accelerometer)
+                        case "Temperature":
+                            TemperatureView(temperature: ble.sensorData.temperature)
+                        default:
+                            EmptyView()
+                        }
                     }
                 }
             }

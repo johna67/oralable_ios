@@ -3,6 +3,7 @@ import UIKit
 
 struct LogExportView: View {
     @ObservedObject var ble: OralableBLE
+    var isViewerMode: Bool = false  // NEW: Flag to indicate Viewer Mode
     @State private var showShareSheet = false
     @State private var exportURL: URL?
     @State private var exportFormat = "CSV"
@@ -13,8 +14,8 @@ struct LogExportView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Device Info
-                    DeviceInfoCard(appleID: appleID)
+                    // Device Info (Apple ID disabled in Viewer Mode)
+                    DeviceInfoCard(appleID: isViewerMode ? nil : appleID, isViewerMode: isViewerMode)
                     
                     // Export Options
                     VStack(alignment: .leading, spacing: 15) {
@@ -80,6 +81,22 @@ struct LogExportView: View {
                             .padding()
                     }
                     
+                    // Viewer Mode Notice
+                    if isViewerMode {
+                        VStack(spacing: 8) {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.blue)
+                                Text("Viewer Mode - Apple ID not included in exports")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                    }
+                    
                     // Recent Logs Preview
                     LogPreviewSection(logs: Array(ble.logMessages.suffix(10)))
                 }
@@ -93,8 +110,11 @@ struct LogExportView: View {
             }
         }
         .onAppear {
-            LogExportManager.shared.fetchAppleUserID { id in
-                self.appleID = id
+            // Only fetch Apple ID in Subscription Mode
+            if !isViewerMode {
+                LogExportManager.shared.fetchAppleUserID { id in
+                    self.appleID = id
+                }
             }
         }
     }
@@ -131,6 +151,7 @@ struct LogExportView: View {
 
 struct DeviceInfoCard: View {
     let appleID: String?
+    var isViewerMode: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -151,12 +172,17 @@ struct DeviceInfoCard: View {
             
             HStack {
                 Label("Apple ID", systemImage: "person.circle")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isViewerMode ? .gray : .secondary)
                     .font(.caption)
                 
                 Spacer()
                 
-                if let id = appleID {
+                if isViewerMode {
+                    Text("Disabled in Viewer Mode")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .italic()
+                } else if let id = appleID {
                     Text(String(id.prefix(8)) + "...")
                         .font(.caption)
                         .monospaced()
@@ -166,6 +192,7 @@ struct DeviceInfoCard: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .opacity(isViewerMode ? 0.6 : 1.0)
         }
         .padding()
         .background(Color(.systemGray6))

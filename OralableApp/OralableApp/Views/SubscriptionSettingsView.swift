@@ -112,7 +112,7 @@ struct SubscriptionSettingsView: View {
                         
                         Button(action: { ble.disconnect() }) {
                             HStack {
-                                Image(systemName: "link.badge.slash")
+                                Image(systemName: "link.slash")
                                 Text("Disconnect")
                             }
                             .foregroundColor(.orange)
@@ -233,4 +233,3 @@ struct SubscriptionSettingsView: View {
         }
     }
 }
-
