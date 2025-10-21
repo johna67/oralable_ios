@@ -11,6 +11,16 @@ struct DashboardView: View {
                     // Connection Status (different behavior in Viewer Mode)
                     ConnectionCard(ble: ble, isViewerMode: isViewerMode)
                     
+                    Button("Test Aggregation") {
+                        // Generate 24 hours of mock data
+                        ble.generateMockHistoricalData(hours: 24)
+                        
+                        // Get day metrics
+                        let dayMetrics = ble.getHistoricalMetrics(for: .day)
+                        print("Day metrics: \(dayMetrics.totalSamples) samples")
+                        print("Avg temp: \(dayMetrics.avgTemperature)°C")
+                    }
+                    
                     // Battery and Temperature (disabled/grayed in Viewer Mode if not connected)
                     HStack(spacing: 15) {
                         MetricCard(
