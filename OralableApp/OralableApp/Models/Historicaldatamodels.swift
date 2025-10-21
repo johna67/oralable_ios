@@ -99,8 +99,8 @@ class HistoricalDataAggregator {
     ///   - range: The time range to aggregate over
     ///   - endDate: The end date for the range (defaults to now)
     /// - Returns: HistoricalMetrics containing aggregated data
-    static func aggregate(data: [SensorData],
-                         for range: TimeRange,
+    static func aggregate(data: [SensorData], 
+                         for range: TimeRange, 
                          endDate: Date = Date()) -> HistoricalMetrics {
         
         let startDate = endDate.addingTimeInterval(-range.seconds)

@@ -443,3 +443,126 @@ extension OralableBLE: CBPeripheralDelegate {
         }
     }
 }
+// MARK: - Historical Data Extension
+extension OralableBLE {
+    
+    /// Get aggregated historical metrics for a specific time range
+    /// - Parameters:
+    ///   - range: The time range to aggregate (day, week, month, year)
+    ///   - endDate: Optional end date (defaults to now)
+    /// - Returns: HistoricalMetrics containing aggregated data
+    func getHistoricalMetrics(for range: TimeRange, endDate: Date = Date()) -> HistoricalMetrics {
+        return HistoricalDataAggregator.aggregate(
+            data: historicalData,
+            for: range,
+            endDate: endDate
+        )
+    }
+    
+    /// Get metrics for all time ranges at once
+    /// - Returns: Dictionary mapping each TimeRange to its HistoricalMetrics
+    func getAllHistoricalMetrics() -> [TimeRange: HistoricalMetrics] {
+        var metrics: [TimeRange: HistoricalMetrics] = [:]
+        
+        for range in TimeRange.allCases {
+            metrics[range] = getHistoricalMetrics(for: range)
+        }
+        
+        return metrics
+    }
+    
+    /// Check if historical data is available for a specific time range
+    /// - Parameter range: The time range to check
+    /// - Returns: True if data exists for the range
+    func hasDataForRange(_ range: TimeRange) -> Bool {
+        guard !historicalData.isEmpty else { return false }
+        
+        let oldestData = historicalData.first?.timestamp ?? Date()
+        let timeSinceOldest = Date().timeIntervalSince(oldestData)
+        
+        return timeSinceOldest >= range.seconds
+    }
+    
+    /// Get a summary of available data
+    /// - Returns: String describing data availability
+    func getDataAvailabilitySummary() -> String {
+        guard !historicalData.isEmpty else {
+            return "No historical data available"
+        }
+        
+        let oldestData = historicalData.first?.timestamp ?? Date()
+        let newestData = historicalData.last?.timestamp ?? Date()
+        let totalDuration = newestData.timeIntervalSince(oldestData)
+        
+        let hours = Int(totalDuration / 3600)
+        let minutes = Int((totalDuration.truncatingRemainder(dividingBy: 3600)) / 60)
+        
+        var summary = "Data available: "
+        
+        if hours > 0 {
+            summary += "\(hours)h "
+        }
+        if minutes > 0 || hours == 0 {
+            summary += "\(minutes)m"
+        }
+        
+        summary += " (\(historicalData.count) samples)"
+        
+        return summary
+    }
+    
+    /// Get the date range of available data
+    /// - Returns: Tuple with start and end dates, or nil if no data
+    func getDataDateRange() -> (start: Date, end: Date)? {
+        guard !historicalData.isEmpty else { return nil }
+        
+        let start = historicalData.first?.timestamp ?? Date()
+        let end = historicalData.last?.timestamp ?? Date()
+        
+        return (start, end)
+    }
+    
+    /// Export historical metrics as JSON
+    /// - Parameter range: The time range to export
+    /// - Returns: JSON data or nil if encoding fails
+    func exportHistoricalMetrics(for range: TimeRange) -> Data? {
+        let metrics = getHistoricalMetrics(for: range)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+        
+        return try? encoder.encode(metrics)
+    }
+    
+    /// Clear historical data (useful for testing or resetting)
+    func clearHistoricalData() {
+        historicalData.removeAll()
+        addLog("Historical data cleared", level: .info)
+    }
+    
+    /// Get recent data points (last N samples)
+    /// - Parameter count: Number of recent samples to retrieve
+    /// - Returns: Array of most recent SensorData
+    func getRecentData(count: Int = 100) -> [SensorData] {
+        let startIndex = max(0, historicalData.count - count)
+        return Array(historicalData[startIndex...])
+    }
+    
+    /// Calculate current rate of data collection (samples per minute)
+    /// - Returns: Samples per minute or 0 if insufficient data
+    func getDataCollectionRate() -> Double {
+        guard historicalData.count > 1 else { return 0 }
+        
+        let recentData = getRecentData(count: 10)
+        guard recentData.count > 1 else { return 0 }
+        
+        let firstTimestamp = recentData.first?.timestamp ?? Date()
+        let lastTimestamp = recentData.last?.timestamp ?? Date()
+        let duration = lastTimestamp.timeIntervalSince(firstTimestamp)
+        
+        guard duration > 0 else { return 0 }
+        
+        let samplesPerSecond = Double(recentData.count) / duration
+        return samplesPerSecond * 60.0 // Convert to per minute
+    }
+}
