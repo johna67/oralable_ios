@@ -90,7 +90,7 @@ struct HistoricalDataView: View {
         }
         .pickerStyle(SegmentedPickerStyle())
         .padding(.horizontal)
-        .onChange(of: selectedRange) { _, newValue in
+        .onChange(of: selectedRange) { newValue in
             historyManager.updateMetrics(for: newValue)
         }
     }
@@ -99,32 +99,32 @@ struct HistoricalDataView: View {
     
     private func summaryCards(metrics: HistoricalMetrics) -> some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            StatCard(
+            HistoryStatCard(
                 title: "Total Samples",
                 value: "\(metrics.totalSamples)",
                 icon: "chart.bar.fill",
-                color: .blue
+                color: Color.blue
             )
             
-            StatCard(
+            HistoryStatCard(
                 title: "Avg Temperature",
                 value: String(format: "%.1f°C", metrics.avgTemperature),
                 icon: "thermometer.medium",
-                color: .orange
+                color: Color.orange
             )
             
-            StatCard(
+            HistoryStatCard(
                 title: "Avg Battery",
                 value: String(format: "%.0f%%", metrics.avgBatteryLevel),
                 icon: "battery.75",
-                color: .green
+                color: Color.green
             )
             
-            StatCard(
+            HistoryStatCard(
                 title: "Grinding Events",
                 value: "\(metrics.totalGrindingEvents)",
                 icon: "exclamationmark.triangle.fill",
-                color: .red
+                color: Color.red
             )
         }
         .padding(.horizontal)
@@ -143,7 +143,7 @@ struct HistoricalDataView: View {
                     ForEach(Array(metrics.dataPoints.enumerated()), id: \.offset) { index, point in
                         LineMark(
                             x: .value("Time", point.timestamp),
-                            y: .value("Temperature", point.temperature)
+                            y: .value("Temperature", point.avgTemperature)
                         )
                         .foregroundStyle(.orange)
                     }
@@ -178,7 +178,7 @@ struct HistoricalDataView: View {
                     ForEach(Array(metrics.dataPoints.enumerated()), id: \.offset) { index, point in
                         LineMark(
                             x: .value("Time", point.timestamp),
-                            y: .value("Battery", point.batteryLevel)
+                            y: .value("Battery", point.avgBatteryLevel)
                         )
                         .foregroundStyle(.green)
                     }
@@ -209,21 +209,21 @@ struct HistoricalDataView: View {
                 .padding(.horizontal)
             
             VStack(spacing: 8) {
-                ActivityRow(
+                HistoryActivityRow(
                     label: "Recording Time",
-                    value: formatDuration(metrics.totalRecordingTime),
+                    value: formatDuration(metrics.totalGrindingDuration),
                     icon: "clock.fill"
                 )
                 
-                ActivityRow(
+                HistoryActivityRow(
                     label: "Grinding Events",
                     value: "\(metrics.totalGrindingEvents)",
                     icon: "exclamationmark.triangle.fill"
                 )
                 
-                ActivityRow(
+                HistoryActivityRow(
                     label: "Peak Activity",
-                    value: String(format: "%.1f", metrics.peakActivity),
+                    value: String(format: "%.1f", metrics.dataPoints.map { $0.avgActivityLevel }.max() ?? 0.0),
                     icon: "chart.line.uptrend.xyaxis"
                 )
             }
@@ -243,9 +243,9 @@ struct HistoricalDataView: View {
                 .padding(.horizontal)
             
             VStack(spacing: 8) {
-                TrendRow(label: "Temperature", trend: metrics.temperatureTrend)
-                TrendRow(label: "Battery", trend: metrics.batteryTrend)
-                TrendRow(label: "Activity", trend: metrics.activityTrend)
+                HistoryTrendRow(label: "Temperature", trend: metrics.temperatureTrend)
+                HistoryTrendRow(label: "Battery", trend: metrics.batteryTrend)
+                HistoryTrendRow(label: "Activity", trend: metrics.activityTrend)
             }
             .padding()
             .background(Color(.systemGray6))
@@ -354,7 +354,7 @@ struct HistoricalDataView: View {
 
 // MARK: - Supporting Views
 
-struct StatCard: View {
+private struct HistoryStatCard: View {
     let title: String
     let value: String
     let icon: String
@@ -381,7 +381,7 @@ struct StatCard: View {
     }
 }
 
-struct ActivityRow: View {
+private struct HistoryActivityRow: View {
     let label: String
     let value: String
     let icon: String
@@ -389,7 +389,7 @@ struct ActivityRow: View {
     var body: some View {
         HStack {
             Image(systemName: icon)
-                .foregroundColor(.blue)
+                .foregroundColor(Color.blue)
                 .frame(width: 30)
             
             Text(label)
@@ -404,7 +404,7 @@ struct ActivityRow: View {
     }
 }
 
-struct TrendRow: View {
+private struct HistoryTrendRow: View {
     let label: String
     let trend: Double
     
@@ -426,8 +426,8 @@ struct TrendRow: View {
     }
     
     private var trendColor: Color {
-        if abs(trend) < 0.1 { return .gray }
-        return trend > 0 ? .green : .red
+        if abs(trend) < 0.1 { return Color.gray }
+        return trend > 0 ? Color.green : Color.red
     }
     
     private var trendText: String {
