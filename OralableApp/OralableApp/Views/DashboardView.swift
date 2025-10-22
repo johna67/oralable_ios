@@ -1,282 +1,482 @@
 import SwiftUI
+import Charts
 
 struct DashboardView: View {
     @ObservedObject var ble: OralableBLE
-    var isViewerMode: Bool = false  // NEW: Flag to indicate Viewer Mode
+    var isViewerMode: Bool = false
+    
+    @State private var selectedMetric: MetricType?
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Connection Status (different behavior in Viewer Mode)
-                    ConnectionCard(ble: ble, isViewerMode: isViewerMode)
+                    // Connection Status Card
+                    ConnectionStatusCard(ble: ble, isViewerMode: isViewerMode)
                     
-                    Button("Test Aggregation") {
-                        // Generate 24 hours of mock data
-                        ble.generateMockHistoricalData(hours: 24)
-                        
-                        // Get day metrics
-                        let dayMetrics = ble.getHistoricalMetrics(for: .day)
-                        print("Day metrics: \(dayMetrics.totalSamples) samples")
-                        print("Avg temp: \(dayMetrics.avgTemperature)°C")
-                    }
-                    
-                    // Battery and Temperature (disabled/grayed in Viewer Mode if not connected)
-                    HStack(spacing: 15) {
-                        MetricCard(
+                    // Real-time Graphs Section
+                    if ble.isConnected || !isViewerMode {
+                        // Battery Graph
+                        MetricGraphCard(
                             title: "Battery",
-                            value: "\(ble.sensorData.batteryLevel)%",
                             icon: "battery.100",
-                            color: batteryColor(ble.sensorData.batteryLevel),
-                            isDisabled: isViewerMode && !ble.isConnected
-                        )
+                            color: .green,
+                            isConnected: ble.isConnected
+                        ) {
+                            BatteryGraphView(ble: ble)
+                        }
+                        .onTapGesture {
+                            selectedMetric = .battery
+                        }
                         
-                        MetricCard(
+                        // PPG Graphs
+                        MetricGraphCard(
+                            title: "PPG Signals",
+                            icon: "waveform.path.ecg",
+                            color: .red,
+                            isConnected: ble.isConnected
+                        ) {
+                            PPGGraphView(ble: ble)
+                        }
+                        .onTapGesture {
+                            selectedMetric = .ppg
+                        }
+                        
+                        // Temperature Graph
+                        MetricGraphCard(
                             title: "Temperature",
-                            value: String(format: "%.1f°C", ble.sensorData.temperature),
                             icon: "thermometer",
                             color: .orange,
-                            isDisabled: isViewerMode && !ble.isConnected
-                        )
-                    }
-                    
-                    // PPG Metrics (disabled/grayed in Viewer Mode if not connected)
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("PPG Signals")
-                            .font(.headline)
-                            .foregroundColor(isViewerMode && !ble.isConnected ? .secondary : .primary)
-                        
-                        HStack(spacing: 15) {
-                            SignalIndicator(
-                                label: "IR",
-                                value: ble.sensorData.ppg.ir,
-                                color: .red,
-                                isDisabled: isViewerMode && !ble.isConnected
-                            )
-                            SignalIndicator(
-                                label: "Red",
-                                value: ble.sensorData.ppg.red,
-                                color: .pink,
-                                isDisabled: isViewerMode && !ble.isConnected
-                            )
-                            SignalIndicator(
-                                label: "Green",
-                                value: ble.sensorData.ppg.green,
-                                color: .green,
-                                isDisabled: isViewerMode && !ble.isConnected
-                            )
+                            isConnected: ble.isConnected
+                        ) {
+                            TemperatureGraphView(ble: ble)
                         }
+                        .onTapGesture {
+                            selectedMetric = .temperature
+                        }
+                        
+                        // Accelerometer Graph
+                        MetricGraphCard(
+                            title: "Accelerometer",
+                            icon: "gyroscope",
+                            color: .blue,
+                            isConnected: ble.isConnected
+                        ) {
+                            AccelerometerGraphView(ble: ble)
+                        }
+                        .onTapGesture {
+                            selectedMetric = .accelerometer
+                        }
+                    } else {
+                        // Viewer Mode - Not Connected
+                        ViewerModeEmptyState()
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                    .opacity(isViewerMode && !ble.isConnected ? 0.5 : 1.0)
-                    
-                    // Activity Level (disabled/grayed in Viewer Mode if not connected)
-                    ActivityGauge(
-                        activityLevel: Double(ble.sensorData.activityLevel),
-                        isDisabled: isViewerMode && !ble.isConnected
-                    )
                 }
                 .padding()
             }
-            .navigationTitle("Oralable Dashboard")
-        }
-    }
-    
-    private func batteryColor(_ level: UInt8) -> Color {
-        switch level {
-        case UInt8(0)..<UInt8(20): return .red
-        case UInt8(20)..<UInt8(50): return .orange
-        default: return .green
+            .navigationTitle("Dashboard")
+            .sheet(item: $selectedMetric) { metric in
+                HistoricalDetailView(ble: ble, metricType: metric)
+            }
         }
     }
 }
 
-struct ConnectionCard: View {
+// MARK: - Connection Status Card
+struct ConnectionStatusCard: View {
     @ObservedObject var ble: OralableBLE
-    var isViewerMode: Bool = false
+    var isViewerMode: Bool
     
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             HStack {
                 Circle()
-                    .fill(connectionStatusColor)
+                    .fill(ble.isConnected ? Color.green : Color.red)
                     .frame(width: 12, height: 12)
                 
-                Text(connectionStatusText)
+                Text(ble.isConnected ? "Connected" : "Disconnected")
                     .font(.headline)
-                    .foregroundColor(connectionStatusColor)
+                    .foregroundColor(ble.isConnected ? .primary : .secondary)
+                
+                Spacer()
+                
+                if isViewerMode {
+                    Text("Viewer Mode")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundColor(.orange)
+                        .cornerRadius(4)
+                }
             }
             
             if ble.isConnected {
-                Text("Device: \(ble.deviceName)")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else if isViewerMode {
-                Text("Device connectivity disabled in Viewer Mode")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            } else {
-                Text(ble.isScanning ? "Scanning for devices..." : "Not connected")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Connection buttons (DISABLED in Viewer Mode)
-            if !isViewerMode {
-                if ble.isConnected {
-                    Button(action: { ble.disconnect() }) {
-                        Text("Disconnect")
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Device")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(ble.deviceName)
                             .font(.subheadline)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.orange)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
+                            .fontWeight(.medium)
                     }
-                } else {
-                    Button(action: { ble.toggleScanning() }) {
-                        Text(ble.isScanning ? "Stop Scanning" : "Start Scanning")
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Last Update")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(ble.lastUpdate, style: .relative)
                             .font(.subheadline)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
+                            .fontWeight(.medium)
                     }
                 }
-            } else {
-                // Disabled button in Viewer Mode
-                Button(action: {}) {
+            } else if !isViewerMode {
+                Button(action: { ble.toggleScanning() }) {
                     HStack {
-                        Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                        Text("Connection Unavailable")
+                        Image(systemName: ble.isScanning ? "stop.circle" : "antenna.radiowaves.left.and.right")
+                        Text(ble.isScanning ? "Stop Scanning" : "Start Scanning")
                     }
                     .font(.subheadline)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(Color.gray.opacity(0.3))
-                    .foregroundColor(.secondary)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
                     .cornerRadius(8)
                 }
-                .disabled(true)
             }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
     }
-    
-    private var connectionStatusColor: Color {
-        if isViewerMode {
-            return .gray
-        }
-        return ble.isConnected ? .green : .red
-    }
-    
-    private var connectionStatusText: String {
-        if isViewerMode {
-            return "Viewer Mode"
-        }
-        return ble.isConnected ? "Connected" : "Disconnected"
-    }
 }
 
-struct MetricCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    var isDisabled: Bool = false
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title)
-                .foregroundColor(isDisabled ? .secondary : color)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(isDisabled ? .secondary : .primary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-        .opacity(isDisabled ? 0.5 : 1.0)
-    }
-}
-
-struct SignalIndicator: View {
-    let label: String
-    let value: UInt32
-    let color: Color
-    var isDisabled: Bool = false
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Circle()
-                .fill(isDisabled ? Color.gray : color)
-                .frame(width: 12, height: 12)
-            
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            
-            Text("\(value)")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .monospaced()
-                .foregroundColor(isDisabled ? .secondary : .primary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-struct ActivityGauge: View {
-    let activityLevel: Double
-    var isDisabled: Bool = false
-    
+// MARK: - Viewer Mode Empty State
+struct ViewerModeEmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
-            Text("Activity Level")
+            Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                .font(.system(size: 50))
+                .foregroundColor(.gray)
+            Text("Connect Device to View Real-time Data")
                 .font(.headline)
-                .foregroundColor(isDisabled ? .secondary : .primary)
+                .foregroundColor(.secondary)
+            Text("Viewer Mode does not support device connection")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(40)
+    }
+}
+
+// MARK: - Metric Graph Card
+struct MetricGraphCard<Content: View>: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let isConnected: Bool
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
-            ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 20)
-                    .frame(width: 150, height: 150)
-                
-                Circle()
-                    .trim(from: 0, to: min(activityLevel / 100.0, 1.0))
-                    .stroke(
-                        LinearGradient(
-                            colors: isDisabled ? [.gray, .gray] : [.green, .yellow, .orange, .red],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 20, lineCap: .round)
-                    )
-                    .frame(width: 150, height: 150)
-                    .rotationEffect(.degrees(-90))
-                
-                Text(String(format: "%.0f%%", activityLevel))
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(isDisabled ? .secondary : .primary)
+            if isConnected {
+                content
+                    .frame(height: 150)
+            } else {
+                VStack {
+                    Text("No Data")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
             }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
-        .opacity(isDisabled ? 0.5 : 1.0)
+    }
+}
+
+// MARK: - Battery Graph View
+struct BatteryGraphView: View {
+    @ObservedObject var ble: OralableBLE
+    
+    private var recentData: [SensorData] {
+        Array(ble.historicalData.suffix(50))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Voltage: \(ble.sensorData.batteryVoltage) mV")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Spacer()
+                Text("\(ble.sensorData.batteryLevel)%")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+            }
+            
+            if #available(iOS 16.0, *) {
+                Chart(recentData.indices, id: \.self) { index in
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Voltage", Int(recentData[index].batteryVoltage))
+                    )
+                    .foregroundStyle(.green)
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartYScale(domain: 3000...4200)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartXAxis(.hidden)
+            } else {
+                Text("Real-time graph (iOS 16+ required)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - PPG Graph View
+struct PPGGraphView: View {
+    @ObservedObject var ble: OralableBLE
+    
+    private var recentData: [SensorData] {
+        Array(ble.historicalData.suffix(50))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                    Text("IR: \(ble.sensorData.ppg.ir)")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.pink)
+                        .frame(width: 8, height: 8)
+                    Text("Red: \(ble.sensorData.ppg.red)")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                    Text("Green: \(ble.sensorData.ppg.green)")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                Spacer()
+            }
+            
+            if #available(iOS 16.0, *) {
+                Chart(recentData.indices, id: \.self) { index in
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("IR", Int(recentData[index].ppg.ir))
+                    )
+                    .foregroundStyle(.red)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Red", Int(recentData[index].ppg.red))
+                    )
+                    .foregroundStyle(.pink)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Green", Int(recentData[index].ppg.green))
+                    )
+                    .foregroundStyle(.green)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartXAxis(.hidden)
+            } else {
+                Text("Real-time graph (iOS 16+ required)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Temperature Graph View
+struct TemperatureGraphView: View {
+    @ObservedObject var ble: OralableBLE
+    
+    private var recentData: [SensorData] {
+        Array(ble.historicalData.suffix(50))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(String(format: "%.1f°C", ble.sensorData.temperature))
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.orange)
+                Spacer()
+            }
+            
+            if #available(iOS 16.0, *) {
+                Chart(recentData.indices, id: \.self) { index in
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Temperature", recentData[index].temperature)
+                    )
+                    .foregroundStyle(.orange)
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartYScale(domain: 30...40)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartXAxis(.hidden)
+            } else {
+                Text("Real-time graph (iOS 16+ required)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Accelerometer Graph View
+struct AccelerometerGraphView: View {
+    @ObservedObject var ble: OralableBLE
+    
+    private var recentData: [SensorData] {
+        Array(ble.historicalData.suffix(50))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("X: \(ble.sensorData.accelerometer.x)")
+                        .font(.caption2)
+                    Text("Y: \(ble.sensorData.accelerometer.y)")
+                        .font(.caption2)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Z: \(ble.sensorData.accelerometer.z)")
+                        .font(.caption2)
+                    Text(String(format: "Mag: %.2f", ble.sensorData.accelerometer.magnitude))
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                Spacer()
+            }
+            
+            if #available(iOS 16.0, *) {
+                Chart(recentData.indices, id: \.self) { index in
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("X", recentData[index].accelerometer.x)
+                    )
+                    .foregroundStyle(.red)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Y", recentData[index].accelerometer.y)
+                    )
+                    .foregroundStyle(.green)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Z", recentData[index].accelerometer.z)
+                    )
+                    .foregroundStyle(.blue)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    
+                    LineMark(
+                        x: .value("Sample", index),
+                        y: .value("Magnitude", recentData[index].accelerometer.magnitude)
+                    )
+                    .foregroundStyle(.purple)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartXAxis(.hidden)
+            } else {
+                Text("Real-time graph (iOS 16+ required)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Metric Type Enum
+enum MetricType: String, Identifiable {
+    case battery
+    case ppg
+    case temperature
+    case accelerometer
+    
+    var id: String { rawValue }
+    
+    var title: String {
+        switch self {
+        case .battery: return "Battery"
+        case .ppg: return "PPG Signals"
+        case .temperature: return "Temperature"
+        case .accelerometer: return "Accelerometer"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .battery: return "battery.100"
+        case .ppg: return "waveform.path.ecg"
+        case .temperature: return "thermometer"
+        case .accelerometer: return "gyroscope"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .battery: return .green
+        case .ppg: return .red
+        case .temperature: return .orange
+        case .accelerometer: return .blue
+        }
     }
 }

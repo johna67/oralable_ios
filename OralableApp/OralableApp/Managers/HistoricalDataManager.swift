@@ -7,10 +7,9 @@ import UIKit
 class HistoricalDataManager: ObservableObject {
     
     // MARK: - Published Properties
+    @Published var hourMetrics: HistoricalMetrics?
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
-    @Published var monthMetrics: HistoricalMetrics?
-    @Published var yearMetrics: HistoricalMetrics?
     
     @Published var isUpdating = false
     @Published var lastUpdateTime: Date?
@@ -46,16 +45,14 @@ class HistoricalDataManager: ObservableObject {
         
         // Use background queue for calculations to avoid blocking UI
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let hour = ble.getHistoricalMetrics(for: .hour)
             let day = ble.getHistoricalMetrics(for: .day)
             let week = ble.getHistoricalMetrics(for: .week)
-            let month = ble.getHistoricalMetrics(for: .month)
-            let year = ble.getHistoricalMetrics(for: .year)
             
             DispatchQueue.main.async {
+                self?.hourMetrics = hour
                 self?.dayMetrics = day
                 self?.weekMetrics = week
-                self?.monthMetrics = month
-                self?.yearMetrics = year
                 self?.lastUpdateTime = Date()
                 self?.isUpdating = false
             }
@@ -75,14 +72,12 @@ class HistoricalDataManager: ObservableObject {
             
             DispatchQueue.main.async {
                 switch range {
+                case .hour:
+                    self?.hourMetrics = metrics
                 case .day:
                     self?.dayMetrics = metrics
                 case .week:
                     self?.weekMetrics = metrics
-                case .month:
-                    self?.monthMetrics = metrics
-                case .year:
-                    self?.yearMetrics = metrics
                 }
                 self?.lastUpdateTime = Date()
             }
@@ -94,10 +89,9 @@ class HistoricalDataManager: ObservableObject {
     /// - Returns: Cached metrics or nil if not available
     func getMetrics(for range: TimeRange) -> HistoricalMetrics? {
         switch range {
+        case .hour: return hourMetrics
         case .day: return dayMetrics
         case .week: return weekMetrics
-        case .month: return monthMetrics
-        case .year: return yearMetrics
         }
     }
     
@@ -110,10 +104,9 @@ class HistoricalDataManager: ObservableObject {
     
     /// Clear all cached metrics
     func clearAllMetrics() {
+        hourMetrics = nil
         dayMetrics = nil
         weekMetrics = nil
-        monthMetrics = nil
-        yearMetrics = nil
         lastUpdateTime = nil
     }
     
@@ -121,10 +114,9 @@ class HistoricalDataManager: ObservableObject {
     /// - Parameter range: The time range to clear
     func clearMetrics(for range: TimeRange) {
         switch range {
+        case .hour: hourMetrics = nil
         case .day: dayMetrics = nil
         case .week: weekMetrics = nil
-        case .month: monthMetrics = nil
-        case .year: yearMetrics = nil
         }
     }
     
@@ -183,17 +175,16 @@ extension HistoricalDataManager {
     
     /// Returns true if any metrics are available
     var hasAnyMetrics: Bool {
-        return dayMetrics != nil || weekMetrics != nil || monthMetrics != nil || yearMetrics != nil
+        return hourMetrics != nil || dayMetrics != nil || weekMetrics != nil
     }
     
     /// Returns a summary string of available metrics
     var availabilityDescription: String {
         var available: [String] = []
         
+        if hourMetrics != nil { available.append("Hour") }
         if dayMetrics != nil { available.append("Day") }
         if weekMetrics != nil { available.append("Week") }
-        if monthMetrics != nil { available.append("Month") }
-        if yearMetrics != nil { available.append("Year") }
         
         return available.isEmpty ? "No metrics available" : "Available: \(available.joined(separator: ", "))"
     }

@@ -2,6 +2,14 @@ import Foundation
 import CoreBluetooth
 import Combine
 
+// MARK: - Simple Log Level Enum
+enum LogLevel: String {
+    case info = "INFO"
+    case success = "SUCCESS"
+    case warning = "WARNING"
+    case error = "ERROR"
+}
+
 class OralableBLE: NSObject, ObservableObject {
     // MARK: - Published Properties
     @Published var isConnected = false
@@ -16,7 +24,6 @@ class OralableBLE: NSObject, ObservableObject {
     private var centralManager: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var cancellables = Set<AnyCancellable>()
-    private var logger = Logger.shared
     
     private var reconnectTimer: Timer?
     private var connectionAttempts = 0
@@ -58,10 +65,9 @@ class OralableBLE: NSObject, ObservableObject {
     }
     
     // MARK: - Logging
-    func addLog(_ message: String, level: Logger.LogLevel = .info) {
-        logger.log(message, level: level)
+    func addLog(_ message: String, level: LogLevel = .info) {
         let timestamp = Date().formatted(date: .omitted, time: .shortened)
-        let logEntry = "\(timestamp) [\(level)] \(message)"
+        let logEntry = "\(timestamp) [\(level.rawValue)] \(message)"
         
         DispatchQueue.main.async {
             self.logMessages.append(logEntry)
@@ -222,7 +228,7 @@ class OralableBLE: NSObject, ObservableObject {
             }
         }
         
-        addLog("PPG Frame \(sensorData.ppg.frameCounter): IR=\(sensorData.ppg.ir)", level: .debug)
+        addLog("PPG: IR=\(sensorData.ppg.ir), R=\(sensorData.ppg.red), G=\(sensorData.ppg.green)")
     }
     
     private func parseAccelerometerData(_ data: Data) {
@@ -248,36 +254,41 @@ class OralableBLE: NSObject, ObservableObject {
                 sensorData.accelerometer.samples.append(sample)
             }
         }
+        
+        let mag = sensorData.accelerometer.magnitude
+        addLog("Accel: X=\(sensorData.accelerometer.x), Y=\(sensorData.accelerometer.y), Z=\(sensorData.accelerometer.z), Mag=\(String(format: "%.2f", mag))")
     }
     
     private func parseTemperatureData(_ data: Data) {
-        guard data.count >= 6 else { return }
+        guard data.count >= 4 else { return }
         
-        let centiTemp = data.withUnsafeBytes { $0.load(fromByteOffset: 4, as: Int16.self) }
-        sensorData.temperature = Double(centiTemp) / 100.0
+        let tempRaw = data.withUnsafeBytes { $0.load(as: Float.self) }
+        sensorData.temperature = Double(tempRaw)
         
-        addLog("Temperature: \(String(format: "%.2f", sensorData.temperature))°C", level: .debug)
+        addLog("Temperature: \(String(format: "%.2f", sensorData.temperature))°C")
     }
     
     private func parseBatteryData(_ data: Data) {
         guard data.count >= 4 else { return }
         
-        sensorData.batteryVoltage = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: Int32.self) }
+        sensorData.batteryVoltage = data.withUnsafeBytes { $0.load(as: Int32.self) }
         
-        addLog("Battery: \(sensorData.batteryVoltage)mV (\(sensorData.batteryLevel)%)", level: .debug)
+        addLog("Battery: \(sensorData.batteryVoltage) mV (\(sensorData.batteryLevel)%)")
     }
     
     private func parseUUIDData(_ data: Data) {
         guard data.count >= 8 else { return }
         
-        sensorData.deviceUUID = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt64.self) }
+        sensorData.deviceUUID = data.withUnsafeBytes { $0.load(as: UInt64.self) }
         
-        addLog("Device UUID: \(String(format: "%016llX", sensorData.deviceUUID))", level: .info)
+        addLog("Device UUID: \(String(format: "%016llX", sensorData.deviceUUID))")
     }
     
     private func parseFirmwareVersion(_ data: Data) {
-        sensorData.firmwareVersion = String(data: data, encoding: .utf8) ?? "Unknown"
-        addLog("Firmware Version: \(sensorData.firmwareVersion)", level: .info)
+        if let version = String(data: data, encoding: .utf8) {
+            sensorData.firmwareVersion = version
+            addLog("Firmware: \(version)")
+        }
     }
 }
 
@@ -286,65 +297,49 @@ extension OralableBLE: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .poweredOn:
-            addLog("Bluetooth powered ON ✅", level: .success)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                if !(self?.isConnected ?? false) {
-                    self?.startScanning()
-                }
-            }
+            addLog("Bluetooth powered on", level: .success)
         case .poweredOff:
-            addLog("Bluetooth powered OFF ❌", level: .error)
-            handleDisconnection()
-        case .resetting:
-            addLog("Bluetooth resetting ⚠️", level: .warning)
+            addLog("Bluetooth powered off", level: .error)
         case .unauthorized:
-            addLog("Bluetooth unauthorized ⛔️", level: .error)
+            addLog("Bluetooth unauthorized", level: .error)
         case .unsupported:
-            addLog("Bluetooth unsupported ❌", level: .error)
-        case .unknown:
-            addLog("Bluetooth state unknown ❓", level: .warning)
-        @unknown default:
+            addLog("Bluetooth not supported", level: .error)
+        default:
             addLog("Bluetooth state: \(central.state.rawValue)", level: .warning)
         }
     }
     
     func centralManager(_ central: CBCentralManager,
                        didDiscover peripheral: CBPeripheral,
-                       advertisementData: [String : Any],
+                       advertisementData: [String: Any],
                        rssi RSSI: NSNumber) {
+        let name = peripheral.name ?? "Unknown"
         
-        if let name = peripheral.name, !name.isEmpty {
-            addLog("📱 Found: \(name) RSSI: \(RSSI)dB", level: .debug)
-            
-            if name == "Oralable" {
-                addLog("🎯 FOUND TGM DEVICE!", level: .success)
-                self.peripheral = peripheral
-                self.peripheral?.delegate = self
-                stopScanning()
-                connectToPeripheral(peripheral)
-            }
+        if name.contains(BLEConstants.DEVICE_NAME) {
+            addLog("Found \(name) (RSSI: \(RSSI))", level: .info)
+            stopScanning()
+            connectToPeripheral(peripheral)
         }
     }
     
-    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+    func centralManager(_ central: CBCentralManager,
+                       didConnect peripheral: CBPeripheral) {
         isConnected = true
         deviceName = peripheral.name ?? "Oralable"
         connectionAttempts = 0
-        addLog("✅ CONNECTED to \(deviceName)", level: .success)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            peripheral.discoverServices([CBUUID(string: BLEConstants.TGM_SERVICE)])
-            self.addLog("Discovering services...", level: .info)
-        }
+        addLog("Connected to \(deviceName) ✅", level: .success)
+        
+        peripheral.discoverServices([CBUUID(string: BLEConstants.TGM_SERVICE)])
     }
     
     func centralManager(_ central: CBCentralManager,
                        didDisconnectPeripheral peripheral: CBPeripheral,
                        error: Error?) {
         if let error = error {
-            addLog("❌ DISCONNECTED: \(error.localizedDescription)", level: .error)
+            addLog("Disconnected: \(error.localizedDescription)", level: .error)
         } else {
-            addLog("Disconnected from device", level: .warning)
+            addLog("Disconnected", level: .warning)
         }
         
         handleDisconnection()
@@ -443,6 +438,7 @@ extension OralableBLE: CBPeripheralDelegate {
         }
     }
 }
+
 // MARK: - Historical Data Extension
 extension OralableBLE {
     

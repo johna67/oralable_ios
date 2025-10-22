@@ -40,7 +40,7 @@ struct OralableApp: App {
     }
 }
 
-// Subscription Mode Content View (wraps the original ContentView)
+// MARK: - Subscription Mode Content View
 struct SubscriptionContentView: View {
     @StateObject private var ble = OralableBLE()
     @StateObject private var authManager = AuthenticationManager.shared
@@ -57,30 +57,17 @@ struct SubscriptionContentView: View {
                 }
                 .tag(0)
             
-            DataView(ble: ble)
+            ShareView(ble: ble)
                 .tabItem {
-                    Label("Data", systemImage: "waveform.path.ecg")
+                    Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .tag(1)
-            
-            // NEW: History Tab
-            HistoricalDataView(ble: ble)
-                .tabItem {
-                    Label("History", systemImage: "chart.line.uptrend.xyaxis")
-                }
-                .tag(2)
-            
-            LogExportView(ble: ble)
-                .tabItem {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                .tag(3)
             
             SubscriptionSettingsView(ble: ble, selectedMode: $selectedMode)
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(4)
+                .tag(2)
         }
         .overlay(
             // Subscription tier badge
@@ -111,6 +98,139 @@ struct SubscriptionContentView: View {
         )
         .sheet(isPresented: $showSubscriptionInfo) {
             SubscriptionTierSelectionView()
+        }
+    }
+}
+
+// MARK: - Viewer Mode View
+struct ViewerModeView: View {
+    @Binding var selectedMode: AppMode?
+    @StateObject private var ble = OralableBLE()
+    @State private var selectedTab = 0
+    
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            DashboardView(ble: ble, isViewerMode: true)
+                .tabItem {
+                    Label("Dashboard", systemImage: "gauge")
+                }
+                .tag(0)
+            
+            ShareView(ble: ble, isViewerMode: true)
+                .tabItem {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .tag(1)
+            
+            ViewerSettingsView(ble: ble, selectedMode: $selectedMode)
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
+                .tag(2)
+        }
+        .onAppear {
+            // Ensure BLE doesn't try to connect in viewer mode
+            ble.disconnect()
+        }
+    }
+}
+
+// MARK: - Viewer Settings View
+struct ViewerSettingsView: View {
+    @ObservedObject var ble: OralableBLE
+    @Binding var selectedMode: AppMode?
+    @State private var showModeChangeAlert = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Current Mode Info
+                Section("Current Mode") {
+                    HStack {
+                        Image(systemName: "doc.text.viewfinder")
+                            .foregroundColor(.green)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Viewer Mode")
+                                .font(.headline)
+                            Text("View data files without authentication")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                // Features Available in Viewer Mode
+                Section("Available Features") {
+                    FeatureRow(icon: "gauge", text: "Dashboard View", isEnabled: true)
+                    FeatureRow(icon: "square.and.arrow.up", text: "Export Data", isEnabled: true)
+                }
+                
+                Section("Unavailable in Viewer Mode") {
+                    FeatureRow(icon: "antenna.radiowaves.left.and.right", text: "Device Connection", isEnabled: false)
+                    FeatureRow(icon: "waveform.path.ecg", text: "Real-time Monitoring", isEnabled: false)
+                }
+                
+                // Switch Mode
+                Section {
+                    Button(action: {
+                        showModeChangeAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("Switch to Subscription Mode")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                // About
+                Section("About") {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Link(destination: URL(string: "https://github.com/johna67/tgm_firmware")!) {
+                        HStack {
+                            Text("GitHub Repository")
+                            Spacer()
+                            Image(systemName: "arrow.up.forward.square")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .alert("Switch Mode", isPresented: $showModeChangeAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Switch") {
+                    selectedMode = nil
+                }
+            } message: {
+                Text("Switch to Subscription Mode for device connectivity and real-time monitoring. You'll need to sign in with your Apple ID.")
+            }
+        }
+    }
+}
+
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    let isEnabled: Bool
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(isEnabled ? .green : .gray)
+                .frame(width: 30)
+            Text(text)
+                .foregroundColor(isEnabled ? .primary : .secondary)
         }
     }
 }

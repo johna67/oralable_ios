@@ -1,165 +1,42 @@
 import SwiftUI
 
-// MARK: - Viewer Mode View (Using Shared Views)
-struct ViewerModeView: View {
-    @Binding var selectedMode: AppMode?
-    @StateObject private var ble = OralableBLE() // BLE manager, but won't connect in viewer mode
-    @State private var selectedTab = 0
+// MARK: - THIS FILE IS NOW A STUB
+// ViewerModeView functionality is now in OralableApp.swift
+// This file just defines LogsView for backward compatibility
+
+// MARK: - Logs View Helper
+struct LogsView: View {
+    let logs: [String]
+    @State private var searchText = ""
+    @Environment(\.dismiss) var dismiss
     
-    var body: some View {
-        TabView(selection: $selectedTab) {
-            // Use the SAME DashboardView as Subscription Mode
-            DashboardView(ble: ble, isViewerMode: true)
-                .tabItem {
-                    Label("Dashboard", systemImage: "gauge")
-                }
-                .tag(0)
-            
-            // Use the SAME DataView as Subscription Mode
-            DataView(ble: ble, isViewerMode: true)
-                .tabItem {
-                    Label("Data", systemImage: "waveform.path.ecg")
-                }
-                .tag(1)
-            
-            // NEW: History Tab (with isViewerMode flag)
-            HistoricalDataView(ble: ble, isViewerMode: true)
-                .tabItem {
-                    Label("History", systemImage: "chart.line.uptrend.xyaxis")
-                }
-                .tag(2)
-            
-            // Use the SAME LogExportView as Subscription Mode
-            LogExportView(ble: ble, isViewerMode: true)
-                .tabItem {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                .tag(3)
-            
-            // Settings view adapted for Viewer Mode
-            ViewerSettingsView(ble: ble, selectedMode: $selectedMode)
-                .tabItem {
-                    Label("Settings", systemImage: "gear")
-                }
-                .tag(4)
-        }
-        .onAppear {
-            // Ensure BLE doesn't try to connect in viewer mode
-            ble.disconnect()
+    var filteredLogs: [String] {
+        if searchText.isEmpty {
+            return logs
+        } else {
+            return logs.filter { $0.localizedCaseInsensitiveContains(searchText) }
         }
     }
-}
-
-// MARK: - Viewer Settings View (Adapted from SubscriptionSettingsView)
-struct ViewerSettingsView: View {
-    @ObservedObject var ble: OralableBLE
-    @Binding var selectedMode: AppMode?
-    @State private var showLogs = false
-    @State private var showModeChangeAlert = false
     
     var body: some View {
         NavigationView {
             List {
-                // Current Mode Info
-                Section("Current Mode") {
-                    HStack {
-                        Image(systemName: "doc.text.viewfinder")
-                            .foregroundColor(.green)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Viewer Mode")
-                                .font(.headline)
-                            Text("View data files without authentication")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 8)
+                ForEach(filteredLogs.reversed(), id: \.self) { log in
+                    Text(log)
+                        .font(.caption)
+                        .lineLimit(nil)
                 }
-                
-                // Features Available in Viewer Mode
-                Section("Available Features") {
-                    FeatureRow(icon: "doc.text.viewfinder", text: "View Imported Files", isEnabled: true)
-                    FeatureRow(icon: "chart.xyaxis.line", text: "Data Visualization", isEnabled: true)
-                    FeatureRow(icon: "chart.line.uptrend.xyaxis", text: "Historical Data", isEnabled: true)
-                    FeatureRow(icon: "square.and.arrow.up", text: "Export Data", isEnabled: true)
-                }
-                
-                Section("Unavailable in Viewer Mode") {
-                    FeatureRow(icon: "antenna.radiowaves.left.and.right", text: "Device Connection", isEnabled: false)
-                    FeatureRow(icon: "waveform.path.ecg", text: "Real-time Monitoring", isEnabled: false)
-                    FeatureRow(icon: "person.circle", text: "Account Features", isEnabled: false)
-                }
-                
-                // Switch Mode
-                Section {
-                    Button(action: {
-                        showModeChangeAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                            Text("Switch to Subscription Mode")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                
-                // About
-                Section("About") {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Text("Mode")
-                        Spacer()
-                        Text("Viewer")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Link(destination: URL(string: "https://github.com/johna67/tgm_firmware")!) {
-                        HStack {
-                            Text("GitHub Repository")
-                            Spacer()
-                            Image(systemName: "arrow.up.forward.square")
-                                .foregroundColor(.secondary)
-                        }
+            }
+            .searchable(text: $searchText)
+            .navigationTitle("Logs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
                     }
                 }
             }
-            .navigationTitle("Settings")
-            .alert("Switch Mode", isPresented: $showModeChangeAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Switch") {
-                    selectedMode = nil
-                }
-            } message: {
-                Text("Switch to Subscription Mode for device connectivity and real-time monitoring. You'll need to sign in with your Apple ID.")
-            }
-        }
-        .sheet(isPresented: $showLogs) {
-            LogsView(logs: ble.logMessages)
-        }
-    }
-}
-
-struct FeatureRow: View {
-    let icon: String
-    let text: String
-    let isEnabled: Bool
-    
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(isEnabled ? .green : .gray)
-                .frame(width: 30)
-            Text(text)
-                .foregroundColor(isEnabled ? .primary : .secondary)
         }
     }
 }

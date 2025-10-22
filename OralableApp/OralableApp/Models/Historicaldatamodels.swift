@@ -3,28 +3,25 @@ import Foundation
 // MARK: - Time Range Selection
 /// Represents the time period for viewing historical data
 enum TimeRange: String, CaseIterable {
+    case hour = "Hour"
     case day = "Day"
     case week = "Week"
-    case month = "Month"
-    case year = "Year"
     
     /// Returns the number of seconds for this time range
     var seconds: TimeInterval {
         switch self {
+        case .hour: return 3600 // 1 hour
         case .day: return 86400 // 24 hours
         case .week: return 604800 // 7 days
-        case .month: return 2592000 // 30 days (approximation)
-        case .year: return 31536000 // 365 days
         }
     }
     
     /// Returns the ideal number of data points to display for this range
     var idealDataPoints: Int {
         switch self {
+        case .hour: return 60 // per minute
         case .day: return 24 // hourly
         case .week: return 7 // daily
-        case .month: return 30 // daily
-        case .year: return 12 // monthly
         }
     }
 }
@@ -99,8 +96,8 @@ class HistoricalDataAggregator {
     ///   - range: The time range to aggregate over
     ///   - endDate: The end date for the range (defaults to now)
     /// - Returns: HistoricalMetrics containing aggregated data
-    static func aggregate(data: [SensorData], 
-                         for range: TimeRange, 
+    static func aggregate(data: [SensorData],
+                         for range: TimeRange,
                          endDate: Date = Date()) -> HistoricalMetrics {
         
         let startDate = endDate.addingTimeInterval(-range.seconds)
