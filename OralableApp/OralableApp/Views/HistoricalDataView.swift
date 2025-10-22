@@ -2,7 +2,7 @@
 //  HistoricalDataView.swift
 //  OralableApp
 //
-//  Created to display historical data metrics with time period selector
+//  Updated to support both Viewer and Subscription modes
 //
 
 import SwiftUI
@@ -10,12 +10,14 @@ import Charts
 
 struct HistoricalDataView: View {
     @ObservedObject var ble: OralableBLE
+    var isViewerMode: Bool = false  // NEW: Flag to indicate Viewer Mode
     @StateObject private var historyManager: HistoricalDataManager
     @State private var selectedRange: TimeRange = .day
     @State private var showExportSheet = false
     
-    init(ble: OralableBLE) {
+    init(ble: OralableBLE, isViewerMode: Bool = false) {
         self.ble = ble
+        self.isViewerMode = isViewerMode
         _historyManager = StateObject(wrappedValue: HistoricalDataManager(bleManager: ble))
     }
     
@@ -23,6 +25,11 @@ struct HistoricalDataView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Viewer Mode Notice (if applicable and no data)
+                    if isViewerMode && (historyManager.getMetrics(for: selectedRange)?.totalSamples ?? 0) == 0 {
+                        viewerModeNotice
+                    }
+                    
                     // Time Range Picker
                     timeRangePicker
                     
@@ -78,6 +85,29 @@ struct HistoricalDataView: View {
         .onDisappear {
             historyManager.stopAutoUpdate()
         }
+    }
+    
+    // MARK: - Viewer Mode Notice
+    
+    private var viewerModeNotice: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 40))
+                .foregroundColor(.blue)
+            
+            Text("Historical Data in Viewer Mode")
+                .font(.headline)
+            
+            Text("Import data files to view historical trends and statistics. Connect device in Subscription Mode for live data collection.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .padding(.horizontal)
     }
     
     // MARK: - Time Range Picker
@@ -210,21 +240,27 @@ struct HistoricalDataView: View {
             
             VStack(spacing: 8) {
                 HistoryActivityRow(
-                    label: "Recording Time",
-                    value: formatDuration(metrics.totalGrindingDuration),
-                    icon: "clock.fill"
-                )
-                
-                HistoryActivityRow(
                     label: "Grinding Events",
                     value: "\(metrics.totalGrindingEvents)",
                     icon: "exclamationmark.triangle.fill"
                 )
                 
                 HistoryActivityRow(
-                    label: "Peak Activity",
-                    value: String(format: "%.1f", metrics.dataPoints.map { $0.avgActivityLevel }.max() ?? 0.0),
-                    icon: "chart.line.uptrend.xyaxis"
+                    label: "Total Duration",
+                    value: formatDuration(metrics.totalGrindingDuration),
+                    icon: "clock.fill"
+                )
+                
+                HistoryActivityRow(
+                    label: "Data Points",
+                    value: "\(metrics.dataPoints.count)",
+                    icon: "point.3.connected.trianglepath.dotted"
+                )
+                
+                HistoryActivityRow(
+                    label: "Time Range",
+                    value: "\(selectedRange.rawValue)",
+                    icon: "calendar"
                 )
             }
             .padding()
@@ -278,7 +314,9 @@ struct HistoricalDataView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Start recording data to see historical trends and statistics.")
+            Text(isViewerMode ?
+                "Import data files to view historical trends." :
+                "Start recording data to see historical trends and statistics.")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 40)

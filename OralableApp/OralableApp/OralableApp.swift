@@ -63,17 +63,24 @@ struct SubscriptionContentView: View {
                 }
                 .tag(1)
             
+            // NEW: History Tab
+            HistoricalDataView(ble: ble)
+                .tabItem {
+                    Label("History", systemImage: "chart.line.uptrend.xyaxis")
+                }
+                .tag(2)
+            
             LogExportView(ble: ble)
                 .tabItem {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
-                .tag(2)
+                .tag(3)
             
             SubscriptionSettingsView(ble: ble, selectedMode: $selectedMode)
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(3)
+                .tag(4)
         }
         .overlay(
             // Subscription tier badge

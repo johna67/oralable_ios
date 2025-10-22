@@ -22,19 +22,26 @@ struct ViewerModeView: View {
                 }
                 .tag(1)
             
+            // NEW: History Tab (with isViewerMode flag)
+            HistoricalDataView(ble: ble, isViewerMode: true)
+                .tabItem {
+                    Label("History", systemImage: "chart.line.uptrend.xyaxis")
+                }
+                .tag(2)
+            
             // Use the SAME LogExportView as Subscription Mode
             LogExportView(ble: ble, isViewerMode: true)
                 .tabItem {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
-                .tag(2)
+                .tag(3)
             
             // Settings view adapted for Viewer Mode
             ViewerSettingsView(ble: ble, selectedMode: $selectedMode)
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(3)
+                .tag(4)
         }
         .onAppear {
             // Ensure BLE doesn't try to connect in viewer mode
@@ -47,23 +54,21 @@ struct ViewerModeView: View {
 struct ViewerSettingsView: View {
     @ObservedObject var ble: OralableBLE
     @Binding var selectedMode: AppMode?
-    @State private var showModeChangeAlert = false
     @State private var showLogs = false
+    @State private var showModeChangeAlert = false
     
     var body: some View {
         NavigationView {
             List {
-                // Mode Status Section (No Account in Viewer Mode)
-                Section("Mode") {
+                // Current Mode Info
+                Section("Current Mode") {
                     HStack {
                         Image(systemName: "doc.text.viewfinder")
-                            .font(.title)
                             .foregroundColor(.green)
-                        
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Viewer Mode")
                                 .font(.headline)
-                            Text("No account required")
+                            Text("View data files without authentication")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -71,60 +76,11 @@ struct ViewerSettingsView: View {
                     .padding(.vertical, 8)
                 }
                 
-                // Connection Section (DISABLED)
-                Section("Device Connection") {
-                    HStack {
-                        Text("Status")
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(Color.gray)
-                                .frame(width: 8, height: 8)
-                            Text("Disabled in Viewer Mode")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    // Device connection buttons DISABLED
-                    Button(action: {}) {
-                        HStack {
-                            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                            Text("Device Connection Unavailable")
-                        }
-                        .foregroundColor(.secondary)
-                    }
-                    .disabled(true)
-                }
-                
-                // Logs Section (Still works in Viewer Mode)
-                Section("Diagnostics") {
-                    Button(action: { showLogs = true }) {
-                        HStack {
-                            Image(systemName: "doc.text.magnifyingglass")
-                            Text("View Logs")
-                            Spacer()
-                            Text("\(ble.logMessages.count)")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    Button(action: { ble.logMessages.removeAll() }) {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("Clear Logs")
-                        }
-                        .foregroundColor(.red)
-                    }
-                }
-                
-                // Features Section (Show what's available)
+                // Features Available in Viewer Mode
                 Section("Available Features") {
                     FeatureRow(icon: "doc.text.viewfinder", text: "View Imported Files", isEnabled: true)
                     FeatureRow(icon: "chart.xyaxis.line", text: "Data Visualization", isEnabled: true)
+                    FeatureRow(icon: "chart.line.uptrend.xyaxis", text: "Historical Data", isEnabled: true)
                     FeatureRow(icon: "square.and.arrow.up", text: "Export Data", isEnabled: true)
                 }
                 
