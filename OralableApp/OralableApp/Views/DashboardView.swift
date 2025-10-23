@@ -7,6 +7,17 @@ struct DashboardView: View {
     
     @State private var selectedMetric: MetricType?
     
+    // Determine if we should show graphs
+    private var shouldShowGraphs: Bool {
+        if isViewerMode {
+            // Viewer Mode: Show graphs if we have imported data
+            return !ble.historicalData.isEmpty
+        } else {
+            // Subscription Mode: Show graphs if connected OR if we have historical data
+            return ble.isConnected || !ble.historicalData.isEmpty
+        }
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -14,8 +25,8 @@ struct DashboardView: View {
                     // Connection Status Card
                     ConnectionStatusCard(ble: ble, isViewerMode: isViewerMode)
                     
-                    // Real-time Graphs Section
-                    if ble.isConnected || !isViewerMode {
+                    // Show graphs or empty state
+                    if shouldShowGraphs {
                         // Battery Graph
                         MetricGraphCard(
                             title: "Battery",
@@ -68,8 +79,8 @@ struct DashboardView: View {
                             selectedMetric = .accelerometer
                         }
                     } else {
-                        // Viewer Mode - Not Connected
-                        ViewerModeEmptyState()
+                        // Empty state - no data available
+                        ViewerModeEmptyState(isViewerMode: isViewerMode)
                     }
                 }
                 .padding()
@@ -146,6 +157,20 @@ struct ConnectionStatusCard: View {
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
+            } else if !ble.historicalData.isEmpty {
+                // Viewer Mode with imported data
+                HStack {
+                    Image(systemName: "doc.text.fill")
+                        .foregroundColor(.green)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Imported Data")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(ble.historicalData.count) data points")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                }
             }
         }
         .padding()
@@ -156,17 +181,62 @@ struct ConnectionStatusCard: View {
 
 // MARK: - Viewer Mode Empty State
 struct ViewerModeEmptyState: View {
+    var isViewerMode: Bool
+    
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                .font(.system(size: 50))
+        VStack(spacing: 20) {
+            Image(systemName: isViewerMode ? "doc.badge.plus" : "antenna.radiowaves.left.and.right.slash")
+                .font(.system(size: 60))
                 .foregroundColor(.gray)
-            Text("Connect Device to View Real-time Data")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            Text("Viewer Mode does not support device connection")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            
+            if isViewerMode {
+                Text("No Data Imported")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text("Import a CSV file to view historical data")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "1.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("Go to the Share tab")
+                            .font(.subheadline)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "2.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("Tap \"Choose CSV File\"")
+                            .font(.subheadline)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "3.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("Select your exported data file")
+                            .font(.subheadline)
+                    }
+                }
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(12)
+                
+            } else {
+                Text("No Device Connected")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text("Connect your device to view real-time data")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(40)
@@ -179,7 +249,21 @@ struct MetricGraphCard<Content: View>: View {
     let icon: String
     let color: Color
     let isConnected: Bool
-    @ViewBuilder let content: Content
+    let content: Content
+    
+    init(
+        title: String,
+        icon: String,
+        color: Color,
+        isConnected: Bool,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.isConnected = isConnected
+        self.content = content()
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -189,23 +273,18 @@ struct MetricGraphCard<Content: View>: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if !isConnected {
+                    Text("Historical")
+                        .font(.caption2)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundColor(.orange)
+                        .cornerRadius(4)
+                }
             }
             
-            if isConnected {
-                content
-                    .frame(height: 150)
-            } else {
-                VStack {
-                    Text("No Data")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(height: 150)
-                .frame(maxWidth: .infinity)
-            }
+            content
         }
         .padding()
         .background(Color(.systemGray6))
@@ -224,34 +303,54 @@ struct BatteryGraphView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Voltage: \(ble.sensorData.batteryVoltage) mV")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Spacer()
-                Text("\(ble.sensorData.batteryLevel)%")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.green)
+                if !recentData.isEmpty {
+                    let latestVoltage = recentData.last?.batteryVoltage ?? 0
+                    let latestLevel = recentData.last?.batteryLevel ?? 0
+                    Text("Voltage: \(latestVoltage) mV")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text("\(latestLevel)%")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                } else {
+                    Text("No Data")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
-            if #available(iOS 16.0, *) {
-                Chart(recentData.indices, id: \.self) { index in
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Voltage", Int(recentData[index].batteryVoltage))
-                    )
-                    .foregroundStyle(.green)
-                    .interpolationMethod(.catmullRom)
+            if !recentData.isEmpty {
+                if #available(iOS 16.0, *) {
+                    Chart(recentData.indices, id: \.self) { index in
+                        LineMark(
+                            x: .value("Sample", index),
+                            y: .value("Voltage", Int(recentData[index].batteryVoltage))
+                        )
+                        .foregroundStyle(.green)
+                        .interpolationMethod(.catmullRom)
+                    }
+                    .chartYScale(domain: 3000...4200)
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: 150)
+                } else {
+                    Text("Charts require iOS 16+")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(height: 150)
                 }
-                .chartYScale(domain: 3000...4200)
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-                .chartXAxis(.hidden)
             } else {
-                Text("Real-time graph (iOS 16+ required)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                VStack {
+                    Text("No Data")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
             }
         }
     }
@@ -267,67 +366,89 @@ struct PPGGraphView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 8, height: 8)
-                    Text("IR: \(ble.sensorData.ppg.ir)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                }
-                
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.pink)
-                        .frame(width: 8, height: 8)
-                    Text("Red: \(ble.sensorData.ppg.red)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                }
-                
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("Green: \(ble.sensorData.ppg.green)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                }
-                Spacer()
-            }
-            
-            if #available(iOS 16.0, *) {
-                Chart(recentData.indices, id: \.self) { index in
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("IR", Int(recentData[index].ppg.ir))
-                    )
-                    .foregroundStyle(.red)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+            if !recentData.isEmpty {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading) {
+                        Text("IR")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(recentData.last?.ppg.ir ?? 0)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.red)
+                    }
                     
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Red", Int(recentData[index].ppg.red))
-                    )
-                    .foregroundStyle(.pink)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    VStack(alignment: .leading) {
+                        Text("Red")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(recentData.last?.ppg.red ?? 0)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.pink)
+                    }
                     
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Green", Int(recentData[index].ppg.green))
-                    )
-                    .foregroundStyle(.green)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    VStack(alignment: .leading) {
+                        Text("Green")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(recentData.last?.ppg.green ?? 0)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.green)
+                    }
                 }
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-                .chartXAxis(.hidden)
             } else {
-                Text("Real-time graph (iOS 16+ required)")
+                Text("No Data")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+            
+            if !recentData.isEmpty {
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        ForEach(recentData.indices, id: \.self) { index in
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("IR", Int(recentData[index].ppg.ir))
+                            )
+                            .foregroundStyle(.red)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                            
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("Red", Int(recentData[index].ppg.red))
+                            )
+                            .foregroundStyle(.pink)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                            
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("Green", Int(recentData[index].ppg.green))
+                            )
+                            .foregroundStyle(.green)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: 150)
+                } else {
+                    Text("Charts require iOS 16+")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(height: 150)
+                }
+            } else {
+                VStack {
+                    Text("No Data")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
             }
         }
     }
@@ -344,31 +465,64 @@ struct TemperatureGraphView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(String(format: "%.1f°C", ble.sensorData.temperature))
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.orange)
-                Spacer()
+                if !recentData.isEmpty {
+                    Text("Temperature")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text(String(format: "%.1f°C", recentData.last?.temperature ?? 0))
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                } else {
+                    Text("No Data")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
-            if #available(iOS 16.0, *) {
-                Chart(recentData.indices, id: \.self) { index in
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Temperature", recentData[index].temperature)
-                    )
-                    .foregroundStyle(.orange)
-                    .interpolationMethod(.catmullRom)
+            if !recentData.isEmpty {
+                if #available(iOS 16.0, *) {
+                    Chart(recentData.indices, id: \.self) { index in
+                        LineMark(
+                            x: .value("Sample", index),
+                            y: .value("Temp", recentData[index].temperature)
+                        )
+                        .foregroundStyle(.orange)
+                        .interpolationMethod(.catmullRom)
+                        
+                        AreaMark(
+                            x: .value("Sample", index),
+                            y: .value("Temp", recentData[index].temperature)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.3), Color.orange.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: 150)
+                } else {
+                    Text("Charts require iOS 16+")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(height: 150)
                 }
-                .chartYScale(domain: 30...40)
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-                .chartXAxis(.hidden)
             } else {
-                Text("Real-time graph (iOS 16+ required)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                VStack {
+                    Text("No Data")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
             }
         }
     }
@@ -384,74 +538,126 @@ struct AccelerometerGraphView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("X: \(ble.sensorData.accelerometer.x)")
-                        .font(.caption2)
-                    Text("Y: \(ble.sensorData.accelerometer.y)")
-                        .font(.caption2)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Z: \(ble.sensorData.accelerometer.z)")
-                        .font(.caption2)
-                    Text(String(format: "Mag: %.2f", ble.sensorData.accelerometer.magnitude))
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                }
-                Spacer()
-            }
-            
-            if #available(iOS 16.0, *) {
-                Chart(recentData.indices, id: \.self) { index in
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("X", recentData[index].accelerometer.x)
-                    )
-                    .foregroundStyle(.red)
-                    .lineStyle(StrokeStyle(lineWidth: 1))
+            if !recentData.isEmpty {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading) {
+                        Text("X")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(recentData.last?.accelerometer.x ?? 0)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.red)
+                    }
                     
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Y", recentData[index].accelerometer.y)
-                    )
-                    .foregroundStyle(.green)
-                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    VStack(alignment: .leading) {
+                        Text("Y")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(recentData.last?.accelerometer.y ?? 0)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.green)
+                    }
                     
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Z", recentData[index].accelerometer.z)
-                    )
-                    .foregroundStyle(.blue)
-                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    VStack(alignment: .leading) {
+                        Text("Z")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(recentData.last?.accelerometer.z ?? 0)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
                     
-                    LineMark(
-                        x: .value("Sample", index),
-                        y: .value("Magnitude", recentData[index].accelerometer.magnitude)
-                    )
-                    .foregroundStyle(.purple)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    VStack(alignment: .leading) {
+                        Text("Mag")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%.0f", recentData.last?.accelerometer.magnitude ?? 0))
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.purple)
+                    }
                 }
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-                .chartXAxis(.hidden)
             } else {
-                Text("Real-time graph (iOS 16+ required)")
+                Text("No Data")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+            
+            if !recentData.isEmpty {
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        ForEach(recentData.indices, id: \.self) { index in
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("X", recentData[index].accelerometer.x)
+                            )
+                            .foregroundStyle(.red)
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                            
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("Y", recentData[index].accelerometer.y)
+                            )
+                            .foregroundStyle(.green)
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                            
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("Z", recentData[index].accelerometer.z)
+                            )
+                            .foregroundStyle(.blue)
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                            
+                            LineMark(
+                                x: .value("Sample", index),
+                                y: .value("Mag", recentData[index].accelerometer.magnitude)
+                            )
+                            .foregroundStyle(.purple)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: 150)
+                } else {
+                    Text("Charts require iOS 16+")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(height: 150)
+                }
+            } else {
+                VStack {
+                    Text("No Data")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
             }
         }
     }
 }
 
 // MARK: - Metric Type Enum
-enum MetricType: String, Identifiable {
+enum MetricType: Identifiable {
     case battery
     case ppg
     case temperature
     case accelerometer
     
-    var id: String { rawValue }
+    var id: String {
+        switch self {
+        case .battery: return "battery"
+        case .ppg: return "ppg"
+        case .temperature: return "temperature"
+        case .accelerometer: return "accelerometer"
+        }
+    }
     
     var title: String {
         switch self {

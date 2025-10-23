@@ -19,10 +19,11 @@ class OralableBLE: NSObject, ObservableObject {
     @Published var lastUpdate = Date()
     @Published var logMessages: [String] = []
     @Published var historicalData: [SensorData] = []
+    @Published var discoveredPeripherals: [String: CBPeripheral] = [:]
     
     // MARK: - Private Properties
     private var centralManager: CBCentralManager!
-    private var peripheral: CBPeripheral?
+    var peripheral: CBPeripheral?
     private var cancellables = Set<AnyCancellable>()
     
     private var reconnectTimer: Timer?
@@ -82,6 +83,34 @@ class OralableBLE: NSObject, ObservableObject {
         isScanning ? stopScanning() : startScanning()
     }
     
+    func startScanning() {
+        guard centralManager.state == .poweredOn else {
+            addLog("Cannot scan - Bluetooth state: \(centralManager.state.rawValue)", level: .error)
+            return
+        }
+        
+        // Clear previous discoveries
+        discoveredPeripherals.removeAll()
+        centralManager.stopScan()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.centralManager.scanForPeripherals(
+                withServices: nil,
+                options: [
+                    CBCentralManagerScanOptionAllowDuplicatesKey: false,
+                    CBCentralManagerScanOptionSolicitedServiceUUIDsKey: []
+                ]
+            )
+            self?.isScanning = true
+            self?.addLog("Started scanning for BLE devices...", level: .info)
+        }
+    }
+    
+    func connect(to peripheral: CBPeripheral) {
+        stopScanning()
+        connectToPeripheral(peripheral)
+    }
+    
     func disconnect() {
         reconnectTimer?.invalidate()
         connectionAttempts = maxConnectionAttempts
@@ -116,27 +145,6 @@ class OralableBLE: NSObject, ObservableObject {
     }
     
     // MARK: - Private Methods
-    private func startScanning() {
-        guard centralManager.state == .poweredOn else {
-            addLog("Cannot scan - Bluetooth state: \(centralManager.state.rawValue)", level: .error)
-            return
-        }
-        
-        centralManager.stopScan()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.centralManager.scanForPeripherals(
-                withServices: nil,
-                options: [
-                    CBCentralManagerScanOptionAllowDuplicatesKey: false,
-                    CBCentralManagerScanOptionSolicitedServiceUUIDsKey: []
-                ]
-            )
-            self?.isScanning = true
-            self?.addLog("Started scanning for BLE devices...", level: .info)
-        }
-    }
-    
     private func stopScanning() {
         centralManager.stopScan()
         isScanning = false
@@ -315,6 +323,10 @@ extension OralableBLE: CBCentralManagerDelegate {
                        rssi RSSI: NSNumber) {
         let name = peripheral.name ?? "Unknown"
         
+        // Store all discovered peripherals for the DevicesView
+        discoveredPeripherals[peripheral.identifier.uuidString] = peripheral
+        
+        // Auto-connect to Oralable devices
         if name.contains(BLEConstants.DEVICE_NAME) {
             addLog("Found \(name) (RSSI: \(RSSI))", level: .info)
             stopScanning()
