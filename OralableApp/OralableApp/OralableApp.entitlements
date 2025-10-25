@@ -7,9 +7,13 @@
 		<string>Default</string>
 	</array>
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
+	<key>com.apple.developer.icloud-container-environment</key>
+	<string>Production</string>
 	<key>com.apple.developer.icloud-container-identifiers</key>
-	<array/>
+	<array>
+		<string>iCloud.jacdentalsolutions.OralableApp</string>
+	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudKit</string>
