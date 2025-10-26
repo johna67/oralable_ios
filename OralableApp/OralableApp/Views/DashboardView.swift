@@ -6,6 +6,7 @@ struct DashboardView: View {
     var isViewerMode: Bool = false
     
     @State private var selectedMetric: MetricType?
+    @State private var selectedTimestamp: Date?
     
     // Determine if we should show graphs
     private var shouldShowGraphs: Bool {
@@ -37,6 +38,7 @@ struct DashboardView: View {
                             BatteryGraphView(ble: ble)
                         }
                         .onTapGesture {
+                            selectedTimestamp = ble.lastUpdate
                             selectedMetric = .battery
                         }
                         
@@ -50,6 +52,7 @@ struct DashboardView: View {
                             PPGGraphView(ble: ble)
                         }
                         .onTapGesture {
+                            selectedTimestamp = ble.lastUpdate
                             selectedMetric = .ppg
                         }
                         
@@ -63,6 +66,7 @@ struct DashboardView: View {
                             TemperatureGraphView(ble: ble)
                         }
                         .onTapGesture {
+                            selectedTimestamp = ble.lastUpdate
                             selectedMetric = .temperature
                         }
                         
@@ -76,6 +80,7 @@ struct DashboardView: View {
                             AccelerometerGraphView(ble: ble)
                         }
                         .onTapGesture {
+                            selectedTimestamp = ble.lastUpdate
                             selectedMetric = .accelerometer
                         }
                     } else {
@@ -87,7 +92,15 @@ struct DashboardView: View {
             }
             .navigationTitle("Dashboard")
             .sheet(item: $selectedMetric) { metric in
-                HistoricalDetailView(ble: ble, metricType: metric)
+                if #available(iOS 16.0, *) {
+                    HistoricalDetailSheet(
+                        ble: ble, 
+                        metricType: metric
+                    )
+                } else {
+                    Text("Detailed view requires iOS 16+")
+                        .padding()
+                }
             }
         }
     }
@@ -684,5 +697,98 @@ enum MetricType: Identifiable {
         case .temperature: return .orange
         case .accelerometer: return .blue
         }
+    }
+}
+
+// MARK: - Historical Detail Sheet Wrapper
+struct HistoricalDetailSheet: View {
+    @ObservedObject var ble: OralableBLE
+    let metricType: MetricType
+    
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedTimeRange: TimeRange = .day
+    
+    // Data availability info
+    private var dataAvailability: String {
+        if ble.historicalData.isEmpty {
+            return "No historical data collected yet"
+        }
+        
+        guard let oldestData = ble.historicalData.first?.timestamp,
+              let newestData = ble.historicalData.last?.timestamp else {
+            return "No data available"
+        }
+        
+        let duration = newestData.timeIntervalSince(oldestData)
+        let hours = Int(duration / 3600)
+        let minutes = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
+        
+        if hours > 0 {
+            return "Data spans: \(hours)h \(minutes)m"
+        } else {
+            return "Data spans: \(minutes)m (need more time for trends)"
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Data Availability Banner
+                if !ble.historicalData.isEmpty {
+                    DataAvailabilityBanner(
+                        dataCount: ble.historicalData.count,
+                        availabilityText: dataAvailability,
+                        oldestDate: ble.historicalData.first?.timestamp,
+                        newestDate: ble.historicalData.last?.timestamp
+                    )
+                    .padding(.horizontal)
+                    .padding(.top)
+                }
+                
+                // Time Range Selector
+                TimeRangePicker(selectedRange: $selectedTimeRange)
+                    .padding()
+                
+                // Historical Chart and Stats
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Info about selected range
+                        SelectedRangeInfo(
+                            timeRange: selectedTimeRange,
+                            filteredDataCount: filteredDataCount
+                        )
+                        
+                        // Main Chart
+                        HistoricalChartCard(
+                            ble: ble,
+                            metricType: metricType,
+                            timeRange: selectedTimeRange
+                        )
+                        
+                        // Statistics Card
+                        StatisticsCard(
+                            ble: ble,
+                            metricType: metricType,
+                            timeRange: selectedTimeRange
+                        )
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle(metricType.title + " History")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private var filteredDataCount: Int {
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.seconds)
+        return ble.historicalData.filter { $0.timestamp >= cutoffDate }.count
     }
 }

@@ -224,6 +224,9 @@ class OralableBLE: NSObject, ObservableObject {
         
         sensorData.ppg.samples.removeAll()
         
+        // Enhanced debugging: collect all samples and check for patterns
+        var allSamples: [(red: UInt32, ir: UInt32, green: UInt32)] = []
+        
         for i in 0..<samplesToRead {
             let offset = headerSize + (i * sampleSize)
             if offset + sampleSize <= data.count {
@@ -233,10 +236,28 @@ class OralableBLE: NSObject, ObservableObject {
                 sample.green = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 8, as: UInt32.self) }
                 sample.timestamp = Date()
                 sensorData.ppg.samples.append(sample)
+                
+                allSamples.append((red: sample.red, ir: sample.ir, green: sample.green))
             }
         }
         
-        addLog("PPG: IR=\(sensorData.ppg.ir), R=\(sensorData.ppg.red), G=\(sensorData.ppg.green)")
+        // Debug: Check if values are consistent across samples
+        let firstSample = allSamples.first
+        let lastSample = allSamples.last
+        let isConsistent = allSamples.allSatisfy { sample in
+            sample.red == firstSample?.red && 
+            sample.ir == firstSample?.ir && 
+            sample.green == firstSample?.green
+        }
+        
+        // Enhanced logging with frame counter and consistency check
+        addLog("PPG Frame \(sensorData.ppg.frameCounter): IR=\(sensorData.ppg.ir), R=\(sensorData.ppg.red), G=\(sensorData.ppg.green) | Samples: \(samplesToRead), Consistent: \(isConsistent)")
+        
+        // Additional debug: Log first and last samples if they differ
+        if !isConsistent, let first = firstSample, let last = lastSample {
+            addLog("  First: IR=\(first.ir), R=\(first.red), G=\(first.green)")
+            addLog("  Last:  IR=\(last.ir), R=\(last.red), G=\(last.green)")
+        }
     }
     
     private func parseAccelerometerData(_ data: Data) {

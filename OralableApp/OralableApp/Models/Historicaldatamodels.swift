@@ -6,6 +6,7 @@ enum TimeRange: String, CaseIterable {
     case hour = "Hour"
     case day = "Day"
     case week = "Week"
+    case month = "Month"
     
     /// Returns the number of seconds for this time range
     var seconds: TimeInterval {
@@ -13,15 +14,17 @@ enum TimeRange: String, CaseIterable {
         case .hour: return 3600 // 1 hour
         case .day: return 86400 // 24 hours
         case .week: return 604800 // 7 days
+        case .month: return 2592000 // 30 days
         }
     }
     
     /// Returns the ideal number of data points to display for this range
     var idealDataPoints: Int {
         switch self {
-        case .hour: return 60 // per minute
+        case .hour: return 12 // 5-minute intervals
         case .day: return 24 // hourly
         case .week: return 7 // daily
+        case .month: return 30 // daily
         }
     }
 }

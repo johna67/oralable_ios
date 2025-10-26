@@ -75,13 +75,33 @@ struct PPGData: Codable {
     var frameCounter: UInt32 = 0
     var samples: [PPGSample] = []
     
+    // Use average of all samples for more stable readings
     var ir: UInt32 {
+        guard !samples.isEmpty else { return 0 }
+        let sum = samples.reduce(0) { $0 + $1.ir }
+        return sum / UInt32(samples.count)
+    }
+    
+    var red: UInt32 {
+        guard !samples.isEmpty else { return 0 }
+        let sum = samples.reduce(0) { $0 + $1.red }
+        return sum / UInt32(samples.count)
+    }
+    
+    var green: UInt32 {
+        guard !samples.isEmpty else { return 0 }
+        let sum = samples.reduce(0) { $0 + $1.green }
+        return sum / UInt32(samples.count)
+    }
+    
+    // Keep the old behavior available for comparison
+    var lastIr: UInt32 {
         return samples.last?.ir ?? 0
     }
-    var red: UInt32 {
+    var lastRed: UInt32 {
         return samples.last?.red ?? 0
     }
-    var green: UInt32 {
+    var lastGreen: UInt32 {
         return samples.last?.green ?? 0
     }
 }
