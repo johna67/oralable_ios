@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftUI
 import Charts
 
 struct DashboardView: View {
@@ -93,7 +94,7 @@ struct DashboardView: View {
             .navigationTitle("Dashboard")
             .sheet(item: $selectedMetric) { metric in
                 if #available(iOS 16.0, *) {
-                    HistoricalDetailSheet(
+                    HistoricalDetailView(
                         ble: ble, 
                         metricType: metric
                     )
@@ -657,19 +658,14 @@ struct AccelerometerGraphView: View {
 }
 
 // MARK: - Metric Type Enum
-enum MetricType: Identifiable {
-    case battery
-    case ppg
-    case temperature
-    case accelerometer
+enum MetricType: String, Identifiable, Codable {
+    case battery = "battery"
+    case ppg = "ppg"
+    case temperature = "temperature"
+    case accelerometer = "accelerometer"
     
     var id: String {
-        switch self {
-        case .battery: return "battery"
-        case .ppg: return "ppg"
-        case .temperature: return "temperature"
-        case .accelerometer: return "accelerometer"
-        }
+        return self.rawValue
     }
     
     var title: String {
@@ -698,97 +694,31 @@ enum MetricType: Identifiable {
         case .accelerometer: return .blue
         }
     }
+    
+    var csvHeaders: String {
+        switch self {
+        case .battery:
+            return "Level,Voltage"
+        case .ppg:
+            return "IR,Red,Green"
+        case .temperature:
+            return "Temperature"
+        case .accelerometer:
+            return "X,Y,Z,Magnitude"
+        }
+    }
+    
+    func csvValues(from sensorData: SensorData) -> String {
+        switch self {
+        case .battery:
+            return "\(sensorData.batteryLevel),\(sensorData.batteryVoltage)"
+        case .ppg:
+            return "\(sensorData.ppg.ir),\(sensorData.ppg.red),\(sensorData.ppg.green)"
+        case .temperature:
+            return "\(sensorData.temperature)"
+        case .accelerometer:
+            return "\(sensorData.accelerometer.x),\(sensorData.accelerometer.y),\(sensorData.accelerometer.z),\(sensorData.accelerometer.magnitude)"
+        }
+    }
 }
 
-// MARK: - Historical Detail Sheet Wrapper
-struct HistoricalDetailSheet: View {
-    @ObservedObject var ble: OralableBLE
-    let metricType: MetricType
-    
-    @Environment(\.dismiss) var dismiss
-    @State private var selectedTimeRange: TimeRange = .day
-    
-    // Data availability info
-    private var dataAvailability: String {
-        if ble.historicalData.isEmpty {
-            return "No historical data collected yet"
-        }
-        
-        guard let oldestData = ble.historicalData.first?.timestamp,
-              let newestData = ble.historicalData.last?.timestamp else {
-            return "No data available"
-        }
-        
-        let duration = newestData.timeIntervalSince(oldestData)
-        let hours = Int(duration / 3600)
-        let minutes = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
-        
-        if hours > 0 {
-            return "Data spans: \(hours)h \(minutes)m"
-        } else {
-            return "Data spans: \(minutes)m (need more time for trends)"
-        }
-    }
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Data Availability Banner
-                if !ble.historicalData.isEmpty {
-                    DataAvailabilityBanner(
-                        dataCount: ble.historicalData.count,
-                        availabilityText: dataAvailability,
-                        oldestDate: ble.historicalData.first?.timestamp,
-                        newestDate: ble.historicalData.last?.timestamp
-                    )
-                    .padding(.horizontal)
-                    .padding(.top)
-                }
-                
-                // Time Range Selector
-                TimeRangePicker(selectedRange: $selectedTimeRange)
-                    .padding()
-                
-                // Historical Chart and Stats
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Info about selected range
-                        SelectedRangeInfo(
-                            timeRange: selectedTimeRange,
-                            filteredDataCount: filteredDataCount
-                        )
-                        
-                        // Main Chart
-                        HistoricalChartCard(
-                            ble: ble,
-                            metricType: metricType,
-                            timeRange: selectedTimeRange
-                        )
-                        
-                        // Statistics Card
-                        StatisticsCard(
-                            ble: ble,
-                            metricType: metricType,
-                            timeRange: selectedTimeRange
-                        )
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle(metricType.title + " History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-    
-    private var filteredDataCount: Int {
-        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.seconds)
-        return ble.historicalData.filter { $0.timestamp >= cutoffDate }.count
-    }
-}

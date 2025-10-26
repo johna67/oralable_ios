@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Time Range Selection
 /// Represents the time period for viewing historical data
-enum TimeRange: String, CaseIterable {
+enum TimeRange: String, CaseIterable, Codable {
     case hour = "Hour"
     case day = "Day"
     case week = "Week"

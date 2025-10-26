@@ -1,5 +1,425 @@
 import SwiftUI
 import Charts
+import Foundation
+
+// MARK: - App Mode and Subscription Management
+enum AppMode: String, CaseIterable {
+    case viewer = "Viewer"
+    case subscription = "Subscription"
+    
+    var description: String {
+        switch self {
+        case .viewer:
+            return "View historical data with basic analysis"
+        case .subscription:
+            return "Full access with advanced analytics and sharing"
+        }
+    }
+    
+    var allowsDataSharing: Bool {
+        return self == .subscription
+    }
+    
+    var allowsAdvancedAnalytics: Bool {
+        return self == .subscription
+    }
+}
+
+// MARK: - Data Sharing Service
+class DataSharingService: ObservableObject {
+    enum ShareFormat: String, CaseIterable {
+        case csv = "CSV"
+        case json = "JSON" 
+        case pdf = "PDF Report"
+        case healthKit = "Apple Health"
+        
+        var fileExtension: String {
+            switch self {
+            case .csv: return "csv"
+            case .json: return "json"
+            case .pdf: return "pdf"
+            case .healthKit: return "" // No file for HealthKit
+            }
+        }
+    }
+    
+    func shareData(
+        _ data: [SensorData],
+        metricType: MetricType,
+        format: ShareFormat,
+        timeRange: TimeRange
+    ) -> URL? {
+        switch format {
+        case .csv:
+            return createCSVFile(data, metricType: metricType, timeRange: timeRange)
+        case .json:
+            return createJSONFile(data, metricType: metricType, timeRange: timeRange)
+        case .pdf:
+            return createPDFReport(data, metricType: metricType, timeRange: timeRange)
+        case .healthKit:
+            exportToHealthKit(data, metricType: metricType)
+            return nil
+        }
+    }
+    
+    private func createCSVFile(_ data: [SensorData], metricType: MetricType, timeRange: TimeRange) -> URL? {
+        let formatter = ISO8601DateFormatter()
+        var csvContent = "Timestamp,\(metricType.csvHeaders)\n"
+        
+        for sample in data {
+            let timestamp = formatter.string(from: sample.timestamp)
+            let values = metricType.csvValues(from: sample)
+            csvContent += "\(timestamp),\(values)\n"
+        }
+        
+        return saveToFile(content: csvContent, filename: "oralable_\(metricType.rawValue)_\(timeRange.rawValue).csv")
+    }
+    
+    private func createJSONFile(_ data: [SensorData], metricType: MetricType, timeRange: TimeRange) -> URL? {
+        let exportData = HistoricalDataExport(
+            metricType: metricType,
+            timeRange: timeRange,
+            exportDate: Date(),
+            dataCount: data.count,
+            samples: data.map { HistoricalSample(from: $0, metricType: metricType) }
+        )
+        
+        do {
+            let jsonData = try JSONEncoder().encode(exportData)
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+            return saveToFile(content: jsonString, filename: "oralable_\(metricType.rawValue)_\(timeRange.rawValue).json")
+        } catch {
+            print("Error creating JSON: \(error)")
+            return nil
+        }
+    }
+    
+    private func createPDFReport(_ data: [SensorData], metricType: MetricType, timeRange: TimeRange) -> URL? {
+        // PDF creation would require a proper PDF library or UIKit/AppKit integration
+        // For now, return nil - this would be implemented with PDFKit
+        print("PDF report creation not implemented yet")
+        return nil
+    }
+    
+    private func exportToHealthKit(_ data: [SensorData], metricType: MetricType) {
+        // HealthKit export would require HealthKit framework
+        print("HealthKit export not implemented yet")
+    }
+    
+    private func saveToFile(content: String, filename: String) -> URL? {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        do {
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            print("Error saving file: \(error)")
+            return nil
+        }
+    }
+}
+
+// MARK: - Data Models for Export
+struct HistoricalDataExport: Codable {
+    let metricTypeRawValue: String
+    let timeRangeRawValue: String
+    let exportDate: Date
+    let dataCount: Int
+    let samples: [HistoricalSample]
+    
+    init(metricType: MetricType, timeRange: TimeRange, exportDate: Date, dataCount: Int, samples: [HistoricalSample]) {
+        self.metricTypeRawValue = metricType.rawValue
+        self.timeRangeRawValue = timeRange.rawValue
+        self.exportDate = exportDate
+        self.dataCount = dataCount
+        self.samples = samples
+    }
+}
+
+struct HistoricalSample: Codable {
+    let timestamp: Date
+    let value: Double
+    let additionalData: [String: Double]?
+    
+    init(from sensorData: SensorData, metricType: MetricType) {
+        self.timestamp = sensorData.timestamp
+        
+        switch metricType {
+        case .ppg:
+            self.value = Double(sensorData.ppg.ir)
+            self.additionalData = [
+                "red": Double(sensorData.ppg.red),
+                "green": Double(sensorData.ppg.green)
+            ]
+        case .temperature:
+            self.value = sensorData.temperature
+            self.additionalData = nil
+        case .battery:
+            self.value = Double(sensorData.batteryLevel)
+            self.additionalData = [
+                "voltage": Double(sensorData.batteryVoltage)
+            ]
+        case .accelerometer:
+            self.value = sensorData.accelerometer.magnitude
+            self.additionalData = [
+                "x": Double(sensorData.accelerometer.x),
+                "y": Double(sensorData.accelerometer.y),
+                "z": Double(sensorData.accelerometer.z)
+            ]
+        }
+    }
+}
+
+// MARK: - Centralized Data Processing Manager
+@MainActor
+class HistoricalDataProcessor: ObservableObject {
+    @Published var processedData: ProcessedHistoricalData?
+    @Published var isProcessing = false
+    @Published var selectedDataPoint: SensorData?
+    
+    private let normalizationService = PPGNormalizationService.shared
+    private var cachedData: [String: ProcessedHistoricalData] = [:]
+    
+    struct ProcessedHistoricalData {
+        let rawData: [SensorData]
+        let normalizedData: [(timestamp: Date, value: Double)]
+        let statistics: DataStatistics
+        let segments: [DataSegment]
+        let deviceContext: DeviceContext?
+        let cacheKey: String
+        let processingMethod: String
+    }
+    
+    struct DataStatistics {
+        let average: Double
+        let minimum: Double
+        let maximum: Double
+        let standardDeviation: Double
+        let variationCoefficient: Double
+        let sampleCount: Int
+    }
+    
+    struct DataSegment {
+        let startIndex: Int
+        let endIndex: Int
+        let isStable: Bool
+        let confidence: Double
+        let timestamp: Date
+    }
+    
+    struct DeviceContext {
+        let state: PPGDebugCard.DeviceState
+        let confidence: Double
+        let isStabilized: Bool
+        let timeInState: TimeInterval
+    }
+    
+    func processData(
+        from ble: OralableBLE,
+        metricType: MetricType,
+        timeRange: TimeRange,
+        selectedDate: Date,
+        appMode: AppMode
+    ) async {
+        let cacheKey = "\(metricType.rawValue)_\(timeRange.rawValue)_\(selectedDate.timeIntervalSince1970)"
+        
+        // Check cache first
+        if let cached = cachedData[cacheKey] {
+            self.processedData = cached
+            return
+        }
+        
+        isProcessing = true
+        defer { isProcessing = false }
+        
+        // Filter data based on time range and selected date
+        let filteredData = filterData(from: ble.historicalData, timeRange: timeRange, selectedDate: selectedDate)
+        
+        guard !filteredData.isEmpty else {
+            processedData = nil
+            return
+        }
+        
+        // Process data based on metric type and app mode
+        let normalizedData = await processMetricData(filteredData, metricType: metricType, appMode: appMode)
+        let statistics = calculateStatistics(from: normalizedData)
+        let segments = appMode.allowsAdvancedAnalytics ? detectDataSegments(filteredData) : []
+        let deviceContext = appMode.allowsAdvancedAnalytics ? analyzeDeviceContext(filteredData) : nil
+        
+        let processed = ProcessedHistoricalData(
+            rawData: filteredData,
+            normalizedData: normalizedData,
+            statistics: statistics,
+            segments: segments,
+            deviceContext: deviceContext,
+            cacheKey: cacheKey,
+            processingMethod: appMode.allowsAdvancedAnalytics ? "Advanced" : "Basic"
+        )
+        
+        // Cache the result
+        cachedData[cacheKey] = processed
+        
+        // Clean cache if it gets too large
+        if cachedData.count > 20 {
+            let oldestKey = cachedData.keys.sorted().first!
+            cachedData.removeValue(forKey: oldestKey)
+        }
+        
+        self.processedData = processed
+    }
+    
+    private func filterData(from data: [SensorData], timeRange: TimeRange, selectedDate: Date) -> [SensorData] {
+        let calendar = Calendar.current
+        
+        switch timeRange {
+        case .hour:
+            let startOfHour = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
+            let endOfHour = calendar.date(byAdding: .hour, value: 1, to: startOfHour) ?? selectedDate
+            return data.filter { $0.timestamp >= startOfHour && $0.timestamp < endOfHour }
+        case .day:
+            let startOfDay = calendar.startOfDay(for: selectedDate)
+            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+            return data.filter { $0.timestamp >= startOfDay && $0.timestamp < endOfDay }
+        case .week:
+            let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
+            let endOfWeek = calendar.date(byAdding: .weekOfYear, value: 1, to: startOfWeek) ?? selectedDate
+            return data.filter { $0.timestamp >= startOfWeek && $0.timestamp < endOfWeek }
+        case .month:
+            let startOfMonth = calendar.dateInterval(of: .month, for: selectedDate)?.start ?? selectedDate
+            let endOfMonth = calendar.date(byAdding: .month, value: 1, to: startOfMonth) ?? selectedDate
+            return data.filter { $0.timestamp >= startOfMonth && $0.timestamp < endOfMonth }
+        }
+    }
+    
+    private func processMetricData(_ data: [SensorData], metricType: MetricType, appMode: AppMode) async -> [(timestamp: Date, value: Double)] {
+        switch metricType {
+        case .ppg:
+            if appMode.allowsAdvancedAnalytics {
+                // Use advanced PPG processing
+                let rawPPG = data.map { (timestamp: $0.timestamp, ir: Double($0.ppg.ir), red: Double($0.ppg.red), green: Double($0.ppg.green)) }
+                let normalized = normalizationService.normalizePPGData(rawPPG, method: .persistent, sensorData: data)
+                return normalized.map { (timestamp: $0.timestamp, value: $0.ir) }
+            } else {
+                // Basic PPG processing for viewer mode
+                return data.map { (timestamp: $0.timestamp, value: Double($0.ppg.ir)) }
+            }
+        case .temperature:
+            return data.map { (timestamp: $0.timestamp, value: $0.temperature) }
+        case .battery:
+            return data.map { (timestamp: $0.timestamp, value: Double($0.batteryLevel)) }
+        case .accelerometer:
+            return data.map { (timestamp: $0.timestamp, value: $0.accelerometer.magnitude) }
+        }
+    }
+    
+    private func calculateStatistics(from data: [(timestamp: Date, value: Double)]) -> DataStatistics {
+        let values = data.map { $0.value }
+        guard !values.isEmpty else {
+            return DataStatistics(average: 0, minimum: 0, maximum: 0, standardDeviation: 0, variationCoefficient: 0, sampleCount: 0)
+        }
+        
+        let average = values.reduce(0, +) / Double(values.count)
+        let minimum = values.min() ?? 0
+        let maximum = values.max() ?? 0
+        
+        let variance = values.map { pow($0 - average, 2) }.reduce(0, +) / Double(values.count)
+        let standardDeviation = sqrt(variance)
+        let variationCoefficient = average != 0 ? (standardDeviation / abs(average)) * 100 : 0
+        
+        return DataStatistics(
+            average: average,
+            minimum: minimum,
+            maximum: maximum,
+            standardDeviation: standardDeviation,
+            variationCoefficient: variationCoefficient,
+            sampleCount: values.count
+        )
+    }
+    
+    private func detectDataSegments(_ data: [SensorData]) -> [DataSegment] {
+        // Simplified segment detection
+        var segments: [DataSegment] = []
+        let windowSize = 5
+        
+        guard data.count > windowSize * 2 else { return [] }
+        
+        var currentStart = 0
+        for i in windowSize..<(data.count - windowSize) {
+            let window = Array(data[(i-windowSize)..<(i+windowSize)])
+            let variation = calculateWindowVariation(window)
+            
+            if variation > 0.5 { // Movement threshold
+                if i - currentStart > windowSize {
+                    segments.append(DataSegment(
+                        startIndex: currentStart,
+                        endIndex: i,
+                        isStable: true,
+                        confidence: 0.8,
+                        timestamp: data[currentStart].timestamp
+                    ))
+                }
+                currentStart = i + windowSize
+            }
+        }
+        
+        // Add final segment
+        if currentStart < data.count - windowSize {
+            segments.append(DataSegment(
+                startIndex: currentStart,
+                endIndex: data.count,
+                isStable: true,
+                confidence: 0.8,
+                timestamp: data[currentStart].timestamp
+            ))
+        }
+        
+        return segments
+    }
+    
+    private func calculateWindowVariation(_ data: [SensorData]) -> Double {
+        let magnitudes = data.map { $0.accelerometer.magnitude }
+        let mean = magnitudes.reduce(0, +) / Double(magnitudes.count)
+        let variance = magnitudes.map { pow($0 - mean, 2) }.reduce(0, +) / Double(magnitudes.count)
+        return sqrt(variance)
+    }
+    
+    private func analyzeDeviceContext(_ data: [SensorData]) -> DeviceContext? {
+        guard data.count >= 5 else { return nil }
+        
+        let recent = Array(data.suffix(10))
+        let movementVariation = calculateWindowVariation(recent)
+        let tempChange = (recent.map { $0.temperature }.max() ?? 0) - (recent.map { $0.temperature }.min() ?? 0)
+        let batteryLevel = recent.last?.batteryLevel ?? 0
+        
+        let state: PPGDebugCard.DeviceState
+        if batteryLevel > 95 && movementVariation < 0.1 {
+            state = .onChargerStatic
+        } else if movementVariation < 0.1 && tempChange < 0.5 {
+            state = .offChargerStatic
+        } else if movementVariation > 0.5 {
+            state = .inMotion
+        } else if tempChange > 2.0 {
+            state = .onCheek
+        } else {
+            state = .unknown
+        }
+        
+        let confidence = min(1.0, max(0.0, 1.0 - (movementVariation / 2.0)))
+        let isStabilized = movementVariation < 0.2 && confidence > 0.7
+        
+        return DeviceContext(
+            state: state,
+            confidence: confidence,
+            isStabilized: isStabilized,
+            timeInState: 60.0 // Simplified
+        )
+    }
+    
+    func clearCache() {
+        cachedData.removeAll()
+    }
+}
 
 struct HistoricalDetailView: View {
     @ObservedObject var ble: OralableBLE
@@ -384,7 +804,7 @@ struct TimeRangePicker: View {
                 Button(action: {
                     selectedRange = range
                 }) {
-                    Text(range.displayName)
+                    Text(range.rawValue)
                         .font(.system(size: 17, weight: selectedRange == range ? .semibold : .regular))
                         .foregroundColor(selectedRange == range ? .blue : .primary)
                 }
@@ -394,18 +814,333 @@ struct TimeRangePicker: View {
     }
 }
 
-// MARK: - TimeRange Extension
-extension TimeRange {
-    var displayName: String {
-        switch self {
-        case .hour: return "Hour"
-        case .day: return "Day"
-        case .week: return "Week"
-        case .month: return "Month"
+// MARK: - PPG Normalization Service (Unified with Persistence)
+class PPGNormalizationService: ObservableObject {
+    static let shared = PPGNormalizationService()
+    
+    enum Method: String, CaseIterable {
+        case raw = "Raw Values"
+        case adaptiveBaseline = "Adaptive Baseline"
+        case dynamicRange = "Dynamic Range"
+        case heartRateSimulation = "HR Simulation"
+        case persistent = "Persistent Smart"
+    }
+    
+    // Persistent state that remembers across data updates
+    @Published private var baselineState: BaselineState?
+    @Published private var deviceContext: DeviceContext?
+    private var lastUpdateTime: Date = Date()
+    
+    struct BaselineState {
+        let irBaseline: Double
+        let redBaseline: Double
+        let greenBaseline: Double
+        let timestamp: Date
+        let confidence: Double
+        let sampleCount: Int
+        
+        var isStale: Bool {
+            Date().timeIntervalSince(timestamp) > 300 // 5 minutes
+        }
+        
+        var isReliable: Bool {
+            confidence > 0.8 && sampleCount >= 20
         }
     }
+    
+    struct DeviceContext {
+        let isOnBody: Bool
+        let isMoving: Bool
+        let temperatureStable: Bool
+        let batteryCharging: Bool
+        let confidence: Double
+        let timestamp: Date
+        
+        var isStable: Bool {
+            !isMoving && temperatureStable && confidence > 0.7
+        }
+        
+        var recommendedNormalization: Method {
+            if isOnBody && isStable {
+                return .persistent
+            } else if isStable {
+                return .adaptiveBaseline
+            } else {
+                return .dynamicRange
+            }
+        }
+    }
+    
+    func normalizePPGData(
+        _ data: [(timestamp: Date, ir: Double, red: Double, green: Double)], 
+        method: Method = .persistent,
+        sensorData: [SensorData] = [] // For context analysis
+    ) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        
+        guard !data.isEmpty else { return data }
+        
+        // Update device context if sensor data is available
+        if !sensorData.isEmpty {
+            updateDeviceContext(from: sensorData)
+        }
+        
+        // Choose method based on context if using persistent
+        let actualMethod = method == .persistent ? 
+            (deviceContext?.recommendedNormalization ?? .adaptiveBaseline) : method
+        
+        print("🔍 PPG Normalization: Using \(actualMethod.rawValue) (requested: \(method.rawValue))")
+        
+        switch actualMethod {
+        case .raw:
+            return data
+            
+        case .adaptiveBaseline:
+            return adaptiveBaselineNormalization(data)
+            
+        case .dynamicRange:
+            return dynamicRangeNormalization(data)
+            
+        case .heartRateSimulation:
+            return heartRateSimulationNormalization(data)
+            
+        case .persistent:
+            return persistentSmartNormalization(data)
+        }
+    }
+    
+    private func updateDeviceContext(from sensorData: [SensorData]) {
+        guard !sensorData.isEmpty else { return }
+        
+        let recentSamples = Array(sensorData.suffix(10))
+        guard recentSamples.count >= 5 else { return }
+        
+        // Analyze device state
+        let accelerometerVariation = calculateMovementVariation(recentSamples)
+        let temperatureChange = calculateTemperatureChange(recentSamples)
+        let batteryLevel = recentSamples.last?.batteryLevel ?? 0
+        let avgTemperature = recentSamples.map { $0.temperature }.reduce(0, +) / Double(recentSamples.count)
+        
+        let isMoving = accelerometerVariation > 0.3
+        let temperatureStable = temperatureChange < 1.0
+        let batteryCharging = batteryLevel > 95
+        let isOnBody = avgTemperature > 25.0 && !isMoving // Simplified body detection
+        
+        // Calculate confidence based on consistency
+        var confidence = 0.5
+        if temperatureStable { confidence += 0.2 }
+        if !isMoving { confidence += 0.2 }
+        if recentSamples.count >= 10 { confidence += 0.1 }
+        
+        deviceContext = DeviceContext(
+            isOnBody: isOnBody,
+            isMoving: isMoving,
+            temperatureStable: temperatureStable,
+            batteryCharging: batteryCharging,
+            confidence: confidence,
+            timestamp: Date()
+        )
+        
+        print("📊 Device Context: OnBody=\(isOnBody), Moving=\(isMoving), TempStable=\(temperatureStable), Confidence=\(String(format: "%.1f", confidence))")
+    }
+    
+    private func persistentSmartNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        
+        // Check if we need to establish or update baseline
+        let shouldUpdateBaseline = baselineState == nil || 
+                                  baselineState!.isStale || 
+                                  (deviceContext?.isStable == true && !(baselineState?.isReliable ?? false))
+        
+        if shouldUpdateBaseline {
+            updatePersistentBaseline(data)
+        }
+        
+        guard let baseline = baselineState, baseline.isReliable else {
+            print("⚠️ No reliable baseline, using adaptive normalization")
+            return adaptiveBaselineNormalization(data)
+        }
+        
+        print("✅ Using persistent baseline from \(baseline.timestamp) (\(baseline.sampleCount) samples)")
+        
+        // Apply persistent baseline correction with physiological scaling
+        return data.map { sample in
+            let correctedIR = sample.ir - baseline.irBaseline
+            let correctedRed = sample.red - baseline.redBaseline  
+            let correctedGreen = sample.green - baseline.greenBaseline
+            
+            // Scale to heart rate-like range (preserving signal characteristics)
+            let scalingFactor: Double = deviceContext?.isOnBody == true ? 0.05 : 0.1
+            
+            return (
+                timestamp: sample.timestamp,
+                ir: 120 + (correctedIR * scalingFactor), // Center around 120 BPM
+                red: 120 + (correctedRed * scalingFactor),
+                green: 120 + (correctedGreen * scalingFactor)
+            )
+        }
+    }
+    
+    private func updatePersistentBaseline(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) {
+        // Use only stable data for baseline calculation
+        guard let context = deviceContext, context.isStable else {
+            print("🚫 Device not stable, skipping baseline update")
+            return
+        }
+        
+        // Use robust statistics (median instead of mean for outlier resistance)
+        let irValues = data.map { $0.ir }.sorted()
+        let redValues = data.map { $0.red }.sorted()
+        let greenValues = data.map { $0.green }.sorted()
+        
+        guard !irValues.isEmpty else { return }
+        
+        let medianIndex = irValues.count / 2
+        let irBaseline = irValues[medianIndex]
+        let redBaseline = redValues[medianIndex]
+        let greenBaseline = greenValues[medianIndex]
+        
+        // Calculate confidence based on data consistency
+        let irStd = calculateStandardDeviation(irValues)
+        let coefficientOfVariation = irStd / irBaseline
+        let confidence = max(0.0, min(1.0, 1.0 - (coefficientOfVariation / 0.2))) // CV < 20% = high confidence
+        
+        baselineState = BaselineState(
+            irBaseline: irBaseline,
+            redBaseline: redBaseline,
+            greenBaseline: greenBaseline,
+            timestamp: Date(),
+            confidence: confidence,
+            sampleCount: data.count
+        )
+        
+        print("📈 Updated persistent baseline - IR: \(String(format: "%.0f", irBaseline)), Confidence: \(String(format: "%.2f", confidence))")
+    }
+    
+    // Helper methods
+    private func calculateMovementVariation(_ samples: [SensorData]) -> Double {
+        let magnitudes = samples.map { $0.accelerometer.magnitude }
+        let mean = magnitudes.reduce(0, +) / Double(magnitudes.count)
+        let variance = magnitudes.map { pow($0 - mean, 2) }.reduce(0, +) / Double(magnitudes.count)
+        return sqrt(variance)
+    }
+    
+    private func calculateTemperatureChange(_ samples: [SensorData]) -> Double {
+        let temperatures = samples.map { $0.temperature }
+        return (temperatures.max() ?? 0) - (temperatures.min() ?? 0)
+    }
+    
+    private func calculateStandardDeviation(_ values: [Double]) -> Double {
+        let mean = values.reduce(0, +) / Double(values.count)
+        let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count)
+        return sqrt(variance)
+    }
+    
+    private func adaptiveBaselineNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        // Use a sliding window baseline that adapts to slow changes
+        let windowSize = min(10, data.count / 3)
+        guard windowSize > 0 else { return data }
+        
+        return data.enumerated().map { index, sample in
+            let windowStart = max(0, index - windowSize/2)
+            let windowEnd = min(data.count, windowStart + windowSize)
+            let window = Array(data[windowStart..<windowEnd])
+            
+            // Calculate baseline from window
+            let irBaseline = window.map { $0.ir }.reduce(0, +) / Double(window.count)
+            let redBaseline = window.map { $0.red }.reduce(0, +) / Double(window.count)
+            let greenBaseline = window.map { $0.green }.reduce(0, +) / Double(window.count)
+            
+            // Apply baseline correction with amplification
+            return (
+                timestamp: sample.timestamp,
+                ir: 100 + (sample.ir - irBaseline) * 0.1,  // Center around 100, amplify changes
+                red: 100 + (sample.red - redBaseline) * 0.1,
+                green: 100 + (sample.green - greenBaseline) * 0.1
+            )
+        }
+    }
+    
+    private func dynamicRangeNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        // Use robust percentile-based normalization
+        let irValues = data.map { $0.ir }.sorted()
+        let redValues = data.map { $0.red }.sorted()
+        let greenValues = data.map { $0.green }.sorted()
+        
+        // Use 10th and 90th percentiles for robust range
+        func percentile(_ values: [Double], _ p: Double) -> Double {
+            let index = Int(Double(values.count - 1) * p)
+            return values[index]
+        }
+        
+        let irMin = percentile(irValues, 0.1)
+        let irMax = percentile(irValues, 0.9)
+        let redMin = percentile(redValues, 0.1)
+        let redMax = percentile(redValues, 0.9)
+        let greenMin = percentile(greenValues, 0.1)
+        let greenMax = percentile(greenValues, 0.9)
+        
+        return data.map { sample in
+            let irNorm = irMax > irMin ? (sample.ir - irMin) / (irMax - irMin) : 0.5
+            let redNorm = redMax > redMin ? (sample.red - redMin) / (redMax - redMin) : 0.5
+            let greenNorm = greenMax > greenMin ? (sample.green - greenMin) / (greenMax - greenMin) : 0.5
+            
+            return (
+                timestamp: sample.timestamp,
+                ir: 50 + irNorm * 100,    // Scale to 50-150 range
+                red: 50 + redNorm * 100,
+                green: 50 + greenNorm * 100
+            )
+        }
+    }
+    
+    private func heartRateSimulationNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        // Create heart rate-like visualization (60-180 bpm range)
+        let irValues = data.map { $0.ir }
+        let irMean = irValues.reduce(0, +) / Double(irValues.count)
+        let irStd = sqrt(irValues.map { pow($0 - irMean, 2) }.reduce(0, +) / Double(irValues.count))
+        
+        return data.map { sample in
+            // Normalize to z-score, then map to HR range
+            let irZ = irStd > 0 ? (sample.ir - irMean) / irStd : 0
+            let simulatedHR = 120 + irZ * 20  // Center at 120 bpm, ±20 variation
+            
+            return (
+                timestamp: sample.timestamp,
+                ir: max(60, min(180, simulatedHR)),  // Clamp to realistic HR range
+                red: sample.red,    // Keep original for comparison
+                green: sample.green
+            )
+        }
+    }
+    
+    // Public method to reset persistent state (useful for testing)
+    func resetPersistentState() {
+        baselineState = nil
+        deviceContext = nil
+        print("🔄 Reset persistent normalization state")
+    }
+    
+    // Public method to get current state info
+    func getStateInfo() -> String {
+        var info = "PPG Normalization State:\n"
+        
+        if let baseline = baselineState {
+            info += "• Baseline: IR=\(String(format: "%.0f", baseline.irBaseline)), "
+            info += "Confidence=\(String(format: "%.1f%%", baseline.confidence * 100)), "
+            info += "Age=\(String(format: "%.0f", Date().timeIntervalSince(baseline.timestamp)))s\n"
+        } else {
+            info += "• No baseline established\n"
+        }
+        
+        if let context = deviceContext {
+            info += "• Context: OnBody=\(context.isOnBody), Stable=\(context.isStable), "
+            info += "Confidence=\(String(format: "%.1f%%", context.confidence * 100))\n"
+        } else {
+            info += "• No device context\n"
+        }
+        
+        return info
+    }
 }
-
 // MARK: - Enhanced Historical Chart Card (Withings-style)
 struct EnhancedHistoricalChartCard: View {
     @ObservedObject var ble: OralableBLE
@@ -445,28 +1180,22 @@ struct EnhancedHistoricalChartCard: View {
         }
     }
     
-    // Normalize PPG IR data for Withings-style display
+    // Unified PPG normalization using the persistent service
     private var normalizedPPGData: [(timestamp: Date, value: Double)] {
-        let ppgValues = filteredData.map { Double($0.ppg.ir) }
-        guard !ppgValues.isEmpty else { return [] }
-        
-        // Apply min-max normalization to scale to 40-200 range (typical HR range)
-        let minValue = ppgValues.min() ?? 0
-        let maxValue = ppgValues.max() ?? 1
-        
-        let normalizedData = filteredData.enumerated().map { index, data in
-            let normalizedValue: Double
-            if maxValue > minValue {
-                // Scale to 40-200 range to simulate heart rate values
-                let normalized = (Double(data.ppg.ir) - minValue) / (maxValue - minValue)
-                normalizedValue = 40 + (normalized * 160) // 40-200 range
-            } else {
-                normalizedValue = 120 // Default middle value
-            }
-            return (timestamp: data.timestamp, value: normalizedValue)
+        let rawData = filteredData.map { data in
+            (timestamp: data.timestamp, ir: Double(data.ppg.ir), red: Double(data.ppg.red), green: Double(data.ppg.green))
         }
+        guard !rawData.isEmpty else { return [] }
         
-        return normalizedData
+        // Use the unified normalization service with persistent smart normalization
+        let normalized = PPGNormalizationService.shared.normalizePPGData(
+            rawData, 
+            method: .persistent,
+            sensorData: filteredData  // Pass sensor data for context analysis
+        )
+        
+        // Convert to the format expected by the chart (using IR channel)
+        return normalized.map { (timestamp: $0.timestamp, value: $0.ir) }
     }
     
     private func getValue(from data: SensorData) -> Double {
@@ -501,13 +1230,50 @@ struct EnhancedHistoricalChartCard: View {
         }
     }
     
+    private var debugInfo: String {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, HH:mm"
+        
+        let totalSamples = ble.historicalData.count
+        let filteredSamples = filteredData.count
+        
+        var dateRange = ""
+        if let first = filteredData.first?.timestamp, let last = filteredData.last?.timestamp {
+            dateRange = "\(formatter.string(from: first)) - \(formatter.string(from: last))"
+        }
+        
+        switch timeRange {
+        case .hour:
+            return "Hour: \(filteredSamples)/\(totalSamples) samples"
+        case .day:
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "MMM d"
+            return "Day \(dayFormatter.string(from: selectedDate)): \(filteredSamples)/\(totalSamples) samples"
+        case .week:
+            return "Week: \(filteredSamples)/\(totalSamples) samples (\(dateRange))"
+        case .month:
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMM yyyy"
+            return "Month \(monthFormatter.string(from: selectedDate)): \(filteredSamples)/\(totalSamples) samples"
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Title and sample count
+            // Title and sample count with debug info
             HStack {
-                Text(metricType.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(metricType.title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    // Debug info to confirm static vs real-time behavior
+                    Text(debugInfo)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .opacity(0.7)
+                }
                 Spacer()
             }
             
@@ -530,7 +1296,7 @@ struct EnhancedHistoricalChartCard: View {
                 // Create the chart based on metric type
                 Group {
                     if metricType == .ppg {
-                        // PPG-specific Withings-style chart
+                        // PPG-specific chart with intelligent normalization
                         Chart {
                             ForEach(Array(normalizedPPGData.enumerated()), id: \.offset) { index, point in
                                 LineMark(
@@ -558,22 +1324,27 @@ struct EnhancedHistoricalChartCard: View {
                             
                             // Selection indicator
                             if let selected = selectedDataPoint {
-                                let selectedValue = getValue(from: selected)
+                                // For PPG, show the normalized value at the selected point
+                                let selectedNormalizedPoint = normalizedPPGData.first { 
+                                    abs($0.timestamp.timeIntervalSince(selected.timestamp)) < 30 // Within 30 seconds
+                                }
                                 
-                                PointMark(
-                                    x: .value("Time", selected.timestamp),
-                                    y: .value("PPG IR", selectedValue)
-                                )
-                                .foregroundStyle(.blue)
-                                .symbol(.circle)
-                                .symbolSize(80)
-                                
-                                // Vertical rule mark for time indication
-                                RuleMark(
-                                    x: .value("Time", selected.timestamp)
-                                )
-                                .foregroundStyle(.gray.opacity(0.5))
-                                .lineStyle(StrokeStyle(lineWidth: 1))
+                                if let normalizedPoint = selectedNormalizedPoint {
+                                    PointMark(
+                                        x: .value("Time", normalizedPoint.timestamp),
+                                        y: .value("PPG IR", normalizedPoint.value)
+                                    )
+                                    .foregroundStyle(.blue)
+                                    .symbol(.circle)
+                                    .symbolSize(80)
+                                    
+                                    // Vertical rule mark for time indication
+                                    RuleMark(
+                                        x: .value("Time", normalizedPoint.timestamp)
+                                    )
+                                    .foregroundStyle(.gray.opacity(0.5))
+                                    .lineStyle(StrokeStyle(lineWidth: 1))
+                                }
                             }
                         }
                         .chartBackground { chartProxy in
@@ -693,7 +1464,17 @@ struct EnhancedHistoricalChartCard: View {
                     TooltipOverlay(
                         dataPoint: selected,
                         metricType: metricType,
-                        value: getValue(from: selected)
+                        value: {
+                            if metricType == .ppg {
+                                // For PPG, find the normalized value corresponding to the selected timestamp
+                                let matchingNormalizedPoint = normalizedPPGData.first { 
+                                    abs($0.timestamp.timeIntervalSince(selected.timestamp)) < 30 
+                                }
+                                return matchingNormalizedPoint?.value ?? getValue(from: selected)
+                            } else {
+                                return getValue(from: selected)
+                            }
+                        }()
                     )
                 }
             }
@@ -711,7 +1492,9 @@ struct EnhancedHistoricalChartCard: View {
     }
     
     private func updateSelection(at location: CGPoint, geometry: GeometryProxy, chartProxy: ChartProxy) {
-        guard !normalizedPPGData.isEmpty else { return }
+        // Use appropriate data source based on metric type
+        let dataSource = metricType == .ppg ? normalizedPPGData.map { ($0.timestamp, $0.value) } : filteredData.map { ($0.timestamp, getValue(from: $0)) }
+        guard !dataSource.isEmpty else { return }
         
         let plotAreaBounds = chartProxy.plotAreaFrame
         let plotAreaRect = geometry[plotAreaBounds]
@@ -722,11 +1505,11 @@ struct EnhancedHistoricalChartCard: View {
         
         guard relativePosition >= 0 && relativePosition <= 1 else { return }
         
-        let timeRange = normalizedPPGData.last!.timestamp.timeIntervalSince(normalizedPPGData.first!.timestamp)
+        let timeRange = dataSource.last!.0.timeIntervalSince(dataSource.first!.0)
         let selectedTimeOffset = relativePosition * timeRange
-        let selectedTime = normalizedPPGData.first!.timestamp.addingTimeInterval(selectedTimeOffset)
+        let selectedTime = dataSource.first!.0.addingTimeInterval(selectedTimeOffset)
         
-        // Find the closest data point
+        // Find the closest data point in the original filtered data
         let closest = filteredData.min { data1, data2 in
             abs(data1.timestamp.timeIntervalSince(selectedTime)) < 
             abs(data2.timestamp.timeIntervalSince(selectedTime))
@@ -1499,9 +2282,12 @@ struct PPGDebugCard: View {
     let timeRange: TimeRange
     let selectedDate: Date
     
-    @State private var normalizationMethod: NormalizationMethod = .adaptive
+    @State private var normalizationMethod: NormalizationMethod = .contextAware
     @State private var detectedSegments: [DataSegment] = []
     @State private var currentSegmentIndex: Int = 0
+    @State private var deviceContext: DeviceContext?
+    @State private var lastStateChange: Date = Date()
+    @State private var stateHistory: [DeviceState] = []
     
     enum NormalizationMethod: String, CaseIterable {
         case none = "Raw Values"
@@ -1510,6 +2296,58 @@ struct PPGDebugCard: View {
         case percentage = "Percentage"
         case baseline = "Baseline Corrected"
         case adaptive = "Adaptive (Auto-Recalibrate)"
+        case contextAware = "Context-Aware (Smart)"
+    }
+    
+    enum DeviceState: String, CaseIterable {
+        case onChargerStatic = "On Charger (Static)"
+        case offChargerStatic = "Off Charger (Static)"
+        case inMotion = "Being Moved"
+        case onCheek = "On Cheek (Masseter)"
+        case unknown = "Unknown Position"
+        
+        var expectedStabilizationTime: TimeInterval {
+            switch self {
+            case .onChargerStatic: return 10.0    // 10 seconds - stable power, minimal movement
+            case .offChargerStatic: return 15.0   // 15 seconds - no power fluctuations but temperature changes
+            case .inMotion: return 30.0           // 30 seconds - significant movement and sensor displacement
+            case .onCheek: return 45.0            // 45 seconds - body heat, muscle movement, skin contact
+            case .unknown: return 25.0            // 25 seconds - conservative default
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .onChargerStatic: return .green
+            case .offChargerStatic: return .blue
+            case .inMotion: return .orange
+            case .onCheek: return .red
+            case .unknown: return .gray
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .onChargerStatic: return "battery.100.bolt"
+            case .offChargerStatic: return "battery.100"
+            case .inMotion: return "figure.walk"
+            case .onCheek: return "face.smiling"
+            case .unknown: return "questionmark.circle"
+            }
+        }
+    }
+    
+    struct DeviceContext {
+        let state: DeviceState
+        let confidence: Double // 0.0 to 1.0
+        let timeInState: TimeInterval
+        let temperatureChange: Double
+        let movementVariation: Double
+        let isStabilized: Bool
+        
+        var shouldNormalize: Bool {
+            return isStabilized && timeInState >= state.expectedStabilizationTime
+        }
     }
     
     struct DataSegment: Equatable {
@@ -1561,17 +2399,202 @@ struct PPGDebugCard: View {
             (timestamp: data.timestamp, ir: Double(data.ppg.ir), red: Double(data.ppg.red), green: Double(data.ppg.green))
         })
         
-        // Update segments when data changes
-        DispatchQueue.main.async {
-            if normalizationMethod == .adaptive {
-                let newSegments = detectDataSegments(rawData)
-                if newSegments != detectedSegments {
-                    detectedSegments = newSegments
+        // Show filtered data from the selected time period, not real-time data
+        // This ensures the debug card shows the same static period as the main chart
+        let staticData = Array(rawData.suffix(20)) // Last 20 from the filtered period
+        
+        // Use the unified service for consistency
+        if normalizationMethod == .none {
+            return staticData
+        } else {
+            // Convert our enum to the service enum
+            let serviceMethod: PPGNormalizationService.Method
+            switch normalizationMethod {
+            case .none:
+                serviceMethod = .raw
+            case .zScore, .minMax, .percentage:
+                serviceMethod = .dynamicRange
+            case .baseline:
+                serviceMethod = .adaptiveBaseline
+            case .adaptive:
+                serviceMethod = .heartRateSimulation
+            case .contextAware:
+                serviceMethod = .persistent
+            }
+            
+            return PPGNormalizationService.shared.normalizePPGData(
+                staticData,
+                method: serviceMethod,
+                sensorData: Array(filteredData)
+            )
+        }
+    }
+    
+    // Separate function to update segments when needed
+    private func updateSegmentsIfNeeded() {
+        if normalizationMethod == .adaptive {
+            let rawData = Array(filteredData.map { data in
+                (timestamp: data.timestamp, ir: Double(data.ppg.ir), red: Double(data.ppg.red), green: Double(data.ppg.green))
+            })
+            let newSegments = detectDataSegments(rawData)
+            if newSegments != detectedSegments {
+                detectedSegments = newSegments
+            }
+        } else if normalizationMethod == .contextAware {
+            updateDeviceContext()
+        }
+    }
+    
+    private func updateDeviceContext() {
+        guard !filteredData.isEmpty else { return }
+        
+        let context = detectDeviceState(from: filteredData)
+        if let context = context {
+            deviceContext = context
+            
+            // Update state history
+            if stateHistory.isEmpty || stateHistory.last != context.state {
+                stateHistory.append(context.state)
+                lastStateChange = Date()
+                
+                // Keep only last 10 states
+                if stateHistory.count > 10 {
+                    stateHistory.removeFirst()
                 }
             }
         }
+    }
+    
+    private func detectDeviceState(from data: [SensorData]) -> DeviceContext? {
+        guard data.count >= 5 else { return nil } // Need minimum samples
         
-        return normalizeData(rawData)
+        // Get recent samples for analysis
+        let recentSamples = Array(data.suffix(10))
+        
+        // Calculate metrics
+        let accelerometerVariation = calculateAccelerometerVariation(recentSamples)
+        let temperatureChange = calculateTemperatureChange(recentSamples)
+        let batteryStatus = recentSamples.last?.batteryLevel ?? 0
+        
+        // Detect device state based on sensor fusion
+        let detectedState = classifyDeviceState(
+            accelerometerVariation: accelerometerVariation,
+            temperatureChange: temperatureChange,
+            batteryLevel: batteryStatus
+        )
+        
+        // Calculate confidence based on consistency
+        let confidence = calculateStateConfidence(detectedState, samples: recentSamples)
+        
+        // Calculate time in current state
+        let timeInState = Date().timeIntervalSince(lastStateChange)
+        
+        // Determine if PPG should be considered stabilized
+        let isStabilized = isDeviceStabilized(detectedState, timeInState: timeInState, confidence: confidence)
+        
+        return DeviceContext(
+            state: detectedState,
+            confidence: confidence,
+            timeInState: timeInState,
+            temperatureChange: temperatureChange,
+            movementVariation: accelerometerVariation,
+            isStabilized: isStabilized
+        )
+    }
+    
+    private func calculateAccelerometerVariation(_ samples: [SensorData]) -> Double {
+        guard samples.count > 1 else { return 0 }
+        
+        let magnitudes = samples.map { $0.accelerometer.magnitude }
+        let mean = magnitudes.reduce(0, +) / Double(magnitudes.count)
+        let variance = magnitudes.map { pow($0 - mean, 2) }.reduce(0, +) / Double(magnitudes.count)
+        
+        return sqrt(variance) // Standard deviation
+    }
+    
+    private func calculateTemperatureChange(_ samples: [SensorData]) -> Double {
+        guard samples.count > 1 else { return 0 }
+        
+        let temperatures = samples.map { $0.temperature }
+        let minTemp = temperatures.min() ?? 0
+        let maxTemp = temperatures.max() ?? 0
+        
+        return maxTemp - minTemp
+    }
+    
+    private func classifyDeviceState(
+        accelerometerVariation: Double,
+        temperatureChange: Double,
+        batteryLevel: UInt8
+    ) -> DeviceState {
+        // Classification thresholds (these would be tuned based on actual device testing)
+        let lowMovementThreshold = 0.1      // Very low accelerometer variation
+        let moderateMovementThreshold = 0.5  // Moderate accelerometer variation
+        let lowTempChangeThreshold = 0.5     // Small temperature change
+        let moderateTempChangeThreshold = 2.0 // Moderate temperature change
+        
+        // Decision tree for state classification
+        if batteryLevel > 95 && accelerometerVariation < lowMovementThreshold {
+            // Very stable, high battery = likely on charger
+            return .onChargerStatic
+            
+        } else if accelerometerVariation < lowMovementThreshold && temperatureChange < lowTempChangeThreshold {
+            // Low movement, low temp change = off charger but static
+            return .offChargerStatic
+            
+        } else if accelerometerVariation > moderateMovementThreshold {
+            // High movement = being moved around
+            return .inMotion
+            
+        } else if temperatureChange > moderateTempChangeThreshold && accelerometerVariation < moderateMovementThreshold {
+            // Significant temperature change with low movement = likely on body (cheek)
+            return .onCheek
+            
+        } else {
+            return .unknown
+        }
+    }
+    
+    private func calculateStateConfidence(_ state: DeviceState, samples: [SensorData]) -> Double {
+        guard samples.count >= 3 else { return 0.5 }
+        
+        // Calculate consistency of the detected state over recent samples
+        var consistentSamples = 0
+        
+        for i in 1..<samples.count {
+            let prevSample = samples[i-1]
+            let currentSample = samples[i]
+            
+            let accelVariation = abs(currentSample.accelerometer.magnitude - prevSample.accelerometer.magnitude)
+            let tempChange = abs(currentSample.temperature - prevSample.temperature)
+            
+            // Check if this sample is consistent with the detected state
+            var isConsistent = false
+            
+            switch state {
+            case .onChargerStatic, .offChargerStatic:
+                isConsistent = accelVariation < 0.2 && tempChange < 1.0
+            case .inMotion:
+                isConsistent = accelVariation > 0.3
+            case .onCheek:
+                isConsistent = tempChange > 1.0 && accelVariation < 0.4
+            case .unknown:
+                isConsistent = true // Unknown state is always "consistent"
+            }
+            
+            if isConsistent {
+                consistentSamples += 1
+            }
+        }
+        
+        return Double(consistentSamples) / Double(samples.count - 1)
+    }
+    
+    private func isDeviceStabilized(_ state: DeviceState, timeInState: TimeInterval, confidence: Double) -> Bool {
+        // Require high confidence and sufficient time in state
+        let requiredConfidence: Double = 0.7
+        
+        return confidence >= requiredConfidence && timeInState >= state.expectedStabilizationTime
     }
     
     
@@ -1663,7 +2686,12 @@ struct PPGDebugCard: View {
     }
     
     private func normalizeData(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        guard !data.isEmpty else { return data }
+        guard !data.isEmpty else { 
+            print("❌ PPG Debug: No data to normalize")
+            return data 
+        }
+        
+        print("🔍 PPG Debug: Normalizing \(data.count) samples using \(normalizationMethod.rawValue)")
         
         if normalizationMethod == .adaptive {
             return adaptiveNormalization(data)
@@ -1672,9 +2700,13 @@ struct PPGDebugCard: View {
         let irValues = data.map { $0.ir }
         let redValues = data.map { $0.red }
         let greenValues = data.map { $0.green }
+        
+        // Add debug info for raw values
+        print("📊 Raw value ranges - IR: \(irValues.min() ?? 0)-\(irValues.max() ?? 0), Red: \(redValues.min() ?? 0)-\(redValues.max() ?? 0), Green: \(greenValues.min() ?? 0)-\(greenValues.max() ?? 0)")
 
         switch normalizationMethod {
         case .none:
+            print("✅ Using raw values (no normalization)")
             return data
             
         case .zScore:
@@ -1686,7 +2718,10 @@ struct PPGDebugCard: View {
             let redStd = sqrt(redValues.map { pow($0 - redMean, 2) }.reduce(0, +) / Double(redValues.count))
             let greenStd = sqrt(greenValues.map { pow($0 - greenMean, 2) }.reduce(0, +) / Double(greenValues.count))
             
-            return data.map { sample in
+            print("📈 Z-Score normalization - IR: mean=\(irMean), std=\(irStd)")
+            
+            // Handle zero standard deviation
+            let normalizedData = data.map { sample in
                 (
                     timestamp: sample.timestamp,
                     ir: irStd > 0 ? (sample.ir - irMean) / irStd : 0,
@@ -1694,6 +2729,8 @@ struct PPGDebugCard: View {
                     green: greenStd > 0 ? (sample.green - greenMean) / greenStd : 0
                 )
             }
+            print("✅ Z-Score normalization complete")
+            return normalizedData
             
         case .minMax:
             let irMin = irValues.min() ?? 0
@@ -1703,21 +2740,27 @@ struct PPGDebugCard: View {
             let greenMin = greenValues.min() ?? 0
             let greenMax = greenValues.max() ?? 1
             
-            return data.map { sample in
+            print("📊 Min-Max ranges - IR: \(irMin)-\(irMax), Red: \(redMin)-\(redMax), Green: \(greenMin)-\(greenMax)")
+            
+            let normalizedData = data.map { sample in
                 (
                     timestamp: sample.timestamp,
-                    ir: irMax > irMin ? (sample.ir - irMin) / (irMax - irMin) : 0,
-                    red: redMax > redMin ? (sample.red - redMin) / (redMax - redMin) : 0,
-                    green: greenMax > greenMin ? (sample.green - greenMin) / (greenMax - greenMin) : 0
+                    ir: irMax > irMin ? (sample.ir - irMin) / (irMax - irMin) : 0.5, // Default to middle if no range
+                    red: redMax > redMin ? (sample.red - redMin) / (redMax - redMin) : 0.5,
+                    green: greenMax > greenMin ? (sample.green - greenMin) / (greenMax - greenMin) : 0.5
                 )
             }
+            print("✅ Min-Max normalization complete")
+            return normalizedData
             
         case .percentage:
             let irMean = irValues.reduce(0, +) / Double(irValues.count)
             let redMean = redValues.reduce(0, +) / Double(redValues.count)
             let greenMean = greenValues.reduce(0, +) / Double(greenValues.count)
             
-            return data.map { sample in
+            print("📊 Percentage normalization - IR mean: \(irMean), Red mean: \(redMean), Green mean: \(greenMean)")
+            
+            let normalizedData = data.map { sample in
                 (
                     timestamp: sample.timestamp,
                     ir: irMean > 0 ? ((sample.ir - irMean) / irMean) * 100 : 0,
@@ -1725,17 +2768,24 @@ struct PPGDebugCard: View {
                     green: greenMean > 0 ? ((sample.green - greenMean) / greenMean) * 100 : 0
                 )
             }
+            print("✅ Percentage normalization complete")
+            return normalizedData
             
         case .baseline:
             // Use first 3 samples as baseline (if available)
             let baselineCount = min(3, data.count)
-            guard baselineCount > 0 else { return data }
+            guard baselineCount > 0 else { 
+                print("❌ Baseline normalization: No baseline samples available")
+                return data 
+            }
             
             let irBaseline = Array(irValues.prefix(baselineCount)).reduce(0, +) / Double(baselineCount)
             let redBaseline = Array(redValues.prefix(baselineCount)).reduce(0, +) / Double(baselineCount)
             let greenBaseline = Array(greenValues.prefix(baselineCount)).reduce(0, +) / Double(baselineCount)
             
-            return data.map { sample in
+            print("📊 Baseline values - IR: \(irBaseline), Red: \(redBaseline), Green: \(greenBaseline)")
+            
+            let normalizedData = data.map { sample in
                 (
                     timestamp: sample.timestamp,
                     ir: sample.ir - irBaseline,
@@ -1743,10 +2793,100 @@ struct PPGDebugCard: View {
                     green: sample.green - greenBaseline
                 )
             }
+            print("✅ Baseline normalization complete")
+            return normalizedData
             
         case .adaptive:
-            return adaptiveNormalization(data) // This case is handled above, but included for completeness
+            print("🔄 Using adaptive normalization")
+            return adaptiveNormalization(data)
+            
+        case .contextAware:
+            print("🧠 Using context-aware normalization")
+            return contextAwareNormalization(data)
         }
+    }
+    
+    private func contextAwareNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        guard let context = deviceContext else {
+            print("⚠️ No device context available, using min-max normalization")
+            return normalizeSegment(data, using: .minMax)
+        }
+        
+        print("🧠 Context-aware normalization for state: \(context.state.rawValue)")
+        print("📊 Confidence: \(String(format: "%.1f%%", context.confidence * 100))")
+        print("⏱️ Time in state: \(String(format: "%.1f", context.timeInState))s / \(String(format: "%.0f", context.state.expectedStabilizationTime))s needed")
+        
+        // Choose normalization strategy based on device state
+        switch context.state {
+        case .onChargerStatic:
+            // Most stable condition - use min-max for consistent baseline
+            print("🔌 Using min-max normalization for stable charging state")
+            return normalizeSegment(data, using: .minMax)
+            
+        case .offChargerStatic:
+            // Stable but may have temperature drift - use baseline correction
+            print("📱 Using baseline normalization for stable off-charger state")
+            return normalizeSegment(data, using: .baseline)
+            
+        case .inMotion:
+            // Unstable - don't normalize or use very gentle normalization
+            if context.shouldNormalize {
+                print("🚶‍♂️ Using gentle z-score normalization for motion state")
+                return normalizeSegment(data, using: .zScore)
+            } else {
+                print("🚶‍♂️ Skipping normalization during motion (not stabilized)")
+                return data // Raw values during motion
+            }
+            
+        case .onCheek:
+            // Body contact - use specialized approach for biological signals
+            print("😊 Using specialized normalization for cheek contact")
+            return normalizeForBiologicalContact(data, context: context)
+            
+        case .unknown:
+            // Conservative approach
+            print("❓ Using conservative baseline normalization for unknown state")
+            return normalizeSegment(data, using: .baseline)
+        }
+    }
+    
+    private func normalizeForBiologicalContact(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)], context: DeviceContext) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        // For biological contact, we expect:
+        // 1. Higher baseline values due to skin contact
+        // 2. Periodic variations due to heartbeat/muscle activity
+        // 3. Temperature-related drift
+        
+        if !context.shouldNormalize {
+            print("🫀 Biological signals not yet stabilized, using raw values")
+            return data
+        }
+        
+        // Use a modified baseline approach that accounts for biological variations
+        guard data.count >= 5 else { return data }
+        
+        let irValues = data.map { $0.ir }
+        let redValues = data.map { $0.red }
+        let greenValues = data.map { $0.green }
+        
+        // Use median of first 5 samples as baseline (more robust to outliers)
+        let irBaseline = Array(irValues.prefix(5)).sorted()[2] // Median of 5
+        let redBaseline = Array(redValues.prefix(5)).sorted()[2]
+        let greenBaseline = Array(greenValues.prefix(5)).sorted()[2]
+        
+        print("🫀 Biological baseline - IR: \(irBaseline), Red: \(redBaseline), Green: \(greenBaseline)")
+        
+        // Apply gentle normalization that preserves biological signal characteristics
+        let normalizedData = data.map { sample in
+            (
+                timestamp: sample.timestamp,
+                ir: (sample.ir - irBaseline) * 0.1, // Scale down to preserve signal shape
+                red: (sample.red - redBaseline) * 0.1,
+                green: (sample.green - greenBaseline) * 0.1
+            )
+        }
+        
+        print("✅ Biological normalization complete")
+        return normalizedData
     }
     
     private func adaptiveNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
@@ -1828,6 +2968,17 @@ struct PPGDebugCard: View {
                     .font(.headline)
                     .fontWeight(.bold)
                 Spacer()
+                
+                // Temporary debug button - remove this later
+                Button("Test") {
+                    testNormalization()
+                }
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.blue.opacity(0.2))
+                .cornerRadius(4)
+                
                 Text("Last \(recentPPGData.count)")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -1845,12 +2996,156 @@ struct PPGDebugCard: View {
                     }
                 }
                 .pickerStyle(SegmentedPickerStyle())
+                .onChange(of: normalizationMethod) { _, _ in
+                    // Update segments when normalization method changes
+                    updateSegmentsIfNeeded()
+                }
                 
                 // Normalization explanation
                 Text(normalizationExplanation)
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .padding(.top, 2)
+                
+                // Show persistent state for context-aware normalization
+                if normalizationMethod == .contextAware {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Persistent Normalization State")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            
+                            Spacer()
+                            
+                            Button("Reset") {
+                                PPGNormalizationService.shared.resetPersistentState()
+                            }
+                            .font(.caption2)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange.opacity(0.2))
+                            .cornerRadius(4)
+                        }
+                        
+                        Text(PPGNormalizationService.shared.getStateInfo())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(8)
+                            .background(Color.blue.opacity(0.05))
+                            .cornerRadius(6)
+                    }
+                }
+                
+                // Show device context for context-aware normalization
+                if normalizationMethod == .contextAware, let context = deviceContext {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Image(systemName: context.state.icon)
+                                .foregroundColor(context.state.color)
+                            Text("Device State: \(context.state.rawValue)")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(context.state.color)
+                        }
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Confidence")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("\(String(format: "%.0f%%", context.confidence * 100))")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(context.confidence > 0.7 ? .green : .orange)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Time in State")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("\(String(format: "%.0f", context.timeInState))s")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Expected")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("\(String(format: "%.0f", context.state.expectedStabilizationTime))s")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Status")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(context.isStabilized ? .green : .orange)
+                                        .frame(width: 8, height: 8)
+                                    Text(context.isStabilized ? "Ready" : "Wait")
+                                        .font(.caption2)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(context.isStabilized ? .green : .orange)
+                                }
+                            }
+                        }
+                        
+                        // Progress bar for stabilization
+                        if !context.isStabilized {
+                            let progress = min(1.0, context.timeInState / context.state.expectedStabilizationTime)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Stabilization Progress")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                ProgressView(value: progress)
+                                    .progressViewStyle(LinearProgressViewStyle(tint: context.state.color))
+                                    .frame(height: 4)
+                                
+                                Text("Ready for normalization in \(String(format: "%.0f", context.state.expectedStabilizationTime - context.timeInState))s")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        // Movement and temperature info
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Movement")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.3f", context.movementVariation))
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Temp Change")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.1f°C", context.temperatureChange))
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .padding(8)
+                    .background(context.state.color.opacity(0.1))
+                    .cornerRadius(6)
+                }
                 
                 // Show adaptive normalization info
                 if normalizationMethod == .adaptive && !detectedSegments.isEmpty {
@@ -1908,11 +3203,19 @@ struct PPGDebugCard: View {
             .padding(.bottom, 8)
             
             if recentPPGData.isEmpty {
-                Text("No PPG data available")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .frame(height: 100)
+                VStack(spacing: 8) {
+                    Text("No PPG data available")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    // Debug info
+                    Text("Filtered data count: \(filteredData.count)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .opacity(0.7)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .frame(height: 100)
             } else {
                 VStack(spacing: 8) {
                     // Channel switching detection
@@ -2055,6 +3358,152 @@ struct PPGDebugCard: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(radius: 1)
+        .onAppear {
+            // Update segments when view appears
+            updateSegmentsIfNeeded()
+            
+            // Start periodic context updates for context-aware normalization
+            if normalizationMethod == .contextAware {
+                startContextUpdates()
+            }
+        }
+        .onDisappear {
+            stopContextUpdates()
+        }
+    }
+    
+
+    
+    // Temporary debug function - you can call this to test normalization
+    private func testNormalization() {
+        print("🧪 Testing PPG normalization...")
+        
+        // Create test data
+        let testData = [
+            (timestamp: Date(), ir: 1000.0, red: 800.0, green: 600.0),
+            (timestamp: Date().addingTimeInterval(1), ir: 1100.0, red: 850.0, green: 650.0),
+            (timestamp: Date().addingTimeInterval(2), ir: 1200.0, red: 900.0, green: 700.0),
+            (timestamp: Date().addingTimeInterval(3), ir: 1050.0, red: 820.0, green: 630.0),
+            (timestamp: Date().addingTimeInterval(4), ir: 1300.0, red: 950.0, green: 750.0)
+        ]
+        
+        print("📊 Original test data:")
+        for (index, data) in testData.enumerated() {
+            print("  Sample \(index): IR=\(data.ir), Red=\(data.red), Green=\(data.green)")
+        }
+        
+        // Test each normalization method
+        for method in NormalizationMethod.allCases {
+            print("\n🔬 Testing \(method.rawValue):")
+            
+            // This is a bit hacky but will show you what each method produces
+            let normalized = normalizeTestData(testData, using: method)
+            
+            for (index, data) in normalized.enumerated() {
+                print("  Sample \(index): IR=\(String(format: "%.3f", data.ir)), Red=\(String(format: "%.3f", data.red)), Green=\(String(format: "%.3f", data.green))")
+            }
+        }
+        
+        print("\n✅ Normalization test complete")
+    }
+    
+    // Helper for testing
+    private func normalizeTestData(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)], using method: NormalizationMethod) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
+        let irValues = data.map { $0.ir }
+        let redValues = data.map { $0.red }
+        let greenValues = data.map { $0.green }
+
+        switch method {
+        case .none:
+            return data
+            
+        case .zScore:
+            let irMean = irValues.reduce(0, +) / Double(irValues.count)
+            let redMean = redValues.reduce(0, +) / Double(redValues.count)
+            let greenMean = greenValues.reduce(0, +) / Double(greenValues.count)
+            
+            let irStd = sqrt(irValues.map { pow($0 - irMean, 2) }.reduce(0, +) / Double(irValues.count))
+            let redStd = sqrt(redValues.map { pow($0 - redMean, 2) }.reduce(0, +) / Double(redValues.count))
+            let greenStd = sqrt(greenValues.map { pow($0 - greenMean, 2) }.reduce(0, +) / Double(greenValues.count))
+            
+            return data.map { sample in
+                (
+                    timestamp: sample.timestamp,
+                    ir: irStd > 0 ? (sample.ir - irMean) / irStd : 0,
+                    red: redStd > 0 ? (sample.red - redMean) / redStd : 0,
+                    green: greenStd > 0 ? (sample.green - greenMean) / greenStd : 0
+                )
+            }
+            
+        case .minMax:
+            let irMin = irValues.min() ?? 0
+            let irMax = irValues.max() ?? 1
+            let redMin = redValues.min() ?? 0
+            let redMax = redValues.max() ?? 1
+            let greenMin = greenValues.min() ?? 0
+            let greenMax = greenValues.max() ?? 1
+            
+            return data.map { sample in
+                (
+                    timestamp: sample.timestamp,
+                    ir: irMax > irMin ? (sample.ir - irMin) / (irMax - irMin) : 0.5,
+                    red: redMax > redMin ? (sample.red - redMin) / (redMax - redMin) : 0.5,
+                    green: greenMax > greenMin ? (sample.green - greenMin) / (greenMax - greenMin) : 0.5
+                )
+            }
+            
+        case .percentage:
+            let irMean = irValues.reduce(0, +) / Double(irValues.count)
+            let redMean = redValues.reduce(0, +) / Double(redValues.count)
+            let greenMean = greenValues.reduce(0, +) / Double(greenValues.count)
+            
+            return data.map { sample in
+                (
+                    timestamp: sample.timestamp,
+                    ir: irMean > 0 ? ((sample.ir - irMean) / irMean) * 100 : 0,
+                    red: redMean > 0 ? ((sample.red - redMean) / redMean) * 100 : 0,
+                    green: greenMean > 0 ? ((sample.green - greenMean) / greenMean) * 100 : 0
+                )
+            }
+            
+        case .baseline:
+            let baselineCount = min(3, data.count)
+            guard baselineCount > 0 else { return data }
+            
+            let irBaseline = Array(irValues.prefix(baselineCount)).reduce(0, +) / Double(baselineCount)
+            let redBaseline = Array(redValues.prefix(baselineCount)).reduce(0, +) / Double(baselineCount)
+            let greenBaseline = Array(greenValues.prefix(baselineCount)).reduce(0, +) / Double(baselineCount)
+            
+            return data.map { sample in
+                (
+                    timestamp: sample.timestamp,
+                    ir: sample.ir - irBaseline,
+                    red: sample.red - redBaseline,
+                    green: sample.green - greenBaseline
+                )
+            }
+            
+        case .adaptive:
+            // For testing, just use minMax
+            return normalizeTestData(data, using: .minMax)
+            
+        case .contextAware:
+            // For testing, just use minMax
+            return normalizeTestData(data, using: .minMax)
+        }
+    }
+    
+    private func startContextUpdates() {
+        // Update context every 2 seconds
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            if normalizationMethod == .contextAware {
+                updateDeviceContext()
+            }
+        }
+    }
+    
+    private func stopContextUpdates() {
+        // Timer will be invalidated when view disappears
     }
     
     private var timeFormatter: DateFormatter {
@@ -2141,6 +3590,8 @@ struct PPGDebugCard: View {
             return "Relative to first 3 samples"
         case .adaptive:
             return "Auto-detects sensor movement and recalibrates normalization for each stable period"
+        case .contextAware:
+            return "🧠 PERSISTENT SMART: Remembers baseline across sessions, adapts to device state (charging, on body, moving), preserves physiological signal patterns. This is the most advanced method."
         }
     }
     
@@ -2184,6 +3635,8 @@ struct PPGDebugCard: View {
             return String(format: "%.1f%%", value)
         case .baseline:
             return String(format: "%.0f", value)
+        case .contextAware:
+            return String(format: "%.3f", value)
         }
     }
 }

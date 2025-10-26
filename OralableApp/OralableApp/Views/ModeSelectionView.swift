@@ -1,10 +1,5 @@
 import SwiftUI
 
-enum AppMode {
-    case viewer
-    case subscription
-}
-
 struct ModeSelectionView: View {
     @Binding var selectedMode: AppMode?
     @State private var showModeInfo = false

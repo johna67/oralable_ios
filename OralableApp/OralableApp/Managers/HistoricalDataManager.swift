@@ -45,9 +45,13 @@ class HistoricalDataManager: ObservableObject {
         
         // Use background queue for calculations to avoid blocking UI
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let day = ble.getHistoricalMetrics(for: .day)
-            let week = ble.getHistoricalMetrics(for: .week)
-            let month = ble.getHistoricalMetrics(for: .month)
+            let dayRange = TimeRange.day
+            let weekRange = TimeRange.week
+            let monthRange = TimeRange.month
+            
+            let day = ble.getHistoricalMetrics(for: dayRange)
+            let week = ble.getHistoricalMetrics(for: weekRange)
+            let month = ble.getHistoricalMetrics(for: monthRange)
             
             DispatchQueue.main.async {
                 self?.dayMetrics = day
@@ -72,14 +76,14 @@ class HistoricalDataManager: ObservableObject {
             
             DispatchQueue.main.async {
                 switch range {
-                case .hour:
+                case TimeRange.hour:
                     // Hour metrics are no longer supported
                     break
-                case .day:
+                case TimeRange.day:
                     self?.dayMetrics = metrics
-                case .week:
+                case TimeRange.week:
                     self?.weekMetrics = metrics
-                case .month:
+                case TimeRange.month:
                     self?.monthMetrics = metrics
                 }
                 self?.lastUpdateTime = Date()
@@ -92,10 +96,10 @@ class HistoricalDataManager: ObservableObject {
     /// - Returns: Cached metrics or nil if not available
     func getMetrics(for range: TimeRange) -> HistoricalMetrics? {
         switch range {
-        case .hour: return nil // Hour metrics are no longer supported
-        case .day: return dayMetrics
-        case .week: return weekMetrics
-        case .month: return monthMetrics
+        case TimeRange.hour: return nil // Hour metrics are no longer supported
+        case TimeRange.day: return dayMetrics
+        case TimeRange.week: return weekMetrics
+        case TimeRange.month: return monthMetrics
         }
     }
     
@@ -118,10 +122,10 @@ class HistoricalDataManager: ObservableObject {
     /// - Parameter range: The time range to clear
     func clearMetrics(for range: TimeRange) {
         switch range {
-        case .hour: break // Hour metrics are no longer supported
-        case .day: dayMetrics = nil
-        case .week: weekMetrics = nil
-        case .month: monthMetrics = nil
+        case TimeRange.hour: break // Hour metrics are no longer supported
+        case TimeRange.day: dayMetrics = nil
+        case TimeRange.week: weekMetrics = nil
+        case TimeRange.month: monthMetrics = nil
         }
     }
     
