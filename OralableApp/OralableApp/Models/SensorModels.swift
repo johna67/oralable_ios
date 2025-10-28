@@ -17,7 +17,7 @@ struct BLEConstants {
 }
 
 // MARK: - Sensor Data
-struct SensorData: Codable {
+struct SensorData: Codable, Equatable {
     var grinding = GrindingData()
     var accelerometer = AccelerometerData()
     var ppg = PPGData()
@@ -35,14 +35,14 @@ struct SensorData: Codable {
     var timestamp: Date = Date()
 }
 
-struct GrindingData: Codable {
+struct GrindingData: Codable, Equatable {
     var isActive: Bool = false
     var count: UInt8 = 0
     var duration: TimeInterval = 0
     var intensity: Float = 0.0
 }
 
-struct AccelerometerData: Codable {
+struct AccelerometerData: Codable, Equatable {
     var frameCounter: UInt32 = 0
     var samples: [AccSample] = []
     
@@ -64,14 +64,14 @@ struct AccelerometerData: Codable {
     }
 }
 
-struct AccSample: Codable {
+struct AccSample: Codable, Equatable {
     var x: Int16 = 0
     var y: Int16 = 0
     var z: Int16 = 0
     var timestamp: Date = Date()
 }
 
-struct PPGData: Codable {
+struct PPGData: Codable, Equatable {
     var frameCounter: UInt32 = 0
     var samples: [PPGSample] = []
     
@@ -106,7 +106,7 @@ struct PPGData: Codable {
     }
 }
 
-struct PPGSample: Codable {
+struct PPGSample: Codable, Equatable {
     var red: UInt32 = 0
     var ir: UInt32 = 0
     var green: UInt32 = 0
