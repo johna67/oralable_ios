@@ -167,6 +167,11 @@ struct HistoricalSample: Codable {
                 "y": Double(sensorData.accelerometer.y),
                 "z": Double(sensorData.accelerometer.z)
             ]
+        case .heartRate:
+            self.value = Double(sensorData.heartRate.bpm)
+            self.additionalData = [
+                "signalQuality": Double(sensorData.heartRate.signalQuality)
+            ]
         }
     }
 }
@@ -303,6 +308,8 @@ class HistoricalDataProcessor: ObservableObject {
             return data.map { (timestamp: $0.timestamp, value: Double($0.batteryLevel)) }
         case .accelerometer:
             return data.map { (timestamp: $0.timestamp, value: $0.accelerometer.magnitude) }
+        case .heartRate:
+            return data.map { (timestamp: $0.timestamp, value: Double($0.heartRate.bpm)) }
         }
     }
     
@@ -1142,6 +1149,8 @@ struct TooltipOverlayUnified: View {
             return String(format: "%.0f%%", value)
         case .accelerometer:
             return String(format: "%.2f", value)
+        case .heartRate:
+            return String(format: "%.0f BPM", value)
         }
     }
     
@@ -1198,6 +1207,8 @@ struct EnhancedStatisticsCardUnified: View {
             return String(format: "%.0f%%", value)
         case .accelerometer:
             return String(format: "%.2f", value)
+        case .heartRate:
+            return String(format: "%.0f BPM", value)
         }
     }
     

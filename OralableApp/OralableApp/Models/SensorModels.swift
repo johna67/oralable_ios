@@ -21,6 +21,7 @@ struct SensorData: Codable, Equatable {
     var grinding = GrindingData()
     var accelerometer = AccelerometerData()
     var ppg = PPGData()
+    var heartRate = HeartRateData()  // NEW: Heart rate data
     var temperature: Double = 0.0
     var activityLevel: UInt8 = 0
     var batteryVoltage: Int32 = 0
@@ -111,6 +112,49 @@ struct PPGSample: Codable, Equatable {
     var ir: UInt32 = 0
     var green: UInt32 = 0
     var timestamp: Date = Date()
+}
+
+// MARK: - Heart Rate Data (NEW)
+struct HeartRateData: Codable, Equatable {
+    var bpm: Double = 0.0
+    var signalQuality: Double = 0.0  // 0.0 to 1.0
+    var isValid: Bool = false
+    var lastCalculated: Date = Date()
+    
+    /// Display text for heart rate with proper formatting
+    var displayText: String {
+        if isValid {
+            return "\(Int(bpm)) BPM"
+        } else {
+            return "-- BPM"
+        }
+    }
+    
+    /// Quality level for UI display
+    var qualityText: String {
+        if !isValid {
+            return "No Signal"
+        } else if signalQuality >= 0.6 {
+            return "Good"
+        } else if signalQuality >= 0.3 {
+            return "Fair"
+        } else {
+            return "Poor"
+        }
+    }
+    
+    /// Color for quality indicator
+    var qualityColor: String {
+        if !isValid {
+            return "gray"
+        } else if signalQuality >= 0.6 {
+            return "green"
+        } else if signalQuality >= 0.3 {
+            return "yellow"
+        } else {
+            return "red"
+        }
+    }
 }
 
 // MARK: - Measurement Sites

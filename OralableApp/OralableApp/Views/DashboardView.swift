@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftUI
 import Charts
 
 struct DashboardView: View {
@@ -57,6 +56,20 @@ struct DashboardView: View {
                             selectedMetric = .ppg
                         }
                         
+                        // Heart Rate Graph (NEW)
+                        MetricGraphCard(
+                            title: "Heart Rate",
+                            icon: "heart.fill",
+                            color: .pink,
+                            isConnected: ble.isConnected
+                        ) {
+                            HeartRateGraphView(ble: ble)
+                        }
+                        .onTapGesture {
+                            selectedTimestamp = ble.lastUpdate
+                            selectedMetric = .heartRate
+                        }
+                        
                         // Temperature Graph
                         MetricGraphCard(
                             title: "Temperature",
@@ -95,7 +108,7 @@ struct DashboardView: View {
             .sheet(item: $selectedMetric) { metric in
                 if #available(iOS 16.0, *) {
                     HistoricalDetailView(
-                        ble: ble, 
+                        ble: ble,
                         metricType: metric
                     )
                 } else {
@@ -119,50 +132,20 @@ struct ConnectionStatusCard: View {
                     .fill(ble.isConnected ? Color.green : Color.red)
                     .frame(width: 12, height: 12)
                 
-                Text(ble.isConnected ? "Connected" : "Disconnected")
+                Text(ble.isConnected ? "Connected" : (isViewerMode ? "Not Connected" : "Disconnected"))
                     .font(.headline)
-                    .foregroundColor(ble.isConnected ? .primary : .secondary)
+                    .foregroundColor(ble.isConnected ? .green : .red)
                 
                 Spacer()
                 
-                if isViewerMode {
-                    Text("Viewer Mode")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.2))
-                        .foregroundColor(.orange)
-                        .cornerRadius(4)
-                }
-            }
-            
-            if ble.isConnected {
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Device")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(ble.deviceName)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Last Update")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(ble.lastUpdate, style: .relative)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                }
-            } else if !isViewerMode {
-                Button(action: { ble.toggleScanning() }) {
-                    HStack {
-                        Image(systemName: ble.isScanning ? "stop.circle" : "antenna.radiowaves.left.and.right")
-                        Text(ble.isScanning ? "Stop Scanning" : "Start Scanning")
+                if !ble.isConnected && !isViewerMode {
+                    Button(action: {
+                        ble.toggleScanning()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: ble.isScanning ? "stop.circle" : "antenna.radiowaves.left.and.right")
+                            Text(ble.isScanning ? "Stop Scanning" : "Start Scanning")
+                        }
                     }
                     .font(.subheadline)
                     .padding(.horizontal, 20)
@@ -171,7 +154,17 @@ struct ConnectionStatusCard: View {
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
-            } else if !ble.historicalData.isEmpty {
+            }
+            
+            if !ble.isConnected && !isViewerMode && ble.isScanning {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Scanning for devices...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else if !ble.historicalData.isEmpty && isViewerMode {
                 // Viewer Mode with imported data
                 HStack {
                     Image(systemName: "doc.text.fill")
@@ -320,14 +313,27 @@ struct BatteryGraphView: View {
                 if !recentData.isEmpty {
                     let latestVoltage = recentData.last?.batteryVoltage ?? 0
                     let latestLevel = recentData.last?.batteryLevel ?? 0
-                    Text("Voltage: \(latestVoltage) mV")
-                        .font(.caption)
-                        .fontWeight(.medium)
+                    
+                    VStack(alignment: .leading) {
+                        Text("Level")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(latestLevel)%")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                    }
+                    
                     Spacer()
-                    Text("\(latestLevel)%")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
+                    
+                    VStack(alignment: .trailing) {
+                        Text("Voltage")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(latestVoltage) mV")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 } else {
                     Text("No Data")
                         .font(.caption)
@@ -340,12 +346,24 @@ struct BatteryGraphView: View {
                     Chart(recentData.indices, id: \.self) { index in
                         LineMark(
                             x: .value("Sample", index),
-                            y: .value("Voltage", Int(recentData[index].batteryVoltage))
+                            y: .value("Battery", recentData[index].batteryLevel)
                         )
                         .foregroundStyle(.green)
                         .interpolationMethod(.catmullRom)
+                        
+                        AreaMark(
+                            x: .value("Sample", index),
+                            y: .value("Battery", recentData[index].batteryLevel)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.3), Color.green.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
                     }
-                    .chartYScale(domain: 3000...4200)
                     .chartYAxis {
                         AxisMarks(position: .leading)
                     }
@@ -399,7 +417,7 @@ struct PPGGraphView: View {
                         Text("\(recentData.last?.ppg.red ?? 0)")
                             .font(.caption)
                             .fontWeight(.medium)
-                            .foregroundColor(.pink)
+                            .foregroundColor(.orange)
                     }
                     
                     VStack(alignment: .leading) {
@@ -424,26 +442,126 @@ struct PPGGraphView: View {
                         ForEach(recentData.indices, id: \.self) { index in
                             LineMark(
                                 x: .value("Sample", index),
-                                y: .value("IR", Int(recentData[index].ppg.ir))
+                                y: .value("IR", recentData[index].ppg.ir)
                             )
                             .foregroundStyle(.red)
                             .lineStyle(StrokeStyle(lineWidth: 1.5))
                             
                             LineMark(
                                 x: .value("Sample", index),
-                                y: .value("Red", Int(recentData[index].ppg.red))
+                                y: .value("Red", recentData[index].ppg.red)
                             )
-                            .foregroundStyle(.pink)
-                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                            .foregroundStyle(.orange)
+                            .lineStyle(StrokeStyle(lineWidth: 1))
                             
                             LineMark(
                                 x: .value("Sample", index),
-                                y: .value("Green", Int(recentData[index].ppg.green))
+                                y: .value("Green", recentData[index].ppg.green)
                             )
                             .foregroundStyle(.green)
-                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1))
                         }
                     }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: 150)
+                } else {
+                    Text("Charts require iOS 16+")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(height: 150)
+                }
+            } else {
+                VStack {
+                    Text("No Data")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+}
+
+// MARK: - Heart Rate Graph View (NEW)
+struct HeartRateGraphView: View {
+    @ObservedObject var ble: OralableBLE
+    
+    private var recentData: [SensorData] {
+        Array(ble.historicalData.suffix(50))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                if !recentData.isEmpty, let latest = recentData.last {
+                    VStack(alignment: .leading) {
+                        Text("BPM")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(latest.heartRate.displayText)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.pink)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing) {
+                        Text("Quality")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(latest.heartRate.isValid ?
+                                      (latest.heartRate.signalQuality >= 0.6 ? Color.green :
+                                       latest.heartRate.signalQuality >= 0.3 ? Color.yellow : Color.red) :
+                                      Color.gray)
+                                .frame(width: 8, height: 8)
+                            Text(latest.heartRate.qualityText)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } else {
+                    Text("No Data")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if !recentData.isEmpty {
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        ForEach(recentData.indices, id: \.self) { index in
+                            if recentData[index].heartRate.isValid {
+                                LineMark(
+                                    x: .value("Sample", index),
+                                    y: .value("BPM", recentData[index].heartRate.bpm)
+                                )
+                                .foregroundStyle(.pink)
+                                .interpolationMethod(.catmullRom)
+                                .lineStyle(StrokeStyle(lineWidth: 2))
+                                
+                                AreaMark(
+                                    x: .value("Sample", index),
+                                    y: .value("BPM", recentData[index].heartRate.bpm)
+                                )
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color.pink.opacity(0.3), Color.pink.opacity(0.0)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .interpolationMethod(.catmullRom)
+                            }
+                        }
+                    }
+                    .chartYScale(domain: 40...180)
                     .chartYAxis {
                         AxisMarks(position: .leading)
                     }
@@ -480,10 +598,6 @@ struct TemperatureGraphView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 if !recentData.isEmpty {
-                    Text("Temperature")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                    Spacer()
                     Text(String(format: "%.1f°C", recentData.last?.temperature ?? 0))
                         .font(.title3)
                         .fontWeight(.bold)
@@ -663,6 +777,7 @@ enum MetricType: String, Identifiable, Codable {
     case ppg = "ppg"
     case temperature = "temperature"
     case accelerometer = "accelerometer"
+    case heartRate = "heartRate"
     
     var id: String {
         return self.rawValue
@@ -674,6 +789,7 @@ enum MetricType: String, Identifiable, Codable {
         case .ppg: return "PPG Signals"
         case .temperature: return "Temperature"
         case .accelerometer: return "Accelerometer"
+        case .heartRate: return "Heart Rate"
         }
     }
     
@@ -683,6 +799,7 @@ enum MetricType: String, Identifiable, Codable {
         case .ppg: return "waveform.path.ecg"
         case .temperature: return "thermometer"
         case .accelerometer: return "gyroscope"
+        case .heartRate: return "heart.fill"
         }
     }
     
@@ -692,6 +809,7 @@ enum MetricType: String, Identifiable, Codable {
         case .ppg: return .red
         case .temperature: return .orange
         case .accelerometer: return .blue
+        case .heartRate: return .pink
         }
     }
     
@@ -705,6 +823,8 @@ enum MetricType: String, Identifiable, Codable {
             return "Temperature"
         case .accelerometer:
             return "X,Y,Z,Magnitude"
+        case .heartRate:
+            return "BPM,Quality"
         }
     }
     
@@ -718,7 +838,8 @@ enum MetricType: String, Identifiable, Codable {
             return "\(sensorData.temperature)"
         case .accelerometer:
             return "\(sensorData.accelerometer.x),\(sensorData.accelerometer.y),\(sensorData.accelerometer.z),\(sensorData.accelerometer.magnitude)"
+        case .heartRate:
+            return "\(sensorData.heartRate.bpm),\(sensorData.heartRate.signalQuality)"
         }
     }
 }
-
