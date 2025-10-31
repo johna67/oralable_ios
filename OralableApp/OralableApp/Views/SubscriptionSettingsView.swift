@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct SubscriptionSettingsView: View {
     @ObservedObject var ble: OralableBLE
@@ -8,6 +9,7 @@ struct SubscriptionSettingsView: View {
     @State private var showSignOutAlert = false
     @State private var showLogs = false
     @State private var showSubscriptionInfo = false
+    @State private var showAppleIDDebug = false
     
     var body: some View {
         NavigationView {
@@ -143,6 +145,17 @@ struct SubscriptionSettingsView: View {
                         }
                     }
                     
+                    Button(action: { showAppleIDDebug = true }) {
+                        HStack {
+                            Image(systemName: "person.crop.rectangle.badge.plus")
+                            Text("Apple ID Debug")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
                     Button(action: { ble.logMessages.removeAll() }) {
                         HStack {
                             Image(systemName: "trash")
@@ -221,6 +234,9 @@ struct SubscriptionSettingsView: View {
         }
         .sheet(isPresented: $showSubscriptionInfo) {
             SubscriptionTierSelectionView()
+        }
+        .sheet(isPresented: $showAppleIDDebug) {
+            AppleIDDebugView()
         }
         .alert("Sign Out", isPresented: $showSignOutAlert) {
             Button("Cancel", role: .cancel) {}

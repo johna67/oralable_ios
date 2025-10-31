@@ -26,6 +26,9 @@ class OralableBLE: NSObject, ObservableObject {
     var peripheral: CBPeripheral?
     private var cancellables = Set<AnyCancellable>()
     
+    // MARK: - Heart Rate Calculator
+    private let heartRateCalculator = HeartRateCalculator()
+    
     private var reconnectTimer: Timer?
     private var connectionAttempts = 0
     private let maxConnectionAttempts = 3
@@ -141,7 +144,16 @@ class OralableBLE: NSObject, ObservableObject {
     func clearLogs() {
         logMessages.removeAll()
         historicalData.removeAll()
+        heartRateCalculator.reset()
         addLog("Logs cleared", level: .info)
+    }
+    
+    func resetHeartRateCalculator() {
+        heartRateCalculator.reset()
+        sensorData.heartRate.isValid = false
+        sensorData.heartRate.bpm = 0.0
+        sensorData.heartRate.signalQuality = 0.0
+        addLog("Heart rate calculator reset", level: .info)
     }
     
     // MARK: - Private Methods
@@ -163,6 +175,14 @@ class OralableBLE: NSObject, ObservableObject {
         isConnected = false
         deviceName = "Not Connected"
         self.peripheral = nil
+        
+        // Reset heart rate calculator when disconnecting
+        heartRateCalculator.reset()
+        
+        // Reset heart rate data
+        sensorData.heartRate.isValid = false
+        sensorData.heartRate.bpm = 0.0
+        sensorData.heartRate.signalQuality = 0.0
         
         reconnectTimer?.invalidate()
         
@@ -239,6 +259,22 @@ class OralableBLE: NSObject, ObservableObject {
                 
                 allSamples.append((red: sample.red, ir: sample.ir, green: sample.green))
             }
+        }
+        
+        // Calculate heart rate from IR samples
+        let irSamples = sensorData.ppg.samples.map { $0.ir }
+        if let heartRateResult = heartRateCalculator.calculateHeartRate(irSamples: irSamples) {
+            // Update heart rate data
+            sensorData.heartRate.bpm = heartRateResult.bpm
+            sensorData.heartRate.signalQuality = heartRateResult.quality
+            sensorData.heartRate.isValid = heartRateResult.isReliable
+            sensorData.heartRate.lastCalculated = heartRateResult.timestamp
+            
+            addLog("Heart Rate: \(heartRateResult.bpm.rounded()) BPM (Quality: \(String(format: "%.2f", heartRateResult.quality)))", level: heartRateResult.isReliable ? .success : .warning)
+        } else {
+            // Mark heart rate as invalid if calculation fails
+            sensorData.heartRate.isValid = false
+            sensorData.heartRate.signalQuality = 0.0
         }
         
         // Debug: Check if values are consistent across samples
