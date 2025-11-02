@@ -3,8 +3,7 @@
 //  OralableApp
 //
 //  Updated: November 2, 2025
-//  BLE Manager for Oralable device communication
-//  FIXES: Device filtering, correct service UUIDs, complete implementation
+//  FIXES: Enhanced service discovery - finds ALL services
 //
 
 import Foundation
@@ -73,6 +72,9 @@ class OralableBLE: NSObject, ObservableObject {
     private var ppgBufferIR: [Int32] = []
     private var ppgBufferGreen: [Int32] = []
     
+    // Track discovered device UUIDs to reduce duplicate logging
+    private var discoveredDeviceUUIDs: Set<UUID> = []
+    
     // FIXED: Correct TGM Service and Characteristic UUIDs
     private let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
     
@@ -118,21 +120,16 @@ class OralableBLE: NSObject, ObservableObject {
         
         isScanning = true
         discoveredDevices.removeAll()
+        discoveredDeviceUUIDs.removeAll()
         connectionStatus = "Scanning..."
         
-        // OPTION 1: Scan for specific TGM service (recommended)
+        // Scan for all devices but don't allow duplicates
         centralManager.scanForPeripherals(
-            withServices: [tgmServiceUUID],
+            withServices: nil,
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
         )
         
-        // OPTION 2: Scan for all devices and filter (use if OPTION 1 doesn't find device)
-        // centralManager.scanForPeripherals(
-        //     withServices: nil,
-        //     options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
-        // )
-        
-        addLogMessage("🔍 Started scanning for Oralable devices...")
+        addLogMessage("🔍 Scanning for Oralable devices...")
     }
     
     /// Stop scanning for devices
@@ -142,7 +139,7 @@ class OralableBLE: NSObject, ObservableObject {
         if !isConnected {
             connectionStatus = "Scan stopped"
         }
-        addLogMessage("⏹️ Stopped scanning")
+        addLogMessage("⏹️ Stopped scanning - Found \(discoveredDevices.count) device(s)")
     }
     
     /// Toggle scanning state
@@ -161,19 +158,21 @@ class OralableBLE: NSObject, ObservableObject {
         connectedPeripheral = peripheral
         peripheral.delegate = self
         
+        addLogMessage("📱 Attempting connection to: \(peripheral.name ?? "Unknown")")
+        addLogMessage("   Device ID: \(peripheral.identifier.uuidString)")
+        
         // Set connection timeout
         connectionTimeoutTimer?.invalidate()
         connectionTimeoutTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
-            self?.addLogMessage("⏰ Connection timeout - cancelling connection attempt")
+            self?.addLogMessage("⏰ Connection timeout after 30 seconds")
             self?.centralManager.cancelPeripheralConnection(peripheral)
             DispatchQueue.main.async {
-                self?.connectionStatus = "Connection timeout"
+                self?.connectionStatus = "Timeout"
                 self?.connectedPeripheral = nil
             }
         }
         
         centralManager.connect(peripheral, options: nil)
-        addLogMessage("📱 Attempting to connect to: \(peripheral.name ?? "Unknown Device")")
     }
     
     /// Connect to first device with matching name (for debugging)
@@ -185,7 +184,7 @@ class OralableBLE: NSObject, ObservableObject {
         if let device = matchingDevices.first {
             connect(to: device)
         } else {
-            addLogMessage("❌ No device found with name containing: \(name)")
+            addLogMessage("❌ No device found with name: \(name)")
         }
     }
     
@@ -195,7 +194,7 @@ class OralableBLE: NSObject, ObservableObject {
         
         connectionStatus = "Disconnecting..."
         centralManager.cancelPeripheralConnection(peripheral)
-        addLogMessage("📱 Disconnecting from device...")
+        addLogMessage("📱 Disconnecting...")
     }
     
     /// Clear discovered devices and start fresh scan
@@ -203,10 +202,10 @@ class OralableBLE: NSObject, ObservableObject {
         stopScanning()
         DispatchQueue.main.async {
             self.discoveredDevices.removeAll()
+            self.discoveredDeviceUUIDs.removeAll()
         }
-        addLogMessage("🔄 Cleared device list")
+        addLogMessage("🔄 Refreshing scan...")
         
-        // Start scanning after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.startScanning()
         }
@@ -214,18 +213,15 @@ class OralableBLE: NSObject, ObservableObject {
     
     /// Force reset all BLE connections and state
     func resetBLE() {
-        addLogMessage("🔄 Resetting BLE state...")
+        addLogMessage("🔄 Resetting BLE...")
         
-        // Cancel any existing timer
         connectionTimeoutTimer?.invalidate()
         connectionTimeoutTimer = nil
         
-        // Disconnect if connected
         if let peripheral = connectedPeripheral {
             centralManager.cancelPeripheralConnection(peripheral)
         }
         
-        // Clear all state
         DispatchQueue.main.async {
             self.isConnected = false
             self.isScanning = false
@@ -233,19 +229,16 @@ class OralableBLE: NSObject, ObservableObject {
             self.connectedPeripheral = nil
             self.connectionStatus = "Disconnected"
             self.discoveredDevices.removeAll()
-            
-            // Reset sensor data
+            self.discoveredDeviceUUIDs.removeAll()
             self.sensorData = CurrentSensorData()
         }
         
-        // Clear data buffers
         ppgBufferRed.removeAll()
         ppgBufferIR.removeAll()
         ppgBufferGreen.removeAll()
         
-        addLogMessage("✅ BLE state reset complete")
+        addLogMessage("✅ Reset complete")
         
-        // Restart scanning if Bluetooth is powered on
         if centralManager.state == .poweredOn {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 self.startScanning()
@@ -265,7 +258,14 @@ class OralableBLE: NSObject, ObservableObject {
             self.temperatureHistory.removeAll()
             self.accelerometerHistory.removeAll()
         }
-        addLogMessage("🗑️ All logs and historical data cleared")
+        addLogMessage("🗑️ Cleared all data")
+    }
+    
+    // MARK: - Historical Data Methods
+    
+    /// Get historical metrics for a specific time range
+    func getHistoricalMetrics(for range: TimeRange) -> HistoricalMetrics {
+        return HistoricalDataAggregator.aggregate(data: sensorDataHistory, for: range)
     }
     
     // MARK: - Private Helper Methods
@@ -276,11 +276,11 @@ class OralableBLE: NSObject, ObservableObject {
         let logEntry = "[\(timestamp)] \(message)"
         
         DispatchQueue.main.async {
-            self.logMessages.append(message)
+            self.logMessages.append(logEntry)
             
-            // Keep only last 500 log messages
-            if self.logMessages.count > 500 {
-                self.logMessages.removeFirst(self.logMessages.count - 500)
+            // Keep only last 200 log messages
+            if self.logMessages.count > 200 {
+                self.logMessages.removeFirst(self.logMessages.count - 200)
             }
         }
         
@@ -289,12 +289,10 @@ class OralableBLE: NSObject, ObservableObject {
     
     /// Process PPG data and calculate heart rate and SpO2
     private func processPPGData(red: [Int32], ir: [Int32], green: [Int32]) {
-        // Accumulate samples
         ppgBufferRed.append(contentsOf: red)
         ppgBufferIR.append(contentsOf: ir)
         ppgBufferGreen.append(contentsOf: green)
         
-        // Keep only recent samples (max 300 = 6 seconds @ 50Hz)
         let maxBufferSize = 300
         if ppgBufferRed.count > maxBufferSize {
             ppgBufferRed.removeFirst(ppgBufferRed.count - maxBufferSize)
@@ -303,10 +301,12 @@ class OralableBLE: NSObject, ObservableObject {
         }
         
         // Calculate heart rate (needs minimum 20 samples)
+        // Convert Int32 to UInt32 for the calculator
         if ppgBufferIR.count >= 20 {
-            if let heartRate = heartRateCalculator.calculateHeartRate(irSamples: ppgBufferIR) {
+            let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
+            if let heartRate = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
                 DispatchQueue.main.async {
-                    self.sensorData.heartRate = heartRate
+                    self.sensorData.heartRate = heartRate.bpm
                 }
             }
         }
@@ -319,7 +319,6 @@ class OralableBLE: NSObject, ObservableObject {
             ) {
                 DispatchQueue.main.async {
                     self.sensorData.spo2 = result.spo2
-                    // Could also store quality: result.quality
                 }
             }
         }
@@ -333,111 +332,103 @@ extension OralableBLE: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         DispatchQueue.main.async {
             switch central.state {
-            case .unknown:
-                self.connectionStatus = "Unknown"
-                self.addLogMessage("⚠️ Bluetooth state: Unknown")
-            case .resetting:
-                self.connectionStatus = "Resetting"
-                self.addLogMessage("⚠️ Bluetooth state: Resetting")
-            case .unsupported:
-                self.connectionStatus = "BLE Unsupported"
-                self.addLogMessage("❌ Bluetooth Low Energy is not supported on this device")
-            case .unauthorized:
-                self.connectionStatus = "Unauthorized"
-                self.addLogMessage("❌ App is not authorized to use Bluetooth")
-            case .poweredOff:
-                self.connectionStatus = "Bluetooth Off"
-                self.addLogMessage("❌ Bluetooth is powered off")
             case .poweredOn:
                 self.connectionStatus = "Ready"
-                self.addLogMessage("✅ Bluetooth is powered on and ready")
-            @unknown default:
-                self.connectionStatus = "Unknown State"
-                self.addLogMessage("⚠️ Bluetooth state: Unknown default")
+                self.addLogMessage("✅ Bluetooth ready")
+            case .poweredOff:
+                self.connectionStatus = "Bluetooth Off"
+                self.addLogMessage("❌ Bluetooth is off")
+            case .unauthorized:
+                self.connectionStatus = "Unauthorized"
+                self.addLogMessage("❌ Bluetooth unauthorized")
+            case .unsupported:
+                self.connectionStatus = "Unsupported"
+                self.addLogMessage("❌ BLE not supported")
+            default:
+                self.connectionStatus = "Not Ready"
+                self.addLogMessage("⚠️ Bluetooth: \(central.state.rawValue)")
             }
         }
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         
-        addLogMessage("🔍 Discovered device: \(peripheral.name ?? "Unknown") - ID: \(peripheral.identifier)")
-        
-        // FIXED: Restrictive device filtering
-        guard let deviceName = peripheral.name, !deviceName.isEmpty else {
-            addLogMessage("📱 Found device without name: \(peripheral.identifier)")
+        // Skip if already discovered
+        guard !discoveredDeviceUUIDs.contains(peripheral.identifier) else {
             return
         }
         
-        // Only accept devices that:
-        // 1. Have "Oralable" in the name, OR
-        // 2. Advertise the TGM Service UUID
-        let advertisedUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
+        let deviceName = peripheral.name ?? ""
         
-        let hasOralableName = deviceName.lowercased().contains("oralable")
+        // Skip unnamed devices
+        guard !deviceName.isEmpty else {
+            return
+        }
+        
+        // Check for Oralable device patterns
+        let deviceNameLower = deviceName.lowercased()
+        let namePatterns = ["oralable", "tgm", "nrf", "tooth", "dental", "bruxism"]
+        let matchesName = namePatterns.contains { deviceNameLower.contains($0) }
+        
+        // Check for TGM service
+        let advertisedUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
         let hasTGMService = advertisedUUIDs.contains(tgmServiceUUID)
         
-        let isOralableDevice = hasOralableName || hasTGMService
-        
-        if isOralableDevice {
-            // Add to discovered devices if not already present
-            if !discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
-                DispatchQueue.main.async {
-                    self.discoveredDevices.append(peripheral)
-                }
-                addLogMessage("✅ Added Oralable device: \(deviceName)")
+        // Accept device if it matches
+        if matchesName || hasTGMService {
+            discoveredDeviceUUIDs.insert(peripheral.identifier)
+            
+            DispatchQueue.main.async {
+                self.discoveredDevices.append(peripheral)
             }
-        } else {
-            // Only log filtered devices if there are very few (reduce noise)
-            // Uncomment for debugging:
-            // addLogMessage("⚠️ Device filtered out: \(deviceName)")
+            
+            addLogMessage("✅ Found: \(deviceName) (RSSI: \(RSSI)dB)")
         }
     }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        // Clear connection timeout and reset retry counter
         connectionTimeoutTimer?.invalidate()
         connectionTimeoutTimer = nil
         retryCount = 0
         
-        addLogMessage("✅ Connected to: \(peripheral.name ?? "Unknown Device")")
+        addLogMessage("✅ Connected to \(peripheral.name ?? "device")")
+        addLogMessage("🔍 Starting service discovery...")
         
         DispatchQueue.main.async {
             self.isConnected = true
             self.connectedDevice = peripheral
-            self.connectionStatus = "Connected"
-            self.deviceName = peripheral.name ?? "Unknown Device"
-            
-            // Update sensor data connection status
+            self.deviceName = peripheral.name ?? "Unknown"
             self.sensorData.isConnected = true
+            self.connectionStatus = "Connected"
         }
         
-        // Start discovering services
-        peripheral.discoverServices([tgmServiceUUID])
+        // CRITICAL FIX: Discover ALL services, not just TGM service
+        // This is needed because the device might not advertise the TGM service UUID
+        addLogMessage("📊 Discovering ALL services on device...")
+        peripheral.discoverServices(nil)  // nil = discover ALL services
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         connectionTimeoutTimer?.invalidate()
         connectionTimeoutTimer = nil
         
-        let errorMessage = error?.localizedDescription ?? "Unknown error"
-        addLogMessage("❌ Failed to connect: \(errorMessage)")
+        let errorMsg = error?.localizedDescription ?? "Unknown error"
+        addLogMessage("❌ Connection failed: \(errorMsg)")
         
         DispatchQueue.main.async {
-            self.connectionStatus = "Connection failed"
+            self.connectionStatus = "Failed"
             self.connectedPeripheral = nil
         }
         
-        // Retry connection if under max retries
         if retryCount < maxRetries {
             retryCount += 1
-            addLogMessage("🔄 Retry attempt \(retryCount)/\(maxRetries)")
+            addLogMessage("🔄 Retry \(retryCount)/\(maxRetries) in 2 seconds...")
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 self.connect(to: peripheral)
             }
         } else {
-            addLogMessage("❌ Max retry attempts reached. Please try again manually.")
-            retryCount = 0
+            addLogMessage("❌ Max retries reached")
         }
     }
     
@@ -446,9 +437,9 @@ extension OralableBLE: CBCentralManagerDelegate {
         connectionTimeoutTimer = nil
         
         if let error = error {
-            addLogMessage("⚠️ Disconnected with error: \(error.localizedDescription)")
+            addLogMessage("⚠️ Disconnected: \(error.localizedDescription)")
         } else {
-            addLogMessage("📱 Disconnected from device")
+            addLogMessage("📱 Disconnected")
         }
         
         DispatchQueue.main.async {
@@ -456,12 +447,9 @@ extension OralableBLE: CBCentralManagerDelegate {
             self.connectedDevice = nil
             self.connectedPeripheral = nil
             self.connectionStatus = "Disconnected"
-            
-            // Update sensor data connection status
             self.sensorData.isConnected = false
         }
         
-        // Clear data buffers
         ppgBufferRed.removeAll()
         ppgBufferIR.removeAll()
         ppgBufferGreen.removeAll()
@@ -474,21 +462,40 @@ extension OralableBLE: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let error = error {
-            addLogMessage("❌ Error discovering services: \(error.localizedDescription)")
+            addLogMessage("❌ Service discovery error: \(error.localizedDescription)")
             return
         }
         
         guard let services = peripheral.services else {
-            addLogMessage("⚠️ No services found")
+            addLogMessage("⚠️ No services found on device")
             return
         }
         
-        addLogMessage("📡 Found \(services.count) service(s)")
+        addLogMessage("📊 Found \(services.count) service(s):")
         
-        // Discover characteristics for TGM service
+        // Log all discovered services
+        for service in services {
+            addLogMessage("   • \(service.uuid.uuidString)")
+        }
+        
+        // Look for TGM service
+        var tgmServiceFound = false
         for service in services {
             if service.uuid == tgmServiceUUID {
-                addLogMessage("✅ Found TGM Service")
+                tgmServiceFound = true
+                addLogMessage("✅ TGM Service found!")
+                addLogMessage("🔍 Discovering characteristics...")
+                peripheral.discoverCharacteristics(nil, for: service)
+            }
+        }
+        
+        if !tgmServiceFound {
+            addLogMessage("⚠️ TGM Service NOT found")
+            addLogMessage("   Expected: \(tgmServiceUUID.uuidString)")
+            addLogMessage("   Trying to discover characteristics on all services...")
+            
+            // Try to discover characteristics on all services
+            for service in services {
                 peripheral.discoverCharacteristics(nil, for: service)
             }
         }
@@ -496,116 +503,111 @@ extension OralableBLE: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         if let error = error {
-            addLogMessage("❌ Error discovering characteristics: \(error.localizedDescription)")
+            addLogMessage("❌ Characteristic error: \(error.localizedDescription)")
             return
         }
         
         guard let characteristics = service.characteristics else {
-            addLogMessage("⚠️ No characteristics found")
+            addLogMessage("⚠️ No characteristics in service: \(service.uuid.uuidString)")
             return
         }
         
-        addLogMessage("📊 Found \(characteristics.count) characteristic(s)")
+        addLogMessage("📊 Service \(service.uuid.uuidString): \(characteristics.count) characteristic(s)")
         
-        // Store characteristic references and enable notifications
+        var foundAnyKnownCharacteristic = false
+        
         for characteristic in characteristics {
+            addLogMessage("   • Char: \(characteristic.uuid.uuidString)")
+            
             switch characteristic.uuid {
             case ppgDataUUID:
                 ppgCharacteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
-                addLogMessage("✅ Enabled PPG Data notifications")
+                addLogMessage("   ✅ PPG Data - notifications enabled")
+                foundAnyKnownCharacteristic = true
                 
             case accelerometerUUID:
                 accelerometerCharacteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
-                addLogMessage("✅ Enabled Accelerometer notifications")
+                addLogMessage("   ✅ Accelerometer - notifications enabled")
+                foundAnyKnownCharacteristic = true
                 
             case temperatureUUID:
                 temperatureCharacteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
-                addLogMessage("✅ Enabled Temperature notifications")
+                addLogMessage("   ✅ Temperature - notifications enabled")
+                foundAnyKnownCharacteristic = true
                 
             case batteryUUID:
                 batteryCharacteristic = characteristic
                 peripheral.setNotifyValue(true, for: characteristic)
-                // Also read initial value
                 peripheral.readValue(for: characteristic)
-                addLogMessage("✅ Enabled Battery notifications")
+                addLogMessage("   ✅ Battery - notifications enabled")
+                foundAnyKnownCharacteristic = true
                 
             case deviceUUIDChar:
                 deviceUUIDCharacteristic = characteristic
                 peripheral.readValue(for: characteristic)
-                addLogMessage("📱 Reading Device UUID")
+                addLogMessage("   ✅ Device UUID - reading")
+                foundAnyKnownCharacteristic = true
                 
             case firmwareVersionUUID:
                 firmwareVersionCharacteristic = characteristic
                 peripheral.readValue(for: characteristic)
-                addLogMessage("📱 Reading Firmware Version")
+                addLogMessage("   ✅ Firmware Version - reading")
+                foundAnyKnownCharacteristic = true
                 
             default:
-                addLogMessage("📊 Found characteristic: \(characteristic.uuid)")
+                addLogMessage("   ⚪ Unknown characteristic")
             }
+        }
+        
+        if !foundAnyKnownCharacteristic {
+            addLogMessage("⚠️ No known TGM characteristics found in this service")
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            addLogMessage("❌ Error reading characteristic: \(error.localizedDescription)")
+            addLogMessage("❌ Read error: \(error.localizedDescription)")
             return
         }
         
         guard let data = characteristic.value else {
-            addLogMessage("⚠️ No data received from characteristic: \(characteristic.uuid)")
             return
         }
         
-        // Parse data based on characteristic UUID
         switch characteristic.uuid {
         case ppgDataUUID:
             parsePPGData(data)
-            
         case accelerometerUUID:
             parseAccelerometerData(data)
-            
         case temperatureUUID:
             parseTemperatureData(data)
-            
         case batteryUUID:
             parseBatteryData(data)
-            
         case deviceUUIDChar:
             parseDeviceUUID(data)
-            
         case firmwareVersionUUID:
             parseFirmwareVersion(data)
-            
         default:
-            addLogMessage("📊 Received data from unknown characteristic: \(characteristic.uuid)")
+            break
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            addLogMessage("❌ Error updating notification state: \(error.localizedDescription)")
-            return
-        }
-        
-        if characteristic.isNotifying {
-            addLogMessage("✅ Notifications enabled for: \(characteristic.uuid)")
-        } else {
-            addLogMessage("⚠️ Notifications disabled for: \(characteristic.uuid)")
+            addLogMessage("❌ Notification error for \(characteristic.uuid): \(error.localizedDescription)")
+        } else if characteristic.isNotifying {
+            addLogMessage("✅ Notifications active for \(characteristic.uuid)")
         }
     }
     
-    // MARK: - Data Parsing Methods
+    // MARK: - Data Parsing
     
     private func parsePPGData(_ data: Data) {
-        // PPG Data Frame: 244 bytes
-        // Bytes 0-3: Frame counter (uint32_t)
-        // Bytes 4+: 20 samples × 12 bytes each (red, ir, green as uint32_t)
-        
         guard data.count >= 244 else {
-            addLogMessage("⚠️ PPG data too short: \(data.count) bytes")
+            addLogMessage("⚠️ PPG data too short: \(data.count) bytes (expected 244)")
             return
         }
         
@@ -613,140 +615,95 @@ extension OralableBLE: CBPeripheralDelegate {
         var irSamples: [Int32] = []
         var greenSamples: [Int32] = []
         
-        // Parse 20 samples
         for i in 0..<20 {
             let offset = 4 + (i * 12)
-            
             let red = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
             let ir = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 4, as: UInt32.self) }
             let green = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 8, as: UInt32.self) }
             
-            redSamples.append(Int32(red))
-            irSamples.append(Int32(ir))
-            greenSamples.append(Int32(green))
+            redSamples.append(Int32(bitPattern: red))
+            irSamples.append(Int32(bitPattern: ir))
+            greenSamples.append(Int32(bitPattern: green))
         }
         
-        // Process PPG data for heart rate and SpO2
+        addLogMessage("💓 PPG data received")
         processPPGData(red: redSamples, ir: irSamples, green: greenSamples)
         
-        // Store last sample in history
         if let lastRed = redSamples.last, let lastIR = irSamples.last, let lastGreen = greenSamples.last {
-            let ppgData = PPGData(
-                red: lastRed,
-                ir: lastIR,
-                green: lastGreen,
-                timestamp: Date()
-            )
-            
+            let ppgData = PPGData(red: lastRed, ir: lastIR, green: lastGreen, timestamp: Date())
             DispatchQueue.main.async {
                 self.ppgHistory.append(ppgData)
-                
-                // Keep only last 1000 samples
                 if self.ppgHistory.count > 1000 {
                     self.ppgHistory.removeFirst(self.ppgHistory.count - 1000)
                 }
+                self.sensorData.lastUpdate = Date()
             }
-        }
-        
-        DispatchQueue.main.async {
-            self.sensorData.lastUpdate = Date()
         }
     }
     
     private func parseAccelerometerData(_ data: Data) {
-        // Accelerometer Data Frame: 154 bytes
-        // Bytes 0-3: Frame counter (uint32_t)
-        // Bytes 4+: 25 samples × 6 bytes each (x, y, z as int16_t)
-        
         guard data.count >= 154 else {
-            addLogMessage("⚠️ Accelerometer data too short: \(data.count) bytes")
+            addLogMessage("⚠️ Accel data too short: \(data.count) bytes (expected 154)")
             return
         }
         
-        // Parse last sample for display
         let lastSampleOffset = 4 + (24 * 6)
         let x = data.withUnsafeBytes { $0.load(fromByteOffset: lastSampleOffset, as: Int16.self) }
         let y = data.withUnsafeBytes { $0.load(fromByteOffset: lastSampleOffset + 2, as: Int16.self) }
         let z = data.withUnsafeBytes { $0.load(fromByteOffset: lastSampleOffset + 4, as: Int16.self) }
         
-        let accelData = AccelerometerData(
-            x: x,
-            y: y,
-            z: z,
-            timestamp: Date()
-        )
+        addLogMessage("📐 Accel: X=\(x), Y=\(y), Z=\(z)")
+        
+        let accelData = AccelerometerData(x: x, y: y, z: z, timestamp: Date())
         
         DispatchQueue.main.async {
             self.accelerometerHistory.append(accelData)
-            
-            // Keep only last 1000 samples
             if self.accelerometerHistory.count > 1000 {
                 self.accelerometerHistory.removeFirst(self.accelerometerHistory.count - 1000)
             }
-            
             self.sensorData.lastUpdate = Date()
         }
     }
     
     private func parseTemperatureData(_ data: Data) {
-        // Temperature Data: 6 bytes
-        // Bytes 0-1: Integer part (int16_t)
-        // Bytes 2-5: Fractional part (uint32_t)
-        
         guard data.count >= 6 else {
-            addLogMessage("⚠️ Temperature data too short: \(data.count) bytes")
+            addLogMessage("⚠️ Temp data too short: \(data.count) bytes (expected 6)")
             return
         }
         
         let integerPart = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: Int16.self) }
         let fractionalPart = data.withUnsafeBytes { $0.load(fromByteOffset: 2, as: UInt32.self) }
-        
         let temperature = Double(integerPart) + (Double(fractionalPart) / 1000000.0)
         
-        let tempData = TemperatureData(
-            celsius: temperature,
-            timestamp: Date()
-        )
+        let tempData = TemperatureData(celsius: temperature, timestamp: Date())
         
         DispatchQueue.main.async {
             self.sensorData.temperature = temperature
             self.temperatureHistory.append(tempData)
-            
-            // Keep only last 1000 samples
             if self.temperatureHistory.count > 1000 {
                 self.temperatureHistory.removeFirst(self.temperatureHistory.count - 1000)
             }
-            
             self.sensorData.lastUpdate = Date()
         }
         
-        addLogMessage("🌡️ Temperature: \(String(format: "%.2f", temperature))°C")
+        addLogMessage("🌡️ Temp: \(String(format: "%.1f", temperature))°C")
     }
     
     private func parseBatteryData(_ data: Data) {
-        // Battery Data: 4 bytes (uint32_t percentage)
-        
         guard data.count >= 4 else {
-            addLogMessage("⚠️ Battery data too short: \(data.count) bytes")
+            addLogMessage("⚠️ Battery data too short: \(data.count) bytes (expected 4)")
             return
         }
         
         let batteryLevel = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        
-        let batteryData = BatteryData(
-            percentage: Int(batteryLevel),
-            timestamp: Date()
-        )
+        let batteryData = BatteryData(percentage: Int(batteryLevel), timestamp: Date())
         
         DispatchQueue.main.async {
             self.sensorData.batteryLevel = Int(batteryLevel)
             self.batteryHistory.append(batteryData)
-            
-            // Keep only last 1000 samples
             if self.batteryHistory.count > 1000 {
                 self.batteryHistory.removeFirst(self.batteryHistory.count - 1000)
             }
-            
             self.sensorData.lastUpdate = Date()
         }
         
@@ -754,10 +711,8 @@ extension OralableBLE: CBPeripheralDelegate {
     }
     
     private func parseDeviceUUID(_ data: Data) {
-        // Device UUID: 16 bytes
-        
         guard data.count >= 8 else {
-            addLogMessage("⚠️ Device UUID data too short: \(data.count) bytes")
+            addLogMessage("⚠️ UUID data too short: \(data.count) bytes (expected 8)")
             return
         }
         
@@ -767,18 +722,15 @@ extension OralableBLE: CBPeripheralDelegate {
             self.sensorData.deviceUUID = uuid
         }
         
-        addLogMessage("🆔 Device UUID: \(String(format: "%016llX", uuid))")
+        addLogMessage("🆔 UUID: \(String(format: "%016llX", uuid))")
     }
     
     private func parseFirmwareVersion(_ data: Data) {
-        // Firmware Version: String
-        
-        if let versionString = String(data: data, encoding: .utf8) {
+        if let version = String(data: data, encoding: .utf8) {
             DispatchQueue.main.async {
-                self.sensorData.firmwareVersion = versionString
+                self.sensorData.firmwareVersion = version
             }
-            
-            addLogMessage("📱 Firmware Version: \(versionString)")
+            addLogMessage("📱 Firmware: \(version)")
         }
     }
 }
