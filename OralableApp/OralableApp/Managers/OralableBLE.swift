@@ -1,633 +1,380 @@
-import Foundation
-import CoreBluetooth
-import Combine
+//
+//  DashboardView_SpO2_Components.swift
+//  OralableApp
+//
+//  Updated: October 28, 2025
+//  Added: SpO2 visualization and metric type
+//
+//  INSTRUCTIONS: Add this code to your existing DashboardView.swift file
+//
 
-// MARK: - Simple Log Level Enum
-enum LogLevel: String {
-    case info = "INFO"
-    case success = "SUCCESS"
-    case warning = "WARNING"
-    case error = "ERROR"
-}
+import SwiftUI
+import Charts
 
-class OralableBLE: NSObject, ObservableObject {
-    // MARK: - Published Properties
-    @Published var isConnected = false
-    @Published var isScanning = false
-    @Published var sensorData = SensorData()
-    @Published var deviceName = "Not Connected"
-    @Published var lastUpdate = Date()
-    @Published var logMessages: [String] = []
-    @Published var historicalData: [SensorData] = []
-    @Published var discoveredPeripherals: [String: CBPeripheral] = [:]
+// MARK: - Updated MetricType Enum
+
+/// Replace the existing MetricType enum in DashboardView.swift with this updated version
+enum MetricType: String, CaseIterable {
+    case battery
+    case ppg
+    case heartRate      // Existing
+    case spo2           // NEW
+    case temperature
+    case accelerometer
     
-    // MARK: - Private Properties
-    private var centralManager: CBCentralManager!
-    var peripheral: CBPeripheral?
-    private var cancellables = Set<AnyCancellable>()
-    
-    // MARK: - Heart Rate Calculator
-    private let heartRateCalculator = HeartRateCalculator()
-    
-    private var reconnectTimer: Timer?
-    private var connectionAttempts = 0
-    private let maxConnectionAttempts = 3
-    private let maxHistoricalDataPoints = 1000
-    
-    // MARK: - Initialization
-    override init() {
-        super.init()
-        
-        centralManager = CBCentralManager(
-            delegate: self,
-            queue: nil,
-            options: [CBCentralManagerOptionShowPowerAlertKey: true]
-        )
-        
-        addLog("🚀 Oralable BLE Manager initialized")
-        
-        if #available(iOS 13.1, *) {
-            checkBluetoothPermissions()
+    var title: String {
+        switch self {
+        case .battery: return "Battery"
+        case .ppg: return "PPG Signals"
+        case .heartRate: return "Heart Rate"
+        case .spo2: return "Blood Oxygen"  // NEW
+        case .temperature: return "Temperature"
+        case .accelerometer: return "Accelerometer"
         }
     }
     
-    // MARK: - Permissions Check
-    @available(iOS 13.1, *)
-    private func checkBluetoothPermissions() {
-        switch CBManager.authorization {
-        case .notDetermined:
-            addLog("Bluetooth permission not determined", level: .warning)
-        case .restricted:
-            addLog("Bluetooth permission restricted ⛔️", level: .error)
-        case .denied:
-            addLog("Bluetooth permission denied - Please enable in Settings", level: .error)
-        case .allowedAlways:
-            addLog("Bluetooth permission granted ✅", level: .success)
-        @unknown default:
-            addLog("Unknown Bluetooth permission state", level: .warning)
+    var icon: String {
+        switch self {
+        case .battery: return "battery.100"
+        case .ppg: return "waveform.ecg"
+        case .heartRate: return "heart.fill"
+        case .spo2: return "drop.fill"  // NEW - water drop icon
+        case .temperature: return "thermometer"
+        case .accelerometer: return "gyroscope"
         }
     }
     
-    // MARK: - Logging
-    func addLog(_ message: String, level: LogLevel = .info) {
-        let timestamp = Date().formatted(date: .omitted, time: .shortened)
-        let logEntry = "\(timestamp) [\(level.rawValue)] \(message)"
+    var color: Color {
+        switch self {
+        case .battery: return .green
+        case .ppg: return .red
+        case .heartRate: return .pink
+        case .spo2: return .blue  // NEW - blue for oxygen
+        case .temperature: return .orange
+        case .accelerometer: return .blue
+        }
+    }
+    
+    func csvHeader() -> String {
+        switch self {
+        case .battery:
+            return "Timestamp,Battery_Percentage"
+        case .ppg:
+            return "Timestamp,PPG_Red,PPG_IR,PPG_Green"
+        case .heartRate:
+            return "Timestamp,Heart_Rate_BPM,Quality"
+        case .spo2:  // NEW
+            return "Timestamp,SpO2_Percentage,Quality"
+        case .temperature:
+            return "Timestamp,Temperature_Celsius"
+        case .accelerometer:
+            return "Timestamp,Accel_X,Accel_Y,Accel_Z,Magnitude"
+        }
+    }
+    
+    func csvRow(for data: SensorData) -> String {
+        let timestamp = ISO8601DateFormatter().string(from: data.timestamp)
         
-        DispatchQueue.main.async {
-            self.logMessages.append(logEntry)
-            if self.logMessages.count > 500 {
-                self.logMessages.removeFirst()
+        switch self {
+        case .battery:
+            return "\(timestamp),\(data.battery.percentage)"
+        case .ppg:
+            return "\(timestamp),\(data.ppg.red),\(data.ppg.ir),\(data.ppg.green)"
+        case .heartRate:
+            if let hr = data.heartRate {
+                return "\(timestamp),\(hr.bpm),\(hr.quality)"
+            } else {
+                return "\(timestamp),--,--"
             }
-        }
-    }
-    
-    // MARK: - Public Methods
-    func toggleScanning() {
-        isScanning ? stopScanning() : startScanning()
-    }
-    
-    func startScanning() {
-        guard centralManager.state == .poweredOn else {
-            addLog("Cannot scan - Bluetooth state: \(centralManager.state.rawValue)", level: .error)
-            return
-        }
-        
-        // Clear previous discoveries
-        discoveredPeripherals.removeAll()
-        centralManager.stopScan()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.centralManager.scanForPeripherals(
-                withServices: nil,
-                options: [
-                    CBCentralManagerScanOptionAllowDuplicatesKey: false,
-                    CBCentralManagerScanOptionSolicitedServiceUUIDsKey: []
-                ]
-            )
-            self?.isScanning = true
-            self?.addLog("Started scanning for BLE devices...", level: .info)
-        }
-    }
-    
-    func connect(to peripheral: CBPeripheral) {
-        stopScanning()
-        connectToPeripheral(peripheral)
-    }
-    
-    func disconnect() {
-        reconnectTimer?.invalidate()
-        connectionAttempts = maxConnectionAttempts
-        
-        if let peripheral = peripheral {
-            addLog("Disconnecting from \(peripheral.name ?? "device")...", level: .warning)
-            centralManager.cancelPeripheralConnection(peripheral)
-        }
-    }
-    
-    func setMeasurementSite(_ site: UInt8) {
-        guard let peripheral = peripheral,
-              let service = peripheral.services?.first(where: {
-                  $0.uuid.uuidString.uppercased() == BLEConstants.TGM_SERVICE.uppercased()
-              }),
-              let characteristic = service.characteristics?.first(where: {
-                  $0.uuid.uuidString.uppercased() == BLEConstants.MUSCLE_SITE_CHAR.uppercased()
-              }) else {
-            addLog("Cannot set measurement site - not connected", level: .error)
-            return
-        }
-        
-        let data = Data([site])
-        peripheral.writeValue(data, for: characteristic, type: .withResponse)
-        addLog("Setting measurement site to \(MeasurementSite(rawValue: site)?.name ?? "unknown")", level: .info)
-    }
-    
-    func clearLogs() {
-        logMessages.removeAll()
-        historicalData.removeAll()
-        heartRateCalculator.reset()
-        addLog("Logs cleared", level: .info)
-    }
-    
-    func resetHeartRateCalculator() {
-        heartRateCalculator.reset()
-        sensorData.heartRate.isValid = false
-        sensorData.heartRate.bpm = 0.0
-        sensorData.heartRate.signalQuality = 0.0
-        addLog("Heart rate calculator reset", level: .info)
-    }
-    
-    // MARK: - Private Methods
-    private func stopScanning() {
-        centralManager.stopScan()
-        isScanning = false
-        addLog("Stopped scanning", level: .info)
-    }
-    
-    private func connectToPeripheral(_ peripheral: CBPeripheral) {
-        self.peripheral = peripheral
-        self.peripheral?.delegate = self
-        
-        addLog("Found Oralable device! Connecting...", level: .success)
-        centralManager.connect(peripheral, options: nil)
-    }
-    
-    private func handleDisconnection() {
-        isConnected = false
-        deviceName = "Not Connected"
-        self.peripheral = nil
-        
-        // Reset heart rate calculator when disconnecting
-        heartRateCalculator.reset()
-        
-        // Reset heart rate data
-        sensorData.heartRate.isValid = false
-        sensorData.heartRate.bpm = 0.0
-        sensorData.heartRate.signalQuality = 0.0
-        
-        reconnectTimer?.invalidate()
-        
-        if connectionAttempts < maxConnectionAttempts {
-            connectionAttempts += 1
-            reconnectTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
-                self?.addLog("Auto-reconnecting (attempt \(self?.connectionAttempts ?? 0))...", level: .info)
-                self?.startScanning()
+        case .spo2:  // NEW
+            if let spo2 = data.spo2 {
+                return "\(timestamp),\(spo2.percentage),\(spo2.quality)"
+            } else {
+                return "\(timestamp),--,--"
             }
-        }
-    }
-    
-    private func storeSensorData() {
-        var dataCopy = sensorData
-        dataCopy.timestamp = Date()
-        historicalData.append(dataCopy)
-        
-        if historicalData.count > maxHistoricalDataPoints {
-            historicalData.removeFirst()
-        }
-    }
-    
-    // MARK: - Data Parsing Methods
-    private func parseCharacteristicData(characteristic: CBCharacteristic, data: Data) {
-        switch characteristic.uuid.uuidString.uppercased() {
-        case BLEConstants.PPG_CHAR.uppercased():
-            parsePPGData(data)
-            storeSensorData()
-            
-        case BLEConstants.ACC_CHAR.uppercased():
-            parseAccelerometerData(data)
-            
-        case BLEConstants.TEMPERATURE_CHAR.uppercased():
-            parseTemperatureData(data)
-            
-        case BLEConstants.BATTERY_CHAR.uppercased():
-            parseBatteryData(data)
-            
-        case BLEConstants.UUID_CHAR.uppercased():
-            parseUUIDData(data)
-            
-        case BLEConstants.FW_VERSION_CHAR.uppercased():
-            parseFirmwareVersion(data)
-            
-        default:
-            addLog("Unknown characteristic: \(characteristic.uuid.uuidString)", level: .warning)
-        }
-    }
-    
-    private func parsePPGData(_ data: Data) {
-        guard data.count >= 4 else { return }
-        
-        sensorData.ppg.frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        
-        let sampleSize = 12
-        let headerSize = 4
-        let availableSamples = (data.count - headerSize) / sampleSize
-        let samplesToRead = min(availableSamples, BLEConstants.PPG_SAMPLES_PER_FRAME)
-        
-        sensorData.ppg.samples.removeAll()
-        
-        // Enhanced debugging: collect all samples and check for patterns
-        var allSamples: [(red: UInt32, ir: UInt32, green: UInt32)] = []
-        
-        for i in 0..<samplesToRead {
-            let offset = headerSize + (i * sampleSize)
-            if offset + sampleSize <= data.count {
-                var sample = PPGSample()
-                sample.red = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
-                sample.ir = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 4, as: UInt32.self) }
-                sample.green = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 8, as: UInt32.self) }
-                sample.timestamp = Date()
-                sensorData.ppg.samples.append(sample)
-                
-                allSamples.append((red: sample.red, ir: sample.ir, green: sample.green))
-            }
-        }
-        
-        // Calculate heart rate from IR samples
-        let irSamples = sensorData.ppg.samples.map { $0.ir }
-        if let heartRateResult = heartRateCalculator.calculateHeartRate(irSamples: irSamples) {
-            // Update heart rate data
-            sensorData.heartRate.bpm = heartRateResult.bpm
-            sensorData.heartRate.signalQuality = heartRateResult.quality
-            sensorData.heartRate.isValid = heartRateResult.isReliable
-            sensorData.heartRate.lastCalculated = heartRateResult.timestamp
-            
-            addLog("Heart Rate: \(heartRateResult.bpm.rounded()) BPM (Quality: \(String(format: "%.2f", heartRateResult.quality)))", level: heartRateResult.isReliable ? .success : .warning)
-        } else {
-            // Mark heart rate as invalid if calculation fails
-            sensorData.heartRate.isValid = false
-            sensorData.heartRate.signalQuality = 0.0
-        }
-        
-        // Debug: Check if values are consistent across samples
-        let firstSample = allSamples.first
-        let lastSample = allSamples.last
-        let isConsistent = allSamples.allSatisfy { sample in
-            sample.red == firstSample?.red && 
-            sample.ir == firstSample?.ir && 
-            sample.green == firstSample?.green
-        }
-        
-        // Enhanced logging with frame counter and consistency check
-        addLog("PPG Frame \(sensorData.ppg.frameCounter): IR=\(sensorData.ppg.ir), R=\(sensorData.ppg.red), G=\(sensorData.ppg.green) | Samples: \(samplesToRead), Consistent: \(isConsistent)")
-        
-        // Additional debug: Log first and last samples if they differ
-        if !isConsistent, let first = firstSample, let last = lastSample {
-            addLog("  First: IR=\(first.ir), R=\(first.red), G=\(first.green)")
-            addLog("  Last:  IR=\(last.ir), R=\(last.red), G=\(last.green)")
-        }
-    }
-    
-    private func parseAccelerometerData(_ data: Data) {
-        guard data.count >= 4 else { return }
-        
-        sensorData.accelerometer.frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        
-        let sampleSize = 6
-        let headerSize = 4
-        let availableSamples = (data.count - headerSize) / sampleSize
-        let samplesToRead = min(availableSamples, BLEConstants.ACC_SAMPLES_PER_FRAME)
-        
-        sensorData.accelerometer.samples.removeAll()
-        
-        for i in 0..<samplesToRead {
-            let offset = headerSize + (i * sampleSize)
-            if offset + sampleSize <= data.count {
-                var sample = AccSample()
-                sample.x = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: Int16.self) }
-                sample.y = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 2, as: Int16.self) }
-                sample.z = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 4, as: Int16.self) }
-                sample.timestamp = Date()
-                sensorData.accelerometer.samples.append(sample)
-            }
-        }
-        
-        let mag = sensorData.accelerometer.magnitude
-        addLog("Accel: X=\(sensorData.accelerometer.x), Y=\(sensorData.accelerometer.y), Z=\(sensorData.accelerometer.z), Mag=\(String(format: "%.2f", mag))")
-    }
-    
-    private func parseTemperatureData(_ data: Data) {
-        guard data.count >= 4 else { return }
-        
-        let tempRaw = data.withUnsafeBytes { $0.load(as: Float.self) }
-        sensorData.temperature = Double(tempRaw)
-        
-        addLog("Temperature: \(String(format: "%.2f", sensorData.temperature))°C")
-    }
-    
-    private func parseBatteryData(_ data: Data) {
-        guard data.count >= 4 else { return }
-        
-        sensorData.batteryVoltage = data.withUnsafeBytes { $0.load(as: Int32.self) }
-        
-        addLog("Battery: \(sensorData.batteryVoltage) mV (\(sensorData.batteryLevel)%)")
-    }
-    
-    private func parseUUIDData(_ data: Data) {
-        guard data.count >= 8 else { return }
-        
-        sensorData.deviceUUID = data.withUnsafeBytes { $0.load(as: UInt64.self) }
-        
-        addLog("Device UUID: \(String(format: "%016llX", sensorData.deviceUUID))")
-    }
-    
-    private func parseFirmwareVersion(_ data: Data) {
-        if let version = String(data: data, encoding: .utf8) {
-            sensorData.firmwareVersion = version
-            addLog("Firmware: \(version)")
+        case .temperature:
+            return "\(timestamp),\(data.temperature.celsius)"
+        case .accelerometer:
+            let mag = data.accelerometer.magnitude
+            return "\(timestamp),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(mag)"
         }
     }
 }
 
-// MARK: - CBCentralManagerDelegate
-extension OralableBLE: CBCentralManagerDelegate {
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        switch central.state {
-        case .poweredOn:
-            addLog("Bluetooth powered on", level: .success)
-        case .poweredOff:
-            addLog("Bluetooth powered off", level: .error)
-        case .unauthorized:
-            addLog("Bluetooth unauthorized", level: .error)
-        case .unsupported:
-            addLog("Bluetooth not supported", level: .error)
-        default:
-            addLog("Bluetooth state: \(central.state.rawValue)", level: .warning)
-        }
-    }
-    
-    func centralManager(_ central: CBCentralManager,
-                       didDiscover peripheral: CBPeripheral,
-                       advertisementData: [String: Any],
-                       rssi RSSI: NSNumber) {
-        let name = peripheral.name ?? "Unknown"
-        
-        // Store all discovered peripherals for the DevicesView
-        discoveredPeripherals[peripheral.identifier.uuidString] = peripheral
-        
-        // Auto-connect to Oralable devices
-        if name.contains(BLEConstants.DEVICE_NAME) {
-            addLog("Found \(name) (RSSI: \(RSSI))", level: .info)
-            stopScanning()
-            connectToPeripheral(peripheral)
-        }
-    }
-    
-    func centralManager(_ central: CBCentralManager,
-                       didConnect peripheral: CBPeripheral) {
-        isConnected = true
-        deviceName = peripheral.name ?? "Oralable"
-        connectionAttempts = 0
-        
-        addLog("Connected to \(deviceName) ✅", level: .success)
-        
-        peripheral.discoverServices([CBUUID(string: BLEConstants.TGM_SERVICE)])
-    }
-    
-    func centralManager(_ central: CBCentralManager,
-                       didDisconnectPeripheral peripheral: CBPeripheral,
-                       error: Error?) {
-        if let error = error {
-            addLog("Disconnected: \(error.localizedDescription)", level: .error)
-        } else {
-            addLog("Disconnected", level: .warning)
-        }
-        
-        handleDisconnection()
-    }
-    
-    func centralManager(_ central: CBCentralManager,
-                       didFailToConnect peripheral: CBPeripheral,
-                       error: Error?) {
-        addLog("Failed to connect: \(error?.localizedDescription ?? "Unknown error")", level: .error)
-        handleDisconnection()
-    }
-}
+// MARK: - SpO2 Graph View Component
 
-// MARK: - CBPeripheralDelegate
-extension OralableBLE: CBPeripheralDelegate {
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        if let error = error {
-            addLog("Service discovery error: \(error.localizedDescription)", level: .error)
-            return
-        }
-        
-        guard let services = peripheral.services else { return }
-        addLog("Discovered \(services.count) services", level: .info)
-        
-        for service in services {
-            if service.uuid.uuidString.uppercased() == BLEConstants.TGM_SERVICE.uppercased() {
-                let characteristicUUIDs = [
-                    CBUUID(string: BLEConstants.PPG_CHAR),
-                    CBUUID(string: BLEConstants.ACC_CHAR),
-                    CBUUID(string: BLEConstants.TEMPERATURE_CHAR),
-                    CBUUID(string: BLEConstants.BATTERY_CHAR),
-                    CBUUID(string: BLEConstants.UUID_CHAR),
-                    CBUUID(string: BLEConstants.FW_VERSION_CHAR),
-                    CBUUID(string: BLEConstants.MUSCLE_SITE_CHAR)
-                ]
-                
-                peripheral.discoverCharacteristics(characteristicUUIDs, for: service)
-                addLog("Discovering characteristics...", level: .info)
-            }
-        }
-    }
+/// Add this new struct to your DashboardView.swift file
+struct SpO2GraphView: View {
+    let spo2History: [SpO2Data]
     
-    func peripheral(_ peripheral: CBPeripheral,
-                   didDiscoverCharacteristicsFor service: CBService,
-                   error: Error?) {
-        if let error = error {
-            addLog("Characteristic discovery error: \(error.localizedDescription)", level: .error)
-            return
-        }
-        
-        guard let characteristics = service.characteristics else { return }
-        addLog("Found \(characteristics.count) characteristics", level: .info)
-        
-        var delay: TimeInterval = 0.1
-        
-        for characteristic in characteristics {
-            if characteristic.properties.contains(.notify) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    peripheral.setNotifyValue(true, for: characteristic)
-                }
-                delay += 0.1
-            }
-            
-            if characteristic.properties.contains(.read) {
-                let readableChars = [
-                    BLEConstants.BATTERY_CHAR,
-                    BLEConstants.UUID_CHAR,
-                    BLEConstants.FW_VERSION_CHAR
-                ]
-                if readableChars.contains(where: { $0.uppercased() == characteristic.uuid.uuidString.uppercased() }) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                        peripheral.readValue(for: characteristic)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with current value
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let latest = spo2History.last, latest.isValid {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(Int(latest.percentage))")
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            
+                            Text("%")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Health status
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(colorForStatus(latest.healthStatus))
+                                .frame(width: 8, height: 8)
+                            
+                            Text(latest.healthStatus)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("--")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Signal")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
-                    delay += 0.1
+                }
+                
+                Spacer()
+                
+                // Signal quality indicator
+                if let latest = spo2History.last {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(colorForQuality(latest.qualityColor))
+                                .frame(width: 10, height: 10)
+                            
+                            Text(latest.qualityLevel)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("Signal Quality")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
+            .padding(.horizontal, 4)
+            
+            // Chart
+            if !spo2History.isEmpty {
+                Chart {
+                    ForEach(Array(spo2History.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("SpO2", measurement.percentage)
+                        )
+                        .foregroundStyle(Color.blue)
+                        .interpolationMethod(.catmullRom)
+                        
+                        AreaMark(
+                            x: .value("Time", index),
+                            y: .value("SpO2", measurement.percentage)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.3), Color.blue.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                    }
+                    
+                    // Reference line at 95% (normal threshold)
+                    RuleMark(y: .value("Normal", 95))
+                        .foregroundStyle(Color.green.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                }
+                .chartYScale(domain: 85...100)
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisValueLabel {
+                            if let intValue = value.as(Int.self) {
+                                Text("\(intValue)%")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 180)
+            } else {
+                // Empty state
+                VStack {
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray.opacity(0.3))
+                    
+                    Text("No SpO2 Data")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 180)
+                .frame(maxWidth: .infinity)
+            }
+            
+            // Info footer
+            HStack {
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text("Normal range: 95-100%")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                if let latest = spo2History.last {
+                    Text("Updated \(timeAgo(latest.timestamp))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func colorForQuality(_ qualityColor: String) -> Color {
+        switch qualityColor {
+        case "green": return .green
+        case "yellow": return .yellow
+        case "orange": return .orange
+        case "red": return .red
+        default: return .gray
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral,
-                   didUpdateValueFor characteristic: CBCharacteristic,
-                   error: Error?) {
-        if let error = error {
-            addLog("Value update error: \(error.localizedDescription)", level: .error)
-            return
+    private func colorForStatus(_ status: String) -> Color {
+        switch status {
+        case "Normal": return .green
+        case "Borderline": return .yellow
+        case "Low": return .orange
+        default: return .red
         }
+    }
+    
+    private func timeAgo(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
         
-        guard let data = characteristic.value, !data.isEmpty else {
-            addLog("Received empty data", level: .warning)
-            return
-        }
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.parseCharacteristicData(characteristic: characteristic, data: data)
-            self?.lastUpdate = Date()
+        if seconds < 60 {
+            return "just now"
+        } else if seconds < 3600 {
+            let minutes = seconds / 60
+            return "\(minutes)m ago"
+        } else if seconds < 86400 {
+            let hours = seconds / 3600
+            return "\(hours)h ago"
+        } else {
+            let days = seconds / 86400
+            return "\(days)d ago"
         }
     }
 }
 
-// MARK: - Historical Data Extension
-extension OralableBLE {
-    
-    /// Get aggregated historical metrics for a specific time range
-    /// - Parameters:
-    ///   - range: The time range to aggregate (day, week, month, year)
-    ///   - endDate: Optional end date (defaults to now)
-    /// - Returns: HistoricalMetrics containing aggregated data
-    func getHistoricalMetrics(for range: TimeRange, endDate: Date = Date()) -> HistoricalMetrics {
-        return HistoricalDataAggregator.aggregate(
-            data: historicalData,
-            for: range,
-            endDate: endDate
-        )
-    }
-    
-    /// Get metrics for all time ranges at once
-    /// - Returns: Dictionary mapping each TimeRange to its HistoricalMetrics
-    func getAllHistoricalMetrics() -> [TimeRange: HistoricalMetrics] {
-        var metrics: [TimeRange: HistoricalMetrics] = [:]
-        
-        for range in TimeRange.allCases {
-            metrics[range] = getHistoricalMetrics(for: range)
-        }
-        
-        return metrics
-    }
-    
-    /// Check if historical data is available for a specific time range
-    /// - Parameter range: The time range to check
-    /// - Returns: True if data exists for the range
-    func hasDataForRange(_ range: TimeRange) -> Bool {
-        guard !historicalData.isEmpty else { return false }
-        
-        let oldestData = historicalData.first?.timestamp ?? Date()
-        let timeSinceOldest = Date().timeIntervalSince(oldestData)
-        
-        return timeSinceOldest >= range.seconds
-    }
-    
-    /// Get a summary of available data
-    /// - Returns: String describing data availability
-    func getDataAvailabilitySummary() -> String {
-        guard !historicalData.isEmpty else {
-            return "No historical data available"
-        }
-        
-        let oldestData = historicalData.first?.timestamp ?? Date()
-        let newestData = historicalData.last?.timestamp ?? Date()
-        let totalDuration = newestData.timeIntervalSince(oldestData)
-        
-        let hours = Int(totalDuration / 3600)
-        let minutes = Int((totalDuration.truncatingRemainder(dividingBy: 3600)) / 60)
-        
-        var summary = "Data available: "
-        
-        if hours > 0 {
-            summary += "\(hours)h "
-        }
-        if minutes > 0 || hours == 0 {
-            summary += "\(minutes)m"
-        }
-        
-        summary += " (\(historicalData.count) samples)"
-        
-        return summary
-    }
-    
-    /// Get the date range of available data
-    /// - Returns: Tuple with start and end dates, or nil if no data
-    func getDataDateRange() -> (start: Date, end: Date)? {
-        guard !historicalData.isEmpty else { return nil }
-        
-        let start = historicalData.first?.timestamp ?? Date()
-        let end = historicalData.last?.timestamp ?? Date()
-        
-        return (start, end)
-    }
-    
-    /// Export historical metrics as JSON
-    /// - Parameter range: The time range to export
-    /// - Returns: JSON data or nil if encoding fails
-    func exportHistoricalMetrics(for range: TimeRange) -> Data? {
-        let metrics = getHistoricalMetrics(for: range)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = .prettyPrinted
-        
-        return try? encoder.encode(metrics)
-    }
-    
-    /// Clear historical data (useful for testing or resetting)
-    func clearHistoricalData() {
-        historicalData.removeAll()
-        addLog("Historical data cleared", level: .info)
-    }
-    
-    /// Get recent data points (last N samples)
-    /// - Parameter count: Number of recent samples to retrieve
-    /// - Returns: Array of most recent SensorData
-    func getRecentData(count: Int = 100) -> [SensorData] {
-        let startIndex = max(0, historicalData.count - count)
-        return Array(historicalData[startIndex...])
-    }
-    
-    /// Calculate current rate of data collection (samples per minute)
-    /// - Returns: Samples per minute or 0 if insufficient data
-    func getDataCollectionRate() -> Double {
-        guard historicalData.count > 1 else { return 0 }
-        
-        let recentData = getRecentData(count: 10)
-        guard recentData.count > 1 else { return 0 }
-        
-        let firstTimestamp = recentData.first?.timestamp ?? Date()
-        let lastTimestamp = recentData.last?.timestamp ?? Date()
-        let duration = lastTimestamp.timeIntervalSince(firstTimestamp)
-        
-        guard duration > 0 else { return 0 }
-        
-        let samplesPerSecond = Double(recentData.count) / duration
-        return samplesPerSecond * 60.0 // Convert to per minute
+// MARK: - Integration Instructions
+
+/*
+ 
+ TO INTEGRATE SpO2 INTO YOUR DASHBOARDVIEW:
+ 
+ 1. REPLACE MetricType enum:
+    - Find the existing `enum MetricType` in DashboardView.swift
+    - Replace it entirely with the updated version above
+ 
+ 2. ADD SpO2GraphView:
+    - Copy the entire SpO2GraphView struct above
+    - Paste it into DashboardView.swift (after other graph views)
+ 
+ 3. UPDATE Dashboard Layout:
+    - In DashboardView body, find the ScrollView with metric cards
+    - Add SpO2 card in the order you want (suggested: after Heart Rate)
+ 
+ Example placement in ScrollView:
+ 
+ ScrollView {
+     VStack(spacing: 16) {
+         // ... existing connection status card ...
+         
+         // Battery card
+         MetricGraphCard(metric: .battery) {
+             BatteryGraphView(batteryHistory: ble.batteryHistory)
+         }
+         
+         // PPG card
+         MetricGraphCard(metric: .ppg) {
+             PPGGraphView(ppgHistory: ble.ppgHistory)
+         }
+         
+         // Heart Rate card (existing)
+         MetricGraphCard(metric: .heartRate) {
+             HeartRateGraphView(heartRateHistory: ble.heartRateHistory)
+         }
+         
+         // SpO2 card (NEW - add this)
+         MetricGraphCard(metric: .spo2) {
+             SpO2GraphView(spo2History: ble.spo2History)
+         }
+         
+         // Temperature card
+         MetricGraphCard(metric: .temperature) {
+             TemperatureGraphView(temperatureHistory: ble.temperatureHistory)
+         }
+         
+         // Accelerometer card
+         MetricGraphCard(metric: .accelerometer) {
+             AccelerometerGraphView(accelerometerHistory: ble.accelerometerHistory)
+         }
+     }
+     .padding()
+ }
+ 
+ 4. UPDATE OralableBLE Manager:
+    - Add spo2History array: @Published var spo2History: [SpO2Data] = []
+    - Import SpO2Calculator in OralableBLE.swift
+    - Calculate SpO2 after parsing PPG data (similar to heart rate)
+    - Append results to spo2History array
+ 
+ 5. TEST:
+    - Build project (Cmd+B)
+    - Run on device
+    - Verify SpO2 card appears on dashboard
+    - Verify SpO2 calculation runs when PPG data arrives
+ 
+ */
+
+// MARK: - Preview Support
+
+#if DEBUG
+struct SpO2GraphView_Previews: PreviewProvider {
+    static var previews: some View {
+        SpO2GraphView(spo2History: [
+            SpO2Data(percentage: 98.0, quality: 0.95, timestamp: Date().addingTimeInterval(-300)),
+            SpO2Data(percentage: 97.5, quality: 0.90, timestamp: Date().addingTimeInterval(-240)),
+            SpO2Data(percentage: 98.2, quality: 0.92, timestamp: Date().addingTimeInterval(-180)),
+            SpO2Data(percentage: 97.8, quality: 0.88, timestamp: Date().addingTimeInterval(-120)),
+            SpO2Data(percentage: 98.5, quality: 0.94, timestamp: Date().addingTimeInterval(-60)),
+            SpO2Data(percentage: 98.0, quality: 0.93, timestamp: Date())
+        ])
+        .padding()
+        .previewLayout(.sizeThatFits)
     }
 }
+#endif

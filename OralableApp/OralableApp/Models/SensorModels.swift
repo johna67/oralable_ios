@@ -1,173 +1,356 @@
+//
+//  SensorModels.swift
+//  OralableApp
+//
+//  Updated: October 28, 2025
+//  Added: SpO2 measurement support
+//
+
 import Foundation
 
-// MARK: - BLE Constants
-struct BLEConstants {
-    static let TGM_SERVICE = "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let PPG_CHAR = "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let ACC_CHAR = "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let TEMPERATURE_CHAR = "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let BATTERY_CHAR = "3A0FF004-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let UUID_CHAR = "3A0FF005-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let FW_VERSION_CHAR = "3A0FF006-98C4-46B2-94AF-1AEE0FD4C48E"
-    static let MUSCLE_SITE_CHAR = "3A0FF102-98C4-46B2-94AF-1AEE0FD4C48E"
+// MARK: - Main Sensor Data Container
+
+/// Container for all sensor data from the Oralable device
+struct SensorData: Identifiable, Codable {
+    let id = UUID()
+    let timestamp: Date
     
-    static let DEVICE_NAME = "Oralable"
-    static let PPG_SAMPLES_PER_FRAME = 20
-    static let ACC_SAMPLES_PER_FRAME = 25
-}
-
-// MARK: - Sensor Data
-struct SensorData: Codable, Equatable {
-    var grinding = GrindingData()
-    var accelerometer = AccelerometerData()
-    var ppg = PPGData()
-    var heartRate = HeartRateData()  // NEW: Heart rate data
-    var temperature: Double = 0.0
-    var activityLevel: UInt8 = 0
-    var batteryVoltage: Int32 = 0
-    var batteryLevel: UInt8 {
-        let minVoltage: Int32 = 3000
-        let maxVoltage: Int32 = 4200
-        let percentage = Int((batteryVoltage - minVoltage) * 100 / (maxVoltage - minVoltage))
-        return UInt8(max(0, min(100, percentage)))
-    }
-    var deviceUUID: UInt64 = 0
-    var firmwareVersion: String = ""
-    var timestamp: Date = Date()
-}
-
-struct GrindingData: Codable, Equatable {
-    var isActive: Bool = false
-    var count: UInt8 = 0
-    var duration: TimeInterval = 0
-    var intensity: Float = 0.0
-}
-
-struct AccelerometerData: Codable, Equatable {
-    var frameCounter: UInt32 = 0
-    var samples: [AccSample] = []
+    // Raw sensor data
+    let ppg: PPGData
+    let accelerometer: AccelerometerData
+    let temperature: TemperatureData
+    let battery: BatteryData
     
-    var x: Int16 {
-        return samples.last?.x ?? 0
+    // Calculated metrics
+    let heartRate: HeartRateData?
+    let spo2: SpO2Data?  // NEW: Blood oxygen saturation
+    
+    init(
+        timestamp: Date = Date(),
+        ppg: PPGData,
+        accelerometer: AccelerometerData,
+        temperature: TemperatureData,
+        battery: BatteryData,
+        heartRate: HeartRateData? = nil,
+        spo2: SpO2Data? = nil
+    ) {
+        self.timestamp = timestamp
+        self.ppg = ppg
+        self.accelerometer = accelerometer
+        self.temperature = temperature
+        self.battery = battery
+        self.heartRate = heartRate
+        self.spo2 = spo2
     }
-    var y: Int16 {
-        return samples.last?.y ?? 0
+}
+
+// MARK: - PPG Data
+
+/// PPG (Photoplethysmography) sensor data with three wavelengths
+struct PPGData: Codable {
+    let red: Int32
+    let ir: Int32      // Infrared
+    let green: Int32
+    let timestamp: Date
+    
+    /// Signal quality indicator (0.0 to 1.0)
+    var signalQuality: Double {
+        // Simple quality check based on reasonable value ranges
+        let redValid = (10000...500000).contains(red)
+        let irValid = (10000...500000).contains(ir)
+        let greenValid = (10000...500000).contains(green)
+        
+        let validCount = [redValid, irValid, greenValid].filter { $0 }.count
+        return Double(validCount) / 3.0
     }
-    var z: Int16 {
-        return samples.last?.z ?? 0
-    }
+}
+
+// MARK: - Accelerometer Data
+
+/// 3-axis accelerometer data
+struct AccelerometerData: Codable {
+    let x: Int16
+    let y: Int16
+    let z: Int16
+    let timestamp: Date
+    
+    /// Calculate magnitude of acceleration vector
     var magnitude: Double {
-        guard let last = samples.last else { return 0 }
-        let dx = Double(last.x)
-        let dy = Double(last.y)
-        let dz = Double(last.z)
-        return sqrt(dx*dx + dy*dy + dz*dz)
+        let xD = Double(x)
+        let yD = Double(y)
+        let zD = Double(z)
+        return sqrt(xD * xD + yD * yD + zD * zD)
+    }
+    
+    /// Simple movement detection
+    var isMoving: Bool {
+        // Threshold for movement detection (adjust based on calibration)
+        return magnitude > 100
     }
 }
 
-struct AccSample: Codable, Equatable {
-    var x: Int16 = 0
-    var y: Int16 = 0
-    var z: Int16 = 0
-    var timestamp: Date = Date()
-}
+// MARK: - Temperature Data
 
-struct PPGData: Codable, Equatable {
-    var frameCounter: UInt32 = 0
-    var samples: [PPGSample] = []
+/// Body temperature measurement
+struct TemperatureData: Codable {
+    let celsius: Double
+    let timestamp: Date
     
-    // Use average of all samples for more stable readings
-    var ir: UInt32 {
-        guard !samples.isEmpty else { return 0 }
-        let sum = samples.reduce(0) { $0 + $1.ir }
-        return sum / UInt32(samples.count)
-    }
-    
-    var red: UInt32 {
-        guard !samples.isEmpty else { return 0 }
-        let sum = samples.reduce(0) { $0 + $1.red }
-        return sum / UInt32(samples.count)
+    /// Convert to Fahrenheit
+    var fahrenheit: Double {
+        return celsius * 9.0 / 5.0 + 32.0
     }
     
-    var green: UInt32 {
-        guard !samples.isEmpty else { return 0 }
-        let sum = samples.reduce(0) { $0 + $1.green }
-        return sum / UInt32(samples.count)
-    }
-    
-    // Keep the old behavior available for comparison
-    var lastIr: UInt32 {
-        return samples.last?.ir ?? 0
-    }
-    var lastRed: UInt32 {
-        return samples.last?.red ?? 0
-    }
-    var lastGreen: UInt32 {
-        return samples.last?.green ?? 0
+    /// Temperature status indicator
+    var status: String {
+        switch celsius {
+        case ..<34.0:
+            return "Low"
+        case 34.0..<36.0:
+            return "Below Normal"
+        case 36.0...37.5:
+            return "Normal"
+        case 37.5..<38.5:
+            return "Slightly Elevated"
+        case 38.5...:
+            return "Elevated"
+        default:
+            return "Unknown"
+        }
     }
 }
 
-struct PPGSample: Codable, Equatable {
-    var red: UInt32 = 0
-    var ir: UInt32 = 0
-    var green: UInt32 = 0
-    var timestamp: Date = Date()
-}
+// MARK: - Battery Data
 
-// MARK: - Heart Rate Data (NEW)
-struct HeartRateData: Codable, Equatable {
-    var bpm: Double = 0.0
-    var signalQuality: Double = 0.0  // 0.0 to 1.0
-    var isValid: Bool = false
-    var lastCalculated: Date = Date()
+/// Device battery level
+struct BatteryData: Codable {
+    let percentage: Int
+    let timestamp: Date
     
-    /// Display text for heart rate with proper formatting
-    var displayText: String {
-        if isValid {
-            return "\(Int(bpm)) BPM"
-        } else {
-            return "-- BPM"
+    /// Battery status indicator
+    var status: String {
+        switch percentage {
+        case 0..<10:
+            return "Critical"
+        case 10..<20:
+            return "Low"
+        case 20..<50:
+            return "Medium"
+        case 50..<80:
+            return "Good"
+        case 80...100:
+            return "Excellent"
+        default:
+            return "Unknown"
         }
     }
     
-    /// Quality level for UI display
-    var qualityText: String {
-        if !isValid {
-            return "No Signal"
-        } else if signalQuality >= 0.6 {
+    /// Whether battery needs charging soon
+    var needsCharging: Bool {
+        return percentage < 20
+    }
+}
+
+// MARK: - Heart Rate Data
+
+/// Heart rate measurement with quality assessment
+struct HeartRateData: Codable {
+    /// Beats per minute
+    let bpm: Double
+    
+    /// Signal quality score (0.0 to 1.0)
+    let quality: Double
+    
+    /// Timestamp of measurement
+    let timestamp: Date
+    
+    /// Whether this measurement is considered valid
+    var isValid: Bool {
+        return (40...200).contains(bpm) && quality >= 0.6
+    }
+    
+    /// Quality level description
+    var qualityLevel: String {
+        switch quality {
+        case 0.9...1.0:
+            return "Excellent"
+        case 0.8..<0.9:
             return "Good"
-        } else if signalQuality >= 0.3 {
+        case 0.7..<0.8:
             return "Fair"
-        } else {
+        case 0.6..<0.7:
+            return "Acceptable"
+        default:
             return "Poor"
         }
     }
     
     /// Color for quality indicator
     var qualityColor: String {
-        if !isValid {
-            return "gray"
-        } else if signalQuality >= 0.6 {
+        switch quality {
+        case 0.85...1.0:
             return "green"
-        } else if signalQuality >= 0.3 {
+        case 0.7..<0.85:
             return "yellow"
-        } else {
+        case 0.6..<0.7:
+            return "orange"
+        default:
+            return "red"
+        }
+    }
+    
+    /// Heart rate zone
+    var zone: String {
+        switch bpm {
+        case 40..<60:
+            return "Resting"
+        case 60..<100:
+            return "Normal"
+        case 100..<120:
+            return "Elevated"
+        case 120..<160:
+            return "Exercise"
+        case 160...:
+            return "High Intensity"
+        default:
+            return "Unknown"
+        }
+    }
+}
+
+// MARK: - SpO2 Data
+
+/// Blood oxygen saturation measurement with quality assessment
+struct SpO2Data: Codable {
+    /// Blood oxygen saturation percentage (70-100%)
+    let percentage: Double
+    
+    /// Signal quality score (0.0 to 1.0)
+    let quality: Double
+    
+    /// Timestamp of measurement
+    let timestamp: Date
+    
+    /// Whether this measurement is considered valid
+    var isValid: Bool {
+        return (70...100).contains(percentage) && quality >= 0.6
+    }
+    
+    /// Quality level description
+    var qualityLevel: String {
+        switch quality {
+        case 0.9...1.0:
+            return "Excellent"
+        case 0.8..<0.9:
+            return "Good"
+        case 0.7..<0.8:
+            return "Fair"
+        case 0.6..<0.7:
+            return "Acceptable"
+        default:
+            return "Poor"
+        }
+    }
+    
+    /// Color for quality indicator
+    var qualityColor: String {
+        switch quality {
+        case 0.85...1.0:
+            return "green"
+        case 0.7..<0.85:
+            return "yellow"
+        case 0.6..<0.7:
+            return "orange"
+        default:
+            return "red"
+        }
+    }
+    
+    /// Health status based on SpO2 value
+    var healthStatus: String {
+        switch percentage {
+        case 95...100:
+            return "Normal"
+        case 90..<95:
+            return "Borderline"
+        case 85..<90:
+            return "Low"
+        default:
+            return "Very Low"
+        }
+    }
+    
+    /// Color for health status
+    var healthStatusColor: String {
+        switch percentage {
+        case 95...100:
+            return "green"
+        case 90..<95:
+            return "yellow"
+        case 85..<90:
+            return "orange"
+        default:
             return "red"
         }
     }
 }
 
-// MARK: - Measurement Sites
-enum MeasurementSite: UInt8, CaseIterable, Codable {
-    case masseter = 0
-    case forearm = 1
-    case calibration = 2
+// MARK: - Historical Data
+
+/// Aggregated sensor data for historical analysis
+struct HistoricalDataPoint: Codable, Identifiable {
+    let id: UUID
+    let timestamp: Date
     
-    var name: String {
-        switch self {
-        case .masseter: return "Masseter (Jaw)"
-        case .forearm: return "Forearm"
-        case .calibration: return "Calibration"
-        }
+    // Aggregated metrics
+    let averageHeartRate: Double?
+    let heartRateQuality: Double?
+    
+    let averageSpO2: Double?        // NEW
+    let spo2Quality: Double?        // NEW
+    
+    let averageTemperature: Double
+    let averageBattery: Int
+    
+    // Activity metrics
+    let movementIntensity: Double
+    let grindingEvents: Int?
+    
+    init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        averageHeartRate: Double? = nil,
+        heartRateQuality: Double? = nil,
+        averageSpO2: Double? = nil,
+        spo2Quality: Double? = nil,
+        averageTemperature: Double,
+        averageBattery: Int,
+        movementIntensity: Double,
+        grindingEvents: Int? = nil
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.averageHeartRate = averageHeartRate
+        self.heartRateQuality = heartRateQuality
+        self.averageSpO2 = averageSpO2
+        self.spo2Quality = spo2Quality
+        self.averageTemperature = averageTemperature
+        self.averageBattery = averageBattery
+        self.movementIntensity = movementIntensity
+        self.grindingEvents = grindingEvents
+    }
+}
+
+// MARK: - Device Information
+
+/// Information about the connected Oralable device
+struct DeviceInfo: Codable {
+    let uuid: String
+    let name: String
+    let firmwareVersion: String
+    let lastConnected: Date
+    
+    var displayName: String {
+        return "\(name) (\(firmwareVersion))"
     }
 }
