@@ -37,18 +37,31 @@ class LogExportManager {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         
-        var csvContent = "Timestamp,DeviceID,AppleID,Message,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temp_C,Battery_mV,Battery_%,Activity\n"
+        var csvContent = "Timestamp,DeviceID,AppleID,Message,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temp_C,Battery_%,HeartRate,SpO2\n"
         
         // Export historical sensor data with logs
         for (index, log) in logs.enumerated() {
-            let sensorData = index < historicalData.count ? historicalData[index] : SensorData()
+            let sensorData = index < historicalData.count ? historicalData[index] : createDefaultSensorData()
             
-            let row = "\(dateFormatter.string(from: Date())),\(deviceID),\(appleUserID ?? "none"),\"\(log)\",\(sensorData.ppg.ir),\(sensorData.ppg.red),\(sensorData.ppg.green),\(sensorData.accelerometer.x),\(sensorData.accelerometer.y),\(sensorData.accelerometer.z),\(sensorData.temperature),\(sensorData.batteryVoltage),\(sensorData.batteryLevel),\(sensorData.activityLevel)\n"
+            let timestamp = index < historicalData.count ? sensorData.timestamp : Date()
+            let heartRate = sensorData.heartRate?.bpm ?? 0
+            let spo2 = sensorData.spo2?.percentage ?? 0
+            
+            let row = "\(dateFormatter.string(from: timestamp)),\(deviceID),\(appleUserID ?? "none"),\"\(log)\",\(sensorData.ppg.ir),\(sensorData.ppg.red),\(sensorData.ppg.green),\(sensorData.accelerometer.x),\(sensorData.accelerometer.y),\(sensorData.accelerometer.z),\(sensorData.temperature.celsius),\(sensorData.battery.percentage),\(heartRate),\(spo2)\n"
             
             csvContent.append(row)
         }
         
         return saveToFile(content: csvContent, filename: "oralable_logs_\(Int(Date().timeIntervalSince1970)).csv")
+    }
+    
+    private func createDefaultSensorData() -> SensorData {
+        return SensorData(
+            ppg: PPGData(red: 0, ir: 0, green: 0, timestamp: Date()),
+            accelerometer: AccelerometerData(x: 0, y: 0, z: 0, timestamp: Date()),
+            temperature: TemperatureData(celsius: 0, timestamp: Date()),
+            battery: BatteryData(percentage: 0, timestamp: Date())
+        )
     }
     
     // Export logs as JSON

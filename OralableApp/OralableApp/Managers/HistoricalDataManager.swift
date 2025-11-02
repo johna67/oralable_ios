@@ -1,4 +1,5 @@
 import Foundation
+import Foundation
 import Combine
 import UIKit
 
@@ -36,7 +37,7 @@ class HistoricalDataManager: ObservableObject {
     
     /// Manually trigger an update of all metrics
     func updateAllMetrics() {
-        guard let ble = bleManager, !ble.historicalData.isEmpty else {
+        guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
             clearAllMetrics()
             return
         }
@@ -66,7 +67,7 @@ class HistoricalDataManager: ObservableObject {
     /// Update metrics for a specific time range only
     /// - Parameter range: The time range to update
     func updateMetrics(for range: TimeRange) {
-        guard let ble = bleManager, !ble.historicalData.isEmpty else {
+        guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
             clearMetrics(for: range)
             return
         }

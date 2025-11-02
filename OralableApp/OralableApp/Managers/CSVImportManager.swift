@@ -123,20 +123,20 @@ class CSVImportManager {
             return nil
         }
         
-        var sensorData = SensorData()
-        
         // Parse timestamp
+        var timestamp = Date()
         if let timestampIndex = columnIndices["Timestamp"],
            timestampIndex < values.count {
             let timestampString = values[timestampIndex].trimmingCharacters(in: .whitespaces)
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
             if let date = dateFormatter.date(from: timestampString) {
-                sensorData.timestamp = date
+                timestamp = date
             }
         }
         
         // Parse PPG data
+        var ppgData = PPGData(red: 0, ir: 0, green: 0, timestamp: timestamp)
         if let irIndex = columnIndices["PPG_IR"],
            let redIndex = columnIndices["PPG_Red"],
            let greenIndex = columnIndices["PPG_Green"],
@@ -144,16 +144,16 @@ class CSVImportManager {
            redIndex < values.count,
            greenIndex < values.count {
             
-            let ppgSample = PPGSample(
-                red: UInt32(values[redIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                ir: UInt32(values[irIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                green: UInt32(values[greenIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                timestamp: sensorData.timestamp
+            ppgData = PPGData(
+                red: Int32(values[redIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
+                ir: Int32(values[irIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
+                green: Int32(values[greenIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
+                timestamp: timestamp
             )
-            sensorData.ppg.samples = [ppgSample]
         }
         
         // Parse accelerometer data
+        var accelerometerData = AccelerometerData(x: 0, y: 0, z: 0, timestamp: timestamp)
         if let xIndex = columnIndices["Accel_X"],
            let yIndex = columnIndices["Accel_Y"],
            let zIndex = columnIndices["Accel_Z"],
@@ -161,34 +161,60 @@ class CSVImportManager {
            yIndex < values.count,
            zIndex < values.count {
             
-            let sample = AccSample(
+            accelerometerData = AccelerometerData(
                 x: Int16(values[xIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
                 y: Int16(values[yIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
                 z: Int16(values[zIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                timestamp: sensorData.timestamp
+                timestamp: timestamp
             )
-            sensorData.accelerometer.samples = [sample]
         }
         
         // Parse temperature
+        var temperatureData = TemperatureData(celsius: 0.0, timestamp: timestamp)
         if let tempIndex = columnIndices["Temp_C"],
            tempIndex < values.count {
-            sensorData.temperature = Double(values[tempIndex].trimmingCharacters(in: .whitespaces)) ?? 0.0
+            let celsius = Double(values[tempIndex].trimmingCharacters(in: .whitespaces)) ?? 0.0
+            temperatureData = TemperatureData(celsius: celsius, timestamp: timestamp)
         }
         
-        // Parse battery
-        if let batteryIndex = columnIndices["Battery_mV"],
-           batteryIndex < values.count {
-            sensorData.batteryVoltage = Int32(values[batteryIndex].trimmingCharacters(in: .whitespaces)) ?? 0
+        // Parse battery data
+        var batteryData = BatteryData(percentage: 0, timestamp: timestamp)
+        if let batteryPercentIndex = columnIndices["Battery_%"],
+           batteryPercentIndex < values.count {
+            let percentage = Int(values[batteryPercentIndex].trimmingCharacters(in: .whitespaces)) ?? 0
+            batteryData = BatteryData(percentage: percentage, timestamp: timestamp)
+        } else if let batteryMvIndex = columnIndices["Battery_mV"],
+                  batteryMvIndex < values.count {
+            // Convert mV to approximate percentage (this is a rough conversion)
+            let milliVolts = Int32(values[batteryMvIndex].trimmingCharacters(in: .whitespaces)) ?? 0
+            let percentage = estimateBatteryPercentage(from: milliVolts)
+            batteryData = BatteryData(percentage: percentage, timestamp: timestamp)
         }
         
-        // Parse activity level if present
-        if let activityIndex = columnIndices["Activity"],
-           activityIndex < values.count {
-            sensorData.activityLevel = UInt8(values[activityIndex].trimmingCharacters(in: .whitespaces)) ?? 0
-        }
+        // Create SensorData with the parsed components
+        let sensorData = SensorData(
+            timestamp: timestamp,
+            ppg: ppgData,
+            accelerometer: accelerometerData,
+            temperature: temperatureData,
+            battery: batteryData,
+            heartRate: nil, // Heart rate would need to be calculated from PPG
+            spo2: nil       // SpO2 would need to be calculated from PPG
+        )
         
         return sensorData
+    }
+    
+    /// Estimate battery percentage from millivolts
+    /// This is a rough estimation - actual conversion depends on battery chemistry
+    private func estimateBatteryPercentage(from milliVolts: Int32) -> Int {
+        // Typical Li-ion battery voltage range: 3000mV (empty) to 4200mV (full)
+        let minVoltage: Double = 3000.0
+        let maxVoltage: Double = 4200.0
+        let voltage = Double(milliVolts)
+        
+        let percentage = ((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100.0
+        return max(0, min(100, Int(percentage.rounded())))
     }
     
     /// Get supported file types for import

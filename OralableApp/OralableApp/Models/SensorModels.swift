@@ -12,7 +12,7 @@ import Foundation
 
 /// Container for all sensor data from the Oralable device
 struct SensorData: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let timestamp: Date
     
     // Raw sensor data
@@ -26,6 +26,7 @@ struct SensorData: Identifiable, Codable {
     let spo2: SpO2Data?  // NEW: Blood oxygen saturation
     
     init(
+        id: UUID = UUID(),
         timestamp: Date = Date(),
         ppg: PPGData,
         accelerometer: AccelerometerData,
@@ -34,6 +35,7 @@ struct SensorData: Identifiable, Codable {
         heartRate: HeartRateData? = nil,
         spo2: SpO2Data? = nil
     ) {
+        self.id = id
         self.timestamp = timestamp
         self.ppg = ppg
         self.accelerometer = accelerometer

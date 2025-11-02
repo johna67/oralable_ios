@@ -18,6 +18,9 @@ struct ShareView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Debug Section (temporary for troubleshooting)
+                    DebugConnectionSection(ble: ble)
+                    
                     // Viewer Mode Import Section
                     if isViewerMode {
                         ImportSection(
@@ -92,11 +95,11 @@ struct ShareView: View {
             
             if let imported = CSVImportManager.shared.importCSV(from: url) {
                 // Add imported data to BLE manager
-                ble.historicalData.append(contentsOf: imported.data)
+                ble.sensorDataHistory.append(contentsOf: imported.data)
                 ble.logMessages.append(contentsOf: imported.logs)
                 
                 // Sort by timestamp
-                ble.historicalData.sort { $0.timestamp < $1.timestamp }
+                ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
                 
                 importedCount = imported.data.count
                 showImportSuccess = true
@@ -267,17 +270,17 @@ struct DataSummaryCard: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
-                    Text("\(ble.historicalData.count)")
+                    Text("\(ble.sensorDataHistory.count)")
                         .font(.title2)
                         .fontWeight(.bold)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             
-            if !ble.historicalData.isEmpty {
+            if !ble.sensorDataHistory.isEmpty {
                 Divider()
                 
-                if let first = ble.historicalData.first, let last = ble.historicalData.last {
+                if let first = ble.sensorDataHistory.first, let last = ble.sensorDataHistory.last {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Data Range")
                             .font(.caption)
@@ -322,8 +325,8 @@ struct ExportButton: View {
             )
             .cornerRadius(12)
         }
-        .disabled(ble.logMessages.isEmpty && ble.historicalData.isEmpty)
-        .opacity((ble.logMessages.isEmpty && ble.historicalData.isEmpty) ? 0.5 : 1.0)
+        .disabled(ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty)
+        .opacity((ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty) ? 0.5 : 1.0)
     }
     
     private func exportCSV() {
@@ -331,7 +334,7 @@ struct ExportButton: View {
         
         if let url = manager.exportLogsAsCSV(
             logs: ble.logMessages,
-            historicalData: ble.historicalData
+            historicalData: ble.sensorDataHistory
         ) {
             exportURL = url
             showShareSheet = true
@@ -428,8 +431,8 @@ struct ClearDataButton: View {
             .background(Color(.systemGray6))
             .cornerRadius(12)
         }
-        .disabled(ble.logMessages.isEmpty && ble.historicalData.isEmpty)
-        .opacity((ble.logMessages.isEmpty && ble.historicalData.isEmpty) ? 0.5 : 1.0)
+        .disabled(ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty)
+        .opacity((ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty) ? 0.5 : 1.0)
     }
 }
 
@@ -466,4 +469,130 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Debug Connection Section (Temporary)
+struct DebugConnectionSection: View {
+    @ObservedObject var ble: OralableBLE
+    @State private var showFullLogs = false
+    @State private var testDeviceName = ""
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "wrench.and.screwdriver")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+                Text("Debug Connection")
+                    .font(.headline)
+                Spacer()
+                Button("View Full Logs") {
+                    showFullLogs = true
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            }
+            
+            Divider()
+            
+            // Connection Status
+            VStack(alignment: .leading, spacing: 8) {
+                InfoRow(label: "Status", value: ble.connectionStatus)
+                InfoRow(label: "Connected", value: ble.isConnected ? "Yes" : "No")
+                InfoRow(label: "Scanning", value: ble.isScanning ? "Yes" : "No")
+                InfoRow(label: "Devices Found", value: "\(ble.discoveredDevices.count)")
+                
+                if ble.isConnected, let device = ble.connectedDevice {
+                    InfoRow(label: "Connected Device", value: device.name ?? "Unknown")
+                }
+            }
+            
+            Divider()
+            
+            // Quick Actions
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Button("Refresh Scan") {
+                        ble.refreshScan()
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Reset BLE") {
+                        ble.resetBLE()
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Force Disconnect") {
+                        ble.disconnect()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                
+                // Test connect by device name
+                HStack {
+                    TextField("Device name to connect", text: $testDeviceName)
+                        .textFieldStyle(.roundedBorder)
+                    
+                    Button("Connect") {
+                        if !testDeviceName.isEmpty {
+                            ble.connectToDeviceWithName(testDeviceName)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(testDeviceName.isEmpty)
+                }
+                .font(.caption)
+            }
+            
+            // Show discovered devices
+            if !ble.discoveredDevices.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Discovered Devices:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    ForEach(ble.discoveredDevices, id: \.identifier) { device in
+                        HStack {
+                            Text(device.name ?? "Unknown")
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            Button("Connect") {
+                                ble.connect(to: device)
+                            }
+                            .font(.caption)
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.blue)
+                        }
+                    }
+                }
+            }
+            
+            // Recent logs preview
+            if !ble.logMessages.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Recent Logs (last 5):")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    ForEach(Array(ble.logMessages.suffix(5).reversed()), id: \.self) { log in
+                        Text(log)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(12)
+        .sheet(isPresented: $showFullLogs) {
+            LogsView(logs: ble.logMessages)
+        }
+    }
 }

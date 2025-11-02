@@ -1,109 +1,257 @@
 //
-//  DashboardView_SpO2_Components.swift
+//  DashboardView.swift
 //  OralableApp
 //
 //  Updated: October 28, 2025
 //  Added: SpO2 visualization and metric type
 //
-//  INSTRUCTIONS: Add this code to your existing DashboardView.swift file
-//
 
 import SwiftUI
 import Charts
 
-// MARK: - Updated MetricType Enum
+// MARK: - Main Dashboard View
 
-/// Replace the existing MetricType enum in DashboardView.swift with this updated version
-enum MetricType: String, CaseIterable {
-    case battery
-    case ppg
-    case heartRate      // Existing
-    case spo2           // NEW
-    case temperature
-    case accelerometer
+struct DashboardView: View {
+    @ObservedObject var ble: OralableBLE
+    var isViewerMode: Bool = false
     
-    var title: String {
-        switch self {
-        case .battery: return "Battery"
-        case .ppg: return "PPG Signals"
-        case .heartRate: return "Heart Rate"
-        case .spo2: return "Blood Oxygen"  // NEW
-        case .temperature: return "Temperature"
-        case .accelerometer: return "Accelerometer"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .battery: return "battery.100"
-        case .ppg: return "waveform.ecg"
-        case .heartRate: return "heart.fill"
-        case .spo2: return "drop.fill"  // NEW - water drop icon
-        case .temperature: return "thermometer"
-        case .accelerometer: return "gyroscope"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .battery: return .green
-        case .ppg: return .red
-        case .heartRate: return .pink
-        case .spo2: return .blue  // NEW - blue for oxygen
-        case .temperature: return .orange
-        case .accelerometer: return .blue
-        }
-    }
-    
-    func csvHeader() -> String {
-        switch self {
-        case .battery:
-            return "Timestamp,Battery_Percentage"
-        case .ppg:
-            return "Timestamp,PPG_Red,PPG_IR,PPG_Green"
-        case .heartRate:
-            return "Timestamp,Heart_Rate_BPM,Quality"
-        case .spo2:  // NEW
-            return "Timestamp,SpO2_Percentage,Quality"
-        case .temperature:
-            return "Timestamp,Temperature_Celsius"
-        case .accelerometer:
-            return "Timestamp,Accel_X,Accel_Y,Accel_Z,Magnitude"
-        }
-    }
-    
-    func csvRow(for data: SensorData) -> String {
-        let timestamp = ISO8601DateFormatter().string(from: data.timestamp)
-        
-        switch self {
-        case .battery:
-            return "\(timestamp),\(data.battery.percentage)"
-        case .ppg:
-            return "\(timestamp),\(data.ppg.red),\(data.ppg.ir),\(data.ppg.green)"
-        case .heartRate:
-            if let hr = data.heartRate {
-                return "\(timestamp),\(hr.bpm),\(hr.quality)"
-            } else {
-                return "\(timestamp),--,--"
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Connection Status Card (only in subscription mode)
+                    if !isViewerMode {
+                        ConnectionStatusCard(ble: ble)
+                    }
+                    
+                    // Sensor Data Cards
+                    if isViewerMode || ble.isConnected {
+                        // Battery card
+                        MetricGraphCard(metric: .battery) {
+                            BatteryGraphView(batteryHistory: ble.batteryHistory)
+                        }
+                        
+                        // PPG card
+                        MetricGraphCard(metric: .ppg) {
+                            PPGGraphView(ppgHistory: ble.ppgHistory)
+                        }
+                        
+                        // Heart Rate card
+                        MetricGraphCard(metric: .heartRate) {
+                            HeartRateGraphView(heartRateHistory: ble.heartRateHistory)
+                        }
+                        
+                        // SpO2 card
+                        MetricGraphCard(metric: .spo2) {
+                            SpO2GraphView(spo2History: ble.spo2History)
+                        }
+                        
+                        // Temperature card
+                        MetricGraphCard(metric: .temperature) {
+                            TemperatureGraphView(temperatureHistory: ble.temperatureHistory)
+                        }
+                        
+                        // Accelerometer card
+                        MetricGraphCard(metric: .accelerometer) {
+                            AccelerometerGraphView(accelerometerHistory: ble.accelerometerHistory)
+                        }
+                    } else {
+                        // No Data State
+                        NoDataView(isViewerMode: isViewerMode)
+                    }
+                }
+                .padding()
             }
-        case .spo2:  // NEW
-            if let spo2 = data.spo2 {
-                return "\(timestamp),\(spo2.percentage),\(spo2.quality)"
-            } else {
-                return "\(timestamp),--,--"
-            }
-        case .temperature:
-            return "\(timestamp),\(data.temperature.celsius)"
-        case .accelerometer:
-            let mag = data.accelerometer.magnitude
-            return "\(timestamp),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(mag)"
+            .navigationTitle("Dashboard")
+            .navigationBarTitleDisplayMode(.large)
         }
+    }
+}
+
+// MARK: - Connection Status Card
+
+struct ConnectionStatusCard: View {
+    @ObservedObject var ble: OralableBLE
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: ble.isConnected ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+                    .font(.title2)
+                    .foregroundColor(ble.isConnected ? .green : .red)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ble.isConnected ? "Connected" : "Disconnected")
+                        .font(.headline)
+                        .foregroundColor(ble.isConnected ? .green : .red)
+                    
+                    Text(ble.isConnected ? ble.deviceName : "Tap to connect to device")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            
+            if !ble.isConnected {
+                Button("Connect Device") {
+                    // This would trigger connection logic
+                    ble.startScanning()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - No Data View
+
+struct NoDataView: View {
+    let isViewerMode: Bool
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: isViewerMode ? "doc.text.viewfinder" : "antenna.radiowaves.left.and.right.slash")
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.6))
+            
+            VStack(spacing: 12) {
+                Text(isViewerMode ? "No Data Available" : "Device Not Connected")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text(isViewerMode ? 
+                     "Load data files to view sensor information" : 
+                     "Connect your Oralable device to start monitoring")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            if !isViewerMode {
+                Button("Connect Device") {
+                    // Trigger connection
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(.horizontal, 40)
+        .padding(.vertical, 60)
+    }
+}
+
+// MARK: - Metric Graph Card
+
+struct MetricGraphCard<Content: View>: View {
+    let metric: MetricType
+    let content: Content
+    
+    init(metric: MetricType, @ViewBuilder content: () -> Content) {
+        self.metric = metric
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: metric.icon)
+                    .font(.title3)
+                    .foregroundColor(metric.color)
+                
+                Text(metric.title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button(action: {
+                    // Navigate to detailed view
+                }) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            content
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Placeholder Graph Views
+// These would be implemented with actual graph content
+
+struct BatteryGraphView: View {
+    let batteryHistory: [BatteryData]
+    
+    var body: some View {
+        VStack {
+            Text("Battery Graph")
+            Text("Implementation needed")
+        }
+        .frame(height: 100)
+    }
+}
+
+struct PPGGraphView: View {
+    let ppgHistory: [PPGData]
+    
+    var body: some View {
+        VStack {
+            Text("PPG Graph")
+            Text("Implementation needed")
+        }
+        .frame(height: 100)
+    }
+}
+
+struct HeartRateGraphView: View {
+    let heartRateHistory: [HeartRateData]
+    
+    var body: some View {
+        VStack {
+            Text("Heart Rate Graph")
+            Text("Implementation needed")
+        }
+        .frame(height: 100)
+    }
+}
+
+struct TemperatureGraphView: View {
+    let temperatureHistory: [TemperatureData]
+    
+    var body: some View {
+        VStack {
+            Text("Temperature Graph")
+            Text("Implementation needed")
+        }
+        .frame(height: 100)
+    }
+}
+
+struct AccelerometerGraphView: View {
+    let accelerometerHistory: [AccelerometerData]
+    
+    var body: some View {
+        VStack {
+            Text("Accelerometer Graph")
+            Text("Implementation needed")
+        }
+        .frame(height: 100)
     }
 }
 
 // MARK: - SpO2 Graph View Component
 
-/// Add this new struct to your DashboardView.swift file
+/// SpO2 Graph View for blood oxygen saturation monitoring
 struct SpO2GraphView: View {
     let spo2History: [SpO2Data]
     
@@ -289,80 +437,16 @@ struct SpO2GraphView: View {
     }
 }
 
-// MARK: - Integration Instructions
-
-/*
- 
- TO INTEGRATE SpO2 INTO YOUR DASHBOARDVIEW:
- 
- 1. REPLACE MetricType enum:
-    - Find the existing `enum MetricType` in DashboardView.swift
-    - Replace it entirely with the updated version above
- 
- 2. ADD SpO2GraphView:
-    - Copy the entire SpO2GraphView struct above
-    - Paste it into DashboardView.swift (after other graph views)
- 
- 3. UPDATE Dashboard Layout:
-    - In DashboardView body, find the ScrollView with metric cards
-    - Add SpO2 card in the order you want (suggested: after Heart Rate)
- 
- Example placement in ScrollView:
- 
- ScrollView {
-     VStack(spacing: 16) {
-         // ... existing connection status card ...
-         
-         // Battery card
-         MetricGraphCard(metric: .battery) {
-             BatteryGraphView(batteryHistory: ble.batteryHistory)
-         }
-         
-         // PPG card
-         MetricGraphCard(metric: .ppg) {
-             PPGGraphView(ppgHistory: ble.ppgHistory)
-         }
-         
-         // Heart Rate card (existing)
-         MetricGraphCard(metric: .heartRate) {
-             HeartRateGraphView(heartRateHistory: ble.heartRateHistory)
-         }
-         
-         // SpO2 card (NEW - add this)
-         MetricGraphCard(metric: .spo2) {
-             SpO2GraphView(spo2History: ble.spo2History)
-         }
-         
-         // Temperature card
-         MetricGraphCard(metric: .temperature) {
-             TemperatureGraphView(temperatureHistory: ble.temperatureHistory)
-         }
-         
-         // Accelerometer card
-         MetricGraphCard(metric: .accelerometer) {
-             AccelerometerGraphView(accelerometerHistory: ble.accelerometerHistory)
-         }
-     }
-     .padding()
- }
- 
- 4. UPDATE OralableBLE Manager:
-    - Add spo2History array: @Published var spo2History: [SpO2Data] = []
-    - Import SpO2Calculator in OralableBLE.swift
-    - Calculate SpO2 after parsing PPG data (similar to heart rate)
-    - Append results to spo2History array
- 
- 5. TEST:
-    - Build project (Cmd+B)
-    - Run on device
-    - Verify SpO2 card appears on dashboard
-    - Verify SpO2 calculation runs when PPG data arrives
- 
- */
-
 // MARK: - Preview Support
 
 #if DEBUG
+struct DashboardView_Previews: PreviewProvider {
+    static var previews: some View {
+        // Create a mock OralableBLE for preview
+        DashboardView(ble: OralableBLE())
+    }
+}
+
 struct SpO2GraphView_Previews: PreviewProvider {
     static var previews: some View {
         SpO2GraphView(spo2History: [
@@ -378,3 +462,6 @@ struct SpO2GraphView_Previews: PreviewProvider {
     }
 }
 #endif
+
+
+

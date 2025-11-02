@@ -54,15 +54,13 @@ struct DevicesView: View {
                 Section("Available Devices") {
                     if ble.isScanning {
                         ScanningIndicator()
-                    } else if !ble.discoveredPeripherals.isEmpty {
-                        ForEach(Array(ble.discoveredPeripherals.keys.sorted()), id: \.self) { uuid in
-                            if let peripheral = ble.discoveredPeripherals[uuid] {
-                                DiscoveredDeviceRow(
-                                    peripheral: peripheral,
-                                    ble: ble,
-                                    onConnect: { connectToDevice(peripheral) }
-                                )
-                            }
+                    } else if !ble.discoveredDevices.isEmpty {
+                        ForEach(ble.discoveredDevices, id: \.identifier) { peripheral in
+                            DiscoveredDeviceRow(
+                                peripheral: peripheral,
+                                ble: ble,
+                                onConnect: { connectToDevice(peripheral) }
+                            )
                         }
                     } else {
                         Text("No devices found")
@@ -227,7 +225,7 @@ struct SavedDeviceRow: View {
     let onDelete: () -> Void
     
     var isCurrentDevice: Bool {
-        ble.peripheral?.identifier.uuidString == device.uuid
+        ble.connectedDevice?.identifier.uuidString == device.uuid
     }
     
     var body: some View {
@@ -265,8 +263,8 @@ struct SavedDeviceRow: View {
                     .cornerRadius(8)
             } else {
                 Button(action: { 
-                    // Connect to saved device - we'll need to find it in discovered peripherals or trigger a scan
-                    if let peripheral = ble.discoveredPeripherals[device.uuid] {
+                    // Connect to saved device - we'll need to find it in discovered devices or trigger a scan
+                    if let peripheral = ble.discoveredDevices.first(where: { $0.identifier.uuidString == device.uuid }) {
                         ble.connect(to: peripheral)
                     } else {
                         // Start scanning to find the device
@@ -397,18 +395,16 @@ struct AddDeviceView: View {
                         }
                     }
                     
-                    ForEach(Array(ble.discoveredPeripherals.keys.sorted()), id: \.self) { uuid in
-                        if let peripheral = ble.discoveredPeripherals[uuid] {
-                            Button(action: {
-                                selectedPeripheral = peripheral
-                            }) {
-                                HStack {
-                                    Text(peripheral.name ?? "Unknown")
-                                    Spacer()
-                                    if selectedPeripheral?.identifier == peripheral.identifier {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.blue)
-                                    }
+                    ForEach(ble.discoveredDevices, id: \.identifier) { peripheral in
+                        Button(action: {
+                            selectedPeripheral = peripheral
+                        }) {
+                            HStack {
+                                Text(peripheral.name ?? "Unknown")
+                                Spacer()
+                                if selectedPeripheral?.identifier == peripheral.identifier {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
                                 }
                             }
                         }

@@ -220,7 +220,7 @@ struct SubscriptionContentView: View {
                                     .foregroundColor(ble.isConnected ? .green : .secondary)
                                 
                                 if ble.isConnected {
-                                    Text(ble.deviceName)
+                                    Text(ble.connectedDevice?.name ?? "Unknown Device")
                                         .font(.system(size: 10))
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)

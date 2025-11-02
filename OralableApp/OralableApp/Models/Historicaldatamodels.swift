@@ -29,42 +29,7 @@ enum TimeRange: String, CaseIterable, Codable {
     }
 }
 
-// MARK: - Historical Data Point
-/// Represents aggregated sensor data for a specific time point
-struct HistoricalDataPoint: Identifiable, Codable {
-    let id = UUID()
-    let timestamp: Date
-    
-    // PPG Metrics (averages)
-    let avgIR: Double
-    let avgRed: Double
-    let avgGreen: Double
-    
-    // Accelerometer Metrics (averages)
-    let avgAccelX: Double
-    let avgAccelY: Double
-    let avgAccelZ: Double
-    let avgMagnitude: Double
-    
-    // Temperature Metrics
-    let avgTemperature: Double
-    let minTemperature: Double
-    let maxTemperature: Double
-    
-    // Battery Metrics
-    let avgBatteryLevel: Double
-    
-    // Activity Metrics
-    let avgActivityLevel: Double
-    
-    // Grinding Metrics
-    let grindingCount: Int
-    let totalGrindingDuration: TimeInterval
-    let avgGrindingIntensity: Double
-    
-    // Metadata
-    let sampleCount: Int // Number of samples that went into this aggregation
-}
+// Note: HistoricalDataPoint is defined in SensorModels.swift
 
 // MARK: - Historical Metrics
 /// Contains calculated metrics and trends for a time range
@@ -135,15 +100,15 @@ class HistoricalDataAggregator {
         }
         
         // Calculate trends
-        let temperatureTrend = calculateTrend(dataPoints.map { $0.avgTemperature })
-        let batteryTrend = calculateTrend(dataPoints.map { $0.avgBatteryLevel })
-        let activityTrend = calculateTrend(dataPoints.map { $0.avgActivityLevel })
+        let temperatureTrend = calculateTrend(dataPoints.map { $0.averageTemperature })
+        let batteryTrend = calculateTrend(dataPoints.map { Double($0.averageBattery) })
+        let activityTrend = calculateTrend(dataPoints.map { $0.movementIntensity })
         
         // Calculate summary statistics
-        let avgTemperature = dataPoints.map { $0.avgTemperature }.reduce(0, +) / Double(max(dataPoints.count, 1))
-        let avgBatteryLevel = dataPoints.map { $0.avgBatteryLevel }.reduce(0, +) / Double(max(dataPoints.count, 1))
-        let totalGrindingEvents = dataPoints.map { $0.grindingCount }.reduce(0, +)
-        let totalGrindingDuration = dataPoints.map { $0.totalGrindingDuration }.reduce(0, +)
+        let avgTemperature = dataPoints.map { $0.averageTemperature }.reduce(0, +) / Double(max(dataPoints.count, 1))
+        let avgBatteryLevel = dataPoints.map { Double($0.averageBattery) }.reduce(0, +) / Double(max(dataPoints.count, 1))
+        let totalGrindingEvents = dataPoints.compactMap { $0.grindingEvents }.reduce(0, +)
+        let totalGrindingDuration: TimeInterval = 0 // Not available in current structure
         
         return HistoricalMetrics(
             timeRange: range.rawValue,
@@ -177,41 +142,32 @@ class HistoricalDataAggregator {
         let avgMagnitude = bucket.map { $0.accelerometer.magnitude }.reduce(0, +) / count
         
         // Temperature statistics
-        let temperatures = bucket.map { $0.temperature }
+        let temperatures = bucket.map { $0.temperature.celsius }
         let avgTemperature = temperatures.reduce(0, +) / count
         let minTemperature = temperatures.min() ?? 0
         let maxTemperature = temperatures.max() ?? 0
         
         // Battery average
-        let avgBatteryLevel = bucket.map { Double($0.batteryLevel) }.reduce(0, +) / count
+        let avgBatteryLevel = bucket.map { Double($0.battery.percentage) }.reduce(0, +) / count
         
-        // Activity average
-        let avgActivityLevel = bucket.map { Double($0.activityLevel) }.reduce(0, +) / count
+        // Activity average (using accelerometer magnitude as proxy)
+        let avgActivityLevel = bucket.map { $0.accelerometer.magnitude }.reduce(0, +) / count
         
-        // Grinding metrics
-        let grindingCount = bucket.filter { $0.grinding.isActive }.count
-        let totalGrindingDuration = bucket.map { $0.grinding.duration }.reduce(0, +)
-        let grindingIntensities = bucket.filter { $0.grinding.isActive }.map { Double($0.grinding.intensity) }
-        let avgGrindingIntensity = grindingIntensities.isEmpty ? 0 : grindingIntensities.reduce(0, +) / Double(grindingIntensities.count)
+        // Note: Grinding metrics would need to be implemented in SensorData
+        let grindingCount = 0 // bucket.filter { $0.grinding.isActive }.count
+        let totalGrindingDuration: TimeInterval = 0 // bucket.map { $0.grinding.duration }.reduce(0, +)
+        let avgGrindingIntensity = 0.0 // placeholder
         
         return HistoricalDataPoint(
             timestamp: timestamp,
-            avgIR: avgIR,
-            avgRed: avgRed,
-            avgGreen: avgGreen,
-            avgAccelX: avgAccelX,
-            avgAccelY: avgAccelY,
-            avgAccelZ: avgAccelZ,
-            avgMagnitude: avgMagnitude,
-            avgTemperature: avgTemperature,
-            minTemperature: minTemperature,
-            maxTemperature: maxTemperature,
-            avgBatteryLevel: avgBatteryLevel,
-            avgActivityLevel: avgActivityLevel,
-            grindingCount: grindingCount,
-            totalGrindingDuration: totalGrindingDuration,
-            avgGrindingIntensity: avgGrindingIntensity,
-            sampleCount: bucket.count
+            averageHeartRate: nil, // Would need heart rate data from SensorData
+            heartRateQuality: nil,
+            averageSpO2: nil, // Would need SpO2 data from SensorData
+            spo2Quality: nil,
+            averageTemperature: avgTemperature,
+            averageBattery: Int(avgBatteryLevel),
+            movementIntensity: avgActivityLevel,
+            grindingEvents: grindingCount
         )
     }
     

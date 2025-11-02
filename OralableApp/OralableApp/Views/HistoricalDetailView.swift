@@ -1,6 +1,93 @@
 import SwiftUI
+import SwiftUI
 import Charts
 import Foundation
+
+// MARK: - MetricType Definition (if not defined elsewhere)
+enum MetricType: String, CaseIterable {
+    case battery = "battery"
+    case ppg = "ppg"
+    case heartRate = "heartRate"
+    case spo2 = "spo2"
+    case temperature = "temperature"
+    case accelerometer = "accelerometer"
+    
+    var title: String {
+        switch self {
+        case .battery: return "Battery"
+        case .ppg: return "PPG Signals"
+        case .heartRate: return "Heart Rate"
+        case .spo2: return "Blood Oxygen"
+        case .temperature: return "Temperature"
+        case .accelerometer: return "Accelerometer"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .battery: return "battery.100"
+        case .ppg: return "waveform.path.ecg"
+        case .heartRate: return "heart.fill"
+        case .spo2: return "drop.fill"
+        case .temperature: return "thermometer"
+        case .accelerometer: return "gyroscope"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .battery: return .green
+        case .ppg: return .red
+        case .heartRate: return .pink
+        case .spo2: return .blue
+        case .temperature: return .orange
+        case .accelerometer: return .purple
+        }
+    }
+    
+    func csvHeader() -> String {
+        switch self {
+        case .battery:
+            return "Timestamp,Battery_Percentage"
+        case .ppg:
+            return "Timestamp,PPG_Red,PPG_IR,PPG_Green"
+        case .heartRate:
+            return "Timestamp,Heart_Rate_BPM,Quality"
+        case .spo2:
+            return "Timestamp,SpO2_Percentage,Quality"
+        case .temperature:
+            return "Timestamp,Temperature_Celsius"
+        case .accelerometer:
+            return "Timestamp,Accel_X,Accel_Y,Accel_Z,Magnitude"
+        }
+    }
+    
+    func csvRow(for data: SensorData) -> String {
+        let timestamp = ISO8601DateFormatter().string(from: data.timestamp)
+        switch self {
+        case .battery:
+            return "\(timestamp),\(data.battery.percentage)"
+        case .ppg:
+            return "\(timestamp),\(data.ppg.red),\(data.ppg.ir),\(data.ppg.green)"
+        case .heartRate:
+            if let hr = data.heartRate {
+                return "\(timestamp),\(hr.bpm),\(hr.quality)"
+            } else {
+                return "\(timestamp),0,0"
+            }
+        case .spo2:
+            if let spo2 = data.spo2 {
+                return "\(timestamp),\(spo2.percentage),\(spo2.quality)"
+            } else {
+                return "\(timestamp),0,0"
+            }
+        case .temperature:
+            return "\(timestamp),\(data.temperature.celsius)"
+        case .accelerometer:
+            return "\(timestamp),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.accelerometer.magnitude)"
+        }
+    }
+}
 
 // MARK: - App Mode and Subscription Management
 enum AppMode: String, CaseIterable {
@@ -63,13 +150,11 @@ class DataSharingService: ObservableObject {
     }
     
     private func createCSVFile(_ data: [SensorData], metricType: MetricType, timeRange: TimeRange) -> URL? {
-        let formatter = ISO8601DateFormatter()
-        var csvContent = "Timestamp,\(metricType.csvHeaders)\n"
+        var csvContent = metricType.csvHeader() + "\n"
         
         for sample in data {
-            let timestamp = formatter.string(from: sample.timestamp)
-            let values = metricType.csvValues(from: sample)
-            csvContent += "\(timestamp),\(values)\n"
+            let row = metricType.csvRow(for: sample)
+            csvContent += "\(row)\n"
         }
         
         return saveToFile(content: csvContent, filename: "oralable_\(metricType.rawValue)_\(timeRange.rawValue).csv")
@@ -122,15 +207,15 @@ class DataSharingService: ObservableObject {
 
 // MARK: - Data Models for Export
 struct HistoricalDataExport: Codable {
-    let metricTypeRawValue: String
-    let timeRangeRawValue: String
+    let metricType: String
+    let timeRange: String
     let exportDate: Date
     let dataCount: Int
     let samples: [HistoricalSample]
     
     init(metricType: MetricType, timeRange: TimeRange, exportDate: Date, dataCount: Int, samples: [HistoricalSample]) {
-        self.metricTypeRawValue = metricType.rawValue
-        self.timeRangeRawValue = timeRange.rawValue
+        self.metricType = metricType.rawValue
+        self.timeRange = timeRange.rawValue
         self.exportDate = exportDate
         self.dataCount = dataCount
         self.samples = samples
@@ -153,13 +238,11 @@ struct HistoricalSample: Codable {
                 "green": Double(sensorData.ppg.green)
             ]
         case .temperature:
-            self.value = sensorData.temperature
+            self.value = sensorData.temperature.celsius
             self.additionalData = nil
         case .battery:
-            self.value = Double(sensorData.batteryLevel)
-            self.additionalData = [
-                "voltage": Double(sensorData.batteryVoltage)
-            ]
+            self.value = Double(sensorData.battery.percentage)
+            self.additionalData = nil
         case .accelerometer:
             self.value = sensorData.accelerometer.magnitude
             self.additionalData = [
@@ -168,10 +251,25 @@ struct HistoricalSample: Codable {
                 "z": Double(sensorData.accelerometer.z)
             ]
         case .heartRate:
-            self.value = Double(sensorData.heartRate.bpm)
-            self.additionalData = [
-                "signalQuality": Double(sensorData.heartRate.signalQuality)
-            ]
+            if let heartRate = sensorData.heartRate {
+                self.value = heartRate.bpm
+                self.additionalData = [
+                    "quality": heartRate.quality
+                ]
+            } else {
+                self.value = 0
+                self.additionalData = nil
+            }
+        case .spo2:
+            if let spo2 = sensorData.spo2 {
+                self.value = spo2.percentage
+                self.additionalData = [
+                    "quality": spo2.quality
+                ]
+            } else {
+                self.value = 0
+                self.additionalData = nil
+            }
         }
     }
 }
@@ -237,7 +335,7 @@ class HistoricalDataProcessor: ObservableObject {
         isProcessing = true
         defer { isProcessing = false }
         
-        let filteredData = filterData(from: ble.historicalData, timeRange: timeRange, selectedDate: selectedDate)
+        let filteredData = filterData(from: ble.sensorDataHistory, timeRange: timeRange, selectedDate: selectedDate)
         
         guard !filteredData.isEmpty else {
             processedData = nil
@@ -303,13 +401,21 @@ class HistoricalDataProcessor: ObservableObject {
                 return data.map { (timestamp: $0.timestamp, value: Double($0.ppg.ir)) }
             }
         case .temperature:
-            return data.map { (timestamp: $0.timestamp, value: $0.temperature) }
+            return data.map { (timestamp: $0.timestamp, value: $0.temperature.celsius) }
         case .battery:
-            return data.map { (timestamp: $0.timestamp, value: Double($0.batteryLevel)) }
+            return data.map { (timestamp: $0.timestamp, value: Double($0.battery.percentage)) }
         case .accelerometer:
             return data.map { (timestamp: $0.timestamp, value: $0.accelerometer.magnitude) }
         case .heartRate:
-            return data.map { (timestamp: $0.timestamp, value: Double($0.heartRate.bpm)) }
+            return data.compactMap { sensorData in
+                guard let heartRate = sensorData.heartRate else { return nil }
+                return (timestamp: sensorData.timestamp, value: heartRate.bpm)
+            }
+        case .spo2:
+            return data.compactMap { sensorData in
+                guard let spo2 = sensorData.spo2 else { return nil }
+                return (timestamp: sensorData.timestamp, value: spo2.percentage)
+            }
         }
     }
     
@@ -387,8 +493,8 @@ class HistoricalDataProcessor: ObservableObject {
         
         let recent = Array(data.suffix(10))
         let movementVariation = calculateWindowVariation(recent)
-        let tempChange = (recent.map { $0.temperature }.max() ?? 0) - (recent.map { $0.temperature }.min() ?? 0)
-        let batteryLevel = recent.last?.batteryLevel ?? 0
+        let tempChange = (recent.map { $0.temperature.celsius }.max() ?? 0) - (recent.map { $0.temperature.celsius }.min() ?? 0)
+        let batteryLevel = recent.last?.battery.percentage ?? 0
         
         let state: PPGDebugCard.DeviceState
         if batteryLevel > 95 && movementVariation < 0.1 {
@@ -532,8 +638,8 @@ class PPGNormalizationService: ObservableObject {
         
         let accelerometerVariation = calculateMovementVariation(recentSamples)
         let temperatureChange = calculateTemperatureChange(recentSamples)
-        let batteryLevel = recentSamples.last?.batteryLevel ?? 0
-        let avgTemperature = recentSamples.map { $0.temperature }.reduce(0, +) / Double(recentSamples.count)
+        let batteryLevel = recentSamples.last?.battery.percentage ?? 0
+        let avgTemperature = recentSamples.map { $0.temperature.celsius }.reduce(0, +) / Double(recentSamples.count)
         
         let isMoving = accelerometerVariation > 0.3
         let temperatureStable = temperatureChange < 1.0
@@ -622,7 +728,7 @@ class PPGNormalizationService: ObservableObject {
     }
     
     private func calculateTemperatureChange(_ samples: [SensorData]) -> Double {
-        let temperatures = samples.map { $0.temperature }
+        let temperatures = samples.map { $0.temperature.celsius }
         return (temperatures.max() ?? 0) - (temperatures.min() ?? 0)
     }
     
@@ -738,7 +844,6 @@ struct HistoricalDetailView: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedTimeRange: TimeRange = .day
     @State private var selectedDate = Date()
-    @State private var selectedDataPoint: SensorData?
     
     // Inject or derive app mode; default to subscription for now
     @State private var appMode: AppMode = .subscription
@@ -765,7 +870,7 @@ struct HistoricalDetailView: View {
                     VStack(spacing: 20) {
                         EnhancedHistoricalChartCardUnified(
                             metricType: metricType,
-                            selectedDataPoint: $selectedDataPoint,
+                            selectedDataPoint: $processor.selectedDataPoint,
                             processed: processor.processedData
                         )
                         
@@ -774,7 +879,7 @@ struct HistoricalDetailView: View {
                             processed: processor.processedData
                         )
                         
-                        if metricType == .ppg, appMode.allowsAdvancedAnalytics {
+                        if metricType == .ppg && appMode.allowsAdvancedAnalytics {
                             PPGDebugCard(
                                 ble: ble,
                                 timeRange: selectedTimeRange,
@@ -803,7 +908,7 @@ struct HistoricalDetailView: View {
                     appMode: appMode
                 )
             }
-            .onChange(of: ble.historicalData) { _, _ in
+            .onChange(of: ble.sensorDataHistory.count) { _, _ in
                 refreshProcessing()
             }
         }
@@ -1151,6 +1256,8 @@ struct TooltipOverlayUnified: View {
             return String(format: "%.2f", value)
         case .heartRate:
             return String(format: "%.0f BPM", value)
+        case .spo2:
+            return String(format: "%.0f%%", value)
         }
     }
     
@@ -1209,6 +1316,8 @@ struct EnhancedStatisticsCardUnified: View {
             return String(format: "%.2f", value)
         case .heartRate:
             return String(format: "%.0f BPM", value)
+        case .spo2:
+            return String(format: "%.0f%%", value)
         }
     }
     
@@ -1379,27 +1488,27 @@ struct PPGDebugCard: View {
         case .hour:
             let startOfHour = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
             let endOfHour = calendar.date(byAdding: .hour, value: 1, to: startOfHour) ?? selectedDate
-            return ble.historicalData.filter { 
+            return Array(ble.sensorDataHistory.filter { 
                 $0.timestamp >= startOfHour && $0.timestamp < endOfHour
-            }.suffix(20)
+            }.suffix(20))
         case .day:
             let startOfDay = calendar.startOfDay(for: selectedDate)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
-            return ble.historicalData.filter { 
+            return Array(ble.sensorDataHistory.filter { 
                 $0.timestamp >= startOfDay && $0.timestamp < endOfDay
-            }.suffix(20)
+            }.suffix(20))
         case .week:
             let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
             let endOfWeek = calendar.date(byAdding: .weekOfYear, value: 1, to: startOfWeek) ?? selectedDate
-            return ble.historicalData.filter { 
+            return Array(ble.sensorDataHistory.filter { 
                 $0.timestamp >= startOfWeek && $0.timestamp < endOfWeek
-            }.suffix(20)
+            }.suffix(20))
         case .month:
             let startOfMonth = calendar.dateInterval(of: .month, for: selectedDate)?.start ?? selectedDate
             let endOfMonth = calendar.date(byAdding: .month, value: 1, to: startOfMonth) ?? selectedDate
-            return ble.historicalData.filter { 
+            return Array(ble.sensorDataHistory.filter { 
                 $0.timestamp >= startOfMonth && $0.timestamp < endOfMonth
-            }.suffix(20)
+            }.suffix(20))
         }
     }
     
@@ -1470,7 +1579,7 @@ struct PPGDebugCard: View {
         let recentSamples = Array(data.suffix(10))
         let accelerometerVariation = calculateAccelerometerVariation(recentSamples)
         let temperatureChange = calculateTemperatureChange(recentSamples)
-        let batteryStatus = recentSamples.last?.batteryLevel ?? 0
+        let batteryStatus = recentSamples.last?.battery.percentage ?? 0
         
         let detectedState = classifyDeviceState(
             accelerometerVariation: accelerometerVariation,
@@ -1502,14 +1611,14 @@ struct PPGDebugCard: View {
     
     private func calculateTemperatureChange(_ samples: [SensorData]) -> Double {
         guard samples.count > 1 else { return 0 }
-        let temperatures = samples.map { $0.temperature }
+        let temperatures = samples.map { $0.temperature.celsius }
         return (temperatures.max() ?? 0) - (temperatures.min() ?? 0)
     }
     
     private func classifyDeviceState(
         accelerometerVariation: Double,
         temperatureChange: Double,
-        batteryLevel: UInt8
+        batteryLevel: Int
     ) -> DeviceState {
         let lowMovementThreshold = 0.1
         let moderateMovementThreshold = 0.5
@@ -1538,7 +1647,7 @@ struct PPGDebugCard: View {
             let currentSample = samples[i]
             
             let accelVariation = abs(currentSample.accelerometer.magnitude - prevSample.accelerometer.magnitude)
-            let tempChange = abs(currentSample.temperature - prevSample.temperature)
+            let tempChange = abs(currentSample.temperature.celsius - prevSample.temperature.celsius)
             
             var isConsistent = false
             switch state {
