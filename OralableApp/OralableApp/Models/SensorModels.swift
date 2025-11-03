@@ -342,17 +342,3 @@ struct HistoricalDataPoint: Codable, Identifiable {
         self.grindingEvents = grindingEvents
     }
 }
-
-// MARK: - Device Information
-
-/// Information about the connected Oralable device
-struct DeviceInfo: Codable {
-    let uuid: String
-    let name: String
-    let firmwareVersion: String
-    let lastConnected: Date
-    
-    var displayName: String {
-        return "\(name) (\(firmwareVersion))"
-    }
-}

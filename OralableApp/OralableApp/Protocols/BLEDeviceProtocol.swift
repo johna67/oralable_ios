@@ -16,7 +16,7 @@ protocol BLEDeviceProtocol: AnyObject {
     // MARK: - Device Information
     
     /// Device information structure
-    var deviceInfo: OralableApp.DeviceInfo { get }
+    var deviceInfo: DeviceInfo { get }
     
     /// Device type
     var deviceType: DeviceType { get }
@@ -260,7 +260,7 @@ extension BLEDeviceProtocol {
 /// Mock device for testing
 class MockBLEDevice: BLEDeviceProtocol {
     
-    var deviceInfo: OralableApp.DeviceInfo
+    var deviceInfo: DeviceInfo
     var deviceType: DeviceType
     var name: String
     var peripheral: CBPeripheral?
@@ -285,7 +285,7 @@ class MockBLEDevice: BLEDeviceProtocol {
     init(type: DeviceType) {
         self.deviceType = type
         self.name = type.displayName
-        self.deviceInfo = OralableApp.DeviceInfo.mock(type: type)
+        self.deviceInfo = DeviceInfo.mock(type: type)
         self.supportedSensors = type.defaultSensors
     }
     
