@@ -3,7 +3,7 @@
 //  OralableApp
 //
 //  Updated: November 2, 2025
-//  FIXES: Enhanced service discovery - finds ALL services
+//  Production version with robust data parsing and proper filtering
 //
 
 import Foundation
@@ -123,7 +123,6 @@ class OralableBLE: NSObject, ObservableObject {
         discoveredDeviceUUIDs.removeAll()
         connectionStatus = "Scanning..."
         
-        // Scan for all devices but don't allow duplicates
         centralManager.scanForPeripherals(
             withServices: nil,
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
@@ -161,7 +160,6 @@ class OralableBLE: NSObject, ObservableObject {
         addLogMessage("📱 Attempting connection to: \(peripheral.name ?? "Unknown")")
         addLogMessage("   Device ID: \(peripheral.identifier.uuidString)")
         
-        // Set connection timeout
         connectionTimeoutTimer?.invalidate()
         connectionTimeoutTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
             self?.addLogMessage("⏰ Connection timeout after 30 seconds")
@@ -278,7 +276,6 @@ class OralableBLE: NSObject, ObservableObject {
         DispatchQueue.main.async {
             self.logMessages.append(logEntry)
             
-            // Keep only last 200 log messages
             if self.logMessages.count > 200 {
                 self.logMessages.removeFirst(self.logMessages.count - 200)
             }
@@ -300,8 +297,6 @@ class OralableBLE: NSObject, ObservableObject {
             ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxBufferSize)
         }
         
-        // Calculate heart rate (needs minimum 20 samples)
-        // Convert Int32 to UInt32 for the calculator
         if ppgBufferIR.count >= 20 {
             let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
             if let heartRate = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
@@ -311,7 +306,6 @@ class OralableBLE: NSObject, ObservableObject {
             }
         }
         
-        // Calculate SpO2 (needs minimum 150 samples = 3 seconds)
         if ppgBufferRed.count >= 150, ppgBufferIR.count >= 150 {
             if let result = spo2Calculator.calculateSpO2WithQuality(
                 redSamples: ppgBufferRed,
@@ -353,28 +347,25 @@ extension OralableBLE: CBCentralManagerDelegate {
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         
-        // Skip if already discovered
         guard !discoveredDeviceUUIDs.contains(peripheral.identifier) else {
             return
         }
         
         let deviceName = peripheral.name ?? ""
         
-        // Skip unnamed devices
+        // Skip devices with no name
         guard !deviceName.isEmpty else {
             return
         }
         
-        // Check for Oralable device patterns
         let deviceNameLower = deviceName.lowercased()
         let namePatterns = ["oralable", "tgm", "nrf", "tooth", "dental", "bruxism"]
         let matchesName = namePatterns.contains { deviceNameLower.contains($0) }
         
-        // Check for TGM service
         let advertisedUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
         let hasTGMService = advertisedUUIDs.contains(tgmServiceUUID)
         
-        // Accept device if it matches
+        // Only add devices that match our criteria
         if matchesName || hasTGMService {
             discoveredDeviceUUIDs.insert(peripheral.identifier)
             
@@ -383,6 +374,10 @@ extension OralableBLE: CBCentralManagerDelegate {
             }
             
             addLogMessage("✅ Found: \(deviceName) (RSSI: \(RSSI)dB)")
+            
+            if !advertisedUUIDs.isEmpty {
+                addLogMessage("   Services: \(advertisedUUIDs.map { $0.uuidString }.joined(separator: ", "))")
+            }
         }
     }
     
@@ -402,10 +397,8 @@ extension OralableBLE: CBCentralManagerDelegate {
             self.connectionStatus = "Connected"
         }
         
-        // CRITICAL FIX: Discover ALL services, not just TGM service
-        // This is needed because the device might not advertise the TGM service UUID
         addLogMessage("📊 Discovering ALL services on device...")
-        peripheral.discoverServices(nil)  // nil = discover ALL services
+        peripheral.discoverServices(nil)
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -427,8 +420,6 @@ extension OralableBLE: CBCentralManagerDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 self.connect(to: peripheral)
             }
-        } else {
-            addLogMessage("❌ Max retries reached")
         }
     }
     
@@ -473,12 +464,10 @@ extension OralableBLE: CBPeripheralDelegate {
         
         addLogMessage("📊 Found \(services.count) service(s):")
         
-        // Log all discovered services
         for service in services {
             addLogMessage("   • \(service.uuid.uuidString)")
         }
         
-        // Look for TGM service
         var tgmServiceFound = false
         for service in services {
             if service.uuid == tgmServiceUUID {
@@ -494,7 +483,6 @@ extension OralableBLE: CBPeripheralDelegate {
             addLogMessage("   Expected: \(tgmServiceUUID.uuidString)")
             addLogMessage("   Trying to discover characteristics on all services...")
             
-            // Try to discover characteristics on all services
             for service in services {
                 peripheral.discoverCharacteristics(nil, for: service)
             }
@@ -603,9 +591,11 @@ extension OralableBLE: CBPeripheralDelegate {
         }
     }
     
-    // MARK: - Data Parsing
+    // MARK: - FIXED Data Parsing - Handles actual firmware format
     
     private func parsePPGData(_ data: Data) {
+        addLogMessage("📊 PPG: Received \(data.count) bytes")
+        
         guard data.count >= 244 else {
             addLogMessage("⚠️ PPG data too short: \(data.count) bytes (expected 244)")
             return
@@ -615,18 +605,27 @@ extension OralableBLE: CBPeripheralDelegate {
         var irSamples: [Int32] = []
         var greenSamples: [Int32] = []
         
+        // Parse 20 samples, each 12 bytes (3 x UInt32)
         for i in 0..<20 {
             let offset = 4 + (i * 12)
-            let red = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
-            let ir = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 4, as: UInt32.self) }
-            let green = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 8, as: UInt32.self) }
+            
+            guard offset + 12 <= data.count else { break }
+            
+            // Read as bytes array to avoid alignment issues
+            let redBytes = data.subdata(in: offset..<(offset + 4))
+            let irBytes = data.subdata(in: (offset + 4)..<(offset + 8))
+            let greenBytes = data.subdata(in: (offset + 8)..<(offset + 12))
+            
+            let red = redBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let ir = irBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let green = greenBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             
             redSamples.append(Int32(bitPattern: red))
             irSamples.append(Int32(bitPattern: ir))
             greenSamples.append(Int32(bitPattern: green))
         }
         
-        addLogMessage("💓 PPG data received")
+        addLogMessage("💓 PPG parsed: \(redSamples.count) samples")
         processPPGData(red: redSamples, ir: irSamples, green: greenSamples)
         
         if let lastRed = redSamples.last, let lastIR = irSamples.last, let lastGreen = greenSamples.last {
@@ -642,15 +641,28 @@ extension OralableBLE: CBPeripheralDelegate {
     }
     
     private func parseAccelerometerData(_ data: Data) {
+        addLogMessage("📊 Accel: Received \(data.count) bytes")
+        
         guard data.count >= 154 else {
             addLogMessage("⚠️ Accel data too short: \(data.count) bytes (expected 154)")
             return
         }
         
+        // Parse last sample (25th sample at offset 4 + 24*6)
         let lastSampleOffset = 4 + (24 * 6)
-        let x = data.withUnsafeBytes { $0.load(fromByteOffset: lastSampleOffset, as: Int16.self) }
-        let y = data.withUnsafeBytes { $0.load(fromByteOffset: lastSampleOffset + 2, as: Int16.self) }
-        let z = data.withUnsafeBytes { $0.load(fromByteOffset: lastSampleOffset + 4, as: Int16.self) }
+        
+        guard lastSampleOffset + 6 <= data.count else {
+            addLogMessage("⚠️ Accel offset out of range")
+            return
+        }
+        
+        let xBytes = data.subdata(in: lastSampleOffset..<(lastSampleOffset + 2))
+        let yBytes = data.subdata(in: (lastSampleOffset + 2)..<(lastSampleOffset + 4))
+        let zBytes = data.subdata(in: (lastSampleOffset + 4)..<(lastSampleOffset + 6))
+        
+        let x = xBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+        let y = yBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+        let z = zBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
         
         addLogMessage("📐 Accel: X=\(x), Y=\(y), Z=\(z)")
         
@@ -666,14 +678,32 @@ extension OralableBLE: CBPeripheralDelegate {
     }
     
     private func parseTemperatureData(_ data: Data) {
-        guard data.count >= 6 else {
-            addLogMessage("⚠️ Temp data too short: \(data.count) bytes (expected 6)")
+        addLogMessage("📊 Temp: Received \(data.count) bytes")
+        
+        // Handle multiple possible formats
+        var temperature: Double = 0.0
+        
+        if data.count == 6 {
+            // Format 1: int16_t + uint32_t (6 bytes)
+            let intBytes = data.subdata(in: 0..<2)
+            let fracBytes = data.subdata(in: 2..<6)
+            
+            let integerPart = intBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let fractionalPart = fracBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            
+            temperature = Double(integerPart) + (Double(fractionalPart) / 1000000.0)
+        } else if data.count == 4 {
+            // Format 2: float (4 bytes)
+            temperature = data.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }.isNaN ? 0.0 : Double(data.withUnsafeBytes { $0.loadUnaligned(as: Float.self) })
+        } else if data.count == 2 {
+            // Format 3: int16_t in 0.1°C units (2 bytes)
+            let intBytes = data.subdata(in: 0..<2)
+            let rawValue = intBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            temperature = Double(rawValue) / 10.0
+        } else {
+            addLogMessage("⚠️ Temp data unexpected size: \(data.count) bytes")
             return
         }
-        
-        let integerPart = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: Int16.self) }
-        let fractionalPart = data.withUnsafeBytes { $0.load(fromByteOffset: 2, as: UInt32.self) }
-        let temperature = Double(integerPart) + (Double(fractionalPart) / 1000000.0)
         
         let tempData = TemperatureData(celsius: temperature, timestamp: Date())
         
@@ -690,16 +720,35 @@ extension OralableBLE: CBPeripheralDelegate {
     }
     
     private func parseBatteryData(_ data: Data) {
-        guard data.count >= 4 else {
-            addLogMessage("⚠️ Battery data too short: \(data.count) bytes (expected 4)")
+        addLogMessage("📊 Battery: Received \(data.count) bytes")
+        
+        var batteryLevel: Int = 0
+        
+        if data.count >= 4 {
+            // Format 1: uint32_t (4 bytes)
+            let bytes = data.subdata(in: 0..<4)
+            let rawValue = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            batteryLevel = Int(rawValue)
+        } else if data.count >= 2 {
+            // Format 2: uint16_t (2 bytes) - ACTUAL FORMAT FROM YOUR DEVICE
+            let bytes = data.subdata(in: 0..<2)
+            let rawValue = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt16.self) }
+            batteryLevel = Int(rawValue)
+        } else if data.count >= 1 {
+            // Format 3: uint8_t (1 byte)
+            batteryLevel = Int(data[0])
+        } else {
+            addLogMessage("⚠️ Battery data too short: \(data.count) bytes")
             return
         }
         
-        let batteryLevel = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        let batteryData = BatteryData(percentage: Int(batteryLevel), timestamp: Date())
+        // Clamp to valid range
+        batteryLevel = max(0, min(100, batteryLevel))
+        
+        let batteryData = BatteryData(percentage: batteryLevel, timestamp: Date())
         
         DispatchQueue.main.async {
-            self.sensorData.batteryLevel = Int(batteryLevel)
+            self.sensorData.batteryLevel = batteryLevel
             self.batteryHistory.append(batteryData)
             if self.batteryHistory.count > 1000 {
                 self.batteryHistory.removeFirst(self.batteryHistory.count - 1000)
@@ -711,12 +760,15 @@ extension OralableBLE: CBPeripheralDelegate {
     }
     
     private func parseDeviceUUID(_ data: Data) {
+        addLogMessage("📊 UUID: Received \(data.count) bytes")
+        
         guard data.count >= 8 else {
             addLogMessage("⚠️ UUID data too short: \(data.count) bytes (expected 8)")
             return
         }
         
-        let uuid = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt64.self) }
+        let bytes = data.subdata(in: 0..<8)
+        let uuid = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }
         
         DispatchQueue.main.async {
             self.sensorData.deviceUUID = uuid
@@ -731,6 +783,32 @@ extension OralableBLE: CBPeripheralDelegate {
                 self.sensorData.firmwareVersion = version
             }
             addLogMessage("📱 Firmware: \(version)")
+        } else {
+            addLogMessage("⚠️ Could not parse firmware version")
+        }
+    }
+}
+
+// MARK: - Data Extension for Safe Loading
+extension Data {
+    /// Safely load a value from unaligned data
+    func loadUnaligned<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+        var value: T!
+        let size = MemoryLayout<T>.size
+        withUnsafeBytes { buffer in
+            let slice = buffer[offset..<(offset + size)]
+            value = slice.withUnsafeBytes { $0.load(as: T.self) }
+        }
+        return value
+    }
+}
+
+// Extension for UnsafeRawBufferPointer to handle unaligned loads
+extension UnsafeRawBufferPointer {
+    func loadUnaligned<T>(as type: T.Type) -> T {
+        assert(count >= MemoryLayout<T>.size)
+        return withUnsafeBytes { bytes in
+            bytes.loadUnaligned(as: T.self)
         }
     }
 }
