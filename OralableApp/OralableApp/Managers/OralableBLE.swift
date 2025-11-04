@@ -397,9 +397,9 @@ extension OralableBLE: CBCentralManagerDelegate {
             self.connectionStatus = "Connected"
         }
         
-        addLogMessage("📊 Discovering ALL services on device...")
-        peripheral.discoverServices(nil)
-    }
+        addLogMessage("📊 Discovering Oralable service...")
+
+        peripheral.discoverServices([tgmServiceUUID])    }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         connectionTimeoutTimer?.invalidate()
