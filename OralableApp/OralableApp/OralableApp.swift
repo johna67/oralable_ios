@@ -187,8 +187,8 @@ struct ProfileHeaderView: View {
                 .fontWeight(.bold)
             
             // Email
-            if let profile = authManager.userProfile {
-                Text(profile.email)
+            if let email = authManager.userEmail {
+                Text(email)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -315,18 +315,24 @@ struct AccountDetailsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         SectionHeaderView(title: "Account Information")
                         
-                        if let profile = authManager.userProfile {
-                            VStack(spacing: 12) {
-                                InfoRowView(icon: "person.fill", title: "Name", value: profile.name)
+                        VStack(spacing: 12) {
+                            if let name = authManager.userFullName {
+                                InfoRowView(icon: "person.fill", title: "Name", value: name)
                                 Divider().padding(.leading, 44)
-                                InfoRowView(icon: "envelope.fill", title: "Email", value: profile.email)
-                                Divider().padding(.leading, 44)
-                                InfoRowView(icon: "key.fill", title: "User ID", value: profile.id)
                             }
-                            .padding()
-                            .background(Color(.systemBackground))
-                            .cornerRadius(12)
+                            
+                            if let email = authManager.userEmail {
+                                InfoRowView(icon: "envelope.fill", title: "Email", value: email)
+                                Divider().padding(.leading, 44)
+                            }
+                            
+                            if let userID = authManager.userID {
+                                InfoRowView(icon: "key.fill", title: "User ID", value: userID)
+                            }
                         }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
                     }
                     .padding(.horizontal)
                 }

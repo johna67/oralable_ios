@@ -2,15 +2,7 @@
 //  ProfileButtonView.swift
 //  OralableApp
 //
-//  Created by John A Cogan on 04/11/2025.
-//
-
-
-//
-//  ProfileButtonView.swift
-//  OralableApp
-//
-//  Created: November 3, 2025
+//  Created: November 4, 2025
 //  Enhanced profile button component
 //
 
@@ -34,7 +26,7 @@ struct ProfileButtonView: View {
                 UserAvatarView(
                     initials: authManager.userInitials,
                     size: 36,
-                    showOnlineIndicator: authManager.isAuthenticated
+                    showOnlineIndicator: authManager.hasCompleteProfile
                 )
                 
                 // User info
@@ -42,13 +34,17 @@ struct ProfileButtonView: View {
                     Text(authManager.displayName)
                         .font(DesignSystem.Typography.labelLarge)
                         .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .lineLimit(1)
                     
                     if let email = authManager.userEmail {
                         Text(email)
                             .font(DesignSystem.Typography.caption)
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                             .lineLimit(1)
-                            .truncationMode(.middle)
+                    } else {
+                        Text("Tap to view profile")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
                 }
                 
@@ -78,13 +74,6 @@ struct ProfileButtonView: View {
                 }
         )
     }
-    
-    // Helper function to get initials from name
-    private func getInitials(from name: String) -> String {
-        let components = name.components(separatedBy: " ")
-        let initials = components.compactMap { $0.first }.prefix(2)
-        return String(initials).uppercased()
-    }
 }
 
 // MARK: - Preview
@@ -94,7 +83,6 @@ struct ProfileButtonView: View {
 struct ProfileButtonView_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: DesignSystem.Spacing.lg) {
-            // Using shared manager for preview
             ProfileButtonView(
                 authManager: AuthenticationManager.shared,
                 action: {}
