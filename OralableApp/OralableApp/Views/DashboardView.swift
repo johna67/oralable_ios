@@ -16,6 +16,12 @@ struct DashboardView: View {
     var isViewerMode: Bool = false
     
     var body: some View {
+        NavigationLink {
+            DeviceTestView()
+        } label: {
+            Text("🧪 Device Test")
+                .font(DesignSystem.Typography.buttonMedium)
+        }
         NavigationView {
             ScrollView {
                 VStack(spacing: 16) {

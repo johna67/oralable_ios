@@ -3,14 +3,7 @@
 //  OralableApp
 //
 //  Created by John A Cogan on 03/11/2025.
-//
-
-
-//
-//  DeviceManager.swift
-//  OralableApp
-//
-//  Created: November 3, 2025
+//  Updated: November 4, 2025
 //  Manages multiple BLE devices and coordinates device operations
 //
 
@@ -52,30 +45,182 @@ class DeviceManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let maxDevices: Int = 5
     
+    // BLE Integration
+    private var bleManager: BLECentralManager?
+    
     // MARK: - Initialization
     
     init() {
-        // Setup will be completed when actual device implementations are ready
+        bleManager = BLECentralManager()
+        setupBLECallbacks()
+    }
+    
+    // MARK: - BLE Callbacks Setup
+    
+    private func setupBLECallbacks() {
+        bleManager?.onDeviceDiscovered = { [weak self] peripheral, name, rssi in
+            Task { @MainActor [weak self] in
+                self?.handleDeviceDiscovered(peripheral: peripheral, name: name, rssi: rssi)
+            }
+        }
+        
+        bleManager?.onDeviceConnected = { [weak self] peripheral in
+            Task { @MainActor [weak self] in
+                self?.handleDeviceConnected(peripheral: peripheral)
+            }
+        }
+        
+        bleManager?.onDeviceDisconnected = { [weak self] peripheral, error in
+            Task { @MainActor [weak self] in
+                self?.handleDeviceDisconnected(peripheral: peripheral, error: error)
+            }
+        }
+        
+        bleManager?.onBluetoothStateChanged = { [weak self] state in
+            Task { @MainActor [weak self] in
+                if state != .poweredOn && (self?.isScanning ?? false) {
+                    self?.isScanning = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Device Discovery Handlers
+    
+    private func handleDeviceDiscovered(peripheral: CBPeripheral, name: String, rssi: Int) {
+        // Check if already discovered
+        if discoveredDevices.contains(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+            // Update RSSI
+            if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+                discoveredDevices[index].signalStrength = rssi
+            }
+            return
+        }
+        
+        // Determine device type
+        let deviceType = detectDeviceType(from: name, peripheral: peripheral)
+        
+        guard deviceType != .unknown else {
+            print("⚠️ Unknown device type: \(name)")
+            return
+        }
+        
+        // Create appropriate device instance
+        let device: BLEDeviceProtocol
+        switch deviceType {
+        case .oralable:
+            device = OralableDevice(peripheral: peripheral, name: name)
+        case .anrMuscleSense:
+            device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
+        case .unknown:
+            return
+        }
+        
+        // Update signal strength
+        var deviceInfo = device.deviceInfo
+        deviceInfo.signalStrength = rssi
+        
+        // Add to discovered devices
+        addDiscoveredDevice(device)
+        
+        print("✅ Discovered: \(name) (\(deviceType.displayName))")
+    }
+    
+    private func handleDeviceConnected(peripheral: CBPeripheral) {
+        print("✅ Device connected: \(peripheral.name ?? "Unknown")")
+        
+        // Find device by peripheral identifier
+        guard let device = devices.values.first(where: { $0.peripheral?.identifier == peripheral.identifier }) else {
+            print("⚠️ Connected device not found in devices dictionary")
+            return
+        }
+        
+        // Update device info
+        if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+            discoveredDevices[index].connectionState = .connected
+            discoveredDevices[index].lastConnected = Date()
+        }
+        
+        // Add to connected devices if not already there
+        if !connectedDevices.contains(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+            var connectedInfo = device.deviceInfo
+            connectedInfo.connectionState = .connected
+            connectedInfo.lastConnected = Date()
+            connectedDevices.append(connectedInfo)
+        }
+        
+        // Set as primary if first device
+        if primaryDevice == nil {
+            primaryDevice = device.deviceInfo
+        }
+        
+        // Start data stream
+        Task {
+            do {
+                try await device.startDataStream()
+                print("✅ Data stream started for: \(device.name)")
+            } catch {
+                print("❌ Failed to start data stream: \(error.localizedDescription)")
+                lastError = .unknownError(error.localizedDescription)
+            }
+        }
+        
+        isConnecting = false
+    }
+    
+    private func handleDeviceDisconnected(peripheral: CBPeripheral, error: Error?) {
+        print("📱 Device disconnected: \(peripheral.name ?? "Unknown")")
+        
+        // Find device by peripheral identifier
+        if let deviceInfo = discoveredDevices.first(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+            // Update device info
+            if let index = discoveredDevices.firstIndex(where: { $0.id == deviceInfo.id }) {
+                discoveredDevices[index].connectionState = .disconnected
+            }
+            
+            // Remove from connected devices
+            connectedDevices.removeAll { $0.id == deviceInfo.id }
+            
+            // Clear primary if it was the primary device
+            if primaryDevice?.id == deviceInfo.id {
+                primaryDevice = connectedDevices.first
+            }
+            
+            if let error = error {
+                print("❌ Disconnection error: \(error.localizedDescription)")
+                lastError = .connectionFailed(error.localizedDescription)
+            }
+        }
+        
+        isConnecting = false
+    }
+    
+    private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType {
+        let lowercaseName = name.lowercased()
+        
+        if lowercaseName.contains("oralable") {
+            return .oralable
+        } else if lowercaseName.contains("anr") || lowercaseName.contains("muscle") {
+            return .anrMuscleSense
+        }
+        
+        return .unknown
     }
     
     // MARK: - Device Discovery
     
     /// Start scanning for devices
     func startScanning() async {
+        print("🔍 Starting device scan...")
         isScanning = true
-        
-        // TODO: Implement actual BLE scanning when device classes are ready
-        // For now, this is a skeleton
-        
-        await Task.sleep(1_000_000_000) // 1 second simulation
-        isScanning = false
+        bleManager?.startScanning()
     }
     
     /// Stop scanning for devices
     func stopScanning() {
+        print("⏹️ Stopping device scan")
         isScanning = false
-        
-        // TODO: Stop BLE scanning
+        bleManager?.stopScanning()
     }
     
     /// Add discovered device
@@ -108,36 +253,24 @@ class DeviceManager: ObservableObject {
             throw DeviceError.invalidPeripheral
         }
         
+        guard let peripheral = device.peripheral else {
+            throw DeviceError.invalidPeripheral
+        }
+        
         isConnecting = true
         
-        do {
-            try await device.connect()
-            
-            // Update device info
-            if let index = discoveredDevices.firstIndex(where: { $0.id == deviceInfo.id }) {
-                discoveredDevices[index].connectionState = .connected
-            }
-            
-            // Add to connected devices
-            if !connectedDevices.contains(where: { $0.id == deviceInfo.id }) {
-                connectedDevices.append(device.deviceInfo)
-            }
-            
-            // Set as primary if first device
-            if primaryDevice == nil {
-                primaryDevice = device.deviceInfo
-            }
-            
-            // Start data stream
-            try await device.startDataStream()
-            
-            isConnecting = false
-            
-        } catch {
-            isConnecting = false
-            lastError = .connectionFailed(error.localizedDescription)
-            throw error
+        print("📱 Connecting to: \(deviceInfo.name)")
+        
+        // Update state
+        if let index = discoveredDevices.firstIndex(where: { $0.id == deviceInfo.id }) {
+            discoveredDevices[index].connectionState = .connecting
         }
+        
+        // Connect via BLE manager
+        bleManager?.connect(to: peripheral)
+        
+        // Note: Actual connection completion handled by callback
+        // The device will be moved to connected state in handleDeviceConnected
     }
     
     /// Disconnect from a device
@@ -146,36 +279,47 @@ class DeviceManager: ObservableObject {
             return
         }
         
-        await device.stopDataStream()
-        await device.disconnect()
+        guard let peripheral = device.peripheral else {
+            return
+        }
         
-        // Update device info
+        print("📱 Disconnecting from: \(deviceInfo.name)")
+        
+        // Update state
         if let index = discoveredDevices.firstIndex(where: { $0.id == deviceInfo.id }) {
-            discoveredDevices[index].connectionState = .disconnected
+            discoveredDevices[index].connectionState = .disconnecting
         }
         
-        // Remove from connected devices
-        connectedDevices.removeAll { $0.id == deviceInfo.id }
-        
-        // Clear primary if it was the primary device
-        if primaryDevice?.id == deviceInfo.id {
-            primaryDevice = connectedDevices.first
-        }
+        await device.stopDataStream()
+        bleManager?.disconnect(from: peripheral)
+        await device.disconnect()
     }
     
     /// Disconnect all devices
     func disconnectAll() async {
+        print("📱 Disconnecting all devices")
+        
+        bleManager?.disconnectAll()
+        
         for deviceInfo in connectedDevices {
-            await disconnect(from: deviceInfo)
+            if let device = devices[deviceInfo.id] {
+                await device.stopDataStream()
+                await device.disconnect()
+            }
         }
+        
+        connectedDevices.removeAll()
+        primaryDevice = nil
     }
     
     /// Set primary device
     func setPrimaryDevice(_ deviceInfo: DeviceInfo) {
         guard connectedDevices.contains(where: { $0.id == deviceInfo.id }) else {
+            print("⚠️ Cannot set primary device - not connected")
             return
         }
         
+        print("📱 Primary device set to: \(deviceInfo.name)")
         primaryDevice = deviceInfo
     }
     
@@ -279,6 +423,8 @@ class DeviceManager: ObservableObject {
     
     /// Remove device
     func removeDevice(_ deviceInfo: DeviceInfo) async {
+        print("🗑️ Removing device: \(deviceInfo.name)")
+        
         // Disconnect if connected
         if isConnected(deviceInfo) {
             await disconnect(from: deviceInfo)
@@ -293,6 +439,8 @@ class DeviceManager: ObservableObject {
     
     /// Clear all devices
     func clearAllDevices() async {
+        print("🗑️ Clearing all devices")
+        
         await disconnectAll()
         discoveredDevices.removeAll()
         connectedDevices.removeAll()
@@ -330,6 +478,16 @@ extension DeviceManager {
     var hasANRConnected: Bool {
         anrDevice != nil
     }
+    
+    /// Get all Oralable devices (discovered)
+    var oralableDevices: [DeviceInfo] {
+        discoveredDevices.filter { $0.type == .oralable }
+    }
+    
+    /// Get all ANR devices (discovered)
+    var anrDevices: [DeviceInfo] {
+        discoveredDevices.filter { $0.type == .anrMuscleSense }
+    }
 }
 
 // MARK: - Preview Helper
@@ -352,17 +510,74 @@ extension DeviceManager {
         
         // Simulate some sensor readings
         manager.allSensorReadings = [
-            .mock(sensorType: .heartRate),
-            .mock(sensorType: .spo2),
-            .mock(sensorType: .temperature),
-            .mock(sensorType: .emg)
+            .mock(sensorType: .heartRate, value: 72),
+            .mock(sensorType: .spo2, value: 98),
+            .mock(sensorType: .temperature, value: 36.5),
+            .mock(sensorType: .emg, value: 450)
         ]
         
         manager.latestReadings = [
-            .heartRate: .mock(sensorType: .heartRate),
-            .spo2: .mock(sensorType: .spo2),
-            .temperature: .mock(sensorType: .temperature),
-            .emg: .mock(sensorType: .emg)
+            .heartRate: .mock(sensorType: .heartRate, value: 72),
+            .spo2: .mock(sensorType: .spo2, value: 98),
+            .temperature: .mock(sensorType: .temperature, value: 36.5),
+            .emg: .mock(sensorType: .emg, value: 450)
+        ]
+        
+        // Set one device as connected
+        manager.connectedDevices = [oralableDevice.deviceInfo]
+        manager.primaryDevice = oralableDevice.deviceInfo
+        
+        return manager
+    }
+    
+    /// Create manager with Oralable device connected
+    static func mockWithOralable() -> DeviceManager {
+        let manager = DeviceManager()
+        
+        let oralableDevice = MockBLEDevice(type: .oralable)
+        manager.addDiscoveredDevice(oralableDevice)
+        
+        var connectedInfo = oralableDevice.deviceInfo
+        connectedInfo.connectionState = .connected
+        connectedInfo.batteryLevel = 85
+        connectedInfo.firmwareVersion = "0.13.0"
+        
+        manager.connectedDevices = [connectedInfo]
+        manager.primaryDevice = connectedInfo
+        
+        // Add realistic sensor data
+        manager.latestReadings = [
+            .heartRate: .mock(sensorType: .heartRate, value: 72),
+            .spo2: .mock(sensorType: .spo2, value: 98),
+            .temperature: .mock(sensorType: .temperature, value: 36.5),
+            .battery: .mock(sensorType: .battery, value: 85),
+            .ppgInfrared: .mock(sensorType: .ppgInfrared, value: 1856),
+            .ppgRed: .mock(sensorType: .ppgRed, value: 2048)
+        ]
+        
+        return manager
+    }
+    
+    /// Create manager with ANR device connected
+    static func mockWithANR() -> DeviceManager {
+        let manager = DeviceManager()
+        
+        let anrDevice = MockBLEDevice(type: .anrMuscleSense)
+        manager.addDiscoveredDevice(anrDevice)
+        
+        var connectedInfo = anrDevice.deviceInfo
+        connectedInfo.connectionState = .connected
+        connectedInfo.batteryLevel = 92
+        connectedInfo.firmwareVersion = "1.0.0"
+        
+        manager.connectedDevices = [connectedInfo]
+        manager.primaryDevice = connectedInfo
+        
+        // Add EMG data
+        manager.latestReadings = [
+            .emg: .mock(sensorType: .emg, value: 450),
+            .battery: .mock(sensorType: .battery, value: 92),
+            .muscleActivity: .mock(sensorType: .muscleActivity, value: 520)
         ]
         
         return manager

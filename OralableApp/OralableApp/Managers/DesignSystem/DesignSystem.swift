@@ -73,43 +73,71 @@ enum DesignSystem {
     
     // MARK: - Typography
 
+    // MARK: - Typography
+
     enum Typography {
+        
+        // MARK: - Font Family Helper
+        
+        /// Custom font with system fallback
+        private static func customFont(size: CGFloat, weight: Font.Weight) -> Font {
+            // Try to load Open Sans, fall back to system font
+            let fontName: String
+            switch weight {
+            case .bold:
+                fontName = "OpenSans-Bold"
+            case .semibold:
+                fontName = "OpenSans-SemiBold"
+            case .medium:
+                fontName = "OpenSans-Medium"
+            default:
+                fontName = "OpenSans-Regular"
+            }
+            
+            // Check if custom font is available
+            if UIFont(name: fontName, size: size) != nil {
+                return Font.custom(fontName, size: size)
+            } else {
+                // Fallback to system font
+                return Font.system(size: size, weight: weight, design: .default)
+            }
+        }
         
         // MARK: Display Styles
         
-        static let displayLarge = Font.system(size: 32, weight: .bold, design: .default)
-        static let displayMedium = Font.system(size: 28, weight: .bold, design: .default)
-        static let displaySmall = Font.system(size: 24, weight: .bold, design: .default)
+        static let displayLarge = customFont(size: 32, weight: .bold)
+        static let displayMedium = customFont(size: 28, weight: .bold)
+        static let displaySmall = customFont(size: 24, weight: .bold)
         
         // MARK: Heading Styles
         
-        static let h1 = Font.system(size: 22, weight: .semibold, design: .default)
-        static let h2 = Font.system(size: 20, weight: .semibold, design: .default)
-        static let h3 = Font.system(size: 18, weight: .semibold, design: .default)
-        static let h4 = Font.system(size: 16, weight: .semibold, design: .default)
+        static let h1 = customFont(size: 22, weight: .semibold)
+        static let h2 = customFont(size: 20, weight: .semibold)
+        static let h3 = customFont(size: 18, weight: .semibold)
+        static let h4 = customFont(size: 16, weight: .semibold)
         
         // MARK: Body Styles
         
-        static let bodyLarge = Font.system(size: 17, weight: .regular, design: .default)
-        static let bodyMedium = Font.system(size: 15, weight: .regular, design: .default)
-        static let bodySmall = Font.system(size: 13, weight: .regular, design: .default)
+        static let bodyLarge = customFont(size: 17, weight: .regular)
+        static let bodyMedium = customFont(size: 15, weight: .regular)
+        static let bodySmall = customFont(size: 13, weight: .regular)
         
         // MARK: Label Styles
         
-        static let labelLarge = Font.system(size: 15, weight: .medium, design: .default)
-        static let labelMedium = Font.system(size: 13, weight: .medium, design: .default)
-        static let labelSmall = Font.system(size: 11, weight: .medium, design: .default)
+        static let labelLarge = customFont(size: 15, weight: .medium)
+        static let labelMedium = customFont(size: 13, weight: .medium)
+        static let labelSmall = customFont(size: 11, weight: .medium)
         
         // MARK: Caption Styles
         
-        static let caption = Font.system(size: 12, weight: .regular, design: .default)
-        static let captionSmall = Font.system(size: 10, weight: .regular, design: .default)
+        static let caption = customFont(size: 12, weight: .regular)
+        static let captionSmall = customFont(size: 10, weight: .regular)
         
         // MARK: Button Styles
         
-        static let buttonLarge = Font.system(size: 17, weight: .semibold, design: .default)
-        static let buttonMedium = Font.system(size: 15, weight: .semibold, design: .default)
-        static let buttonSmall = Font.system(size: 13, weight: .semibold, design: .default)
+        static let buttonLarge = customFont(size: 17, weight: .semibold)
+        static let buttonMedium = customFont(size: 15, weight: .semibold)
+        static let buttonSmall = customFont(size: 13, weight: .semibold)
     }
     
     // MARK: - Spacing
