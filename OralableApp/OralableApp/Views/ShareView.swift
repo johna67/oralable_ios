@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftUI
+import Foundation
 import UniformTypeIdentifiers
 
 struct ShareView: View {
@@ -93,15 +95,19 @@ struct ShareView: View {
         case .success(let urls):
             guard let url = urls.first else { return }
             
-            if let imported = CSVImportManager.shared.importCSV(from: url) {
+            if let imported = CSVImportManager.shared.importData(from: url) {
                 // Add imported data to BLE manager
-                ble.sensorDataHistory.append(contentsOf: imported.data)
-                ble.logMessages.append(contentsOf: imported.logs)
+                ble.sensorDataHistory.append(contentsOf: imported.sensorData)
+                
+                // Convert imported string logs to LogMessage objects
+                for logString in imported.logs {
+                    ble.logMessages.append(LogMessage(message: logString))
+                }
                 
                 // Sort by timestamp
                 ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
                 
-                importedCount = imported.data.count
+                importedCount = imported.sensorData.count
                 showImportSuccess = true
             } else {
                 importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
@@ -222,8 +228,9 @@ struct DeviceInfoCard: View {
             if isViewerMode {
                 HStack {
                     Image(systemName: "info.circle")
-                        .foregroundColor(.orange)
-                    Text("Viewer Mode - Import CSV files to view data")
+                        .foregroundColor(.blue)
+                        .font(.caption)
+                    Text("Viewing mode - no device connected")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -248,46 +255,39 @@ struct DataSummaryCard: View {
             Divider()
             
             HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "list.bullet.rectangle")
-                            .foregroundColor(.blue)
-                        Text("Log Entries")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    Text("\(ble.logMessages.count)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "chart.xyaxis.line")
-                            .foregroundColor(.green)
-                        Text("Data Points")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sensor Data Points")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                     Text("\(ble.sensorDataHistory.count)")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundColor(.blue)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Log Entries")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("\(ble.logMessages.count)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                }
             }
             
-            if !ble.sensorDataHistory.isEmpty {
+            if !ble.sensorDataHistory.isEmpty, let first = ble.sensorDataHistory.first, let last = ble.sensorDataHistory.last {
                 Divider()
                 
-                if let first = ble.sensorDataHistory.first, let last = ble.sensorDataHistory.last {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Data Range")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("\(first.timestamp, style: .date) to \(last.timestamp, style: .date)")
-                            .font(.subheadline)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Recording Period")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("\(first.timestamp, style: .date) - \(last.timestamp, style: .date)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
         }
@@ -302,16 +302,20 @@ struct ExportButton: View {
     @Binding var showShareSheet: Bool
     @Binding var exportURL: URL?
     @ObservedObject var ble: OralableBLE
+    @State private var isExporting = false
     
     var body: some View {
         Button(action: {
-            exportCSV()
+            exportData()
         }) {
             HStack {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.title3)
-                Text("Export as CSV")
-                    .font(.headline)
+                if isExporting {
+                    ProgressView()
+                        .padding(.trailing, 4)
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                Text(isExporting ? "Exporting..." : "Export Data as CSV")
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
@@ -329,15 +333,20 @@ struct ExportButton: View {
         .opacity((ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty) ? 0.5 : 1.0)
     }
     
-    private func exportCSV() {
-        let manager = LogExportManager.shared
+    private func exportData() {
+        isExporting = true
         
-        if let url = manager.exportLogsAsCSV(
-            logs: ble.logMessages,
-            historicalData: ble.sensorDataHistory
-        ) {
-            exportURL = url
-            showShareSheet = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let exportResult = CSVExportManager.shared.exportData(
+                sensorData: ble.sensorDataHistory,
+                logs: ble.logMessages.map { $0.message }
+            )
+            
+            DispatchQueue.main.async {
+                isExporting = false
+                exportURL = exportResult
+                showShareSheet = true
+            }
         }
     }
 }
@@ -346,7 +355,7 @@ struct ExportButton: View {
 struct RecentLogsPreview: View {
     @ObservedObject var ble: OralableBLE
     
-    private var recentLogs: [String] {
+    private var recentLogs: [LogMessage] {
         Array(ble.logMessages.suffix(10).reversed())
     }
     
@@ -366,9 +375,9 @@ struct RecentLogsPreview: View {
             if ble.logMessages.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "tray")
-                        .font(.system(size: 40))
+                        .font(.largeTitle)
                         .foregroundColor(.gray)
-                    Text("No activity logged yet")
+                    Text("No activity yet")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -376,14 +385,15 @@ struct RecentLogsPreview: View {
                 .padding(.vertical, 20)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(recentLogs, id: \.self) { log in
+                    // ✅ FIXED: Use LogMessage.id instead of String
+                    ForEach(recentLogs) { log in
                         HStack(alignment: .top, spacing: 8) {
                             Circle()
-                                .fill(logColor(for: log))
+                                .fill(logColor(for: log.message))
                                 .frame(width: 6, height: 6)
                                 .padding(.top, 6)
                             
-                            Text(log)
+                            Text(log.message)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .lineLimit(2)
@@ -400,11 +410,11 @@ struct RecentLogsPreview: View {
     }
     
     private func logColor(for log: String) -> Color {
-        if log.contains("ERROR") || log.contains("Failed") {
+        if log.contains("ERROR") || log.contains("Failed") || log.contains("❌") {
             return .red
-        } else if log.contains("WARNING") || log.contains("Disconnected") {
+        } else if log.contains("WARNING") || log.contains("Disconnected") || log.contains("⚠️") {
             return .orange
-        } else if log.contains("Connected") || log.contains("SUCCESS") {
+        } else if log.contains("Connected") || log.contains("SUCCESS") || log.contains("✅") {
             return .green
         } else {
             return .blue
@@ -571,7 +581,7 @@ struct DebugConnectionSection: View {
                 }
             }
             
-            // Recent logs preview
+            // Recent logs preview - ✅ FIXED: Use LogMessage.id
             if !ble.logMessages.isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
@@ -579,8 +589,8 @@ struct DebugConnectionSection: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    ForEach(Array(ble.logMessages.suffix(5).reversed()), id: \.self) { log in
-                        Text(log)
+                    ForEach(Array(ble.logMessages.suffix(5).reversed())) { log in
+                        Text(log.message)
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.secondary)
                             .lineLimit(2)
@@ -592,7 +602,9 @@ struct DebugConnectionSection: View {
         .background(Color.orange.opacity(0.1))
         .cornerRadius(12)
         .sheet(isPresented: $showFullLogs) {
-            LogsView(logs: ble.logMessages)
+            NavigationView {
+                LogsView(logs: ble.logMessages)
+            }
         }
     }
 }

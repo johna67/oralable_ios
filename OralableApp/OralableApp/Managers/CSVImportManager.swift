@@ -1,224 +1,236 @@
 import Foundation
-import UniformTypeIdentifiers
 
-/// Manager for importing CSV data files in Viewer Mode
+/// Manager for importing sensor data and logs from CSV format
 class CSVImportManager {
     static let shared = CSVImportManager()
     
     private init() {}
     
-    /// Import historical data from a CSV file
-    /// - Parameter url: URL of the CSV file
-    /// - Returns: Array of SensorData or nil if parsing fails
-    func importCSV(from url: URL) -> (data: [SensorData], logs: [String])? {
-        guard url.startAccessingSecurityScopedResource() else {
-            print("Failed to access security scoped resource")
-            return nil
-        }
-        
-        defer {
-            url.stopAccessingSecurityScopedResource()
-        }
-        
+    /// Import sensor data and logs from CSV file
+    /// - Parameter url: URL of the CSV file to import
+    /// - Returns: Tuple containing imported sensor data and logs, or nil if import fails
+    func importData(from url: URL) -> (sensorData: [SensorData], logs: [String])? {
         do {
-            let csvString = try String(contentsOf: url, encoding: .utf8)
-            return parseCSV(csvString)
+            let csvContent = try String(contentsOf: url, encoding: .utf8)
+            return parseCSVContent(csvContent)
         } catch {
-            print("Error reading CSV file: \(error)")
+            print("Failed to read CSV file: \(error)")
             return nil
         }
     }
     
-    /// Parse CSV string into SensorData array and logs
-    /// - Parameter csvString: CSV content as string
-    /// - Returns: Tuple of parsed data and logs
-    private func parseCSV(_ csvString: String) -> (data: [SensorData], logs: [String])? {
-        let lines = csvString.components(separatedBy: .newlines).filter { !$0.isEmpty }
+    /// Parse CSV content and extract sensor data and logs
+    private func parseCSVContent(_ csvContent: String) -> (sensorData: [SensorData], logs: [String])? {
+        let lines = csvContent.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         
-        guard lines.count > 1 else {
-            print("CSV file is empty or has no data rows")
+        guard !lines.isEmpty else {
+            print("CSV file is empty")
             return nil
         }
         
-        // Parse header to find column indices
-        let header = lines[0].components(separatedBy: ",")
-        guard let columnIndices = parseHeader(header) else {
-            print("Invalid CSV header format")
-            return nil
-        }
+        // Skip header line
+        let dataLines = Array(lines.dropFirst())
         
         var sensorDataArray: [SensorData] = []
         var logs: [String] = []
         
-        // Parse data rows (skip header)
-        for (index, line) in lines.dropFirst().enumerated() {
-            let values = parseCSVLine(line)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        
+        for line in dataLines {
+            let fields = parseCSVLine(line)
             
-            if let sensorData = parseSensorDataRow(values, columnIndices: columnIndices) {
-                sensorDataArray.append(sensorData)
+            guard fields.count >= 14 else {
+                print("Invalid CSV line format: \(line)")
+                continue
             }
             
-            // Extract log message if present
-            if let messageIndex = columnIndices["Message"],
-               messageIndex < values.count {
-                let message = values[messageIndex].trimmingCharacters(in: .whitespaces)
-                if !message.isEmpty && message != "\"\"" {
-                    logs.append(message.replacingOccurrences(of: "\"", with: ""))
+            // Parse timestamp
+            guard let timestamp = dateFormatter.date(from: fields[0]) else {
+                print("Invalid timestamp format: \(fields[0])")
+                continue
+            }
+            
+            // Check if this is a log-only entry (all sensor fields are empty)
+            let sensorFieldsEmpty = fields[1...12].allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+            
+            if sensorFieldsEmpty {
+                // This is a log entry
+                let message = unescapeCSVField(fields[13])
+                if !message.isEmpty {
+                    logs.append(message)
+                }
+            } else {
+                // This is a sensor data entry
+                if let sensorData = parseSensorData(from: fields, timestamp: timestamp) {
+                    sensorDataArray.append(sensorData)
+                    
+                    // Add associated log message if present
+                    let message = unescapeCSVField(fields[13])
+                    if !message.isEmpty {
+                        logs.append(message)
+                    }
                 }
             }
         }
         
-        print("Successfully imported \(sensorDataArray.count) data points and \(logs.count) log entries")
-        return (sensorDataArray, logs)
+        return (sensorData: sensorDataArray, logs: logs)
     }
     
-    /// Parse CSV header to find column indices
-    private func parseHeader(_ header: [String]) -> [String: Int]? {
-        var indices: [String: Int] = [:]
-        
-        for (index, column) in header.enumerated() {
-            let trimmed = column.trimmingCharacters(in: .whitespaces)
-            indices[trimmed] = index
-        }
-        
-        // Verify required columns exist
-        let requiredColumns = ["Timestamp", "PPG_IR", "PPG_Red", "PPG_Green",
-                              "Accel_X", "Accel_Y", "Accel_Z", "Temp_C",
-                              "Battery_mV", "Battery_%"]
-        
-        for column in requiredColumns {
-            if indices[column] == nil {
-                print("Missing required column: \(column)")
-                return nil
-            }
-        }
-        
-        return indices
-    }
-    
-    /// Parse a single CSV line handling quoted values
+    /// Parse a single CSV line, handling quoted fields
     private func parseCSVLine(_ line: String) -> [String] {
-        var values: [String] = []
-        var currentValue = ""
+        var fields: [String] = []
+        var currentField = ""
         var insideQuotes = false
+        var i = line.startIndex
         
-        for char in line {
+        while i < line.endIndex {
+            let char = line[i]
+            
             if char == "\"" {
-                insideQuotes.toggle()
+                if insideQuotes && i < line.index(before: line.endIndex) && line[line.index(after: i)] == "\"" {
+                    // Double quote - add single quote to field
+                    currentField += "\""
+                    i = line.index(i, offsetBy: 2)
+                } else {
+                    // Toggle quote state
+                    insideQuotes.toggle()
+                    i = line.index(after: i)
+                }
             } else if char == "," && !insideQuotes {
-                values.append(currentValue)
-                currentValue = ""
+                // Field separator
+                fields.append(currentField)
+                currentField = ""
+                i = line.index(after: i)
             } else {
-                currentValue.append(char)
+                // Regular character
+                currentField += String(char)
+                i = line.index(after: i)
             }
         }
-        values.append(currentValue)
         
-        return values
+        // Add the last field
+        fields.append(currentField)
+        
+        return fields
     }
     
-    /// Parse a single data row into SensorData
-    private func parseSensorDataRow(_ values: [String], columnIndices: [String: Int]) -> SensorData? {
-        guard values.count >= columnIndices.count else {
+    /// Parse sensor data from CSV fields
+    private func parseSensorData(from fields: [String], timestamp: Date) -> SensorData? {
+        guard fields.count >= 13 else { return nil }
+        
+        // Parse PPG data (convert to Int32)
+        guard let ppgIR = Int32(fields[1]),
+              let ppgRed = Int32(fields[2]),
+              let ppgGreen = Int32(fields[3]) else {
+            print("Invalid PPG data")
             return nil
         }
         
-        // Parse timestamp
-        var timestamp = Date()
-        if let timestampIndex = columnIndices["Timestamp"],
-           timestampIndex < values.count {
-            let timestampString = values[timestampIndex].trimmingCharacters(in: .whitespaces)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-            if let date = dateFormatter.date(from: timestampString) {
-                timestamp = date
-            }
-        }
-        
-        // Parse PPG data
-        var ppgData = PPGData(red: 0, ir: 0, green: 0, timestamp: timestamp)
-        if let irIndex = columnIndices["PPG_IR"],
-           let redIndex = columnIndices["PPG_Red"],
-           let greenIndex = columnIndices["PPG_Green"],
-           irIndex < values.count,
-           redIndex < values.count,
-           greenIndex < values.count {
-            
-            ppgData = PPGData(
-                red: Int32(values[redIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                ir: Int32(values[irIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                green: Int32(values[greenIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                timestamp: timestamp
-            )
-        }
-        
-        // Parse accelerometer data
-        var accelerometerData = AccelerometerData(x: 0, y: 0, z: 0, timestamp: timestamp)
-        if let xIndex = columnIndices["Accel_X"],
-           let yIndex = columnIndices["Accel_Y"],
-           let zIndex = columnIndices["Accel_Z"],
-           xIndex < values.count,
-           yIndex < values.count,
-           zIndex < values.count {
-            
-            accelerometerData = AccelerometerData(
-                x: Int16(values[xIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                y: Int16(values[yIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                z: Int16(values[zIndex].trimmingCharacters(in: .whitespaces)) ?? 0,
-                timestamp: timestamp
-            )
+        // Parse accelerometer data (convert to Int16)
+        guard let accelX = Int16(fields[4]),
+              let accelY = Int16(fields[5]),
+              let accelZ = Int16(fields[6]) else {
+            print("Invalid accelerometer data")
+            return nil
         }
         
         // Parse temperature
-        var temperatureData = TemperatureData(celsius: 0.0, timestamp: timestamp)
-        if let tempIndex = columnIndices["Temp_C"],
-           tempIndex < values.count {
-            let celsius = Double(values[tempIndex].trimmingCharacters(in: .whitespaces)) ?? 0.0
-            temperatureData = TemperatureData(celsius: celsius, timestamp: timestamp)
+        guard let tempCelsius = Double(fields[7]) else {
+            print("Invalid temperature data")
+            return nil
         }
         
-        // Parse battery data
-        var batteryData = BatteryData(percentage: 0, timestamp: timestamp)
-        if let batteryPercentIndex = columnIndices["Battery_%"],
-           batteryPercentIndex < values.count {
-            let percentage = Int(values[batteryPercentIndex].trimmingCharacters(in: .whitespaces)) ?? 0
-            batteryData = BatteryData(percentage: percentage, timestamp: timestamp)
-        } else if let batteryMvIndex = columnIndices["Battery_mV"],
-                  batteryMvIndex < values.count {
-            // Convert mV to approximate percentage (this is a rough conversion)
-            let milliVolts = Int32(values[batteryMvIndex].trimmingCharacters(in: .whitespaces)) ?? 0
-            let percentage = estimateBatteryPercentage(from: milliVolts)
-            batteryData = BatteryData(percentage: percentage, timestamp: timestamp)
+        // Parse battery
+        guard let batteryPercentage = Int(fields[8]) else {
+            print("Invalid battery data")
+            return nil
         }
         
-        // Create SensorData with the parsed components
-        let sensorData = SensorData(
+        // Parse optional heart rate
+        var heartRate: HeartRateData?
+        if !fields[9].isEmpty && !fields[10].isEmpty,
+           let bpm = Double(fields[9]),
+           let quality = Double(fields[10]) {
+            heartRate = HeartRateData(bpm: bpm, quality: quality, timestamp: timestamp)
+        }
+        
+        // Parse optional SpO2
+        var spo2: SpO2Data?
+        if !fields[11].isEmpty && !fields[12].isEmpty,
+           let percentage = Double(fields[11]),
+           let quality = Double(fields[12]) {
+            spo2 = SpO2Data(percentage: percentage, quality: quality, timestamp: timestamp)
+        }
+        
+        return SensorData(
             timestamp: timestamp,
-            ppg: ppgData,
-            accelerometer: accelerometerData,
-            temperature: temperatureData,
-            battery: batteryData,
-            heartRate: nil, // Heart rate would need to be calculated from PPG
-            spo2: nil       // SpO2 would need to be calculated from PPG
+            ppg: PPGData(red: ppgRed, ir: ppgIR, green: ppgGreen, timestamp: timestamp),
+            accelerometer: AccelerometerData(x: accelX, y: accelY, z: accelZ, timestamp: timestamp),
+            temperature: TemperatureData(celsius: tempCelsius, timestamp: timestamp),
+            battery: BatteryData(percentage: batteryPercentage, timestamp: timestamp),
+            heartRate: heartRate,
+            spo2: spo2
         )
-        
-        return sensorData
     }
     
-    /// Estimate battery percentage from millivolts
-    /// This is a rough estimation - actual conversion depends on battery chemistry
-    private func estimateBatteryPercentage(from milliVolts: Int32) -> Int {
-        // Typical Li-ion battery voltage range: 3000mV (empty) to 4200mV (full)
-        let minVoltage: Double = 3000.0
-        let maxVoltage: Double = 4200.0
-        let voltage = Double(milliVolts)
+    /// Unescape CSV field by removing outer quotes and converting double quotes
+    private func unescapeCSVField(_ field: String) -> String {
+        var result = field
         
-        let percentage = ((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100.0
-        return max(0, min(100, Int(percentage.rounded())))
+        // Remove outer quotes if present
+        if result.hasPrefix("\"") && result.hasSuffix("\"") {
+            result = String(result.dropFirst().dropLast())
+        }
+        
+        // Convert double quotes to single quotes
+        result = result.replacingOccurrences(of: "\"\"", with: "\"")
+        
+        return result
     }
     
-    /// Get supported file types for import
-    static var supportedTypes: [UTType] {
-        return [.commaSeparatedText, .text, .plainText]
+    /// Validate CSV file format before importing
+    func validateCSVFile(at url: URL) -> ValidationResult {
+        do {
+            let csvContent = try String(contentsOf: url, encoding: .utf8)
+            let lines = csvContent.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            
+            guard !lines.isEmpty else {
+                return ValidationResult(isValid: false, errorMessage: "CSV file is empty", estimatedDataPoints: 0)
+            }
+            
+            // Check header
+            let headerLine = lines.first!
+            let expectedHeaders = [
+                "Timestamp", "PPG_IR", "PPG_Red", "PPG_Green",
+                "Accel_X", "Accel_Y", "Accel_Z", "Temp_C", "Battery_%",
+                "HeartRate_BPM", "HeartRate_Quality", "SpO2_%", "SpO2_Quality", "Message"
+            ]
+            
+            let actualHeaders = parseCSVLine(headerLine)
+            
+            guard actualHeaders.count >= expectedHeaders.count else {
+                return ValidationResult(isValid: false, errorMessage: "Invalid header format", estimatedDataPoints: 0)
+            }
+            
+            for (index, expectedHeader) in expectedHeaders.enumerated() {
+                if index < actualHeaders.count && actualHeaders[index] != expectedHeader {
+                    return ValidationResult(isValid: false, errorMessage: "Invalid header: expected '\(expectedHeader)', found '\(actualHeaders[index])'", estimatedDataPoints: 0)
+                }
+            }
+            
+            let dataLines = Array(lines.dropFirst())
+            return ValidationResult(isValid: true, errorMessage: nil, estimatedDataPoints: dataLines.count)
+            
+        } catch {
+            return ValidationResult(isValid: false, errorMessage: "Failed to read file: \(error.localizedDescription)", estimatedDataPoints: 0)
+        }
     }
+}
+
+/// Result of CSV file validation
+struct ValidationResult {
+    let isValid: Bool
+    let errorMessage: String?
+    let estimatedDataPoints: Int
 }

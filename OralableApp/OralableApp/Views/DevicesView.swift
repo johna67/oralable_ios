@@ -131,17 +131,22 @@ struct DevicesView: View {
         saveDevices()
     }
     
+    // ✅ FIX 1: Update existing device or add new one
     private func connectToDevice(_ peripheral: CBPeripheral) {
         ble.connect(to: peripheral)
         
-        // Save device if not already saved
-        let newDevice = SavedDevice(
-            uuid: peripheral.identifier.uuidString,
-            name: peripheral.name ?? "Unknown Device",
-            lastConnected: Date()
-        )
-        
-        if !savedDevices.contains(where: { $0.uuid == newDevice.uuid }) {
+        // Check if device already exists
+        if let index = savedDevices.firstIndex(where: { $0.uuid == peripheral.identifier.uuidString }) {
+            // Update last connected time for existing device
+            savedDevices[index].lastConnected = Date()
+            saveDevices()
+        } else {
+            // Save new device
+            let newDevice = SavedDevice(
+                uuid: peripheral.identifier.uuidString,
+                name: peripheral.name ?? "Unknown Device",
+                lastConnected: Date()
+            )
             savedDevices.append(newDevice)
             saveDevices()
         }
@@ -153,7 +158,7 @@ struct SavedDevice: Identifiable, Codable {
     let id = UUID()
     let uuid: String
     let name: String
-    var lastConnected: Date
+    var lastConnected: Date  // ✅ FIX 2: var allows mutation
     var nickname: String?
     
     enum CodingKeys: String, CodingKey {
@@ -262,7 +267,7 @@ struct SavedDeviceRow: View {
                     .background(Color.green.opacity(0.1))
                     .cornerRadius(8)
             } else {
-                Button(action: { 
+                Button(action: {
                     // Connect to saved device - we'll need to find it in discovered devices or trigger a scan
                     if let peripheral = ble.discoveredDevices.first(where: { $0.identifier.uuidString == device.uuid }) {
                         ble.connect(to: peripheral)
@@ -411,20 +416,34 @@ struct AddDeviceView: View {
                     }
                 }
                 
+                // ✅ FIX 3: Check for duplicates before adding
                 Section {
                     Button(action: {
                         if let peripheral = selectedPeripheral {
-                            let device = SavedDevice(
-                                uuid: peripheral.identifier.uuidString,
-                                name: peripheral.name ?? "Unknown",
-                                lastConnected: Date(),
-                                nickname: deviceName.isEmpty ? nil : deviceName
-                            )
-                            
-                            savedDevices.append(device)
-                            if let data = try? JSONEncoder().encode(savedDevices) {
-                                UserDefaults.standard.set(data, forKey: "savedDevices")
+                            // Check for duplicates before adding
+                            if !savedDevices.contains(where: { $0.uuid == peripheral.identifier.uuidString }) {
+                                let device = SavedDevice(
+                                    uuid: peripheral.identifier.uuidString,
+                                    name: peripheral.name ?? "Unknown",
+                                    lastConnected: Date(),
+                                    nickname: deviceName.isEmpty ? nil : deviceName
+                                )
+                                
+                                savedDevices.append(device)
+                                if let data = try? JSONEncoder().encode(savedDevices) {
+                                    UserDefaults.standard.set(data, forKey: "savedDevices")
+                                }
+                            } else {
+                                // Update nickname if provided for existing device
+                                if !deviceName.isEmpty, let index = savedDevices.firstIndex(where: { $0.uuid == peripheral.identifier.uuidString }) {
+                                    savedDevices[index].nickname = deviceName
+                                    savedDevices[index].lastConnected = Date()
+                                    if let data = try? JSONEncoder().encode(savedDevices) {
+                                        UserDefaults.standard.set(data, forKey: "savedDevices")
+                                    }
+                                }
                             }
+                            
                             dismiss()
                         }
                     }) {

@@ -1,39 +1,38 @@
 import SwiftUI
 
 struct LogsView: View {
-    let logs: [String]
+    let logs: [LogMessage]
     @State private var searchText = ""
     @Environment(\.dismiss) private var dismiss
     
-    var filteredLogs: [String] {
+    var filteredLogs: [LogMessage] {
         if searchText.isEmpty {
             return logs
         } else {
-            return logs.filter { $0.localizedCaseInsensitiveContains(searchText) }
+            return logs.filter { $0.message.localizedCaseInsensitiveContains(searchText) }
         }
     }
     
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(filteredLogs.reversed(), id: \.self) { log in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(log)
-                            .font(.caption)
-                            .textSelection(.enabled)
-                            .lineLimit(nil)
-                    }
-                    .padding(.vertical, 2)
+        List {
+            // ✅ FIXED: Use LogMessage.id instead of String
+            ForEach(filteredLogs.reversed()) { log in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(log.message)
+                        .font(.caption)
+                        .textSelection(.enabled)
+                        .lineLimit(nil)
                 }
+                .padding(.vertical, 2)
             }
-            .searchable(text: $searchText)
-            .navigationTitle("Logs")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        }
+        .searchable(text: $searchText)
+        .navigationTitle("Logs (\(logs.count))")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
         }
@@ -41,9 +40,11 @@ struct LogsView: View {
 }
 
 #Preview {
-    LogsView(logs: [
-        "[12:34:56.789] 🔍 Started scanning for Oralable devices...",
-        "[12:34:57.123] 📱 Discovered Oralable device: Oralable-001",
-        "[12:34:58.456] ✅ Connected to: Oralable-001"
-    ])
+    NavigationView {
+        LogsView(logs: [
+            LogMessage(message: "[12:34:56] 🔍 Started scanning for Oralable devices..."),
+            LogMessage(message: "[12:34:57] 📱 Discovered Oralable device: Oralable-001"),
+            LogMessage(message: "[12:34:58] ✅ Connected to: Oralable-001")
+        ])
+    }
 }

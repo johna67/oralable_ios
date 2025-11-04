@@ -200,3 +200,13 @@ class HistoricalDataAggregator {
         )
     }
 }
+
+// MARK: - Export Summary Model
+
+/// Summary information about an export operation
+struct ExportSummary {
+    let sensorDataCount: Int
+    let logCount: Int
+    let dateRange: String
+    let estimatedSize: String
+}

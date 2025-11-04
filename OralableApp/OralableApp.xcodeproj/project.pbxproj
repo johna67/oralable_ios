@@ -24,13 +24,25 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		26B2FF602EB9CE9800E0F7B1 /* OpenSans-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-Bold.ttf"; sourceTree = "<group>"; };
+		26B2FF612EB9CE9800E0F7B1 /* OpenSans-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-BoldItalic.ttf"; sourceTree = "<group>"; };
+		26B2FF622EB9CE9800E0F7B1 /* OpenSans-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-ExtraBold.ttf"; sourceTree = "<group>"; };
+		26B2FF632EB9CE9800E0F7B1 /* OpenSans-ExtraBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-ExtraBoldItalic.ttf"; sourceTree = "<group>"; };
+		26B2FF642EB9CE9800E0F7B1 /* OpenSans-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-Italic.ttf"; sourceTree = "<group>"; };
+		26B2FF652EB9CE9800E0F7B1 /* OpenSans-Light.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-Light.ttf"; sourceTree = "<group>"; };
+		26B2FF662EB9CE9800E0F7B1 /* OpenSans-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-LightItalic.ttf"; sourceTree = "<group>"; };
+		26B2FF672EB9CE9800E0F7B1 /* OpenSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-Medium.ttf"; sourceTree = "<group>"; };
+		26B2FF682EB9CE9800E0F7B1 /* OpenSans-MediumItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-MediumItalic.ttf"; sourceTree = "<group>"; };
+		26B2FF692EB9CE9800E0F7B1 /* OpenSans-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-Regular.ttf"; sourceTree = "<group>"; };
+		26B2FF6A2EB9CE9800E0F7B1 /* OpenSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-SemiBold.ttf"; sourceTree = "<group>"; };
+		26B2FF6B2EB9CE9800E0F7B1 /* OpenSans-SemiBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "OpenSans-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
 		26CAF25E2E781EFB003FE378 /* OralableApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OralableApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		266FCD152EA145930039BBA6 /* Exceptions for "OralableApp" folder in "OralableApp" target */ = {
+		26B2FF052EB999C200E0F7B1 /* Exceptions for "OralableApp" folder in "OralableApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -40,10 +52,10 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		26CAF2602E781EFB003FE378 /* OralableApp */ = {
+		26B2FED92EB999C100E0F7B1 /* OralableApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				266FCD152EA145930039BBA6 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
+				26B2FF052EB999C200E0F7B1 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
 			);
 			path = OralableApp;
 			sourceTree = "<group>";
@@ -85,10 +97,31 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		26B2FF6C2EB9CE9800E0F7B1 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				26B2FF602EB9CE9800E0F7B1 /* OpenSans-Bold.ttf */,
+				26B2FF612EB9CE9800E0F7B1 /* OpenSans-BoldItalic.ttf */,
+				26B2FF622EB9CE9800E0F7B1 /* OpenSans-ExtraBold.ttf */,
+				26B2FF632EB9CE9800E0F7B1 /* OpenSans-ExtraBoldItalic.ttf */,
+				26B2FF642EB9CE9800E0F7B1 /* OpenSans-Italic.ttf */,
+				26B2FF652EB9CE9800E0F7B1 /* OpenSans-Light.ttf */,
+				26B2FF662EB9CE9800E0F7B1 /* OpenSans-LightItalic.ttf */,
+				26B2FF672EB9CE9800E0F7B1 /* OpenSans-Medium.ttf */,
+				26B2FF682EB9CE9800E0F7B1 /* OpenSans-MediumItalic.ttf */,
+				26B2FF692EB9CE9800E0F7B1 /* OpenSans-Regular.ttf */,
+				26B2FF6A2EB9CE9800E0F7B1 /* OpenSans-SemiBold.ttf */,
+				26B2FF6B2EB9CE9800E0F7B1 /* OpenSans-SemiBoldItalic.ttf */,
+			);
+			name = Fonts;
+			path = OralableApp/Managers/DesignSystem/Fonts;
+			sourceTree = "<group>";
+		};
 		26CAF2552E781EFB003FE378 = {
 			isa = PBXGroup;
 			children = (
-				26CAF2602E781EFB003FE378 /* OralableApp */,
+				26B2FF6C2EB9CE9800E0F7B1 /* Fonts */,
+				26B2FED92EB999C100E0F7B1 /* OralableApp */,
 				26CAF2722E781EFE003FE378 /* OralableAppTests */,
 				26CAF27C2E781EFE003FE378 /* OralableAppUITests */,
 				26CAF25F2E781EFB003FE378 /* Products */,
@@ -121,7 +154,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				26CAF2602E781EFB003FE378 /* OralableApp */,
+				26B2FED92EB999C100E0F7B1 /* OralableApp */,
 			);
 			name = OralableApp;
 			packageProductDependencies = (

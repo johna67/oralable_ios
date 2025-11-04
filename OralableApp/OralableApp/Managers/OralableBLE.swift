@@ -24,6 +24,14 @@ struct CurrentSensorData {
     var lastUpdate: Date = Date()
 }
 
+
+// MARK: - Log Message Model
+
+struct LogMessage: Identifiable {
+    let id = UUID()
+    let message: String
+    let timestamp: Date = Date()
+}
 // MARK: - BLE Manager
 
 /// Manages Bluetooth Low Energy communication with Oralable devices
@@ -44,7 +52,7 @@ class OralableBLE: NSObject, ObservableObject {
     @Published var deviceName: String = "Unknown Device"
     
     // Logs for diagnostics
-    @Published var logMessages: [String] = []
+    @Published var logMessages: [LogMessage] = []
     
     // Sensor data history
     @Published var sensorDataHistory: [SensorData] = []
@@ -271,17 +279,12 @@ class OralableBLE: NSObject, ObservableObject {
     /// Add a log message with timestamp
     private func addLogMessage(_ message: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        let logEntry = "[\(timestamp)] \(message)"
+        let formattedMessage = "[\(timestamp)] \(message)"
         
         DispatchQueue.main.async {
-            self.logMessages.append(logEntry)
-            
-            if self.logMessages.count > 200 {
-                self.logMessages.removeFirst(self.logMessages.count - 200)
-            }
+            self.logMessages.append(LogMessage(message: formattedMessage))
         }
-        
-        print(logEntry)
+        print(formattedMessage)
     }
     
     /// Process PPG data and calculate heart rate and SpO2
