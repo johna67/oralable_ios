@@ -2,16 +2,8 @@
 //  OralableDevice.swift
 //  OralableApp
 //
-//  Created by John A Cogan on 04/11/2025.
-//
-
-
-//
-//  OralableDevice.swift
-//  OralableApp
-//
 //  Created: November 4, 2025
-//  Concrete implementation of BLEDeviceProtocol for Oralable TGM/MAM device
+//  Concrete implementation of BLEDeviceProtocol for Oralable device
 //
 
 import Foundation
@@ -24,13 +16,12 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     
     // MARK: - BLE Service & Characteristics UUIDs
     
-    private static let serviceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-    private static let ppgCharacteristicUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
-    private static let accelCharacteristicUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
-    private static let tempCharacteristicUUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")
-    private static let batteryCharacteristicUUID = CBUUID(string: "3A0FF004-98C4-46B2-94AF-1AEE0FD4C48E")
-    private static let uuidCharacteristicUUID = CBUUID(string: "3A0FF005-98C4-46B2-94AF-1AEE0FD4C48E")
-    private static let firmwareCharacteristicUUID = CBUUID(string: "3A0FF006-98C4-46B2-94AF-1AEE0FD4C48E")
+    private static let serviceUUID = CBUUID(string: "0000180D-0000-1000-8000-00805F9B34FB") // Heart Rate Service
+    private static let heartRateCharacteristicUUID = CBUUID(string: "00002A37-0000-1000-8000-00805F9B34FB") // Heart Rate Measurement
+    private static let batteryServiceUUID = CBUUID(string: "0000180F-0000-1000-8000-00805F9B34FB")
+    private static let batteryCharacteristicUUID = CBUUID(string: "00002A19-0000-1000-8000-00805F9B34FB")
+    private static let temperatureServiceUUID = CBUUID(string: "00001809-0000-1000-8000-00805F9B34FB") // Health Thermometer
+    private static let temperatureCharacteristicUUID = CBUUID(string: "00002A1C-0000-1000-8000-00805F9B34FB") // Temperature Measurement
     
     // MARK: - Protocol Properties
     
@@ -60,7 +51,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     
     private var centralManager: CBCentralManager?
     private var characteristics: [CBUUID: CBCharacteristic] = [:]
-    private var deviceUUID: String?
     
     // MARK: - Initialization
     
@@ -84,19 +74,13 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         
         deviceInfo.connectionState = .connecting
         
-        // Connection will be handled by CBCentralManager
-        // This is a placeholder - actual connection happens via BLE manager
-        
         peripheral.delegate = self
     }
     
     func disconnect() async {
         deviceInfo.connectionState = .disconnecting
         
-        // Stop notifications
         await stopDataStream()
-        
-        // Disconnection will be handled by CBCentralManager
         
         deviceInfo.connectionState = .disconnected
     }
@@ -117,28 +101,15 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             throw DeviceError.invalidPeripheral
         }
         
-        // Enable notifications for all data characteristics
-        if let ppgChar = characteristics[Self.ppgCharacteristicUUID] {
-            peripheral.setNotifyValue(true, for: ppgChar)
-        }
-        
-        if let accelChar = characteristics[Self.accelCharacteristicUUID] {
-            peripheral.setNotifyValue(true, for: accelChar)
-        }
-        
-        if let tempChar = characteristics[Self.tempCharacteristicUUID] {
-            peripheral.setNotifyValue(true, for: tempChar)
-        }
-        
-        if let batteryChar = characteristics[Self.batteryCharacteristicUUID] {
-            peripheral.setNotifyValue(true, for: batteryChar)
+        // Enable notifications for all supported characteristics
+        for characteristic in characteristics.values {
+            peripheral.setNotifyValue(true, for: characteristic)
         }
     }
     
     func stopDataStream() async {
         guard let peripheral = peripheral else { return }
         
-        // Disable notifications
         for characteristic in characteristics.values {
             peripheral.setNotifyValue(false, for: characteristic)
         }
@@ -157,23 +128,19 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         let characteristicUUID = characteristic.uuid
         let timestamp = Date()
         
-        // PPG Data
-        if characteristicUUID == Self.ppgCharacteristicUUID {
-            readings.append(contentsOf: parsePPGData(data, timestamp: timestamp))
-        }
-        // Accelerometer Data
-        else if characteristicUUID == Self.accelCharacteristicUUID {
-            readings.append(contentsOf: parseAccelData(data, timestamp: timestamp))
-        }
-        // Temperature Data
-        else if characteristicUUID == Self.tempCharacteristicUUID {
-            if let reading = parseTempData(data, timestamp: timestamp) {
-                readings.append(reading)
-            }
+        // Heart Rate / PPG Data
+        if characteristicUUID == Self.heartRateCharacteristicUUID {
+            readings.append(contentsOf: parseHeartRateData(data, timestamp: timestamp))
         }
         // Battery Data
         else if characteristicUUID == Self.batteryCharacteristicUUID {
             if let reading = parseBatteryData(data, timestamp: timestamp) {
+                readings.append(reading)
+            }
+        }
+        // Temperature Data
+        else if characteristicUUID == Self.temperatureCharacteristicUUID {
+            if let reading = parseTemperatureData(data, timestamp: timestamp) {
                 readings.append(reading)
             }
         }
@@ -194,8 +161,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             throw DeviceError.notConnected
         }
         
-        // Commands not implemented for current Oralable firmware
-        // Future firmware may support commands
+        // Commands implementation would go here
+        // This depends on the specific Oralable device protocol
     }
     
     func updateConfiguration(_ config: DeviceConfiguration) async throws {
@@ -203,7 +170,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             throw DeviceError.notConnected
         }
         
-        // Configuration not implemented for current Oralable firmware
+        // Configuration implementation would go here
+        // This depends on the specific Oralable device protocol
     }
     
     func updateDeviceInfo() async throws {
@@ -215,137 +183,69 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             throw DeviceError.invalidPeripheral
         }
         
-        // Read UUID
-        if let uuidChar = characteristics[Self.uuidCharacteristicUUID] {
-            peripheral.readValue(for: uuidChar)
-        }
-        
-        // Read firmware version
-        if let firmwareChar = characteristics[Self.firmwareCharacteristicUUID] {
-            peripheral.readValue(for: firmwareChar)
-        }
-        
-        // Read battery
-        if let batteryChar = characteristics[Self.batteryCharacteristicUUID] {
-            peripheral.readValue(for: batteryChar)
+        // Read battery and other device info
+        for characteristic in characteristics.values {
+            peripheral.readValue(for: characteristic)
         }
     }
     
     // MARK: - Data Parsing Helpers
     
-    private func parsePPGData(_ data: Data, timestamp: Date) -> [SensorReading] {
+    private func parseHeartRateData(_ data: Data, timestamp: Date) -> [SensorReading] {
         var readings: [SensorReading] = []
         
-        // PPG data format: 12-bit samples, 3 channels (Red, IR, Green)
-        // Each sample: 2 bytes per channel (12 bits, MSB aligned)
-        let bytesPerSample = 6 // 2 bytes × 3 channels
-        let sampleCount = data.count / bytesPerSample
+        guard data.count >= 2 else { return readings }
         
-        for i in 0..<sampleCount {
-            let offset = i * bytesPerSample
-            
-            guard offset + bytesPerSample <= data.count else { break }
-            
-            // Parse Red channel
-            let red = data.subdata(in: offset..<offset+2).withUnsafeBytes { $0.load(as: UInt16.self).bigEndian }
-            let redValue = Double(red & 0x0FFF) // 12-bit mask
-            
-            // Parse IR channel
-            let ir = data.subdata(in: offset+2..<offset+4).withUnsafeBytes { $0.load(as: UInt16.self).bigEndian }
-            let irValue = Double(ir & 0x0FFF)
-            
-            // Parse Green channel
-            let green = data.subdata(in: offset+4..<offset+6).withUnsafeBytes { $0.load(as: UInt16.self).bigEndian }
-            let greenValue = Double(green & 0x0FFF)
-            
-            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.01) // 100 Hz
-            
+        let flags = data[0]
+        var offset = 1
+        
+        // Check if heart rate is 16-bit (bit 0 of flags)
+        let is16Bit = (flags & 0x01) != 0
+        
+        var heartRateValue: UInt16 = 0
+        
+        if is16Bit && data.count >= offset + 2 {
+            heartRateValue = data.subdata(in: offset..<offset+2)
+                .withUnsafeBytes { $0.load(as: UInt16.self).littleEndian }
+            offset += 2
+        } else if data.count >= offset + 1 {
+            heartRateValue = UInt16(data[offset])
+            offset += 1
+        }
+        
+        // Create heart rate reading
+        if heartRateValue > 0 {
             readings.append(SensorReading(
-                sensorType: .ppgRed,
-                value: redValue,
-                timestamp: sampleTimestamp,
-                deviceId: deviceInfo.id.uuidString
+                sensorType: .heartRate,
+                value: Double(heartRateValue),
+                timestamp: timestamp,
+                deviceId: deviceInfo.id.uuidString,
+                quality: 0.95
             ))
-            
-            readings.append(SensorReading(
-                sensorType: .ppgInfrared,
-                value: irValue,
-                timestamp: sampleTimestamp,
-                deviceId: deviceInfo.id.uuidString
-            ))
-            
-            readings.append(SensorReading(
-                sensorType: .ppgGreen,
-                value: greenValue,
-                timestamp: sampleTimestamp,
-                deviceId: deviceInfo.id.uuidString
-            ))
+        }
+        
+        // Parse RR intervals if present (contact detected bit)
+        if (flags & 0x10) != 0 {
+            while offset + 2 <= data.count {
+                let rrInterval = data.subdata(in: offset..<offset+2)
+                    .withUnsafeBytes { $0.load(as: UInt16.self).littleEndian }
+                
+                // RR interval is in 1/1024 seconds
+                let rrSeconds = Double(rrInterval) / 1024.0
+                
+                readings.append(SensorReading(
+                    sensorType: .ppgInfrared, // Use PPG IR for RR intervals
+                    value: Double(rrInterval),
+                    timestamp: timestamp,
+                    deviceId: deviceInfo.id.uuidString,
+                    quality: 0.9
+                ))
+                
+                offset += 2
+            }
         }
         
         return readings
-    }
-    
-    private func parseAccelData(_ data: Data, timestamp: Date) -> [SensorReading] {
-        var readings: [SensorReading] = []
-        
-        // Accelerometer data format: 16-bit signed integers, 3 axes (X, Y, Z)
-        let bytesPerSample = 6 // 2 bytes × 3 axes
-        let sampleCount = data.count / bytesPerSample
-        
-        for i in 0..<sampleCount {
-            let offset = i * bytesPerSample
-            
-            guard offset + bytesPerSample <= data.count else { break }
-            
-            let x = data.subdata(in: offset..<offset+2).withUnsafeBytes { $0.load(as: Int16.self).bigEndian }
-            let y = data.subdata(in: offset+2..<offset+4).withUnsafeBytes { $0.load(as: Int16.self).bigEndian }
-            let z = data.subdata(in: offset+4..<offset+6).withUnsafeBytes { $0.load(as: Int16.self).bigEndian }
-            
-            // Convert to g (assuming ±16g range, 16-bit resolution)
-            let scale = 16.0 / 32768.0
-            
-            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02) // 50 Hz
-            
-            readings.append(SensorReading(
-                sensorType: .accelerometerX,
-                value: Double(x) * scale,
-                timestamp: sampleTimestamp,
-                deviceId: deviceInfo.id.uuidString
-            ))
-            
-            readings.append(SensorReading(
-                sensorType: .accelerometerY,
-                value: Double(y) * scale,
-                timestamp: sampleTimestamp,
-                deviceId: deviceInfo.id.uuidString
-            ))
-            
-            readings.append(SensorReading(
-                sensorType: .accelerometerZ,
-                value: Double(z) * scale,
-                timestamp: sampleTimestamp,
-                deviceId: deviceInfo.id.uuidString
-            ))
-        }
-        
-        return readings
-    }
-    
-    private func parseTempData(_ data: Data, timestamp: Date) -> SensorReading? {
-        guard data.count >= 4 else { return nil }
-        
-        // Temperature as Float32 - convert from big endian
-        let tempValue = data.withUnsafeBytes { bytes in
-            let rawValue = bytes.load(as: UInt32.self).bigEndian
-            return Float32(bitPattern: rawValue)
-        }
-        
-        return SensorReading(
-            sensorType: .temperature,
-            value: Double(tempValue),
-            timestamp: timestamp,
-            deviceId: deviceInfo.id.uuidString
-        )
     }
     
     private func parseBatteryData(_ data: Data, timestamp: Date) -> SensorReading? {
@@ -361,6 +261,33 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             deviceId: deviceInfo.id.uuidString
         )
     }
+    
+    private func parseTemperatureData(_ data: Data, timestamp: Date) -> SensorReading? {
+        guard data.count >= 5 else { return nil } // Minimum for temperature measurement
+        
+        let flags = data[0]
+        var offset = 1
+        
+        // Temperature value is 32-bit IEEE-754 float
+        if data.count >= offset + 4 {
+            let tempValue = data.subdata(in: offset..<offset+4)
+                .withUnsafeBytes { $0.load(as: Float32.self) }
+            
+            // Check if temperature is in Fahrenheit (bit 0 of flags)
+            let isInFahrenheit = (flags & 0x01) != 0
+            let temperatureCelsius = isInFahrenheit ? (tempValue - 32.0) * 5.0 / 9.0 : tempValue
+            
+            return SensorReading(
+                sensorType: .temperature,
+                value: Double(temperatureCelsius),
+                timestamp: timestamp,
+                deviceId: deviceInfo.id.uuidString,
+                quality: 0.98
+            )
+        }
+        
+        return nil
+    }
 }
 
 // MARK: - CBPeripheralDelegate
@@ -369,14 +296,14 @@ extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard error == nil else {
-            print("❌ Service discovery error: \(error!.localizedDescription)")
+            print("❌ Oralable Service discovery error: \(error!.localizedDescription)")
             return
         }
         
         guard let services = peripheral.services else { return }
         
         for service in services {
-            if service.uuid == Self.serviceUUID {
+            if [Self.serviceUUID, Self.batteryServiceUUID, Self.temperatureServiceUUID].contains(service.uuid) {
                 peripheral.discoverCharacteristics(nil, for: service)
             }
         }
@@ -384,7 +311,7 @@ extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard error == nil else {
-            print("❌ Characteristic discovery error: \(error!.localizedDescription)")
+            print("❌ Oralable Characteristic discovery error: \(error!.localizedDescription)")
             return
         }
         
@@ -394,11 +321,7 @@ extension OralableDevice: CBPeripheralDelegate {
             self.characteristics[characteristic.uuid] = characteristic
             
             // Read initial values
-            if characteristic.uuid == Self.uuidCharacteristicUUID ||
-               characteristic.uuid == Self.firmwareCharacteristicUUID ||
-               characteristic.uuid == Self.batteryCharacteristicUUID {
-                peripheral.readValue(for: characteristic)
-            }
+            peripheral.readValue(for: characteristic)
         }
         
         deviceInfo.connectionState = .connected
@@ -406,28 +329,21 @@ extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard error == nil else {
-            print("❌ Value update error: \(error!.localizedDescription)")
+            print("❌ Oralable Value update error: \(error!.localizedDescription)")
             return
         }
         
         guard let data = characteristic.value else { return }
         
         // Parse data
-        let readings = parseData(data, from: characteristic)
-        
-        // Handle special characteristics
-        if characteristic.uuid == Self.uuidCharacteristicUUID {
-            deviceUUID = data.map { String(format: "%02X", $0) }.joined()
-        } else if characteristic.uuid == Self.firmwareCharacteristicUUID {
-            deviceInfo.firmwareVersion = String(data: data, encoding: .utf8)
-        }
+        _ = parseData(data, from: characteristic)
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            print("❌ Notification state error: \(error.localizedDescription)")
+            print("❌ Oralable Notification state error: \(error.localizedDescription)")
         } else {
-            print("✅ Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid)")
+            print("✅ Oralable Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid)")
         }
     }
 }
