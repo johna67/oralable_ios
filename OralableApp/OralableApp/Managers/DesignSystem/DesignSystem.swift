@@ -72,52 +72,44 @@ enum DesignSystem {
     }
     
     // MARK: - Typography
-    
+
     enum Typography {
-        
-        enum FontFamily {
-            static let regular = "OpenSans-Regular"
-            static let medium = "OpenSans-Medium"
-            static let semiBold = "OpenSans-SemiBold"
-            static let bold = "OpenSans-Bold"
-            static let light = "OpenSans-Light"
-        }
         
         // MARK: Display Styles
         
-        static let displayLarge = Font.custom(FontFamily.bold, size: 32)
-        static let displayMedium = Font.custom(FontFamily.bold, size: 28)
-        static let displaySmall = Font.custom(FontFamily.bold, size: 24)
+        static let displayLarge = Font.system(size: 32, weight: .bold, design: .default)
+        static let displayMedium = Font.system(size: 28, weight: .bold, design: .default)
+        static let displaySmall = Font.system(size: 24, weight: .bold, design: .default)
         
         // MARK: Heading Styles
         
-        static let h1 = Font.custom(FontFamily.semiBold, size: 22)
-        static let h2 = Font.custom(FontFamily.semiBold, size: 20)
-        static let h3 = Font.custom(FontFamily.semiBold, size: 18)
-        static let h4 = Font.custom(FontFamily.semiBold, size: 16)
+        static let h1 = Font.system(size: 22, weight: .semibold, design: .default)
+        static let h2 = Font.system(size: 20, weight: .semibold, design: .default)
+        static let h3 = Font.system(size: 18, weight: .semibold, design: .default)
+        static let h4 = Font.system(size: 16, weight: .semibold, design: .default)
         
         // MARK: Body Styles
         
-        static let bodyLarge = Font.custom(FontFamily.regular, size: 17)
-        static let bodyMedium = Font.custom(FontFamily.regular, size: 15)
-        static let bodySmall = Font.custom(FontFamily.regular, size: 13)
+        static let bodyLarge = Font.system(size: 17, weight: .regular, design: .default)
+        static let bodyMedium = Font.system(size: 15, weight: .regular, design: .default)
+        static let bodySmall = Font.system(size: 13, weight: .regular, design: .default)
         
         // MARK: Label Styles
         
-        static let labelLarge = Font.custom(FontFamily.medium, size: 15)
-        static let labelMedium = Font.custom(FontFamily.medium, size: 13)
-        static let labelSmall = Font.custom(FontFamily.medium, size: 11)
+        static let labelLarge = Font.system(size: 15, weight: .medium, design: .default)
+        static let labelMedium = Font.system(size: 13, weight: .medium, design: .default)
+        static let labelSmall = Font.system(size: 11, weight: .medium, design: .default)
         
         // MARK: Caption Styles
         
-        static let caption = Font.custom(FontFamily.regular, size: 12)
-        static let captionSmall = Font.custom(FontFamily.regular, size: 10)
+        static let caption = Font.system(size: 12, weight: .regular, design: .default)
+        static let captionSmall = Font.system(size: 10, weight: .regular, design: .default)
         
         // MARK: Button Styles
         
-        static let buttonLarge = Font.custom(FontFamily.semiBold, size: 17)
-        static let buttonMedium = Font.custom(FontFamily.semiBold, size: 15)
-        static let buttonSmall = Font.custom(FontFamily.semiBold, size: 13)
+        static let buttonLarge = Font.system(size: 17, weight: .semibold, design: .default)
+        static let buttonMedium = Font.system(size: 15, weight: .semibold, design: .default)
+        static let buttonSmall = Font.system(size: 13, weight: .semibold, design: .default)
     }
     
     // MARK: - Spacing
