@@ -767,8 +767,11 @@ extension OralableBLE: CBPeripheralDelegate {
             return
         }
         
-        let bytes = data.subdata(in: 0..<8)
-        let uuid = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }
+        // Safe way to read UInt64 from Data
+        let uuid = data.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> UInt64 in
+            guard pointer.count >= 8 else { return 0 }
+            return pointer.load(as: UInt64.self)
+        }
         
         DispatchQueue.main.async {
             self.sensorData.deviceUUID = uuid
@@ -803,12 +806,3 @@ extension Data {
     }
 }
 
-// Extension for UnsafeRawBufferPointer to handle unaligned loads
-extension UnsafeRawBufferPointer {
-    func loadUnaligned<T>(as type: T.Type) -> T {
-        assert(count >= MemoryLayout<T>.size)
-        return withUnsafeBytes { bytes in
-            bytes.loadUnaligned(as: T.self)
-        }
-    }
-}

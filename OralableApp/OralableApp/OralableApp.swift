@@ -53,13 +53,13 @@ struct SubscriptionContentView: View {
         ZStack {
             // Main Tab View
             TabView(selection: $selectedTab) {
-                DashboardView(ble: ble)
+                DashboardView(ble: ble, isViewerMode: false)
                     .tabItem {
                         Label("Dashboard", systemImage: "gauge")
                     }
                     .tag(0)
                 
-                ShareView(ble: ble)
+                ShareView(ble: ble, isViewerMode: false)
                     .tabItem {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
@@ -71,7 +71,6 @@ struct SubscriptionContentView: View {
                     }
                     .tag(2)
             }
-            
             // Top Navigation Bar Overlay
             VStack {
                 HStack {
