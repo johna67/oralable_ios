@@ -35,10 +35,11 @@ struct LogMessage: Identifiable {
 // MARK: - BLE Manager
 
 /// Manages Bluetooth Low Energy communication with Oralable devices
+@MainActor
 class OralableBLE: NSObject, ObservableObject {
     
     private var connectionManager: ConnectionManager?
-
+    private var dataParser: DataParser?  // ADD THIS
     
     // MARK: - Published Properties
     
@@ -113,13 +114,38 @@ class OralableBLE: NSObject, ObservableObject {
     
     override init() {
         super.init()
+        
         connectionManager = ConnectionManager()
-           setupConnectionCallbacks()
+        setupConnectionCallbacks()
+        
+        // ADD THIS:
+        dataParser = DataParser()
+        setupDataParserCallbacks()
         setupCentralManager()
     }
     
     private func setupCentralManager() {
         centralManager = CBCentralManager(delegate: self, queue: nil)
+    }
+    // MARK: - Data Parser Setup
+
+    private func setupDataParserCallbacks() {
+        // Subscribe to parsed sensor readings
+        dataParser?.sensorReadingSubject
+            .sink { [weak self] reading in
+                self?.handleParsedSensorReading(reading)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleParsedSensorReading(_ reading: SensorReading) {
+        // Add to your existing sensor data arrays
+        // Update your @Published properties
+        // This replaces the manual parsing you had before
+        
+        print("Parsed sensor reading: \(reading.sensorType) = \(reading.value)")
+        
+        // You'll connect this to your existing data storage logic
     }
     
     // MARK: - Public Methods
