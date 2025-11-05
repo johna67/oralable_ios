@@ -37,6 +37,9 @@ struct LogMessage: Identifiable {
 /// Manages Bluetooth Low Energy communication with Oralable devices
 class OralableBLE: NSObject, ObservableObject {
     
+    private var connectionManager: ConnectionManager?
+
+    
     // MARK: - Published Properties
     
     @Published var isConnected: Bool = false
@@ -110,6 +113,8 @@ class OralableBLE: NSObject, ObservableObject {
     
     override init() {
         super.init()
+        connectionManager = ConnectionManager()
+           setupConnectionCallbacks()
         setupCentralManager()
     }
     
@@ -276,6 +281,46 @@ class OralableBLE: NSObject, ObservableObject {
     
     // MARK: - Private Helper Methods
     
+    
+    // MARK: - Connection Manager Setup
+    
+    private func setupConnectionCallbacks() {
+        connectionManager?.onConnected = { [weak self] peripheral in
+            Task { @MainActor [weak self] in
+                self?.handleConnectionSuccess(peripheral: peripheral)
+            }
+        }
+        
+        connectionManager?.onDisconnected = { [weak self] peripheral, error in
+            Task { @MainActor [weak self] in
+                self?.handleDisconnection(peripheral: peripheral, error: error)
+            }
+        }
+        
+        connectionManager?.onConnectionFailed = { [weak self] error in
+            Task { @MainActor [weak self] in
+                self?.handleConnectionFailure(error: error)
+            }
+        }
+    }
+
+    private func handleConnectionSuccess(peripheral: CBPeripheral) {
+        // Find existing connection success code in OralableBLE
+        // and call it here
+        print("Connected via ConnectionManager")
+    }
+
+    private func handleDisconnection(peripheral: CBPeripheral, error: Error?) {
+        // Find existing disconnection code in OralableBLE
+        // and call it here
+        print("Disconnected via ConnectionManager")
+    }
+
+    private func handleConnectionFailure(error: Error) {
+        // Find existing connection failure code in OralableBLE
+        // and call it here
+        print("Connection failed via ConnectionManager")
+    }
     /// Add a log message with timestamp
     private func addLogMessage(_ message: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
