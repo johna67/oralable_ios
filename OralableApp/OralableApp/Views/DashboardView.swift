@@ -48,31 +48,37 @@ struct DashboardView: View {
                         MetricGraphCard(metric: .battery) {
                             BatteryGraphView(batteryHistory: ble.batteryHistory)
                         }
+                        .environmentObject(ble)
                         
                         // PPG card
                         MetricGraphCard(metric: .ppg) {
                             PPGGraphView(ppgHistory: ble.ppgHistory)
                         }
+                        .environmentObject(ble)
                         
                         // Heart Rate card
                         MetricGraphCard(metric: .heartRate) {
                             HeartRateGraphView(heartRateHistory: ble.heartRateHistory)
                         }
+                        .environmentObject(ble)
                         
                         // SpO2 card
                         MetricGraphCard(metric: .spo2) {
                             SpO2GraphView(spo2History: ble.spo2History)
                         }
+                        .environmentObject(ble)
                         
                         // Temperature card
                         MetricGraphCard(metric: .temperature) {
                             TemperatureGraphView(temperatureHistory: ble.temperatureHistory)
                         }
+                        .environmentObject(ble)
                         
                         // Accelerometer card
                         MetricGraphCard(metric: .accelerometer) {
                             AccelerometerGraphView(accelerometerHistory: ble.accelerometerHistory)
                         }
+                        .environmentObject(ble)
                     } else {
                         // No Data State
                         NoDataView(isViewerMode: isViewerMode)
@@ -143,8 +149,8 @@ struct NoDataView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
-                Text(isViewerMode ? 
-                     "Load data files to view sensor information" : 
+                Text(isViewerMode ?
+                     "Load data files to view sensor information" :
                      "Connect your Oralable device to start monitoring")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -168,6 +174,7 @@ struct NoDataView: View {
 struct MetricGraphCard<Content: View>: View {
     let metric: MetricType
     let content: Content
+    @EnvironmentObject var ble: OralableBLE
     
     init(metric: MetricType, @ViewBuilder content: () -> Content) {
         self.metric = metric
@@ -175,32 +182,31 @@ struct MetricGraphCard<Content: View>: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: metric.icon)
-                    .font(.title3)
-                    .foregroundColor(metric.color)
-                
-                Text(metric.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Button(action: {
-                    // Navigate to detailed view
-                }) {
+        NavigationLink(destination: HistoricalDetailView(ble: ble, metricType: metric)) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: metric.icon)
+                        .font(.title3)
+                        .foregroundColor(metric.color)
+                    
+                    Text(metric.title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
                     Image(systemName: "chevron.right")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                
+                content
             }
-            
-            content
+            .padding()
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(12)
         }
-        .padding()
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -211,11 +217,76 @@ struct BatteryGraphView: View {
     let batteryHistory: [BatteryData]
     
     var body: some View {
-        VStack {
-            Text("Battery Graph")
-            Text("Implementation needed")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let latest = batteryHistory.last {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(latest.percentage)")
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            
+                            Text("%")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text(latest.status)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Data")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            
+            if !batteryHistory.isEmpty {
+                Chart {
+                    ForEach(Array(batteryHistory.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("Battery", measurement.percentage)
+                        )
+                        .foregroundStyle(Color.green)
+                        .interpolationMethod(.catmullRom)
+                        
+                        AreaMark(
+                            x: .value("Time", index),
+                            y: .value("Battery", measurement.percentage)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.3), Color.green.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                    }
+                }
+                .chartYScale(domain: 0...100)
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                Text("Waiting for data...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .frame(height: 100)
     }
 }
 
@@ -223,11 +294,59 @@ struct PPGGraphView: View {
     let ppgHistory: [PPGData]
     
     var body: some View {
-        VStack {
-            Text("PPG Graph")
-            Text("Implementation needed")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let latest = ppgHistory.last {
+                        Text("IR: \(latest.ir)")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.red)
+                        
+                        Text("R: \(latest.red) G: \(latest.green)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Signal")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            
+            if !ppgHistory.isEmpty {
+                let recentData = Array(ppgHistory.suffix(50))
+                
+                Chart {
+                    // IR channel (primary)
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("IR", measurement.ir)
+                        )
+                        .foregroundStyle(Color.red)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                    }
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                Text("Waiting for data...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .frame(height: 100)
     }
 }
 
@@ -235,11 +354,85 @@ struct HeartRateGraphView: View {
     let heartRateHistory: [HeartRateData]
     
     var body: some View {
-        VStack {
-            Text("Heart Rate Graph")
-            Text("Implementation needed")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let latest = heartRateHistory.last {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(Int(latest.bpm))")
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            
+                            Text("BPM")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text(latest.zone)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Signal")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            
+            if !heartRateHistory.isEmpty {
+                Chart {
+                    ForEach(Array(heartRateHistory.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("BPM", measurement.bpm)
+                        )
+                        .foregroundStyle(Color.red)
+                        .interpolationMethod(.catmullRom)
+                        
+                        AreaMark(
+                            x: .value("Time", index),
+                            y: .value("BPM", measurement.bpm)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.red.opacity(0.3), Color.red.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                    }
+                    
+                    // Normal range reference lines
+                    RuleMark(y: .value("Normal Low", 60))
+                        .foregroundStyle(Color.gray.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    
+                    RuleMark(y: .value("Normal High", 100))
+                        .foregroundStyle(Color.gray.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                }
+                .chartYScale(domain: 40...200)
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                Text("Waiting for data...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .frame(height: 100)
     }
 }
 
@@ -247,11 +440,81 @@ struct TemperatureGraphView: View {
     let temperatureHistory: [TemperatureData]
     
     var body: some View {
-        VStack {
-            Text("Temperature Graph")
-            Text("Implementation needed")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let latest = temperatureHistory.last {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(String(format: "%.1f", latest.celsius))
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            
+                            Text("°C")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text(String(format: "%.1f°F", latest.fahrenheit))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Data")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            
+            if !temperatureHistory.isEmpty {
+                Chart {
+                    ForEach(Array(temperatureHistory.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("Temperature", measurement.celsius)
+                        )
+                        .foregroundStyle(Color.orange)
+                        .interpolationMethod(.catmullRom)
+                        
+                        AreaMark(
+                            x: .value("Time", index),
+                            y: .value("Temperature", measurement.celsius)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.3), Color.orange.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                    }
+                    
+                    // Normal body temperature reference
+                    RuleMark(y: .value("Normal", 37.0))
+                        .foregroundStyle(Color.green.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                }
+                .chartYScale(domain: 32...42)
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                Text("Waiting for data...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .frame(height: 100)
     }
 }
 
@@ -259,11 +522,85 @@ struct AccelerometerGraphView: View {
     let accelerometerHistory: [AccelerometerData]
     
     var body: some View {
-        VStack {
-            Text("Accelerometer Graph")
-            Text("Implementation needed")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let latest = accelerometerHistory.last {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("X: \(latest.x)  Y: \(latest.y)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.primary)
+                            
+                            Text("Z: \(latest.z)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Text("mg (milligravity)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Data")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            
+            if !accelerometerHistory.isEmpty {
+                let recentData = Array(accelerometerHistory.suffix(50))
+                
+                Chart {
+                    // X axis
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("X", measurement.x)
+                        )
+                        .foregroundStyle(Color.red)
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    }
+                    
+                    // Y axis
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("Y", measurement.y)
+                        )
+                        .foregroundStyle(Color.green)
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    }
+                    
+                    // Z axis
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
+                        LineMark(
+                            x: .value("Time", index),
+                            y: .value("Z", measurement.z)
+                        )
+                        .foregroundStyle(Color.blue)
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    }
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                Text("Waiting for data...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .frame(height: 100)
     }
 }
 

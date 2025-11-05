@@ -843,15 +843,18 @@ extension OralableBLE: CBPeripheralDelegate {
             // Format 1: uint32_t (4 bytes)
             let bytes = data.subdata(in: 0..<4)
             let rawValue = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            addLogMessage("🔋 Battery: Raw UInt32 value = \(rawValue)")
             batteryLevel = Int(rawValue)
         } else if data.count >= 2 {
             // Format 2: uint16_t (2 bytes) - ACTUAL FORMAT FROM YOUR DEVICE
             let bytes = data.subdata(in: 0..<2)
             let rawValue = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt16.self) }
+            addLogMessage("🔋 Battery: Raw UInt16 value = \(rawValue)")
             batteryLevel = Int(rawValue)
         } else if data.count >= 1 {
             // Format 3: uint8_t (1 byte)
             batteryLevel = Int(data[0])
+            addLogMessage("🔋 Battery: Raw UInt8 value = \(batteryLevel)")
         } else {
             addLogMessage("⚠️ Battery data too short: \(data.count) bytes")
             return
