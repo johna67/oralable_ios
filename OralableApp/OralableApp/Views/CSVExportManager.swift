@@ -20,11 +20,31 @@ class CSVExportManager {
         let timestamp = dateFormatter.string(from: Date())
         let filename = "oralable_data_\(timestamp).csv"
         
-        // Get temporary directory URL
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        // Use a different temporary directory that's more accessible
+        let fileManager = FileManager.default
+        let tempDirectory = fileManager.temporaryDirectory
+        let exportDirectory = tempDirectory.appendingPathComponent("Exports", isDirectory: true)
+        
+        // Create exports directory if it doesn't exist
+        if !fileManager.fileExists(atPath: exportDirectory.path) {
+            try? fileManager.createDirectory(at: exportDirectory, withIntermediateDirectories: true)
+        }
+        
+        let tempURL = exportDirectory.appendingPathComponent(filename)
         
         do {
+            // Remove existing file if present
+            if fileManager.fileExists(atPath: tempURL.path) {
+                try fileManager.removeItem(at: tempURL)
+            }
+            
+            // Write with proper permissions
             try csvContent.write(to: tempURL, atomically: true, encoding: .utf8)
+            
+            // Set file attributes to ensure it's readable
+            let attributes = [FileAttributeKey.posixPermissions: 0o644]
+            try? fileManager.setAttributes(attributes, ofItemAtPath: tempURL.path)
+            
             print("Successfully exported CSV to: \(tempURL.path)")
             return tempURL
         } catch {

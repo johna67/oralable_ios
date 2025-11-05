@@ -18,28 +18,15 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 16) {
-                    // Device Test Button
-                    NavigationLink {
-                        DeviceTestView()
-                    } label: {
-                        HStack {
-                            Image(systemName: "flask.fill")
-                            Text("Device Test")
-                        }
-                        .font(DesignSystem.Typography.buttonMedium)
-                        .foregroundColor(DesignSystem.Colors.textPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(DesignSystem.Colors.backgroundSecondary)
-                        .cornerRadius(DesignSystem.CornerRadius.lg)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal)
-                    
+                VStack(spacing: DesignSystem.Spacing.lg) {
                     // Connection Status Card (only in subscription mode)
                     if !isViewerMode {
                         ConnectionStatusCard(ble: ble)
+                    }
+                    
+                    // Device State Card (shows what the device is doing)
+                    if ble.isConnected || isViewerMode {
+                        DeviceStateCard(deviceState: ble.deviceState)
                     }
                     
                     // Sensor Data Cards
@@ -47,12 +34,6 @@ struct DashboardView: View {
                         // Battery card
                         MetricGraphCard(metric: .battery) {
                             BatteryGraphView(batteryHistory: ble.batteryHistory)
-                        }
-                        .environmentObject(ble)
-                        
-                        // PPG card
-                        MetricGraphCard(metric: .ppg) {
-                            PPGGraphView(ppgHistory: ble.ppgHistory)
                         }
                         .environmentObject(ble)
                         
@@ -79,15 +60,143 @@ struct DashboardView: View {
                             AccelerometerGraphView(accelerometerHistory: ble.accelerometerHistory)
                         }
                         .environmentObject(ble)
+                        
+                        // PPG card (last - most technical)
+                        MetricGraphCard(metric: .ppg) {
+                            PPGGraphView(ppgHistory: ble.ppgHistory)
+                        }
+                        .environmentObject(ble)
                     } else {
                         // No Data State
                         NoDataView(isViewerMode: isViewerMode)
                     }
                 }
-                .padding()
+                .padding(DesignSystem.Spacing.lg)
             }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.large)
+            .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
+        }
+    }
+}
+
+// MARK: - Device State Card
+
+struct DeviceStateCard: View {
+    let deviceState: DeviceStateResult?
+    
+    private var stateColor: Color {
+        guard let state = deviceState?.state else { return .gray }
+        switch state.color {
+        case "green": return .green
+        case "blue": return .blue
+        case "orange": return .orange
+        case "gray": return .gray
+        default: return .secondary
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack(spacing: DesignSystem.Spacing.md) {
+                // State Icon
+                ZStack {
+                    Circle()
+                        .fill(stateColor.opacity(0.2))
+                        .frame(width: 56, height: 56)
+                    
+                    Image(systemName: deviceState?.state.icon ?? "questionmark.circle")
+                        .font(.system(size: DesignSystem.Sizing.Icon.lg))
+                        .foregroundColor(stateColor)
+                }
+                
+                // State Info
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xxs) {
+                    Text(deviceState?.state.rawValue ?? "Unknown")
+                        .font(DesignSystem.Typography.h4)
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                    
+                    if let state = deviceState {
+                        HStack(spacing: DesignSystem.Spacing.xs) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: DesignSystem.Sizing.Icon.xs))
+                                .foregroundColor(confidenceColor(state.confidence))
+                            
+                            Text("\(state.confidenceDescription) Confidence")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Description
+            if let state = deviceState?.state {
+                Divider()
+                
+                Text(state.description)
+                    .font(DesignSystem.Typography.bodySmall)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .lineSpacing(4)
+            }
+            
+            // Detailed metrics (collapsible)
+            if let deviceState = deviceState, !deviceState.details.isEmpty {
+                DisclosureGroup("Details") {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                        ForEach(Array(deviceState.details.keys.sorted()), id: \.self) { key in
+                            if key != "reason" {
+                                HStack {
+                                    Text(key.capitalized)
+                                        .font(DesignSystem.Typography.caption)
+                                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                                    
+                                    Spacer()
+                                    
+                                    Text(formatValue(deviceState.details[key]))
+                                        .font(DesignSystem.Typography.caption)
+                                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, DesignSystem.Spacing.xs)
+                }
+                .font(DesignSystem.Typography.labelSmall)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
+            }
+        }
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.backgroundPrimary)
+        .cornerRadius(DesignSystem.CornerRadius.lg)
+        .designShadow(DesignSystem.Shadow.md)
+    }
+    
+    private func confidenceColor(_ confidence: Double) -> Color {
+        switch confidence {
+        case 0.75...1.0:
+            return .green
+        case 0.5..<0.75:
+            return .orange
+        default:
+            return .red
+        }
+    }
+    
+    private func formatValue(_ value: Any?) -> String {
+        guard let value = value else { return "N/A" }
+        
+        if let doubleValue = value as? Double {
+            return String(format: "%.1f", doubleValue)
+        } else if let intValue = value as? Int {
+            return "\(intValue)"
+        } else if let stringValue = value as? String {
+            return stringValue
+        } else {
+            return String(describing: value)
         }
     }
 }
@@ -98,37 +207,48 @@ struct ConnectionStatusCard: View {
     @ObservedObject var ble: OralableBLE
     
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            // Status Icon
+            ZStack {
+                Circle()
+                    .fill(ble.isConnected ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                    .frame(width: 56, height: 56)
+                
                 Image(systemName: ble.isConnected ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
-                    .font(.title2)
+                    .font(.system(size: DesignSystem.Sizing.Icon.lg))
                     .foregroundColor(ble.isConnected ? .green : .red)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ble.isConnected ? "Connected" : "Disconnected")
-                        .font(.headline)
-                        .foregroundColor(ble.isConnected ? .green : .red)
-                    
-                    Text(ble.isConnected ? ble.deviceName : "Tap to connect to device")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
             }
             
+            // Status Info
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xxs) {
+                Text(ble.isConnected ? "Connected" : "Disconnected")
+                    .font(DesignSystem.Typography.h4)
+                    .foregroundColor(ble.isConnected ? .green : .red)
+                
+                Text(ble.isConnected ? ble.deviceName : "No device connected")
+                    .font(DesignSystem.Typography.bodySmall)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+            }
+            
+            Spacer()
+            
+            // Connect Button (if disconnected)
             if !ble.isConnected {
-                Button("Connect Device") {
-                    // This would trigger connection logic
+                Button("Connect") {
                     ble.startScanning()
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .font(DesignSystem.Typography.buttonSmall)
+                .foregroundColor(.white)
+                .padding(.horizontal, DesignSystem.Spacing.md)
+                .padding(.vertical, DesignSystem.Spacing.sm)
+                .background(Color.blue)
+                .cornerRadius(DesignSystem.CornerRadius.md)
             }
         }
-        .padding()
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.backgroundPrimary)
+        .cornerRadius(DesignSystem.CornerRadius.lg)
+        .designShadow(DesignSystem.Shadow.md)
     }
 }
 
@@ -138,34 +258,55 @@ struct NoDataView: View {
     let isViewerMode: Bool
     
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: isViewerMode ? "doc.text.viewfinder" : "antenna.radiowaves.left.and.right.slash")
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.6))
+        VStack(spacing: DesignSystem.Spacing.xl) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(DesignSystem.Colors.backgroundTertiary)
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: isViewerMode ? "doc.text.magnifyingglass" : "antenna.radiowaves.left.and.right.slash")
+                    .font(.system(size: 60))
+                    .foregroundColor(DesignSystem.Colors.textDisabled)
+            }
             
-            VStack(spacing: 12) {
+            // Message
+            VStack(spacing: DesignSystem.Spacing.sm) {
                 Text(isViewerMode ? "No Data Available" : "Device Not Connected")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .font(DesignSystem.Typography.h2)
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
                 
                 Text(isViewerMode ?
-                     "Load data files to view sensor information" :
+                     "Import a CSV file to view sensor data" :
                      "Connect your Oralable device to start monitoring")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(DesignSystem.Typography.bodyMedium)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
             }
             
+            // Action Button
             if !isViewerMode {
-                Button("Connect Device") {
-                    // Trigger connection
+                Button(action: {}) {
+                    HStack(spacing: DesignSystem.Spacing.sm) {
+                        Image(systemName: "wave.3.right")
+                        Text("Connect Device")
+                    }
+                    .font(DesignSystem.Typography.buttonMedium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, DesignSystem.Spacing.xl)
+                    .padding(.vertical, DesignSystem.Spacing.md)
+                    .background(Color.blue)
+                    .cornerRadius(DesignSystem.CornerRadius.lg)
+                    .designShadow(DesignSystem.Shadow.md)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 60)
+        .frame(maxWidth: .infinity)
+        .padding(DesignSystem.Spacing.xxxl)
+        .background(DesignSystem.Colors.backgroundPrimary)
+        .cornerRadius(DesignSystem.CornerRadius.lg)
+        .designShadow(DesignSystem.Shadow.sm)
     }
 }
 
@@ -216,6 +357,12 @@ struct MetricGraphCard<Content: View>: View {
 struct BatteryGraphView: View {
     let batteryHistory: [BatteryData]
     
+    // Show only last 3 minutes of data
+    private var recentData: [BatteryData] {
+        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
+        return batteryHistory.filter { $0.timestamp >= threeMinutesAgo }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -249,18 +396,18 @@ struct BatteryGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !batteryHistory.isEmpty {
+            if !recentData.isEmpty {
                 Chart {
-                    ForEach(Array(batteryHistory.enumerated()), id: \.offset) { index, measurement in
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("Battery", measurement.percentage)
                         )
                         .foregroundStyle(Color.green)
                         .interpolationMethod(.catmullRom)
                         
                         AreaMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("Battery", measurement.percentage)
                         )
                         .foregroundStyle(
@@ -274,7 +421,12 @@ struct BatteryGraphView: View {
                     }
                 }
                 .chartYScale(domain: 0...100)
-                .chartXAxis(.hidden)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel(format: .dateTime.minute().second())
+                            .font(.caption2)
+                    }
+                }
                 .chartYAxis {
                     AxisMarks(position: .leading)
                 }
@@ -292,6 +444,32 @@ struct BatteryGraphView: View {
 
 struct PPGGraphView: View {
     let ppgHistory: [PPGData]
+    
+    // Show only last 3 minutes of data
+    private var recentData: [PPGData] {
+        let threeMinutesAgo = Date().addingTimeInterval(-180)
+        return ppgHistory.filter { $0.timestamp >= threeMinutesAgo }
+    }
+    
+    // Calculate dynamic Y-axis range based on actual data
+    private var yAxisRange: ClosedRange<Double> {
+        guard !recentData.isEmpty else { return 0...100000 }
+        
+        let values = recentData.map { Double($0.ir) }
+        
+        guard let minValue = values.min(), let maxValue = values.max() else {
+            return 0...100000
+        }
+        
+        // Add 10% padding above and below
+        let range = maxValue - minValue
+        let padding = max(range * 0.1, 1000) // At least 1000 units padding
+        
+        let lower = max(0, minValue - padding)
+        let upper = maxValue + padding
+        
+        return lower...upper
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -320,23 +498,35 @@ struct PPGGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !ppgHistory.isEmpty {
-                let recentData = Array(ppgHistory.suffix(50))
-                
+            if !recentData.isEmpty {
                 Chart {
                     // IR channel (primary)
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("IR", measurement.ir)
                         )
                         .foregroundStyle(Color.red)
                         .lineStyle(StrokeStyle(lineWidth: 2))
                     }
                 }
-                .chartXAxis(.hidden)
+                .chartYScale(domain: yAxisRange)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel(format: .dateTime.minute().second())
+                            .font(.caption2)
+                    }
+                }
                 .chartYAxis {
-                    AxisMarks(position: .leading)
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel {
+                            if let intValue = value.as(Int.self) {
+                                Text("\(intValue / 1000)K")
+                                    .font(.caption2)
+                            }
+                        }
+                        AxisGridLine()
+                    }
                 }
                 .frame(height: 120)
             } else {
@@ -352,6 +542,36 @@ struct PPGGraphView: View {
 
 struct HeartRateGraphView: View {
     let heartRateHistory: [HeartRateData]
+    
+    // Show only last 3 minutes of data
+    private var recentData: [HeartRateData] {
+        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
+        return heartRateHistory.filter { $0.timestamp >= threeMinutesAgo }
+    }
+    
+    // Calculate dynamic Y-axis range based on actual data
+    private var yAxisRange: ClosedRange<Double> {
+        guard !recentData.isEmpty else { return 40...120 }
+        
+        let values = recentData.map { $0.bpm }
+        
+        guard let minValue = values.min(), let maxValue = values.max() else {
+            return 40...120
+        }
+        
+        // Round to nearest 10 and add padding
+        let lower = max(40, floor((minValue - 10) / 10) * 10)
+        let upper = min(200, ceil((maxValue + 10) / 10) * 10)
+        
+        // Ensure minimum range of 40 BPM
+        let range = upper - lower
+        if range < 40 {
+            let mid = (lower + upper) / 2
+            return (mid - 20)...(mid + 20)
+        }
+        
+        return lower...upper
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -386,18 +606,18 @@ struct HeartRateGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !heartRateHistory.isEmpty {
+            if !recentData.isEmpty {
                 Chart {
-                    ForEach(Array(heartRateHistory.enumerated()), id: \.offset) { index, measurement in
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("BPM", measurement.bpm)
                         )
                         .foregroundStyle(Color.red)
                         .interpolationMethod(.catmullRom)
                         
                         AreaMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("BPM", measurement.bpm)
                         )
                         .foregroundStyle(
@@ -410,19 +630,31 @@ struct HeartRateGraphView: View {
                         .interpolationMethod(.catmullRom)
                     }
                     
-                    // Normal range reference lines
-                    RuleMark(y: .value("Normal Low", 60))
-                        .foregroundStyle(Color.gray.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    // Normal range reference lines (only if in view)
+                    if yAxisRange.contains(60) {
+                        RuleMark(y: .value("Normal Low", 60))
+                            .foregroundStyle(Color.gray.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    }
                     
-                    RuleMark(y: .value("Normal High", 100))
-                        .foregroundStyle(Color.gray.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    if yAxisRange.contains(100) {
+                        RuleMark(y: .value("Normal High", 100))
+                            .foregroundStyle(Color.gray.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    }
                 }
-                .chartYScale(domain: 40...200)
-                .chartXAxis(.hidden)
+                .chartYScale(domain: yAxisRange)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel(format: .dateTime.minute().second())
+                            .font(.caption2)
+                    }
+                }
                 .chartYAxis {
-                    AxisMarks(position: .leading)
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 5)) { value in
+                        AxisValueLabel()
+                        AxisGridLine()
+                    }
                 }
                 .frame(height: 120)
             } else {
@@ -438,6 +670,36 @@ struct HeartRateGraphView: View {
 
 struct TemperatureGraphView: View {
     let temperatureHistory: [TemperatureData]
+    
+    // Show only last 3 minutes of data
+    private var recentData: [TemperatureData] {
+        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
+        return temperatureHistory.filter { $0.timestamp >= threeMinutesAgo }
+    }
+    
+    // Calculate dynamic Y-axis range based on actual data
+    private var yAxisRange: ClosedRange<Double> {
+        guard !recentData.isEmpty else { return 20...40 }
+        
+        let values = recentData.map { $0.celsius }
+        
+        guard let minValue = values.min(), let maxValue = values.max() else {
+            return 20...40
+        }
+        
+        // For temperature, use tighter bounds around typical body temp
+        let lower = max(15, floor(minValue - 2))
+        let upper = min(45, ceil(maxValue + 2))
+        
+        // Ensure minimum range of 8°C for meaningful visualization
+        let range = upper - lower
+        if range < 8 {
+            let mid = (lower + upper) / 2
+            return (mid - 4)...(mid + 4)
+        }
+        
+        return lower...upper
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -472,18 +734,18 @@ struct TemperatureGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !temperatureHistory.isEmpty {
+            if !recentData.isEmpty {
                 Chart {
-                    ForEach(Array(temperatureHistory.enumerated()), id: \.offset) { index, measurement in
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("Temperature", measurement.celsius)
                         )
                         .foregroundStyle(Color.orange)
                         .interpolationMethod(.catmullRom)
                         
                         AreaMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("Temperature", measurement.celsius)
                         )
                         .foregroundStyle(
@@ -496,15 +758,30 @@ struct TemperatureGraphView: View {
                         .interpolationMethod(.catmullRom)
                     }
                     
-                    // Normal body temperature reference
-                    RuleMark(y: .value("Normal", 37.0))
-                        .foregroundStyle(Color.green.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    // Normal body temperature reference (only if in view)
+                    if yAxisRange.contains(37.0) {
+                        RuleMark(y: .value("Normal", 37.0))
+                            .foregroundStyle(Color.green.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    }
                 }
-                .chartYScale(domain: 32...42)
-                .chartXAxis(.hidden)
+                .chartYScale(domain: yAxisRange)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel(format: .dateTime.minute().second())
+                            .font(.caption2)
+                    }
+                }
                 .chartYAxis {
-                    AxisMarks(position: .leading)
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 5)) { value in
+                        AxisValueLabel {
+                            if let doubleValue = value.as(Double.self) {
+                                Text(String(format: "%.1f°", doubleValue))
+                                    .font(.caption2)
+                            }
+                        }
+                        AxisGridLine()
+                    }
                 }
                 .frame(height: 120)
             } else {
@@ -521,31 +798,62 @@ struct TemperatureGraphView: View {
 struct AccelerometerGraphView: View {
     let accelerometerHistory: [AccelerometerData]
     
+    // Show only last 3 minutes of data
+    private var recentData: [AccelerometerData] {
+        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
+        return accelerometerHistory.filter { $0.timestamp >= threeMinutesAgo }
+    }
+    
+    // Calculate dynamic Y-axis range based on actual data
+    private var yAxisRange: ClosedRange<Double> {
+        guard !recentData.isEmpty else { return 0...500 }
+        
+        let values = recentData.map { $0.magnitude }
+        
+        guard let minValue = values.min(), let maxValue = values.max() else {
+            return 0...500
+        }
+        
+        // Always start from 0 for magnitude
+        let lower: Double = 0
+        
+        // Round up to nearest 100 and add padding
+        let upper = ceil((maxValue + 50) / 100) * 100
+        
+        // Ensure minimum range of 200 for meaningful visualization
+        let range = upper - lower
+        if range < 200 {
+            return 0...200
+        }
+        
+        return lower...upper
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     if let latest = accelerometerHistory.last {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("X: \(latest.x)  Y: \(latest.y)")
-                                .font(.system(size: 14, weight: .semibold))
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(String(format: "%.0f", latest.magnitude))
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
                                 .foregroundColor(.primary)
                             
-                            Text("Z: \(latest.z)")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.primary)
+                            Text("mg")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.secondary)
                         }
                         
-                        Text("mg (milligravity)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Text(latest.isMoving ? "Movement Detected" : "Stationary")
+                            .font(.subheadline)
+                            .foregroundColor(latest.isMoving ? .orange : .secondary)
                     } else {
                         Text("--")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
                             .foregroundColor(.secondary)
                         
                         Text("No Data")
-                            .font(.caption)
+                            .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -554,43 +862,54 @@ struct AccelerometerGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !accelerometerHistory.isEmpty {
-                let recentData = Array(accelerometerHistory.suffix(50))
-                
+            if !recentData.isEmpty {
                 Chart {
-                    // X axis
+                    // Magnitude line
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
-                            x: .value("Time", index),
-                            y: .value("X", measurement.x)
+                            x: .value("Time", measurement.timestamp),
+                            y: .value("Magnitude", measurement.magnitude)
                         )
-                        .foregroundStyle(Color.red)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                        .foregroundStyle(Color.purple)
+                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
                     }
                     
-                    // Y axis
+                    // Area under the curve
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
-                        LineMark(
-                            x: .value("Time", index),
-                            y: .value("Y", measurement.y)
+                        AreaMark(
+                            x: .value("Time", measurement.timestamp),
+                            y: .value("Magnitude", measurement.magnitude)
                         )
-                        .foregroundStyle(Color.green)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.3), Color.purple.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
                     }
                     
-                    // Z axis
-                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
-                        LineMark(
-                            x: .value("Time", index),
-                            y: .value("Z", measurement.z)
-                        )
-                        .foregroundStyle(Color.blue)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    // Movement threshold reference line (only if in view)
+                    if yAxisRange.contains(100) {
+                        RuleMark(y: .value("Movement Threshold", 100))
+                            .foregroundStyle(Color.orange.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
                     }
                 }
-                .chartXAxis(.hidden)
+                .chartYScale(domain: yAxisRange)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel(format: .dateTime.minute().second())
+                            .font(.caption2)
+                    }
+                }
                 .chartYAxis {
-                    AxisMarks(position: .leading)
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel()
+                        AxisGridLine()
+                    }
                 }
                 .frame(height: 120)
             } else {
@@ -609,6 +928,36 @@ struct AccelerometerGraphView: View {
 /// SpO2 Graph View for blood oxygen saturation monitoring
 struct SpO2GraphView: View {
     let spo2History: [SpO2Data]
+    
+    // Show only last 3 minutes of data
+    private var recentData: [SpO2Data] {
+        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
+        return spo2History.filter { $0.timestamp >= threeMinutesAgo }
+    }
+    
+    // Calculate dynamic Y-axis range based on actual data
+    private var yAxisRange: ClosedRange<Double> {
+        guard !recentData.isEmpty else { return 90...100 }
+        
+        let values = recentData.map { $0.percentage }
+        
+        guard let minValue = values.min(), let maxValue = values.max() else {
+            return 90...100
+        }
+        
+        // For SpO2, use tight bounds around normal range (95-100%)
+        let lower = max(80, floor(minValue - 2))
+        let upper = min(100, ceil(maxValue + 1))
+        
+        // Ensure minimum range of 10% for meaningful visualization
+        let range = upper - lower
+        if range < 10 {
+            let mid = (lower + upper) / 2
+            return max(80, mid - 5)...min(100, mid + 5)
+        }
+        
+        return lower...upper
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -671,18 +1020,18 @@ struct SpO2GraphView: View {
             .padding(.horizontal, 4)
             
             // Chart
-            if !spo2History.isEmpty {
+            if !recentData.isEmpty {
                 Chart {
-                    ForEach(Array(spo2History.enumerated()), id: \.offset) { index, measurement in
+                    ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("SpO2", measurement.percentage)
                         )
                         .foregroundStyle(Color.blue)
                         .interpolationMethod(.catmullRom)
                         
                         AreaMark(
-                            x: .value("Time", index),
+                            x: .value("Time", measurement.timestamp),
                             y: .value("SpO2", measurement.percentage)
                         )
                         .foregroundStyle(
@@ -695,24 +1044,32 @@ struct SpO2GraphView: View {
                         .interpolationMethod(.catmullRom)
                     }
                     
-                    // Reference line at 95% (normal threshold)
-                    RuleMark(y: .value("Normal", 95))
-                        .foregroundStyle(Color.green.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    // Reference line at 95% (normal threshold) - only if in view
+                    if yAxisRange.contains(95) {
+                        RuleMark(y: .value("Normal", 95))
+                            .foregroundStyle(Color.green.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    }
                 }
-                .chartYScale(domain: 85...100)
-                .chartXAxis(.hidden)
+                .chartYScale(domain: yAxisRange)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel(format: .dateTime.minute().second())
+                            .font(.caption2)
+                    }
+                }
                 .chartYAxis {
-                    AxisMarks(position: .leading) { value in
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 5)) { value in
                         AxisValueLabel {
                             if let intValue = value.as(Int.self) {
                                 Text("\(intValue)%")
                                     .font(.caption2)
                             }
                         }
+                        AxisGridLine()
                     }
                 }
-                .frame(height: 180)
+                .frame(height: 120)
             } else {
                 // Empty state
                 VStack {
@@ -724,7 +1081,7 @@ struct SpO2GraphView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                .frame(height: 180)
+                .frame(height: 120)
                 .frame(maxWidth: .infinity)
             }
             
@@ -748,9 +1105,6 @@ struct SpO2GraphView: View {
             }
             .padding(.horizontal, 4)
         }
-        .padding()
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(12)
     }
     
     // MARK: - Helper Functions

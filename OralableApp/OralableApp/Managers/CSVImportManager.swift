@@ -210,12 +210,29 @@ class CSVImportManager {
             let actualHeaders = parseCSVLine(headerLine)
             
             guard actualHeaders.count >= expectedHeaders.count else {
-                return ValidationResult(isValid: false, errorMessage: "Invalid header format", estimatedDataPoints: 0)
+                let errorMessage = """
+                Invalid header format. Expected \(expectedHeaders.count) columns, found \(actualHeaders.count).
+                
+                Expected headers:
+                \(expectedHeaders.joined(separator: ", "))
+                
+                Found headers:
+                \(actualHeaders.joined(separator: ", "))
+                """
+                return ValidationResult(isValid: false, errorMessage: errorMessage, estimatedDataPoints: 0)
             }
             
             for (index, expectedHeader) in expectedHeaders.enumerated() {
                 if index < actualHeaders.count && actualHeaders[index] != expectedHeader {
-                    return ValidationResult(isValid: false, errorMessage: "Invalid header: expected '\(expectedHeader)', found '\(actualHeaders[index])'", estimatedDataPoints: 0)
+                    let errorMessage = """
+                    Invalid header at column \(index + 1).
+                    Expected: '\(expectedHeader)'
+                    Found: '\(actualHeaders[index])'
+                    
+                    Full expected header row:
+                    \(expectedHeaders.joined(separator: ","))
+                    """
+                    return ValidationResult(isValid: false, errorMessage: errorMessage, estimatedDataPoints: 0)
                 }
             }
             
@@ -233,4 +250,70 @@ struct ValidationResult {
     let isValid: Bool
     let errorMessage: String?
     let estimatedDataPoints: Int
+}
+
+// MARK: - CSV Template Generation
+
+extension CSVImportManager {
+    
+    /// Generate a sample CSV file with correct format
+    /// - Returns: URL of the generated template file
+    func generateTemplate() -> URL? {
+        let headers = [
+            "Timestamp", "PPG_IR", "PPG_Red", "PPG_Green",
+            "Accel_X", "Accel_Y", "Accel_Z", "Temp_C", "Battery_%",
+            "HeartRate_BPM", "HeartRate_Quality", "SpO2_%", "SpO2_Quality", "Message"
+        ]
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        
+        var csvContent = headers.joined(separator: ",") + "\n"
+        
+        // Add sample rows
+        let sampleTimestamp = dateFormatter.string(from: Date())
+        csvContent += "\(sampleTimestamp),12345,67890,11111,100,200,300,36.5,85,72,0.95,98,0.98,Sample measurement\n"
+        csvContent += "\(sampleTimestamp),,,,,,,,,,,,,Log entry without sensor data\n"
+        
+        do {
+            let tempDir = FileManager.default.temporaryDirectory
+            let templateURL = tempDir.appendingPathComponent("oralable_template.csv")
+            try csvContent.write(to: templateURL, atomically: true, encoding: .utf8)
+            return templateURL
+        } catch {
+            print("Failed to generate template: \(error)")
+            return nil
+        }
+    }
+    
+    /// Get the expected CSV format as a string for display
+    var expectedFormat: String {
+        """
+        Expected CSV Format:
+        
+        Header Row (required):
+        Timestamp,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temp_C,Battery_%,HeartRate_BPM,HeartRate_Quality,SpO2_%,SpO2_Quality,Message
+        
+        Timestamp Format:
+        yyyy-MM-dd HH:mm:ss.SSS (e.g., 2025-11-05 14:30:45.123)
+        
+        Data Types:
+        - Timestamp: Date/time string
+        - PPG_IR, PPG_Red, PPG_Green: 32-bit integers
+        - Accel_X, Accel_Y, Accel_Z: 16-bit integers
+        - Temp_C: Decimal number (temperature in Celsius)
+        - Battery_%: Integer (0-100)
+        - HeartRate_BPM: Decimal number (optional)
+        - HeartRate_Quality: Decimal 0.0-1.0 (optional)
+        - SpO2_%: Decimal number (optional)
+        - SpO2_Quality: Decimal 0.0-1.0 (optional)
+        - Message: Text (optional, use quotes if contains commas)
+        
+        Notes:
+        - Empty sensor fields with a message = log entry only
+        - All fields present = sensor data with optional log
+        - Use quotes around fields containing commas or newlines
+        - Double quotes inside fields should be escaped as ""
+        """
+    }
 }

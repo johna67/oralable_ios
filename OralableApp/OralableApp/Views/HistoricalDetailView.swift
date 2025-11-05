@@ -325,9 +325,34 @@ class HistoricalDataProcessor: ObservableObject {
         selectedDate: Date,
         appMode: AppMode
     ) async {
-        let cacheKey = "\(metricType.rawValue)_\(timeRange.rawValue)_\(selectedDate.timeIntervalSince1970)"
+        // Create normalized cache key based on the actual time period
+        let calendar = Calendar.current
+        let normalizedDate: Date
+        
+        switch timeRange {
+        case .hour:
+            normalizedDate = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
+        case .day:
+            normalizedDate = calendar.startOfDay(for: selectedDate)
+        case .week:
+            normalizedDate = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
+        case .month:
+            normalizedDate = calendar.dateInterval(of: .month, for: selectedDate)?.start ?? selectedDate
+        }
+        
+        let cacheKey = "\(metricType.rawValue)_\(timeRange.rawValue)_\(Int(normalizedDate.timeIntervalSince1970))"
+        
+        // DEBUG: Log what we're trying to process
+        print("🔄 Processing historical data:")
+        print("   Metric: \(metricType.title)")
+        print("   Time Range: \(timeRange.rawValue)")
+        print("   Selected Date: \(selectedDate)")
+        print("   Normalized Date: \(normalizedDate)")
+        print("   Cache Key: \(cacheKey)")
+        print("   Total sensor history count: \(ble.sensorDataHistory.count)")
         
         if let cached = cachedData[cacheKey] {
+            print("✅ Using cached data")
             self.processedData = cached
             return
         }
@@ -338,9 +363,12 @@ class HistoricalDataProcessor: ObservableObject {
         let filteredData = filterData(from: ble.sensorDataHistory, timeRange: timeRange, selectedDate: selectedDate)
         
         guard !filteredData.isEmpty else {
+            print("❌ No data after filtering")
             processedData = nil
             return
         }
+        
+        print("📊 Processing \(filteredData.count) filtered readings")
         
         let normalizedData = await processMetricData(filteredData, metricType: metricType, appMode: appMode)
         let statistics = calculateStatistics(from: normalizedData)
@@ -364,30 +392,56 @@ class HistoricalDataProcessor: ObservableObject {
             cachedData.removeValue(forKey: oldestKey)
         }
         
+        print("✅ Processed data successfully - \(statistics.sampleCount) samples")
+        
         self.processedData = processed
     }
     
     private func filterData(from data: [SensorData], timeRange: TimeRange, selectedDate: Date) -> [SensorData] {
         let calendar = Calendar.current
         
+        // DEBUG: Log data availability
+        print("📊 Filtering \(data.count) total sensor readings")
+        if let earliest = data.first?.timestamp, let latest = data.last?.timestamp {
+            print("📅 Data range: \(earliest) to \(latest)")
+        }
+        
+        var filtered: [SensorData] = []
+        
         switch timeRange {
         case .hour:
             let startOfHour = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
             let endOfHour = calendar.date(byAdding: .hour, value: 1, to: startOfHour) ?? selectedDate
-            return data.filter { $0.timestamp >= startOfHour && $0.timestamp < endOfHour }
+            print("⏰ Hour filter: \(startOfHour) to \(endOfHour)")
+            filtered = data.filter { $0.timestamp >= startOfHour && $0.timestamp < endOfHour }
         case .day:
             let startOfDay = calendar.startOfDay(for: selectedDate)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
-            return data.filter { $0.timestamp >= startOfDay && $0.timestamp < endOfDay }
+            print("📅 Day filter: \(startOfDay) to \(endOfDay)")
+            filtered = data.filter { $0.timestamp >= startOfDay && $0.timestamp < endOfDay }
         case .week:
             let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
             let endOfWeek = calendar.date(byAdding: .weekOfYear, value: 1, to: startOfWeek) ?? selectedDate
-            return data.filter { $0.timestamp >= startOfWeek && $0.timestamp < endOfWeek }
+            print("📅 Week filter: \(startOfWeek) to \(endOfWeek)")
+            filtered = data.filter { $0.timestamp >= startOfWeek && $0.timestamp < endOfWeek }
         case .month:
             let startOfMonth = calendar.dateInterval(of: .month, for: selectedDate)?.start ?? selectedDate
             let endOfMonth = calendar.date(byAdding: .month, value: 1, to: startOfMonth) ?? selectedDate
-            return data.filter { $0.timestamp >= startOfMonth && $0.timestamp < endOfMonth }
+            print("📅 Month filter: \(startOfMonth) to \(endOfMonth)")
+            filtered = data.filter { $0.timestamp >= startOfMonth && $0.timestamp < endOfMonth }
         }
+        
+        print("✅ Filtered to \(filtered.count) readings for selected period")
+        
+        // REMOVED: Automatic fallback to all data
+        // Let the UI show "No data" message instead of confusing users
+        // by showing the same recent data for all historical periods
+        
+        if filtered.isEmpty {
+            print("⚠️ No data found for selected period")
+        }
+        
+        return filtered
     }
     
     private func processMetricData(_ data: [SensorData], metricType: MetricType, appMode: AppMode) async -> [(timestamp: Date, value: Double)] {
@@ -870,6 +924,7 @@ struct HistoricalDetailView: View {
                     VStack(spacing: 20) {
                         EnhancedHistoricalChartCardUnified(
                             metricType: metricType,
+                            timeRange: selectedTimeRange,
                             selectedDataPoint: $processor.selectedDataPoint,
                             processed: processor.processedData
                         )
@@ -1087,8 +1142,37 @@ struct DateNavigationView: View {
 // MARK: - Unified Enhanced Chart (consumes processor output)
 struct EnhancedHistoricalChartCardUnified: View {
     let metricType: MetricType
+    let timeRange: TimeRange
     @Binding var selectedDataPoint: SensorData?
     let processed: HistoricalDataProcessor.ProcessedHistoricalData?
+    
+    // X-axis stride based on time range
+    private var xAxisStride: Calendar.Component {
+        switch timeRange {
+        case .hour:
+            return .minute // Show every 10 minutes
+        case .day:
+            return .hour   // Show every few hours
+        case .week:
+            return .day    // Show every day
+        case .month:
+            return .day    // Show every few days
+        }
+    }
+    
+    // X-axis date format based on time range
+    private var xAxisDateFormat: Date.FormatStyle {
+        switch timeRange {
+        case .hour:
+            return .dateTime.hour().minute()  // "14:30"
+        case .day:
+            return .dateTime.hour()          // "14"
+        case .week:
+            return .dateTime.weekday(.abbreviated).day()  // "Mon 5"
+        case .month:
+            return .dateTime.month(.abbreviated).day()    // "Nov 5"
+        }
+    }
     
     private var chartPoints: [(timestamp: Date, value: Double)] {
         guard let processed = processed else { return [] }
@@ -1180,10 +1264,10 @@ struct EnhancedHistoricalChartCardUnified: View {
                 }
                 .frame(height: 250)
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 6)) { value in
+                    AxisMarks(values: .stride(by: xAxisStride)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(.gray.opacity(0.3))
-                        AxisValueLabel()
+                        AxisValueLabel(format: xAxisDateFormat)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }

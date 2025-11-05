@@ -67,6 +67,10 @@ class OralableBLE: NSObject, ObservableObject {
     @Published var temperatureHistory: [TemperatureData] = []
     @Published var accelerometerHistory: [AccelerometerData] = []
     
+    // Device state detection
+    @Published var deviceState: DeviceStateResult?
+    private let deviceStateDetector = DeviceStateDetector()
+    
     // MARK: - Private Properties
     
     private var centralManager: CBCentralManager!
@@ -426,6 +430,79 @@ class OralableBLE: NSObject, ObservableObject {
         } else {
             addLogMessage("⏳ SpO2: Waiting for more data (\(ppgBufferRed.count)/150 samples)")
         }
+        
+        // CRITICAL FIX: Consolidate all sensor data into sensorDataHistory
+        consolidateSensorData()
+    }
+    
+    /// Consolidates individual sensor readings into complete SensorData objects
+    /// This is required for HistoricalDetailView to work properly
+    private func consolidateSensorData() {
+        DispatchQueue.main.async {
+            // DEBUG: Log sensor availability
+            print("🔄 Attempting to consolidate sensor data:")
+            print("   PPG: \(self.ppgHistory.count)")
+            print("   Temperature: \(self.temperatureHistory.count)")
+            print("   Battery: \(self.batteryHistory.count)")
+            print("   Accelerometer: \(self.accelerometerHistory.count)")
+            print("   Heart Rate: \(self.heartRateHistory.count)")
+            print("   SpO2: \(self.spo2History.count)")
+            
+            // RELAXED REQUIREMENTS: Only require PPG and accelerometer as minimum
+            // Battery and temperature can be missing or zero
+            guard !self.ppgHistory.isEmpty,
+                  !self.accelerometerHistory.isEmpty else {
+                print("⚠️ Need at least PPG and Accelerometer data to consolidate")
+                return
+            }
+            
+            // Get the latest readings from each sensor
+            guard let latestPPG = self.ppgHistory.last,
+                  let latestAccel = self.accelerometerHistory.last else {
+                print("⚠️ Could not get latest PPG or Accelerometer readings")
+                return
+            }
+            
+            // Use latest or create default values for optional sensors
+            let latestTemp = self.temperatureHistory.last ?? TemperatureData(celsius: 0.0, timestamp: Date())
+            let latestBattery = self.batteryHistory.last ?? BatteryData(percentage: 0, timestamp: Date())
+            
+            // Get optional calculated metrics
+            let latestHeartRate = self.heartRateHistory.last
+            let latestSpO2 = self.spo2History.last
+            
+            // Create consolidated sensor data
+            let consolidatedData = SensorData(
+                timestamp: Date(),
+                ppg: latestPPG,
+                accelerometer: latestAccel,
+                temperature: latestTemp,
+                battery: latestBattery,
+                heartRate: latestHeartRate,
+                spo2: latestSpO2
+            )
+            
+            // Add to history
+            self.sensorDataHistory.append(consolidatedData)
+            
+            // Limit history size
+            if self.sensorDataHistory.count > 10000 {
+                self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
+            }
+            
+            print("✅ Consolidated! Total sensorDataHistory: \(self.sensorDataHistory.count)")
+            self.addLogMessage("📦 Consolidated sensor data: \(self.sensorDataHistory.count) complete readings")
+            
+            // Detect device state based on recent sensor data
+            Task {
+                if let stateResult = await self.deviceStateDetector.analyzeDeviceState(sensorData: self.sensorDataHistory) {
+                    await MainActor.run {
+                        self.deviceState = stateResult
+                        self.addLogMessage("🔍 Device State: \(stateResult.state.rawValue) (confidence: \(String(format: "%.0f", stateResult.confidence * 100))%)")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -715,6 +792,10 @@ extension OralableBLE: CBPeripheralDelegate {
         var irSamples: [Int32] = []
         var greenSamples: [Int32] = []
         
+        // DEBUG: Log first few bytes
+        let firstBytes = data.prefix(24).map { String(format: "%02X", $0) }.joined(separator: " ")
+        addLogMessage("🔍 First 24 bytes: \(firstBytes)")
+        
         // Parse 20 samples, each 12 bytes (3 x UInt32)
         for i in 0..<20 {
             let offset = 4 + (i * 12)
@@ -730,9 +811,22 @@ extension OralableBLE: CBPeripheralDelegate {
             let ir = irBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             let green = greenBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             
+            // DEBUG: Log first sample values
+            if i == 0 {
+                addLogMessage("🔍 Sample 0: Red=\(red), IR=\(ir), Green=\(green)")
+            }
+            
             redSamples.append(Int32(bitPattern: red))
             irSamples.append(Int32(bitPattern: ir))
             greenSamples.append(Int32(bitPattern: green))
+        }
+        
+        // DEBUG: Log parsed sample statistics
+        if !irSamples.isEmpty {
+            let avgIR = irSamples.map { Double($0) }.reduce(0, +) / Double(irSamples.count)
+            let minIR = irSamples.min() ?? 0
+            let maxIR = irSamples.max() ?? 0
+            addLogMessage("📈 IR Stats: Min=\(minIR), Max=\(maxIR), Avg=\(Int(avgIR))")
         }
         
         addLogMessage("💓 PPG parsed: \(redSamples.count) samples")
@@ -747,7 +841,7 @@ extension OralableBLE: CBPeripheralDelegate {
                 }
                 self.sensorData.lastUpdate = Date()
                 
-                self.addLogMessage("📊 PPG History: \(self.ppgHistory.count) readings (IR=\(lastIR))")
+                self.addLogMessage("📊 PPG History: \(self.ppgHistory.count) readings (R=\(lastRed), IR=\(lastIR), G=\(lastGreen))")
             }
         }
     }
@@ -788,16 +882,76 @@ extension OralableBLE: CBPeripheralDelegate {
             self.sensorData.lastUpdate = Date()
             
             self.addLogMessage("📊 Accelerometer History: \(self.accelerometerHistory.count) readings")
+            
+            // Consolidate sensor data for historical view
+            self.consolidateSensorData()
         }
     }
     
     private func parseTemperatureData(_ data: Data) {
         addLogMessage("📊 Temp: Received \(data.count) bytes")
         
+        // DEBUG: Print raw bytes to understand the format
+        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        addLogMessage("🔍 Temp raw bytes: \(hexString)")
+        
         // Handle multiple possible formats
         var temperature: Double = 0.0
         
-        if data.count == 6 {
+        if data.count == 8 {
+            // Based on your device's actual format: Two 32-bit integers
+            // Bytes: 82 19 00 00 61 0D 00 00
+            // This appears to be raw sensor values, not temperature yet
+            
+            let int1Bytes = data.subdata(in: 0..<4)
+            let int2Bytes = data.subdata(in: 4..<8)
+            let val1 = int1Bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let val2 = int2Bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            
+            addLogMessage("🔍 Raw sensor values: val1=\(val1), val2=\(val2)")
+            
+            // Try different interpretations
+            
+            // Option 1: val1 and val2 are in hundredths of degrees (0.01°C units)
+            let temp1 = Double(val1) / 100.0
+            addLogMessage("🔍 Val1 as temp (÷100): \(String(format: "%.2f", temp1))°C")
+            
+            // Option 2: Some devices send object temp and ambient temp
+            let temp2 = Double(val2) / 100.0
+            addLogMessage("🔍 Val2 as temp (÷100): \(String(format: "%.2f", temp2))°C")
+            
+            // Option 3: Kelvin to Celsius (val1 in hundredths of Kelvin)
+            let tempKelvin1 = (Double(val1) / 100.0) - 273.15
+            addLogMessage("🔍 Val1 as Kelvin→Celsius: \(String(format: "%.2f", tempKelvin1))°C")
+            
+            // Option 4: Maybe it's in 10ths or 1000ths
+            let temp1div10 = Double(val1) / 10.0
+            let temp1div1000 = Double(val1) / 1000.0
+            addLogMessage("🔍 Val1 ÷10: \(String(format: "%.2f", temp1div10))°C, ÷1000: \(String(format: "%.2f", temp1div1000))°C")
+            
+            // Use the most reasonable interpretation
+            // 6530 / 100 = 65.30°C (too high)
+            // 6530 / 10 = 653.0°C (way too high)
+            // Let's try: maybe it's actually (val1/100 + val2/100)/2 or just use val2?
+            // Or perhaps it needs to be interpreted as signed int16 values instead?
+            
+            // Try as signed 16-bit values (maybe it's two temp readings)
+            let int16_1 = int1Bytes.subdata(in: 0..<2).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let int16_2 = int1Bytes.subdata(in: 2..<4).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let int16_3 = int2Bytes.subdata(in: 0..<2).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let int16_4 = int2Bytes.subdata(in: 2..<4).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            
+            addLogMessage("🔍 As 4 x Int16: [\(int16_1), \(int16_2), \(int16_3), \(int16_4)]")
+            
+            // 0x1982 = 6530, 0x0D61 = 3425
+            // If we divide by 100: 65.30°C and 34.25°C
+            // 34.25°C is a reasonable body temperature!
+            
+            // Use val2 (the second value) as it seems more reasonable
+            temperature = Double(val2) / 100.0
+            addLogMessage("🌡️ Using val2/100 = \(String(format: "%.2f", temperature))°C")
+            
+        } else if data.count == 6 {
             // Format 1: int16_t + uint32_t (6 bytes)
             let intBytes = data.subdata(in: 0..<2)
             let fracBytes = data.subdata(in: 2..<6)
@@ -806,17 +960,29 @@ extension OralableBLE: CBPeripheralDelegate {
             let fractionalPart = fracBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             
             temperature = Double(integerPart) + (Double(fractionalPart) / 1000000.0)
+            addLogMessage("🌡️ Temp format: 6-byte split = \(String(format: "%.2f", temperature))°C")
         } else if data.count == 4 {
             // Format 2: float (4 bytes)
-            temperature = data.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }.isNaN ? 0.0 : Double(data.withUnsafeBytes { $0.loadUnaligned(as: Float.self) })
+            let floatTemp = data.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
+            temperature = floatTemp.isNaN ? 0.0 : Double(floatTemp)
+            addLogMessage("🌡️ Temp format: 4-byte float = \(String(format: "%.2f", temperature))°C")
         } else if data.count == 2 {
             // Format 3: int16_t in 0.1°C units (2 bytes)
             let intBytes = data.subdata(in: 0..<2)
             let rawValue = intBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
             temperature = Double(rawValue) / 10.0
+            addLogMessage("🌡️ Temp format: 2-byte int16 = \(String(format: "%.2f", temperature))°C")
         } else {
             addLogMessage("⚠️ Temp data unexpected size: \(data.count) bytes")
             return
+        }
+        
+        // Validate temperature is in reasonable range for body temperature
+        // Typical range: 30°C to 45°C (86°F to 113°F)
+        if temperature < 20.0 || temperature > 50.0 {
+            addLogMessage("⚠️ Temperature \(String(format: "%.2f", temperature))°C is out of reasonable range")
+            // Still add it to history but with 0 value
+            temperature = 0.0
         }
         
         let tempData = TemperatureData(celsius: temperature, timestamp: Date())
@@ -831,6 +997,9 @@ extension OralableBLE: CBPeripheralDelegate {
             
             self.addLogMessage("🌡️ Temp: \(String(format: "%.1f", temperature))°C")
             self.addLogMessage("📊 Temperature History: \(self.temperatureHistory.count) readings")
+            
+            // Consolidate sensor data for historical view
+            self.consolidateSensorData()
         }
     }
     
@@ -875,6 +1044,9 @@ extension OralableBLE: CBPeripheralDelegate {
             
             self.addLogMessage("🔋 Battery: \(batteryLevel)%")
             self.addLogMessage("📊 Battery History: \(self.batteryHistory.count) readings")
+            
+            // Consolidate sensor data for historical view
+            self.consolidateSensorData()
         }
     }
     

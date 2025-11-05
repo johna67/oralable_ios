@@ -37,8 +37,40 @@ class HeartRateCalculator {
     /// - Parameter irSamples: Array of PPG IR values (UInt32)
     /// - Returns: HeartRateResult with BPM and quality metrics, or nil if insufficient data
     func calculateHeartRate(irSamples: [UInt32]) -> HeartRateResult? {
+        // Filter out invalid samples (saturation, zero, or out of range)
+        let validSamples = irSamples.filter { sample in
+            // Reject zero values (sensor error)
+            guard sample > 0 else { return false }
+            
+            // Reject saturation values (0x7FFFF = 524287 for 19-bit ADC)
+            guard sample < 500000 else { return false }
+            
+            // Reject very low values (likely not on tissue)
+            guard sample > 1000 else { return false }
+            
+            return true
+        }
+        
+        // Need at least 80% valid samples to proceed
+        guard Double(validSamples.count) / Double(irSamples.count) >= 0.8 else {
+            print("⚠️ Heart Rate: Too many invalid samples (\(validSamples.count)/\(irSamples.count))")
+            return nil
+        }
+        
         // Convert UInt32 to Double
-        let samples = irSamples.map { Double($0) }
+        let samples = validSamples.map { Double($0) }
+        
+        // Check for reasonable signal variability
+        guard samples.count >= 3 else { return nil }
+        let mean = samples.reduce(0, +) / Double(samples.count)
+        let variance = samples.map { pow($0 - mean, 2) }.reduce(0, +) / Double(samples.count)
+        let coefficientOfVariation = sqrt(variance) / mean
+        
+        // Signal should have some variability (>0.5%) but not too much (>50%)
+        guard coefficientOfVariation > 0.005 && coefficientOfVariation < 0.5 else {
+            print("⚠️ Heart Rate: Poor signal variability (CV: \(String(format: "%.3f", coefficientOfVariation)))")
+            return nil
+        }
         
         // Add to buffer
         signalBuffer.append(contentsOf: samples)
@@ -62,6 +94,33 @@ class HeartRateCalculator {
         // Calculate heart rate from peaks
         guard let (bpm, quality) = calculateBPMFromPeaks(peaks, signalLength: filtered.count) else {
             return nil
+        }
+        
+        // Additional validation: reject physiologically impossible heart rates
+        guard bpm >= 40 && bpm <= 180 else {
+            print("⚠️ Heart Rate: Physiologically impossible BPM: \(bpm)")
+            return nil
+        }
+        
+        // If we have a previous heart rate, check for unrealistic jumps
+        if let lastBPM = lastHeartRate {
+            let change = abs(bpm - lastBPM)
+            let percentChange = change / lastBPM
+            
+            // Reject changes > 30% between readings (too fast for real HR change)
+            if percentChange > 0.3 {
+                print("⚠️ Heart Rate: Unrealistic jump from \(Int(lastBPM)) to \(Int(bpm)) BPM")
+                // Don't return nil, but reduce quality
+                let adjustedQuality = quality * 0.5
+                
+                return HeartRateResult(
+                    bpm: bpm,
+                    quality: adjustedQuality,
+                    qualityLevel: qualityLevel(from: adjustedQuality),
+                    isReliable: adjustedQuality >= minQualityThreshold,
+                    timestamp: Date()
+                )
+            }
         }
         
         // Store for trend analysis

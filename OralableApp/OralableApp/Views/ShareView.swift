@@ -19,10 +19,7 @@ struct ShareView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Debug Section (temporary for troubleshooting)
-                    DebugConnectionSection(ble: ble)
-                    
+                VStack(spacing: DesignSystem.Spacing.lg) {
                     // Viewer Mode Import Section
                     if isViewerMode {
                         ImportSection(
@@ -34,9 +31,6 @@ struct ShareView: View {
                             importErrorMessage: $importErrorMessage
                         )
                     }
-                    
-                    // Device Info Card
-                    DeviceInfoCard(isViewerMode: isViewerMode)
                     
                     // Data Summary Card
                     DataSummaryCard(ble: ble)
@@ -51,12 +45,22 @@ struct ShareView: View {
                     // Recent Logs Preview
                     RecentLogsPreview(ble: ble)
                     
+                    // Device Info Card (collapsed/minimal)
+                    DeviceInfoCard(isViewerMode: isViewerMode)
+                    
                     // Clear Data Button
                     ClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
+                    
+                    // Debug Section (only in debug builds)
+                    #if DEBUG
+                    DebugConnectionSection(ble: ble)
+                    #endif
                 }
-                .padding()
+                .padding(DesignSystem.Spacing.lg)
             }
             .navigationTitle(isViewerMode ? "Import & Export" : "Share Data")
+            .navigationBarTitleDisplayMode(.large)
+            .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
             .sheet(isPresented: $showShareSheet) {
                 if let url = exportURL {
                     ShareSheet(items: [url])
@@ -95,22 +99,71 @@ struct ShareView: View {
         case .success(let urls):
             guard let url = urls.first else { return }
             
-            if let imported = CSVImportManager.shared.importData(from: url) {
-                // Add imported data to BLE manager
-                ble.sensorDataHistory.append(contentsOf: imported.sensorData)
-                
-                // Convert imported string logs to LogMessage objects
-                for logString in imported.logs {
-                    ble.logMessages.append(LogMessage(message: logString))
+            // Request access to security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                importErrorMessage = "Unable to access the selected file. Please try again."
+                showImportError = true
+                return
+            }
+            
+            // Ensure we stop accessing the resource when done
+            defer {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
+            // Copy file to temporary location to avoid permission issues
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+            
+            do {
+                // Remove existing file if present
+                if FileManager.default.fileExists(atPath: tempURL.path) {
+                    try FileManager.default.removeItem(at: tempURL)
                 }
                 
-                // Sort by timestamp
-                ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
+                // Copy to temporary directory
+                try FileManager.default.copyItem(at: url, to: tempURL)
                 
-                importedCount = imported.sensorData.count
-                showImportSuccess = true
-            } else {
-                importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
+                // Validate before importing
+                let validation = CSVImportManager.shared.validateCSVFile(at: tempURL)
+                
+                if !validation.isValid {
+                    importErrorMessage = validation.errorMessage ?? "Invalid CSV format"
+                    showImportError = true
+                    try? FileManager.default.removeItem(at: tempURL)
+                    return
+                }
+                
+                // Now import from the copied file
+                if let imported = CSVImportManager.shared.importData(from: tempURL) {
+                    // Add imported data to BLE manager
+                    ble.sensorDataHistory.append(contentsOf: imported.sensorData)
+                    
+                    // Convert imported string logs to LogMessage objects
+                    for logString in imported.logs {
+                        ble.logMessages.append(LogMessage(message: logString))
+                    }
+                    
+                    // Sort by timestamp
+                    ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
+                    
+                    importedCount = imported.sensorData.count
+                    
+                    // Log success
+                    ble.logMessages.append(LogMessage(
+                        message: "✅ Successfully imported \(imported.sensorData.count) sensor data points and \(imported.logs.count) log entries"
+                    ))
+                    
+                    showImportSuccess = true
+                } else {
+                    importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
+                    showImportError = true
+                }
+                
+                // Clean up temporary file
+                try? FileManager.default.removeItem(at: tempURL)
+                
+            } catch {
+                importErrorMessage = "Failed to access file: \(error.localizedDescription)"
                 showImportError = true
             }
             
@@ -129,6 +182,7 @@ struct ImportSection: View {
     @Binding var importedCount: Int
     @Binding var showImportError: Bool
     @Binding var importErrorMessage: String
+    @State private var showFormatInfo = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -138,6 +192,13 @@ struct ImportSection: View {
                     .foregroundColor(.blue)
                 Text("Import Data")
                     .font(.headline)
+                
+                Spacer()
+                
+                Button(action: { showFormatInfo = true }) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.blue)
+                }
             }
             
             Text("Load previously exported CSV files to view historical data without connecting a device.")
@@ -190,12 +251,90 @@ struct ImportSection: View {
         .padding()
         .background(Color.green.opacity(0.1))
         .cornerRadius(12)
+        .sheet(isPresented: $showFormatInfo) {
+            NavigationView {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(CSVImportManager.shared.expectedFormat)
+                            .font(.system(.caption, design: .monospaced))
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Common Issues")
+                                .font(.headline)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                TroubleshootItem(
+                                    icon: "exclamationmark.triangle",
+                                    color: .orange,
+                                    title: "File Permission Error",
+                                    description: "After exporting, save the file to Files app or iCloud Drive, then import from there."
+                                )
+                                
+                                TroubleshootItem(
+                                    icon: "doc.text",
+                                    color: .blue,
+                                    title: "Wrong Format",
+                                    description: "Ensure your CSV has the exact header row shown above."
+                                )
+                                
+                                TroubleshootItem(
+                                    icon: "calendar",
+                                    color: .purple,
+                                    title: "Timestamp Format",
+                                    description: "Dates must be in yyyy-MM-dd HH:mm:ss.SSS format."
+                                )
+                            }
+                        }
+                        .padding()
+                    }
+                    .padding()
+                }
+                .navigationTitle("CSV Format")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            showFormatInfo = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct TroubleshootItem: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let description: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.title3)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 }
 
 // MARK: - Device Info Card
 struct DeviceInfoCard: View {
     let isViewerMode: Bool
+    @State private var isExpanded = false
     
     private var deviceID: String {
         UIDevice.current.identifierForVendor?.uuidString ?? "Unknown"
@@ -214,32 +353,50 @@ struct DeviceInfoCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Device Information")
-                .font(.headline)
-            
-            Divider()
-            
-            InfoRow(label: "Device ID", value: String(deviceID.prefix(12)) + "...")
-            InfoRow(label: "Model", value: deviceModel)
-            InfoRow(label: "iOS Version", value: systemVersion)
-            InfoRow(label: "App Version", value: appVersion)
-            
-            if isViewerMode {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            Button(action: { withAnimation { isExpanded.toggle() } }) {
                 HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.blue)
-                        .font(.caption)
-                    Text("Viewing mode - no device connected")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Label("Device Information", systemImage: "info.circle")
+                        .font(DesignSystem.Typography.labelMedium)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: DesignSystem.Sizing.Icon.xs))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
                 }
-                .padding(.top, 4)
+            }
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                Divider()
+                
+                VStack(spacing: DesignSystem.Spacing.sm) {
+                    InfoRow(label: "Device", value: deviceModel)
+                    InfoRow(label: "iOS", value: systemVersion)
+                    InfoRow(label: "App Version", value: appVersion)
+                    InfoRow(label: "Device ID", value: String(deviceID.prefix(12)) + "...")
+                    
+                    if isViewerMode {
+                        HStack {
+                            Image(systemName: "eye")
+                                .font(.system(size: DesignSystem.Sizing.Icon.xs))
+                                .foregroundColor(DesignSystem.Colors.info)
+                            
+                            Text("Viewing mode - no device connected")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                        }
+                        .padding(.top, DesignSystem.Spacing.xs)
+                    }
+                }
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.backgroundPrimary)
+        .cornerRadius(DesignSystem.CornerRadius.lg)
+        .designShadow(DesignSystem.Shadow.sm)
     }
 }
 
@@ -248,52 +405,92 @@ struct DataSummaryCard: View {
     @ObservedObject var ble: OralableBLE
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("Data Summary")
-                .font(.headline)
+                .font(DesignSystem.Typography.h3)
+                .foregroundColor(DesignSystem.Colors.textPrimary)
             
             Divider()
             
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Sensor Data Points")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text("\(ble.sensorDataHistory.count)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                }
+            // Metrics Grid
+            HStack(spacing: DesignSystem.Spacing.lg) {
+                MetricBox(
+                    title: "Sensor Data",
+                    value: "\(ble.sensorDataHistory.count)",
+                    subtitle: "points",
+                    icon: "waveform.path.ecg",
+                    color: .blue
+                )
                 
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Log Entries")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text("\(ble.logMessages.count)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                }
+                MetricBox(
+                    title: "Log Entries",
+                    value: "\(ble.logMessages.count)",
+                    subtitle: "messages",
+                    icon: "doc.text",
+                    color: .green
+                )
             }
             
-            if !ble.sensorDataHistory.isEmpty, let first = ble.sensorDataHistory.first, let last = ble.sensorDataHistory.last {
+            if !ble.sensorDataHistory.isEmpty, 
+               let first = ble.sensorDataHistory.first, 
+               let last = ble.sensorDataHistory.last {
                 Divider()
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Recording Period")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text("\(first.timestamp, style: .date) - \(last.timestamp, style: .date)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                    Label("Recording Period", systemImage: "clock")
+                        .font(DesignSystem.Typography.labelMedium)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    
+                    HStack {
+                        Text(first.timestamp, style: .date)
+                        Image(systemName: "arrow.right")
+                        Text(last.timestamp, style: .date)
+                    }
+                    .font(DesignSystem.Typography.bodySmall)
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
                 }
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.backgroundPrimary)
+        .cornerRadius(DesignSystem.CornerRadius.lg)
+        .designShadow(DesignSystem.Shadow.sm)
+    }
+}
+
+struct MetricBox: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+            HStack(spacing: DesignSystem.Spacing.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: DesignSystem.Sizing.Icon.sm))
+                    .foregroundColor(color)
+                
+                Text(title)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+            }
+            
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(DesignSystem.Typography.displaySmall)
+                    .foregroundColor(color)
+                
+                Text(subtitle)
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(DesignSystem.Spacing.md)
+        .background(color.opacity(0.1))
+        .cornerRadius(DesignSystem.CornerRadius.md)
     }
 }
 
@@ -304,33 +501,45 @@ struct ExportButton: View {
     @ObservedObject var ble: OralableBLE
     @State private var isExporting = false
     
+    private var hasData: Bool {
+        !ble.logMessages.isEmpty || !ble.sensorDataHistory.isEmpty
+    }
+    
     var body: some View {
-        Button(action: {
-            exportData()
-        }) {
-            HStack {
+        Button(action: exportData) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
                 if isExporting {
                     ProgressView()
-                        .padding(.trailing, 4)
+                        .tint(.white)
                 } else {
                     Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: DesignSystem.Sizing.Icon.md))
                 }
+                
                 Text(isExporting ? "Exporting..." : "Export Data as CSV")
+                    .font(DesignSystem.Typography.buttonMedium)
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .padding()
+            .padding(.vertical, DesignSystem.Spacing.md)
             .background(
-                LinearGradient(
-                    colors: [Color.blue, Color.blue.opacity(0.8)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
+                hasData ? 
+                    LinearGradient(
+                        colors: [Color.blue, Color.blue.opacity(0.8)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ) :
+                    LinearGradient(
+                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
             )
-            .cornerRadius(12)
+            .cornerRadius(DesignSystem.CornerRadius.lg)
+            .designShadow(hasData ? DesignSystem.Shadow.md : DesignSystem.Shadow.sm)
         }
-        .disabled(ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty)
-        .opacity((ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty) ? 0.5 : 1.0)
+        .disabled(!hasData || isExporting)
+        .animation(.easeInOut(duration: DesignSystem.Animation.fast), value: isExporting)
     }
     
     private func exportData() {
@@ -351,6 +560,38 @@ struct ExportButton: View {
     }
 }
 
+// MARK: - Clear Data Button
+struct ClearDataButton: View {
+    @Binding var showClearConfirmation: Bool
+    @ObservedObject var ble: OralableBLE
+    
+    private var hasData: Bool {
+        !ble.logMessages.isEmpty || !ble.sensorDataHistory.isEmpty
+    }
+    
+    var body: some View {
+        Button(action: { showClearConfirmation = true }) {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                Image(systemName: "trash")
+                    .font(.system(size: DesignSystem.Sizing.Icon.sm))
+                
+                Text("Clear All Data")
+                    .font(DesignSystem.Typography.buttonMedium)
+            }
+            .foregroundColor(hasData ? .red : DesignSystem.Colors.textDisabled)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, DesignSystem.Spacing.md)
+            .background(hasData ? Color.red.opacity(0.1) : DesignSystem.Colors.backgroundTertiary)
+            .cornerRadius(DesignSystem.CornerRadius.lg)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                    .stroke(hasData ? Color.red.opacity(0.3) : DesignSystem.Colors.border, lineWidth: 1)
+            )
+        }
+        .disabled(!hasData)
+    }
+}
+
 // MARK: - Recent Logs Preview
 struct RecentLogsPreview: View {
     @ObservedObject var ble: OralableBLE
@@ -360,53 +601,58 @@ struct RecentLogsPreview: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             HStack {
-                Text("Recent Activity")
-                    .font(.headline)
+                Label("Recent Activity", systemImage: "clock")
+                    .font(DesignSystem.Typography.h3)
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                
                 Spacer()
-                Text("Last \(min(10, ble.logMessages.count)) entries")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                
+                Text("Last \(min(10, ble.logMessages.count))")
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
             }
             
             Divider()
             
             if ble.logMessages.isEmpty {
-                VStack(spacing: 8) {
+                VStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: "tray")
-                        .font(.largeTitle)
-                        .foregroundColor(.gray)
+                        .font(.system(size: 40))
+                        .foregroundColor(DesignSystem.Colors.textDisabled)
+                    
                     Text("No activity yet")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(DesignSystem.Typography.bodyMedium)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
+                .padding(.vertical, DesignSystem.Spacing.xl)
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    // ✅ FIXED: Use LogMessage.id instead of String
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                     ForEach(recentLogs) { log in
-                        HStack(alignment: .top, spacing: 8) {
+                        HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
                             Circle()
                                 .fill(logColor(for: log.message))
-                                .frame(width: 6, height: 6)
+                                .frame(width: 8, height: 8)
                                 .padding(.top, 6)
                             
                             Text(log.message)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(DesignSystem.Typography.bodySmall)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
                                 .lineLimit(2)
                             
                             Spacer()
                         }
+                        .padding(.vertical, DesignSystem.Spacing.xxs)
                     }
                 }
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.backgroundPrimary)
+        .cornerRadius(DesignSystem.CornerRadius.lg)
+        .designShadow(DesignSystem.Shadow.sm)
     }
     
     private func logColor(for log: String) -> Color {
@@ -422,30 +668,6 @@ struct RecentLogsPreview: View {
     }
 }
 
-// MARK: - Clear Data Button
-struct ClearDataButton: View {
-    @Binding var showClearConfirmation: Bool
-    @ObservedObject var ble: OralableBLE
-    
-    var body: some View {
-        Button(action: {
-            showClearConfirmation = true
-        }) {
-            HStack {
-                Image(systemName: "trash")
-                Text("Clear All Data")
-            }
-            .foregroundColor(.red)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-        }
-        .disabled(ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty)
-        .opacity((ble.logMessages.isEmpty && ble.sensorDataHistory.isEmpty) ? 0.5 : 1.0)
-    }
-}
-
 // MARK: - Helper Views
 struct InfoRow: View {
     let label: String
@@ -454,12 +676,14 @@ struct InfoRow: View {
     var body: some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(DesignSystem.Typography.bodySmall)
+                .foregroundColor(DesignSystem.Colors.textTertiary)
+            
             Spacer()
+            
             Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
+                .font(DesignSystem.Typography.bodySmall)
+                .foregroundColor(DesignSystem.Colors.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
