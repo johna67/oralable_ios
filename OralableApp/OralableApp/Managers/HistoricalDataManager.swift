@@ -36,7 +36,7 @@ class HistoricalDataManager: ObservableObject {
     // MARK: - Public Methods
     
     /// Manually trigger an update of all metrics
-    func updateAllMetrics() {
+    @MainActor func updateAllMetrics() {
         guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
             clearAllMetrics()
             return
@@ -66,7 +66,7 @@ class HistoricalDataManager: ObservableObject {
     
     /// Update metrics for a specific time range only
     /// - Parameter range: The time range to update
-    func updateMetrics(for range: TimeRange) {
+    @MainActor func updateMetrics(for range: TimeRange) {
         guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
             clearMetrics(for: range)
             return
@@ -133,7 +133,7 @@ class HistoricalDataManager: ObservableObject {
     // MARK: - Auto-Update Management
     
     /// Start automatic periodic updates
-    func startAutoUpdate() {
+    @MainActor func startAutoUpdate() {
         stopAutoUpdate()
         
         // Initial update

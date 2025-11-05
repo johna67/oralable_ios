@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		26A0F47C2EBAE8C00054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */; };
+		26A0F47E2EBAE8D80054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47D2EBAE8D80054C5FC /* AsyncAlgorithms */; };
+		26A0F4802EBAE8EE0054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47F2EBAE8EE0054C5FC /* AsyncAlgorithms */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		26CAF2702E781EFE003FE378 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -42,7 +48,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		26B2FF052EB999C200E0F7B1 /* Exceptions for "OralableApp" folder in "OralableApp" target */ = {
+		269F12F92EBAF6CC00D8F477 /* Exceptions for "OralableApp" folder in "OralableApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -55,7 +61,7 @@
 		26B2FED92EB999C100E0F7B1 /* OralableApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				26B2FF052EB999C200E0F7B1 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
+				269F12F92EBAF6CC00D8F477 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
 			);
 			path = OralableApp;
 			sourceTree = "<group>";
@@ -77,6 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26A0F47C2EBAE8C00054C5FC /* AsyncAlgorithms in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +91,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26A0F47E2EBAE8D80054C5FC /* AsyncAlgorithms in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +99,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26A0F4802EBAE8EE0054C5FC /* AsyncAlgorithms in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -158,6 +167,7 @@
 			);
 			name = OralableApp;
 			packageProductDependencies = (
+				26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */,
 			);
 			productName = OralableApp;
 			productReference = 26CAF25E2E781EFB003FE378 /* OralableApp.app */;
@@ -181,6 +191,7 @@
 			);
 			name = OralableAppTests;
 			packageProductDependencies = (
+				26A0F47D2EBAE8D80054C5FC /* AsyncAlgorithms */,
 			);
 			productName = OralableAppTests;
 			productReference = 26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */;
@@ -204,6 +215,7 @@
 			);
 			name = OralableAppUITests;
 			packageProductDependencies = (
+				26A0F47F2EBAE8EE0054C5FC /* AsyncAlgorithms */,
 			);
 			productName = OralableAppUITests;
 			productReference = 26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */;
@@ -241,6 +253,9 @@
 			);
 			mainGroup = 26CAF2552E781EFB003FE378;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 26CAF25F2E781EFB003FE378 /* Products */;
 			projectDirPath = "";
@@ -622,6 +637,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-async-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
+			productName = AsyncAlgorithms;
+		};
+		26A0F47D2EBAE8D80054C5FC /* AsyncAlgorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
+			productName = AsyncAlgorithms;
+		};
+		26A0F47F2EBAE8EE0054C5FC /* AsyncAlgorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
+			productName = AsyncAlgorithms;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 26CAF2562E781EFB003FE378 /* Project object */;
 }

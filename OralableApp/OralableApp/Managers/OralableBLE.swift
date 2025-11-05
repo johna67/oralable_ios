@@ -364,6 +364,8 @@ class OralableBLE: NSObject, ObservableObject {
         ppgBufferIR.append(contentsOf: ir)
         ppgBufferGreen.append(contentsOf: green)
         
+        addLogMessage("📈 PPG Buffer: Red=\(ppgBufferRed.count), IR=\(ppgBufferIR.count), Green=\(ppgBufferGreen.count) samples")
+        
         let maxBufferSize = 300
         if ppgBufferRed.count > maxBufferSize {
             ppgBufferRed.removeFirst(ppgBufferRed.count - maxBufferSize)
@@ -371,24 +373,58 @@ class OralableBLE: NSObject, ObservableObject {
             ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxBufferSize)
         }
         
+        // Heart Rate Calculation
         if ppgBufferIR.count >= 20 {
             let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
             if let heartRate = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
+                let bpm = heartRate.bpm
+                addLogMessage("❤️ Heart Rate Calculated: \(bpm) BPM (quality: \(String(format: "%.1f", heartRate.quality)))")
+                
                 DispatchQueue.main.async {
-                    self.sensorData.heartRate = heartRate.bpm
+                    self.sensorData.heartRate = bpm
+                    
+                    // FIXED: Add to history array so dashboard shows it!
+                    let hrData = HeartRateData(bpm: bpm, quality: heartRate.quality, timestamp: Date())
+                    self.heartRateHistory.append(hrData)
+                    if self.heartRateHistory.count > 1000 {
+                        self.heartRateHistory.removeFirst(self.heartRateHistory.count - 1000)
+                    }
+                    
+                    self.addLogMessage("📊 Heart Rate History: \(self.heartRateHistory.count) readings")
                 }
+            } else {
+                addLogMessage("⚠️ Heart Rate: Calculation failed (insufficient signal quality)")
             }
+        } else {
+            addLogMessage("⏳ Heart Rate: Waiting for more data (\(ppgBufferIR.count)/20 samples)")
         }
         
+        // SpO2 Calculation
         if ppgBufferRed.count >= 150, ppgBufferIR.count >= 150 {
             if let result = spo2Calculator.calculateSpO2WithQuality(
                 redSamples: ppgBufferRed,
                 irSamples: ppgBufferIR
             ) {
+                let spo2Value = result.spo2
+                addLogMessage("🫁 SpO2 Calculated: \(String(format: "%.1f", spo2Value))% (quality: \(String(format: "%.1f", result.quality)))")
+                
                 DispatchQueue.main.async {
-                    self.sensorData.spo2 = result.spo2
+                    self.sensorData.spo2 = spo2Value
+                    
+                    // FIXED: Add to history array so dashboard shows it!
+                    let spo2Data = SpO2Data(percentage: spo2Value, quality: result.quality, timestamp: Date())
+                    self.spo2History.append(spo2Data)
+                    if self.spo2History.count > 1000 {
+                        self.spo2History.removeFirst(self.spo2History.count - 1000)
+                    }
+                    
+                    self.addLogMessage("📊 SpO2 History: \(self.spo2History.count) readings")
                 }
+            } else {
+                addLogMessage("⚠️ SpO2: Calculation failed (poor signal quality)")
             }
+        } else {
+            addLogMessage("⏳ SpO2: Waiting for more data (\(ppgBufferRed.count)/150 samples)")
         }
     }
 }
@@ -710,6 +746,8 @@ extension OralableBLE: CBPeripheralDelegate {
                     self.ppgHistory.removeFirst(self.ppgHistory.count - 1000)
                 }
                 self.sensorData.lastUpdate = Date()
+                
+                self.addLogMessage("📊 PPG History: \(self.ppgHistory.count) readings (IR=\(lastIR))")
             }
         }
     }
@@ -748,6 +786,8 @@ extension OralableBLE: CBPeripheralDelegate {
                 self.accelerometerHistory.removeFirst(self.accelerometerHistory.count - 1000)
             }
             self.sensorData.lastUpdate = Date()
+            
+            self.addLogMessage("📊 Accelerometer History: \(self.accelerometerHistory.count) readings")
         }
     }
     
@@ -788,9 +828,10 @@ extension OralableBLE: CBPeripheralDelegate {
                 self.temperatureHistory.removeFirst(self.temperatureHistory.count - 1000)
             }
             self.sensorData.lastUpdate = Date()
+            
+            self.addLogMessage("🌡️ Temp: \(String(format: "%.1f", temperature))°C")
+            self.addLogMessage("📊 Temperature History: \(self.temperatureHistory.count) readings")
         }
-        
-        addLogMessage("🌡️ Temp: \(String(format: "%.1f", temperature))°C")
     }
     
     private func parseBatteryData(_ data: Data) {
@@ -828,9 +869,10 @@ extension OralableBLE: CBPeripheralDelegate {
                 self.batteryHistory.removeFirst(self.batteryHistory.count - 1000)
             }
             self.sensorData.lastUpdate = Date()
+            
+            self.addLogMessage("🔋 Battery: \(batteryLevel)%")
+            self.addLogMessage("📊 Battery History: \(self.batteryHistory.count) readings")
         }
-        
-        addLogMessage("🔋 Battery: \(batteryLevel)%")
     }
     
     private func parseDeviceUUID(_ data: Data) {

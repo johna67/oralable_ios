@@ -321,8 +321,8 @@ extension ANRMuscleSenseDevice: CBPeripheralDelegate {
         
         guard let data = characteristic.value else { return }
         
-        // Parse data
-        _ = parseData(data, from: characteristic)
+        // Parse data using the existing parseData method
+        let _ = parseData(data, from: characteristic)
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
