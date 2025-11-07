@@ -222,63 +222,8 @@ enum CSVValidationSeverity {
 }
 
 // MARK: - Log Entry Model
-
-/// Unified log entry model for CSV export/import
-struct LogEntry: Codable, Identifiable {
-    
-    let id: UUID
-    let timestamp: Date
-    let level: LogLevel
-    let message: String
-    let source: String?
-    
-    init(
-        id: UUID = UUID(),
-        timestamp: Date = Date(),
-        level: LogLevel = .info,
-        message: String,
-        source: String? = nil
-    ) {
-        self.id = id
-        self.timestamp = timestamp
-        self.level = level
-        self.message = message
-        self.source = source
-    }
-}
-
-enum LogLevel: String, Codable, CaseIterable {
-    case debug = "debug"
-    case info = "info"
-    case warning = "warning"
-    case error = "error"
-    
-    var displayName: String {
-        switch self {
-        case .debug:
-            return "Debug"
-        case .info:
-            return "Info"
-        case .warning:
-            return "Warning"
-        case .error:
-            return "Error"
-        }
-    }
-    
-    var emoji: String {
-        switch self {
-        case .debug:
-            return "🔍"
-        case .info:
-            return "ℹ️"
-        case .warning:
-            return "⚠️"
-        case .error:
-            return "❌"
-        }
-    }
-}
+// Note: LogEntry and LogLevel are now defined in LogModels.swift
+// This file uses those shared definitions to avoid ambiguity
 
 // MARK: - Concrete CSV Service Implementation
 

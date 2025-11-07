@@ -3,16 +3,20 @@
 //  OralableApp
 //
 //  Updated: November 7, 2025
-//  Refactored to use DashboardViewModel (MVVM pattern)
+//  Complete MVVM implementation - No duplicate views
 //
 
 import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    // MVVM: Use ViewModel instead of direct manager access
+    // MVVM: Use ViewModel with convenience initializer
     @StateObject private var viewModel = DashboardViewModel()
     @EnvironmentObject var designSystem: DesignSystem
+    
+    // View State
+    @State private var showingExportSheet = false
+    @State private var selectedTimeRange: TimeRange = .day
     
     var body: some View {
         NavigationView {
@@ -46,6 +50,14 @@ struct DashboardView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        Button(action: { viewModel.refreshScan() }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        
+                        Button(action: { showingExportSheet = true }) {
+                            Label("Export Data", systemImage: "square.and.arrow.up")
+                        }
+                        
                         Button(action: { viewModel.toggleRecording() }) {
                             Label(
                                 viewModel.isRecording ? "Stop Recording" : "Start Recording",
@@ -53,12 +65,10 @@ struct DashboardView: View {
                             )
                         }
                         
-                        Button(action: { viewModel.exportData() }) {
-                            Label("Export Data", systemImage: "square.and.arrow.up")
-                        }
+                        Divider()
                         
-                        Button(action: { viewModel.refreshData() }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
+                        Button(action: { viewModel.resetBLE() }) {
+                            Label("Reset Connection", systemImage: "exclamationmark.triangle")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -66,108 +76,117 @@ struct DashboardView: View {
                     }
                 }
             }
-            .refreshable {
-                await viewModel.refresh()
+            .sheet(isPresented: $showingExportSheet) {
+                ShareView()
             }
-        }
-        .onAppear {
-            viewModel.startMonitoring()
-        }
-        .onDisappear {
-            viewModel.stopMonitoring()
-        }
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.dismissError()
-            }
-        } message: {
-            Text(viewModel.errorMessage ?? "An unknown error occurred")
         }
     }
     
     // MARK: - Connection Status Card
     
     private var connectionStatusCard: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+        VStack(spacing: designSystem.spacing.sm) {
             HStack {
-                Circle()
-                    .fill(viewModel.isConnected ? Color.green : Color.red)
-                    .frame(width: 12, height: 12)
-                
-                Text(viewModel.connectionStatus)
-                    .font(designSystem.typography.body)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                
-                Spacer()
-                
-                if viewModel.isConnecting {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
-            }
-            
-            if viewModel.isConnected {
-                HStack {
-                    Label(viewModel.deviceName, systemImage: "dot.radiowaves.left.and.right")
+                VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
+                    Text("Connection Status")
                         .font(designSystem.typography.caption)
                         .foregroundColor(designSystem.colors.textSecondary)
                     
-                    Spacer()
+                    Text(viewModel.deviceName)
+                        .font(designSystem.typography.h3)
+                        .foregroundColor(designSystem.colors.textPrimary)
                     
-                    Label("\(viewModel.batteryLevel)%", systemImage: "battery.\(viewModel.batteryIconName)")
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(viewModel.batteryColor)
+                    HStack(spacing: designSystem.spacing.xs) {
+                        Circle()
+                            .fill(viewModel.isConnected ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                        
+                        Text(viewModel.connectionStatus)
+                            .font(designSystem.typography.body)
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: { viewModel.toggleScanning() }) {
+                    HStack {
+                        Image(systemName: viewModel.isConnected ? "stop.circle" :
+                              (viewModel.isScanning ? "pause.circle" : "play.circle"))
+                        Text(viewModel.scanButtonText)
+                    }
+                    .font(designSystem.typography.button)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, designSystem.spacing.md)
+                    .padding(.vertical, designSystem.spacing.sm)
+                    .background(viewModel.isConnected ? Color.red :
+                               (viewModel.isScanning ? Color.orange : Color.blue))
+                    .cornerRadius(designSystem.cornerRadius.medium)
                 }
             }
+            .padding(designSystem.spacing.md)
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.large)
         }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.md)
     }
     
     // MARK: - Metrics Grid
     
     private var metricsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
-            // Heart Rate
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: designSystem.spacing.md) {
             MetricCard(
                 title: "Heart Rate",
                 value: viewModel.heartRateText,
-                unit: "BPM",
+                unit: "bpm",
                 icon: "heart.fill",
-                color: .red,
-                trend: viewModel.heartRateTrend
+                color: .red
             )
             
-            // SpO2
             MetricCard(
-                title: "SpO2",
+                title: "SpO₂",
                 value: viewModel.spo2Text,
                 unit: "%",
-                icon: "lungs.fill",
-                color: .blue,
-                trend: viewModel.spo2Trend
+                icon: "drop.fill",
+                color: .blue
             )
             
-            // Temperature
             MetricCard(
                 title: "Temperature",
                 value: viewModel.temperatureText,
-                unit: "°C",
+                unit: "",
                 icon: "thermometer",
-                color: .orange,
-                trend: viewModel.temperatureTrend
+                color: .orange
             )
             
-            // Activity
             MetricCard(
-                title: "Activity",
-                value: viewModel.activityLevel,
+                title: "Battery",
+                value: viewModel.batteryPercentageText,
                 unit: "",
-                icon: "figure.walk",
-                color: .green,
-                trend: nil
+                icon: batteryIcon,
+                color: batteryColor
             )
+        }
+    }
+    
+    // Battery icon helper
+    private var batteryIcon: String {
+        switch viewModel.batteryLevel {
+        case 0..<25: return "battery.25"
+        case 25..<50: return "battery.50"
+        case 50..<75: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+    
+    // Battery color helper
+    private var batteryColor: Color {
+        switch viewModel.batteryLevel {
+        case 0..<20: return .red
+        case 20..<50: return .orange
+        default: return .green
         }
     }
     
@@ -176,39 +195,52 @@ struct DashboardView: View {
     private var ppgWaveformCard: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             HStack {
-                Text("PPG Signal")
-                    .font(designSystem.typography.headline)
+                Text("PPG Waveform")
+                    .font(designSystem.typography.h3)
                     .foregroundColor(designSystem.colors.textPrimary)
                 
                 Spacer()
                 
-                Text(viewModel.ppgQualityText)
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(viewModel.ppgQualityColor)
+                HStack(spacing: designSystem.spacing.xs) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                    Text("Red")
+                        .font(designSystem.typography.caption)
+                    
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 8, height: 8)
+                    Text("IR")
+                        .font(designSystem.typography.caption)
+                }
+                .foregroundColor(designSystem.colors.textSecondary)
             }
             
-            Chart(viewModel.ppgChartData) { dataPoint in
+            Chart(viewModel.ppgData) { dataPoint in
                 LineMark(
                     x: .value("Time", dataPoint.timestamp),
-                    y: .value("Value", dataPoint.value)
+                    y: .value("Red", dataPoint.red)
                 )
-                .foregroundStyle(Color.red.gradient)
-                .lineStyle(StrokeStyle(lineWidth: 2))
+                .foregroundStyle(.red)
+                .lineStyle(StrokeStyle(lineWidth: 1))
+                
+                LineMark(
+                    x: .value("Time", dataPoint.timestamp),
+                    y: .value("IR", dataPoint.ir)
+                )
+                .foregroundStyle(.orange)
+                .lineStyle(StrokeStyle(lineWidth: 1))
             }
-            .frame(height: 150)
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                    AxisGridLine()
-                    AxisTick()
-                }
-            }
+            .frame(height: 200)
+            .chartXAxis(.hidden)
             .chartYAxis {
                 AxisMarks(position: .leading)
             }
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.md)
+        .cornerRadius(designSystem.cornerRadius.large)
     }
     
     // MARK: - Accelerometer Card
@@ -216,174 +248,188 @@ struct DashboardView: View {
     private var accelerometerCard: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             HStack {
-                Text("Movement")
-                    .font(designSystem.typography.headline)
+                Text("Accelerometer")
+                    .font(designSystem.typography.h3)
                     .foregroundColor(designSystem.colors.textPrimary)
                 
                 Spacer()
                 
-                Text(viewModel.movementStatusText)
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textSecondary)
+                HStack(spacing: designSystem.spacing.xs) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                    Text("X")
+                    
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                    Text("Y")
+                    
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: 8, height: 8)
+                    Text("Z")
+                }
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textSecondary)
             }
             
-            Chart {
-                ForEach(viewModel.accelerometerChartData) { dataPoint in
-                    LineMark(
-                        x: .value("Time", dataPoint.timestamp),
-                        y: .value("X", dataPoint.x)
-                    )
-                    .foregroundStyle(Color.red)
-                    
-                    LineMark(
-                        x: .value("Time", dataPoint.timestamp),
-                        y: .value("Y", dataPoint.y)
-                    )
-                    .foregroundStyle(Color.green)
-                    
-                    LineMark(
-                        x: .value("Time", dataPoint.timestamp),
-                        y: .value("Z", dataPoint.z)
-                    )
-                    .foregroundStyle(Color.blue)
-                }
+            Chart(viewModel.accelerometerData) { dataPoint in
+                LineMark(
+                    x: .value("Time", dataPoint.timestamp),
+                    y: .value("X", dataPoint.x)
+                )
+                .foregroundStyle(.red)
+                .lineStyle(StrokeStyle(lineWidth: 1))
+                
+                LineMark(
+                    x: .value("Time", dataPoint.timestamp),
+                    y: .value("Y", dataPoint.y)
+                )
+                .foregroundStyle(.green)
+                .lineStyle(StrokeStyle(lineWidth: 1))
+                
+                LineMark(
+                    x: .value("Time", dataPoint.timestamp),
+                    y: .value("Z", dataPoint.z)
+                )
+                .foregroundStyle(.blue)
+                .lineStyle(StrokeStyle(lineWidth: 1))
             }
             .frame(height: 150)
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                    AxisGridLine()
-                    AxisTick()
-                }
-            }
+            .chartXAxis(.hidden)
             .chartYAxis {
                 AxisMarks(position: .leading)
-            }
-            
-            // Legend
-            HStack(spacing: designSystem.spacing.md) {
-                Label("X", systemImage: "circle.fill")
-                    .foregroundColor(.red)
-                    .font(designSystem.typography.caption)
-                
-                Label("Y", systemImage: "circle.fill")
-                    .foregroundColor(.green)
-                    .font(designSystem.typography.caption)
-                
-                Label("Z", systemImage: "circle.fill")
-                    .foregroundColor(.blue)
-                    .font(designSystem.typography.caption)
             }
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.md)
+        .cornerRadius(designSystem.cornerRadius.large)
     }
     
     // MARK: - Quick Actions Card
     
     private var quickActionsCard: some View {
-        VStack(spacing: designSystem.spacing.sm) {
-            SectionHeaderView(title: "Quick Actions", icon: "bolt.fill")
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("Quick Actions")
+                .font(designSystem.typography.h3)
+                .foregroundColor(designSystem.colors.textPrimary)
             
             HStack(spacing: designSystem.spacing.md) {
-                // Connect/Disconnect Button
-                Button(action: {
-                    if viewModel.isConnected {
-                        viewModel.disconnect()
-                    } else {
-                        viewModel.startScanning()
-                    }
-                }) {
-                    VStack(spacing: designSystem.spacing.xs) {
-                        Image(systemName: viewModel.isConnected ? "wifi.slash" : "wifi")
-                            .font(.title2)
-                        Text(viewModel.isConnected ? "Disconnect" : "Connect")
-                            .font(designSystem.typography.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundTertiary)
-                    .cornerRadius(designSystem.cornerRadius.sm)
-                }
+                QuickActionButton(
+                    title: "Export",
+                    icon: "square.and.arrow.up",
+                    action: { showingExportSheet = true }
+                )
                 
-                // Export Button
-                Button(action: { viewModel.exportData() }) {
-                    VStack(spacing: designSystem.spacing.xs) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.title2)
-                        Text("Export")
-                            .font(designSystem.typography.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundTertiary)
-                    .cornerRadius(designSystem.cornerRadius.sm)
+                NavigationLink(destination: HistoricalView()) {
+                    QuickActionView(
+                        title: "History",
+                        icon: "clock.arrow.circlepath"
+                    )
                 }
+                .buttonStyle(PlainButtonStyle())
                 
-                // Settings Button
                 NavigationLink(destination: SettingsView()) {
-                    VStack(spacing: designSystem.spacing.xs) {
-                        Image(systemName: "gearshape")
-                            .font(.title2)
-                        Text("Settings")
-                            .font(designSystem.typography.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundTertiary)
-                    .cornerRadius(designSystem.cornerRadius.sm)
+                    QuickActionView(
+                        title: "Settings",
+                        icon: "gearshape"
+                    )
                 }
+                .buttonStyle(PlainButtonStyle())
             }
-            .foregroundColor(designSystem.colors.textPrimary)
         }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
     }
 }
 
-// MARK: - Metric Card Component
+// MARK: - Supporting Views (Keep these as they're used within DashboardView)
 
 struct MetricCard: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    
     let title: String
     let value: String
     let unit: String
     let icon: String
     let color: Color
-    let trend: String?
+    @EnvironmentObject var designSystem: DesignSystem
     
     var body: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+        VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(color)
-                Text(title)
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textSecondary)
+                    .font(.system(size: 16))
+                
+                Spacer()
             }
+            
+            Text(title)
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textSecondary)
             
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(designSystem.typography.title2)
+                    .font(designSystem.typography.h2)
                     .foregroundColor(designSystem.colors.textPrimary)
+                
                 Text(unit)
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textSecondary)
             }
-            
-            if let trend = trend {
-                Text(trend)
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textTertiary)
-            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(designSystem.colors.backgroundTertiary)
+        .cornerRadius(designSystem.cornerRadius.medium)
     }
 }
 
-// MARK: - Preview
+struct QuickActionButton: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
+    @EnvironmentObject var designSystem: DesignSystem
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: designSystem.spacing.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                Text(title)
+                    .font(designSystem.typography.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(designSystem.spacing.sm)
+            .foregroundColor(designSystem.colors.textPrimary)
+            .background(designSystem.colors.backgroundTertiary)
+            .cornerRadius(designSystem.cornerRadius.small)
+        }
+    }
+}
+
+struct QuickActionView: View {
+    let title: String
+    let icon: String
+    @EnvironmentObject var designSystem: DesignSystem
+    
+    var body: some View {
+        VStack(spacing: designSystem.spacing.xs) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+            Text(title)
+                .font(designSystem.typography.caption)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(designSystem.spacing.sm)
+        .foregroundColor(designSystem.colors.textPrimary)
+        .background(designSystem.colors.backgroundTertiary)
+        .cornerRadius(designSystem.cornerRadius.small)
+    }
+}
+
+// MARK: - Previews
 
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {

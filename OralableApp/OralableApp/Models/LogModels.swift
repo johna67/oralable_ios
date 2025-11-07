@@ -85,6 +85,3 @@ public struct LogEntry: Codable, Identifiable, Equatable {
         lhs.id == rhs.id
     }
 }
-
-// MARK: - LogMessage Alias (for compatibility)
-public typealias LogMessage = LogEntry

@@ -24,44 +24,46 @@ struct ActionCardView: View {
     let iconColor: Color
     let action: () -> Void
     
+    @ObservedObject private var designSystem = DesignSystem.shared
+    
     init(
         icon: String,
         title: String,
         description: String,
-        iconColor: Color = DesignSystem.Colors.textPrimary,
+        iconColor: Color? = nil,
         action: @escaping () -> Void = {}
     ) {
         self.icon = icon
         self.title = title
         self.description = description
-        self.iconColor = iconColor
+        self.iconColor = iconColor ?? DesignSystem.shared.colors.textPrimary
         self.action = action
     }
     
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+            VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
                 // Icon
                 Image(systemName: icon)
-                    .font(.system(size: DesignSystem.Sizing.Icon.xl))
+                    .font(.system(size: 32))
                     .foregroundColor(iconColor)
                 
                 // Title
                 Text(title)
-                    .font(DesignSystem.Typography.h4)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .font(designSystem.typography.h4)
+                    .foregroundColor(designSystem.colors.textPrimary)
                 
                 // Description
                 Text(description)
-                    .font(DesignSystem.Typography.bodySmall)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(DesignSystem.Spacing.lg)
+            .padding(designSystem.spacing.lg)
             .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
-                    .fill(DesignSystem.Colors.backgroundSecondary)
+                RoundedRectangle(cornerRadius: designSystem.cornerRadius.large)
+                    .fill(designSystem.colors.backgroundSecondary)
             )
         }
         .buttonStyle(.plain)
@@ -74,12 +76,14 @@ struct ActionCardView: View {
 
 struct ActionCardView_Previews: PreviewProvider {
     static var previews: some View {
-        VStack(spacing: DesignSystem.Spacing.md) {
+        let designSystem = DesignSystem.shared
+        
+        VStack(spacing: designSystem.spacing.md) {
             ActionCardView(
                 icon: "chart.line.uptrend.xyaxis",
                 title: "View Data",
                 description: "Access your historical health data and trends",
-                iconColor: DesignSystem.Colors.info,
+                iconColor: .blue,
                 action: {}
             )
             
@@ -87,7 +91,7 @@ struct ActionCardView_Previews: PreviewProvider {
                 icon: "arrow.down.doc.fill",
                 title: "Export Data",
                 description: "Download your data in CSV or JSON format",
-                iconColor: DesignSystem.Colors.success,
+                iconColor: .green,
                 action: {}
             )
             
@@ -99,7 +103,7 @@ struct ActionCardView_Previews: PreviewProvider {
             )
         }
         .padding()
-        .background(DesignSystem.Colors.backgroundPrimary)
+        .background(designSystem.colors.backgroundPrimary)
     }
 }
 
