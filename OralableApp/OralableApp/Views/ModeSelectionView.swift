@@ -1,218 +1,423 @@
+//
+//  ModeSelectionView.swift
+//  OralableApp
+//
+//  Created: November 7, 2025
+//  Initial mode selection on first launch
+//
+
 import SwiftUI
 
 struct ModeSelectionView: View {
-    @Binding var selectedMode: AppMode?
-    @State private var showModeInfo = false
+    @EnvironmentObject var designSystem: DesignSystem
+    @State private var selectedMode: AppMode?
+    @State private var showingInfoSheet = false
+    @State private var infoMode: AppMode?
     
-    var body: some View {
-        ZStack {
-            // Background gradient
-            LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 40) {
-                // Logo and Title
-                VStack(spacing: 16) {
-                    Image(systemName: "waveform.path.ecg.rectangle")
-                        .font(.system(size: 80))
-                        .foregroundColor(.white)
-                    
-                    Text("Oralable")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    
-                    Text("Sleep Bruxism Monitor")
-                        .font(.title3)
-                        .foregroundColor(.white.opacity(0.9))
-                }
-                .padding(.top, 60)
-                
-                Spacer()
-                
-                // Mode Selection Cards
-                VStack(spacing: 20) {
-                    // Viewer Mode Card
-                    ModeCard(
-                        icon: "doc.text.viewfinder",
-                        title: "Viewer Mode",
-                        subtitle: "View and export data files",
-                        description: "No account required",
-                        color: .green
-                    ) {
-                        selectedMode = .viewer
-                    }
-                    
-                    // Subscription Mode Card
-                    ModeCard(
-                        icon: "person.crop.circle.badge.checkmark",
-                        title: "Subscription Mode",
-                        subtitle: "Full device connectivity",
-                        description: "Sign in with Apple ID",
-                        color: .blue
-                    ) {
-                        selectedMode = .subscription
-                    }
-                }
-                .padding(.horizontal, 24)
-                
-                Spacer()
-                
-                // Info button
-                Button(action: {
-                    showModeInfo = true
-                }) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                        Text("Learn more about modes")
-                    }
-                    .foregroundColor(.white.opacity(0.9))
-                    .font(.footnote)
-                }
-                .padding(.bottom, 40)
-            }
-        }
-        .sheet(isPresented: $showModeInfo) {
-            ModeInfoView()
-        }
-    }
-}
-
-struct ModeCard: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let description: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 20) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.2))
-                        .frame(width: 60, height: 60)
-                    
-                    Image(systemName: icon)
-                        .font(.system(size: 28))
-                        .foregroundColor(color)
-                }
-                
-                // Text content
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                // Arrow
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-            }
-            .padding(20)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct ModeInfoView: View {
-    @Environment(\.dismiss) var dismiss
+    let onModeSelected: (AppMode) -> Void
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Viewer Mode Info
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Viewer Mode", systemImage: "doc.text.viewfinder")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                        
-                        Text("Perfect for:")
-                            .font(.headline)
-                        
-                        BulletPoint(text: "Viewing previously exported data files")
-                        BulletPoint(text: "Sharing data with healthcare providers")
-                        BulletPoint(text: "Quick access without signing in")
-                        BulletPoint(text: "Privacy-focused file browsing")
-                        
-                        Text("Limitations:")
-                            .font(.headline)
-                            .padding(.top, 8)
-                        
-                        BulletPoint(text: "Cannot connect to TGM device", isLimitation: true)
-                        BulletPoint(text: "No real-time monitoring", isLimitation: true)
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                VStack(spacing: designSystem.spacing.xl) {
+                    // Header
+                    headerSection
                     
-                    // Subscription Mode Info
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Subscription Mode", systemImage: "person.crop.circle.badge.checkmark")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.blue)
+                    // Mode Options
+                    VStack(spacing: designSystem.spacing.lg) {
+                        // Viewer Mode
+                        ModeCard(
+                            mode: .viewer,
+                            icon: "eye",
+                            title: "Viewer Mode",
+                            subtitle: "View real-time data",
+                            features: [
+                                "Connect to Oralable device",
+                                "View real-time sensor data",
+                                "Basic data visualization",
+                                "Export session data"
+                            ],
+                            limitations: [
+                                "No data storage",
+                                "No historical tracking",
+                                "Limited features"
+                            ],
+                            price: "Free",
+                            isSelected: selectedMode == .viewer,
+                            onSelect: {
+                                selectedMode = .viewer
+                            },
+                            onInfo: {
+                                infoMode = .viewer
+                                showingInfoSheet = true
+                            }
+                        )
                         
-                        Text("Features:")
-                            .font(.headline)
+                        // Subscription Mode
+                        ModeCard(
+                            mode: .subscription,
+                            icon: "crown",
+                            title: "Full Access",
+                            subtitle: "Complete feature set",
+                            features: [
+                                "All Viewer Mode features",
+                                "Unlimited data storage",
+                                "Historical analysis",
+                                "Advanced visualizations",
+                                "Health insights",
+                                "Cloud sync",
+                                "Priority support"
+                            ],
+                            limitations: [],
+                            price: "Sign in required",
+                            isSelected: selectedMode == .subscription,
+                            isRecommended: true,
+                            onSelect: {
+                                selectedMode = .subscription
+                            },
+                            onInfo: {
+                                infoMode = .subscription
+                                showingInfoSheet = true
+                            }
+                        )
                         
-                        BulletPoint(text: "Full device connectivity via Bluetooth")
-                        BulletPoint(text: "Real-time sensor data monitoring")
-                        BulletPoint(text: "Live data visualization")
-                        BulletPoint(text: "Data export and logging")
-                        BulletPoint(text: "Device settings and configuration")
+                        // Demo Mode
+                        ModeCard(
+                            mode: .demo,
+                            icon: "play.circle",
+                            title: "Demo Mode",
+                            subtitle: "Try without device",
+                            features: [
+                                "Explore all features",
+                                "Simulated sensor data",
+                                "Test functionality",
+                                "No device needed"
+                            ],
+                            limitations: [
+                                "Mock data only",
+                                "Cannot connect to real device",
+                                "For evaluation only"
+                            ],
+                            price: "Free",
+                            isSelected: selectedMode == .demo,
+                            onSelect: {
+                                selectedMode = .demo
+                            },
+                            onInfo: {
+                                infoMode = .demo
+                                showingInfoSheet = true
+                            }
+                        )
+                    }
+                    
+                    // Continue Button
+                    if let mode = selectedMode {
+                        continueButton(for: mode)
+                    }
+                    
+                    // Footer
+                    footerSection
+                }
+                .padding(designSystem.spacing.md)
+            }
+            .navigationBarHidden(true)
+        }
+        .sheet(isPresented: $showingInfoSheet) {
+            if let mode = infoMode {
+                ModeInfoSheet(mode: mode)
+            }
+        }
+    }
+    
+    // MARK: - Header Section
+    
+    private var headerSection: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            // App Icon
+            Image("AppIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 80, height: 80)
+                .cornerRadius(designSystem.cornerRadius.lg)
+            
+            // Welcome Text
+            Text("Welcome to Oralable")
+                .font(designSystem.typography.largeTitle)
+                .foregroundColor(designSystem.colors.primaryBlack)
+            
+            Text("Choose how you'd like to use the app")
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+    
+    // MARK: - Continue Button
+    
+    private func continueButton(for mode: AppMode) -> some View {
+        Button(action: {
+            onModeSelected(mode)
+        }) {
+            HStack {
+                Text("Continue with \(mode.displayName)")
+                Image(systemName: "arrow.right")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(designSystem.spacing.md)
+            .background(designSystem.colors.primaryBlack)
+            .foregroundColor(designSystem.colors.primaryWhite)
+            .cornerRadius(designSystem.cornerRadius.md)
+        }
+        .padding(.top, designSystem.spacing.lg)
+    }
+    
+    // MARK: - Footer Section
+    
+    private var footerSection: some View {
+        VStack(spacing: designSystem.spacing.sm) {
+            Text("You can change modes anytime in Settings")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .multilineTextAlignment(.center)
+            
+            HStack(spacing: designSystem.spacing.md) {
+                Link("Privacy Policy", destination: URL(string: "https://oralable.com/privacy")!)
+                Text("•")
+                Link("Terms of Service", destination: URL(string: "https://oralable.com/terms")!)
+            }
+            .font(designSystem.typography.caption)
+            .foregroundColor(designSystem.colors.textTertiary)
+        }
+        .padding(.top, designSystem.spacing.xl)
+    }
+}
+
+// MARK: - Mode Card
+
+struct ModeCard: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    
+    let mode: AppMode
+    let icon: String
+    let title: String
+    let subtitle: String
+    let features: [String]
+    let limitations: [String]
+    let price: String
+    let isSelected: Bool
+    var isRecommended: Bool = false
+    let onSelect: () -> Void
+    let onInfo: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            // Header
+            HStack {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(mode.color)
+                    .frame(width: 40, height: 40)
+                    .background(mode.color.opacity(0.1))
+                    .cornerRadius(designSystem.cornerRadius.sm)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(title)
+                            .font(designSystem.typography.headline)
+                            .foregroundColor(designSystem.colors.textPrimary)
                         
-                        Text("Requires:")
-                            .font(.headline)
-                            .padding(.top, 8)
-                        
-                        BulletPoint(text: "Sign in with Apple ID")
-                        BulletPoint(text: "Bluetooth permissions")
-                        
-                        Text("Tiers:")
-                            .font(.headline)
-                            .padding(.top, 8)
-                        
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Basic (Free) - Essential features")
-                        }
-                        
-                        HStack {
-                            Image(systemName: "star.circle.fill")
-                                .foregroundColor(.orange)
-                            Text("Premium - Advanced analytics & unlimited exports")
+                        if isRecommended {
+                            Text("RECOMMENDED")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(4)
                         }
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    
+                    Text(subtitle)
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
-                .padding()
+                
+                Spacer()
+                
+                Button(action: onInfo) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
             }
-            .navigationTitle("About Modes")
+            
+            Divider()
+            
+            // Features
+            VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
+                Text("Features")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                
+                ForEach(features.prefix(3), id: \.self) { feature in
+                    HStack(spacing: designSystem.spacing.sm) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text(feature)
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.textPrimary)
+                    }
+                }
+                
+                if features.count > 3 {
+                    Text("+ \(features.count - 3) more")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+            }
+            
+            // Limitations
+            if !limitations.isEmpty {
+                VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
+                    Text("Limitations")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    
+                    ForEach(limitations.prefix(2), id: \.self) { limitation in
+                        HStack(spacing: designSystem.spacing.sm) {
+                            Image(systemName: "xmark.circle")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Text(limitation)
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Price and Select Button
+            HStack {
+                Text(price)
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textPrimary)
+                
+                Spacer()
+                
+                Button(action: onSelect) {
+                    Text(isSelected ? "Selected" : "Select")
+                        .font(designSystem.typography.caption)
+                        .padding(.horizontal, designSystem.spacing.md)
+                        .padding(.vertical, designSystem.spacing.xs)
+                        .background(
+                            isSelected ? mode.color : designSystem.colors.backgroundTertiary
+                        )
+                        .foregroundColor(
+                            isSelected ? .white : designSystem.colors.textPrimary
+                        )
+                        .cornerRadius(designSystem.cornerRadius.sm)
+                }
+            }
+        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .overlay(
+            RoundedRectangle(cornerRadius: designSystem.cornerRadius.md)
+                .stroke(
+                    isSelected ? mode.color : Color.clear,
+                    lineWidth: 2
+                )
+        )
+        .cornerRadius(designSystem.cornerRadius.md)
+    }
+}
+
+// MARK: - Mode Info Sheet
+
+struct ModeInfoSheet: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    @Environment(\.dismiss) private var dismiss
+    
+    let mode: AppMode
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: designSystem.spacing.lg) {
+                    // Icon and Title
+                    HStack {
+                        Image(systemName: mode.icon)
+                            .font(.largeTitle)
+                            .foregroundColor(mode.color)
+                        
+                        VStack(alignment: .leading) {
+                            Text(mode.displayName)
+                                .font(designSystem.typography.title)
+                                .foregroundColor(designSystem.colors.textPrimary)
+                            
+                            Text(mode.description)
+                                .font(designSystem.typography.body)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                    .background(mode.color.opacity(0.1))
+                    .cornerRadius(designSystem.cornerRadius.md)
+                    
+                    // Detailed Information
+                    VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+                        Text("What's Included")
+                            .font(designSystem.typography.headline)
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        
+                        Text(mode.detailedDescription)
+                            .font(designSystem.typography.body)
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                    
+                    // Use Cases
+                    VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+                        Text("Best For")
+                            .font(designSystem.typography.headline)
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        
+                        ForEach(mode.useCases, id: \.self) { useCase in
+                            HStack(alignment: .top, spacing: designSystem.spacing.sm) {
+                                Image(systemName: "arrow.right.circle")
+                                    .foregroundColor(mode.color)
+                                Text(useCase)
+                                    .font(designSystem.typography.body)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+                            }
+                        }
+                    }
+                    
+                    // Requirements
+                    if !mode.requirements.isEmpty {
+                        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+                            Text("Requirements")
+                                .font(designSystem.typography.headline)
+                                .foregroundColor(designSystem.colors.textPrimary)
+                            
+                            ForEach(mode.requirements, id: \.self) { requirement in
+                                HStack(alignment: .top, spacing: designSystem.spacing.sm) {
+                                    Image(systemName: "checkmark.circle")
+                                        .foregroundColor(.green)
+                                    Text(requirement)
+                                        .font(designSystem.typography.body)
+                                        .foregroundColor(designSystem.colors.textPrimary)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(designSystem.spacing.md)
+            }
+            .navigationTitle("\(mode.displayName) Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -225,22 +430,100 @@ struct ModeInfoView: View {
     }
 }
 
-struct BulletPoint: View {
-    let text: String
-    var isLimitation: Bool = false
+// MARK: - App Mode Extension
+
+extension AppMode {
+    var displayName: String {
+        switch self {
+        case .viewer: return "Viewer Mode"
+        case .subscription: return "Full Access"
+        case .demo: return "Demo Mode"
+        }
+    }
     
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: isLimitation ? "xmark.circle.fill" : "checkmark.circle.fill")
-                .foregroundColor(isLimitation ? .red : .green)
-                .font(.caption)
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.primary)
+    var icon: String {
+        switch self {
+        case .viewer: return "eye"
+        case .subscription: return "crown"
+        case .demo: return "play.circle"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .viewer: return .blue
+        case .subscription: return .green
+        case .demo: return .purple
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .viewer:
+            return "View real-time data from your Oralable device"
+        case .subscription:
+            return "Unlock all features with your account"
+        case .demo:
+            return "Explore the app with simulated data"
+        }
+    }
+    
+    var detailedDescription: String {
+        switch self {
+        case .viewer:
+            return "Viewer Mode provides essential functionality for monitoring your Oralable device in real-time. Perfect for quick sessions and immediate data viewing without the need for an account."
+        case .subscription:
+            return "Full Access unlocks the complete Oralable experience. Track your health metrics over time, gain insights from historical data, and sync across all your devices. Requires Sign in with Apple for secure authentication."
+        case .demo:
+            return "Demo Mode lets you explore all app features using simulated data. Ideal for evaluating the app before purchasing a device or for healthcare professionals demonstrating to patients."
+        }
+    }
+    
+    var useCases: [String] {
+        switch self {
+        case .viewer:
+            return [
+                "Quick monitoring sessions",
+                "Real-time data viewing",
+                "Basic health tracking",
+                "Testing device connectivity"
+            ]
+        case .subscription:
+            return [
+                "Long-term health monitoring",
+                "Tracking treatment progress",
+                "Sharing data with healthcare providers",
+                "Multiple device management"
+            ]
+        case .demo:
+            return [
+                "App evaluation",
+                "Feature exploration",
+                "Training and demos",
+                "No device available"
+            ]
+        }
+    }
+    
+    var requirements: [String] {
+        switch self {
+        case .viewer:
+            return ["Oralable device required"]
+        case .subscription:
+            return ["Apple ID required", "Oralable device required"]
+        case .demo:
+            return []
         }
     }
 }
 
-#Preview {
-    ModeSelectionView(selectedMode: .constant(nil))
+// MARK: - Preview
+
+struct ModeSelectionView_Previews: PreviewProvider {
+    static var previews: some View {
+        ModeSelectionView { mode in
+            print("Selected mode: \(mode)")
+        }
+        .environmentObject(DesignSystem.shared)
+    }
 }

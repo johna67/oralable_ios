@@ -1,305 +1,400 @@
+//
+//  AuthenticationView.swift
+//  OralableApp
+//
+//  Updated: November 7, 2025
+//  Refactored to use AuthenticationViewModel (MVVM pattern)
+//
+
 import SwiftUI
 import AuthenticationServices
 
 struct AuthenticationView: View {
-    @StateObject private var authManager = AuthenticationManager.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @Binding var selectedMode: AppMode?
-    @State private var showError = false
-    
-    var body: some View {
-        ZStack {
-            // Background gradient
-            LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 40) {
-                Spacer()
-                
-                // Logo and Title
-                VStack(spacing: 16) {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
-                        .font(.system(size: 80))
-                        .foregroundColor(.white)
-                    
-                    Text("Sign In Required")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    
-                    Text("Connect your Apple ID to access subscription features")
-                        .font(.body)
-                        .foregroundColor(.white.opacity(0.9))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-                
-                Spacer()
-                
-                // Sign in button
-                VStack(spacing: 16) {
-                    SignInWithAppleButton(
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            authManager.handleSignIn(result: result)
-                            if case .failure = result {
-                                showError = true
-                            }
-                        }
-                    )
-                    .signInWithAppleButtonStyle(.white)
-                    .frame(height: 50)
-                    .cornerRadius(12)
-                    .padding(.horizontal, 40)
-                    
-                    if showError, let error = authManager.authenticationError {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 40)
-                    }
-                }
-                
-                Spacer()
-                
-                // Back button
-                Button(action: {
-                    selectedMode = nil
-                }) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                        Text("Back to Mode Selection")
-                    }
-                    .foregroundColor(.white.opacity(0.9))
-                    .font(.footnote)
-                }
-                .padding(.bottom, 40)
-                
-                // Privacy info
-                Text("Your Apple ID is used only for authentication. We don't store or share your personal information.")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 20)
-            }
-        }
-        .alert("Authentication Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {
-                showError = false
-            }
-        } message: {
-            Text(authManager.authenticationError ?? "An unknown error occurred")
-        }
-    }
-}
-
-struct SubscriptionTierSelectionView: View {
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @State private var showUpgradeSheet = false
+    // MVVM: Use ViewModel instead of direct manager access
+    @StateObject private var viewModel = AuthenticationViewModel()
+    @EnvironmentObject var designSystem: DesignSystem
+    @State private var showingProfileDetails = false
+    @State private var showingSignOutConfirmation = false
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Text("Choose Your Plan")
-                            .font(.title)
-                            .fontWeight(.bold)
-                        
-                        Text("Start with Basic, upgrade anytime")
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 20)
+                VStack(spacing: designSystem.spacing.xl) {
+                    // Profile Header
+                    profileHeaderSection
                     
-                    // Basic Tier Card
-                    TierCard(
-                        tier: .basic,
-                        isCurrentTier: subscriptionManager.currentTier == .basic,
-                        action: {
-                            subscriptionManager.resetToBasic()
-                        }
-                    )
+                    // Authentication Status
+                    authenticationStatusCard
                     
-                    // Paid Tier Card
-                    TierCard(
-                        tier: .paid,
-                        isCurrentTier: subscriptionManager.currentTier == .paid,
-                        action: {
-                            showUpgradeSheet = true
-                        }
-                    )
-                    
-                    // Continue button
-                    if subscriptionManager.currentTier != .basic {
-                        Button(action: {
-                            // Continue with current tier
-                        }) {
-                            Text("Continue with \(subscriptionManager.currentTier.displayName)")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Subscription")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-        .sheet(isPresented: $showUpgradeSheet) {
-            UpgradeView(showUpgradeSheet: $showUpgradeSheet)
-        }
-    }
-}
-
-struct TierCard: View {
-    let tier: SubscriptionTier
-    let isCurrentTier: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(tier.displayName)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        if isCurrentTier {
-                            Text("CURRENT")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green)
-                                .cornerRadius(4)
-                        }
-                    }
-                    
-                    if tier == .basic {
-                        Text("Free Forever")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    // Profile Information (if authenticated)
+                    if viewModel.isAuthenticated {
+                        profileInformationSection
+                        profileActionsSection
                     } else {
-                        Text("Coming Soon")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        signInSection
+                    }
+                    
+                    // Debug Section (only in DEBUG builds)
+                    #if DEBUG
+                    debugSection
+                    #endif
+                }
+                .padding(designSystem.spacing.md)
+            }
+            .navigationTitle("Account")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                if viewModel.isAuthenticated {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { showingProfileDetails = true }) {
+                            Image(systemName: "person.crop.circle")
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
                     }
                 }
-                
-                Spacer()
-                
-                if tier == .paid {
-                    Image(systemName: "star.fill")
-                        .font(.title)
-                        .foregroundColor(.orange)
-                }
-            }
-            
-            Divider()
-            
-            // Features
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(tier.features, id: \.self) { feature in
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.caption)
-                        Text(feature)
-                            .font(.subheadline)
-                    }
-                }
-            }
-            
-            // Action button
-            if !isCurrentTier {
-                Button(action: action) {
-                    Text(tier == .basic ? "Select Basic" : "Upgrade to Premium")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(tier == .basic ? Color.gray : Color.blue)
-                        .cornerRadius(10)
-                }
-                .padding(.top, 8)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: isCurrentTier ? Color.green.opacity(0.3) : Color.black.opacity(0.1), 
-                radius: 10, x: 0, y: 5)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(isCurrentTier ? Color.green : Color.clear, lineWidth: 2)
-        )
+        .onAppear {
+            viewModel.checkAuthenticationState()
+        }
+        .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Sign Out", role: .destructive) {
+                viewModel.signOut()
+            }
+        } message: {
+            Text("Are you sure you want to sign out? You'll need to sign in again to access your data.")
+        }
+        .alert("Error", isPresented: $viewModel.showError) {
+            Button("OK") {
+                viewModel.dismissError()
+            }
+        } message: {
+            Text(viewModel.authenticationError ?? "An authentication error occurred")
+        }
+        .sheet(isPresented: $showingProfileDetails) {
+            ProfileDetailView(viewModel: viewModel)
+        }
     }
+    
+    // MARK: - Profile Header Section
+    
+    private var profileHeaderSection: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            // Avatar
+            ZStack {
+                Circle()
+                    .fill(viewModel.isAuthenticated ? Color.green : designSystem.colors.backgroundTertiary)
+                    .frame(width: 100, height: 100)
+                
+                if viewModel.isAuthenticated {
+                    Text(viewModel.userInitials)
+                        .font(designSystem.typography.largeTitle)
+                        .foregroundColor(designSystem.colors.primaryWhite)
+                } else {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 50))
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+            }
+            
+            // Greeting
+            Text(viewModel.greetingText)
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+            
+            // Display Name
+            if let displayName = viewModel.displayName {
+                Text(displayName)
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
+        }
+    }
+    
+    // MARK: - Authentication Status Card
+    
+    private var authenticationStatusCard: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
+                HStack {
+                    Circle()
+                        .fill(viewModel.isAuthenticated ? Color.green : Color.gray)
+                        .frame(width: 12, height: 12)
+                    
+                    Text(viewModel.isAuthenticated ? "Signed In" : "Not Signed In")
+                        .font(designSystem.typography.body)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                }
+                
+                Text(viewModel.profileStatusText)
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
+            
+            Spacer()
+            
+            if viewModel.isAuthenticated {
+                // Profile Completion
+                CircularProgressView(
+                    progress: viewModel.profileCompletionPercentage / 100,
+                    lineWidth: 4,
+                    size: 40
+                ) {
+                    Text("\(Int(viewModel.profileCompletionPercentage))%")
+                        .font(designSystem.typography.caption2)
+                }
+            }
+        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.md)
+    }
+    
+    // MARK: - Sign In Section
+    
+    private var signInSection: some View {
+        VStack(spacing: designSystem.spacing.lg) {
+            // Benefits List
+            VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+                Text("Sign in to:")
+                    .font(designSystem.typography.headline)
+                    .foregroundColor(designSystem.colors.textPrimary)
+                
+                FeatureRow(
+                    icon: "icloud",
+                    title: "Sync your data",
+                    subtitle: "Access from any device"
+                )
+                
+                FeatureRow(
+                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Track progress",
+                    subtitle: "View historical trends"
+                )
+                
+                FeatureRow(
+                    icon: "square.and.arrow.up",
+                    title: "Export reports",
+                    subtitle: "Share with healthcare providers"
+                )
+            }
+            .padding(designSystem.spacing.md)
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.md)
+            
+            // Sign In Button
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                },
+                onCompletion: { result in
+                    viewModel.handleSignIn(result: result)
+                }
+            )
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 50)
+            .cornerRadius(designSystem.cornerRadius.md)
+        }
+    }
+    
+    // MARK: - Profile Information Section
+    
+    private var profileInformationSection: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            SectionHeaderView(title: "Profile Information", icon: "person.text.rectangle")
+            
+            VStack(spacing: designSystem.spacing.sm) {
+                if let email = viewModel.userEmail {
+                    InfoRowView(label: "Email", value: email)
+                }
+                
+                if let fullName = viewModel.userFullName {
+                    InfoRowView(label: "Name", value: fullName)
+                }
+                
+                if let userID = viewModel.userID {
+                    InfoRowView(
+                        label: "User ID",
+                        value: String(userID.prefix(8)) + "..."
+                    )
+                }
+                
+                InfoRowView(
+                    label: "Member Since",
+                    value: viewModel.memberSinceText
+                )
+            }
+            .padding(designSystem.spacing.md)
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.md)
+        }
+    }
+    
+    // MARK: - Profile Actions Section
+    
+    private var profileActionsSection: some View {
+        VStack(spacing: designSystem.spacing.sm) {
+            // Refresh Profile
+            ActionCardView(
+                icon: "arrow.clockwise",
+                title: "Refresh Profile",
+                subtitle: "Update profile information",
+                action: {
+                    viewModel.refreshProfile()
+                }
+            )
+            
+            // Export Data
+            ActionCardView(
+                icon: "square.and.arrow.up",
+                title: "Export Data",
+                subtitle: "Download all your data",
+                action: {
+                    // Navigate to export view
+                }
+            )
+            
+            // Privacy Settings
+            ActionCardView(
+                icon: "lock.shield",
+                title: "Privacy Settings",
+                subtitle: "Manage data and permissions",
+                action: {
+                    // Navigate to privacy settings
+                }
+            )
+            
+            // Sign Out
+            ActionCardView(
+                icon: "arrow.right.square",
+                title: "Sign Out",
+                subtitle: "Sign out of your account",
+                color: .red,
+                action: {
+                    showingSignOutConfirmation = true
+                }
+            )
+        }
+    }
+    
+    // MARK: - Debug Section
+    
+    #if DEBUG
+    private var debugSection: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            SectionHeaderView(title: "Debug Information", icon: "ladybug")
+            
+            VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                Button(action: { viewModel.debugAuthState() }) {
+                    HStack {
+                        Image(systemName: "ant.circle")
+                        Text("Print Auth State")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(designSystem.spacing.sm)
+                    .background(designSystem.colors.backgroundTertiary)
+                    .cornerRadius(designSystem.cornerRadius.sm)
+                }
+                
+                Button(action: { viewModel.resetAppleIDAuth() }) {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Reset Apple ID Auth")
+                    }
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(designSystem.spacing.sm)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(designSystem.cornerRadius.sm)
+                }
+                
+                // Auth State Info
+                Text("Auth State: \(viewModel.isAuthenticated ? "Authenticated" : "Not Authenticated")")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textTertiary)
+                
+                if let userID = viewModel.userID {
+                    Text("User ID: \(userID)")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+            }
+            .padding(designSystem.spacing.md)
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.md)
+        }
+    }
+    #endif
 }
 
-struct UpgradeView: View {
-    @Binding var showUpgradeSheet: Bool
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @State private var isProcessing = false
+// MARK: - Profile Detail View
+
+struct ProfileDetailView: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    @Environment(\.dismiss) private var dismiss
+    
+    let viewModel: AuthenticationViewModel
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 30) {
-                Spacer()
-                
-                Image(systemName: "star.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.orange)
-                
-                Text("Premium Features")
-                    .font(.title)
-                    .fontWeight(.bold)
-                
-                Text("Coming Soon!")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                
-                Text("In-app purchases will be available in a future update. Premium features are under development.")
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 40)
-                
-                Spacer()
-                
-                Button(action: {
-                    showUpgradeSheet = false
-                }) {
-                    Text("Got It")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
+            List {
+                Section("Account Information") {
+                    if let email = viewModel.userEmail {
+                        InfoRowView(label: "Email", value: email)
+                    }
+                    
+                    if let fullName = viewModel.userFullName {
+                        InfoRowView(label: "Full Name", value: fullName)
+                    }
+                    
+                    if let userID = viewModel.userID {
+                        InfoRowView(label: "User ID", value: userID)
+                    }
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 40)
+                
+                Section("Profile Stats") {
+                    InfoRowView(label: "Completion", value: "\(Int(viewModel.profileCompletionPercentage))%")
+                    InfoRowView(label: "Member Since", value: viewModel.memberSinceText)
+                    InfoRowView(label: "Last Updated", value: viewModel.lastUpdatedText)
+                }
+                
+                Section("Subscription") {
+                    InfoRowView(label: "Status", value: viewModel.subscriptionStatus)
+                    InfoRowView(label: "Plan", value: viewModel.subscriptionPlan)
+                    if viewModel.hasSubscription {
+                        InfoRowView(label: "Expires", value: viewModel.subscriptionExpiryText)
+                    }
+                }
+                
+                Section("Data & Privacy") {
+                    Button(action: {
+                        // Request data export
+                    }) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("Request Data Export")
+                        }
+                    }
+                    
+                    Button(action: {
+                        // Delete account
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("Delete Account")
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
             }
-            .navigationTitle("Upgrade")
+            .navigationTitle("Profile Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
-                        showUpgradeSheet = false
+                    Button("Done") {
+                        dismiss()
                     }
                 }
             }
@@ -307,6 +402,40 @@ struct UpgradeView: View {
     }
 }
 
-#Preview {
-    AuthenticationView(selectedMode: .constant(.subscription))
+// MARK: - Circular Progress View
+
+struct CircularProgressView<Content: View>: View {
+    let progress: Double
+    let lineWidth: CGFloat
+    let size: CGFloat
+    @ViewBuilder let content: () -> Content
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.gray.opacity(0.2), lineWidth: lineWidth)
+                .frame(width: size, height: size)
+            
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    Color.green,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .frame(width: size, height: size)
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut, value: progress)
+            
+            content()
+        }
+    }
+}
+
+// MARK: - Preview
+
+struct AuthenticationView_Previews: PreviewProvider {
+    static var previews: some View {
+        AuthenticationView()
+            .environmentObject(DesignSystem.shared)
+    }
 }
