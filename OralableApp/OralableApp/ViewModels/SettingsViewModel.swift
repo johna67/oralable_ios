@@ -2,14 +2,6 @@
 //  SettingsViewModel.swift
 //  OralableApp
 //
-//  Created by John A Cogan on 07/11/2025.
-//
-
-
-//
-//  SettingsViewModel.swift
-//  OralableApp
-//
 //  Created: November 7, 2025
 //  MVVM Architecture - Settings management business logic
 //
@@ -24,7 +16,6 @@ class SettingsViewModel: ObservableObject {
     
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
     @Published var notificationsEnabled: Bool = true
-    @Published var exportFormat: ExportFormat = .csv
     @Published var dataRetentionDays: Int = 30
     @Published var autoConnectEnabled: Bool = true
     @Published var showDebugInfo: Bool = false
@@ -57,7 +48,6 @@ class SettingsViewModel: ObservableObject {
     private enum Keys {
         static let ppgChannelOrder = "ppgChannelOrder"
         static let notificationsEnabled = "notificationsEnabled"
-        static let exportFormat = "exportFormat"
         static let dataRetentionDays = "dataRetentionDays"
         static let autoConnectEnabled = "autoConnectEnabled"
         static let showDebugInfo = "showDebugInfo"
@@ -123,6 +113,20 @@ class SettingsViewModel: ObservableObject {
                 self?.saveSetting(Keys.dataRetentionDays, value: value)
             }
             .store(in: &cancellables)
+        
+        $autoConnectEnabled
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.saveSetting(Keys.autoConnectEnabled, value: value)
+            }
+            .store(in: &cancellables)
+        
+        $showDebugInfo
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.saveSetting(Keys.showDebugInfo, value: value)
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Settings Management
@@ -140,6 +144,11 @@ class SettingsViewModel: ObservableObject {
         show24HourTime = userDefaults.bool(forKey: Keys.show24HourTime, defaultValue: true)
         shareAnalytics = userDefaults.bool(forKey: Keys.shareAnalytics, defaultValue: false)
         localStorageOnly = userDefaults.bool(forKey: Keys.localStorageOnly, defaultValue: true)
+        
+        if let rateString = userDefaults.string(forKey: Keys.chartRefreshRate),
+           let rate = ChartRefreshRate(rawValue: rateString) {
+            chartRefreshRate = rate
+        }
     }
     
     func saveSetting(_ key: String, value: Any) {
@@ -149,7 +158,6 @@ class SettingsViewModel: ObservableObject {
     func resetToDefaults() {
         ppgChannelOrder = .standard
         notificationsEnabled = true
-        exportFormat = .csv
         dataRetentionDays = 30
         autoConnectEnabled = true
         showDebugInfo = false
@@ -160,9 +168,17 @@ class SettingsViewModel: ObservableObject {
         show24HourTime = true
         shareAnalytics = false
         localStorageOnly = true
+        chartRefreshRate = .realTime
         
         // Remove all saved settings
-        Keys.allCases.forEach { userDefaults.removeObject(forKey: $0) }
+        let allKeys = [
+            Keys.ppgChannelOrder, Keys.notificationsEnabled, Keys.dataRetentionDays,
+            Keys.autoConnectEnabled, Keys.showDebugInfo, Keys.connectionAlerts,
+            Keys.batteryAlerts, Keys.lowBatteryThreshold, Keys.useMetricUnits,
+            Keys.show24HourTime, Keys.chartRefreshRate, Keys.shareAnalytics,
+            Keys.localStorageOnly
+        ]
+        allKeys.forEach { userDefaults.removeObject(forKey: $0) }
     }
     
     func validateSettings() -> Bool {
@@ -181,7 +197,6 @@ class SettingsViewModel: ObservableObject {
         return [
             Keys.ppgChannelOrder: ppgChannelOrder.rawValue,
             Keys.notificationsEnabled: notificationsEnabled,
-            Keys.exportFormat: exportFormat == .csv ? "csv" : "json",
             Keys.dataRetentionDays: dataRetentionDays,
             Keys.autoConnectEnabled: autoConnectEnabled,
             Keys.showDebugInfo: showDebugInfo,
@@ -191,7 +206,8 @@ class SettingsViewModel: ObservableObject {
             Keys.useMetricUnits: useMetricUnits,
             Keys.show24HourTime: show24HourTime,
             Keys.shareAnalytics: shareAnalytics,
-            Keys.localStorageOnly: localStorageOnly
+            Keys.localStorageOnly: localStorageOnly,
+            Keys.chartRefreshRate: chartRefreshRate.rawValue
         ]
     }
     
@@ -205,7 +221,37 @@ class SettingsViewModel: ObservableObject {
         if let value = dictionary[Keys.dataRetentionDays] as? Int {
             dataRetentionDays = value
         }
-        // ... import other settings
+        if let value = dictionary[Keys.autoConnectEnabled] as? Bool {
+            autoConnectEnabled = value
+        }
+        if let value = dictionary[Keys.showDebugInfo] as? Bool {
+            showDebugInfo = value
+        }
+        if let value = dictionary[Keys.connectionAlerts] as? Bool {
+            connectionAlerts = value
+        }
+        if let value = dictionary[Keys.batteryAlerts] as? Bool {
+            batteryAlerts = value
+        }
+        if let value = dictionary[Keys.lowBatteryThreshold] as? Int {
+            lowBatteryThreshold = value
+        }
+        if let value = dictionary[Keys.useMetricUnits] as? Bool {
+            useMetricUnits = value
+        }
+        if let value = dictionary[Keys.show24HourTime] as? Bool {
+            show24HourTime = value
+        }
+        if let value = dictionary[Keys.chartRefreshRate] as? String,
+           let rate = ChartRefreshRate(rawValue: value) {
+            chartRefreshRate = rate
+        }
+        if let value = dictionary[Keys.shareAnalytics] as? Bool {
+            shareAnalytics = value
+        }
+        if let value = dictionary[Keys.localStorageOnly] as? Bool {
+            localStorageOnly = value
+        }
     }
 }
 
@@ -232,19 +278,6 @@ extension UserDefaults {
             return defaultValue
         }
         return integer(forKey: key)
-    }
-}
-
-// MARK: - Keys Extension
-
-extension SettingsViewModel.Keys {
-    static var allCases: [String] {
-        return [
-            ppgChannelOrder, notificationsEnabled, exportFormat, dataRetentionDays,
-            autoConnectEnabled, showDebugInfo, connectionAlerts, batteryAlerts,
-            lowBatteryThreshold, useMetricUnits, show24HourTime, chartRefreshRate,
-            shareAnalytics, localStorageOnly
-        ]
     }
 }
 
