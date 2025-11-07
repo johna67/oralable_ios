@@ -3,7 +3,7 @@
 //  OralableApp
 //
 //  Created by John A Cogan on 03/11/2025.
-//  Updated: November 4, 2025
+//  Updated: November 7, 2025
 //  Thin wrapper around CoreBluetooth to surface discovery/connection callbacks
 //
 
@@ -126,4 +126,3 @@ extension BLECentralManager: CBCentralManagerDelegate {
         onDeviceDisconnected?(peripheral, error)
     }
 }
-
