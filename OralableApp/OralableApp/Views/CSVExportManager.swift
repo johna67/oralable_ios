@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - CSV Export Manager
+
 /// Manager for exporting sensor data and logs to CSV format
 class CSVExportManager {
     static let shared = CSVExportManager()
@@ -20,33 +22,30 @@ class CSVExportManager {
         let timestamp = dateFormatter.string(from: Date())
         let filename = "oralable_data_\(timestamp).csv"
         
-        // Use a different temporary directory that's more accessible
+        // Use the cache directory for temporary files that need to be shared
+        // This is accessible by the share sheet and gets cleaned up automatically
         let fileManager = FileManager.default
-        let tempDirectory = fileManager.temporaryDirectory
-        let exportDirectory = tempDirectory.appendingPathComponent("Exports", isDirectory: true)
+        let cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let exportDirectory = cacheDirectory.appendingPathComponent("Exports", isDirectory: true)
         
         // Create exports directory if it doesn't exist
         if !fileManager.fileExists(atPath: exportDirectory.path) {
             try? fileManager.createDirectory(at: exportDirectory, withIntermediateDirectories: true)
         }
         
-        let tempURL = exportDirectory.appendingPathComponent(filename)
+        let fileURL = exportDirectory.appendingPathComponent(filename)
         
         do {
             // Remove existing file if present
-            if fileManager.fileExists(atPath: tempURL.path) {
-                try fileManager.removeItem(at: tempURL)
+            if fileManager.fileExists(atPath: fileURL.path) {
+                try fileManager.removeItem(at: fileURL)
             }
             
-            // Write with proper permissions
-            try csvContent.write(to: tempURL, atomically: true, encoding: .utf8)
+            // Write the CSV content
+            try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
             
-            // Set file attributes to ensure it's readable
-            let attributes = [FileAttributeKey.posixPermissions: 0o644]
-            try? fileManager.setAttributes(attributes, ofItemAtPath: tempURL.path)
-            
-            print("Successfully exported CSV to: \(tempURL.path)")
-            return tempURL
+            print("Successfully exported CSV to: \(fileURL.path)")
+            return fileURL
         } catch {
             print("Failed to write CSV file: \(error)")
             return nil
@@ -214,6 +213,39 @@ class CSVExportManager {
             return dateFormatter.string(from: startDate)
         } else {
             return "\(dateFormatter.string(from: startDate)) - \(dateFormatter.string(from: endDate))"
+        }
+    }
+    
+    /// Clean up old export files from the cache directory
+    /// This helps manage disk space by removing temporary export files
+    func cleanupOldExports() {
+        let fileManager = FileManager.default
+        guard let cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        let exportDirectory = cacheDirectory.appendingPathComponent("Exports", isDirectory: true)
+        
+        guard fileManager.fileExists(atPath: exportDirectory.path) else {
+            return
+        }
+        
+        do {
+            let fileURLs = try fileManager.contentsOfDirectory(at: exportDirectory, includingPropertiesForKeys: [.creationDateKey], options: .skipsHiddenFiles)
+            
+            // Remove files older than 24 hours
+            let dayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+            
+            for fileURL in fileURLs {
+                if let attributes = try? fileManager.attributesOfItem(atPath: fileURL.path),
+                   let creationDate = attributes[.creationDate] as? Date,
+                   creationDate < dayAgo {
+                    try? fileManager.removeItem(at: fileURL)
+                    print("Cleaned up old export file: \(fileURL.lastPathComponent)")
+                }
+            }
+        } catch {
+            print("Error cleaning up exports: \(error)")
         }
     }
 }

@@ -49,58 +49,16 @@ struct SubscriptionContentView: View {
     @State private var showProfile = false
     @State private var showDevices = false
     
+    @Environment(\.horizontalSizeClass) var sizeClass
+    
     var body: some View {
-        ZStack {
-            // Main Tab View
-            TabView(selection: $selectedTab) {
-                DashboardView(ble: ble, isViewerMode: false)
-                    .tabItem {
-                        Label("Dashboard", systemImage: "gauge")
-                    }
-                    .tag(0)
-                
-                ShareView(ble: ble, isViewerMode: false)
-                    .tabItem {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
-                    .tag(1)
-                
-                SubscriptionSettingsView(ble: ble, selectedMode: $selectedMode)
-                    .tabItem {
-                        Label("Settings", systemImage: "gear")
-                    }
-                    .tag(2)
-            }
-            // Top Navigation Bar Overlay
-            VStack {
-                HStack {
-                    // Left: Profile Button
-                    ProfileButtonView(
-                        authManager: authManager,
-                        action: { showProfile = true }
-                    )
-                    
-                    Spacer()
-                    
-                    // Right: Devices Button
-                    Button(action: { showDevices = true }) {
-                        HStack(spacing: 8) {
-                            ZStack {
-                                Circle()
-                                    .fill(ble.isConnected ? Color.green.opacity(0.2) : Color.gray.opacity(0.15))
-                                    .frame(width: 40, height: 40)
-                                
-                                Image(systemName: "wave.3.right.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(ble.isConnected ? .green : .gray)
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                
-                Spacer()
+        Group {
+            if DesignSystem.Layout.isIPad && sizeClass == .regular {
+                // iPad with regular width - use split view
+                iPadSplitView
+            } else {
+                // iPhone or iPad in compact mode - use tab view
+                iPhoneTabView
             }
         }
         .sheet(isPresented: $showProfile) {
@@ -108,6 +66,157 @@ struct SubscriptionContentView: View {
         }
         .sheet(isPresented: $showDevices) {
             DevicesView(ble: ble)
+        }
+    }
+    
+    // MARK: - iPad Split View Layout
+    
+    private var iPadSplitView: some View {
+        NavigationSplitView {
+            List {
+                Section("Main") {
+                    Button {
+                        selectedTab = 0
+                    } label: {
+                        Label("Dashboard", systemImage: "gauge")
+                    }
+                    .listRowBackground(selectedTab == 0 ? Color.accentColor.opacity(0.15) : Color.clear)
+                    
+                    Button {
+                        selectedTab = 1
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .listRowBackground(selectedTab == 1 ? Color.accentColor.opacity(0.15) : Color.clear)
+                }
+                
+                Section("Account") {
+                    Button {
+                        selectedTab = 2
+                    } label: {
+                        Label("Settings", systemImage: "gear")
+                    }
+                    .listRowBackground(selectedTab == 2 ? Color.accentColor.opacity(0.15) : Color.clear)
+                }
+                
+                Section {
+                    Button(action: { showProfile = true }) {
+                        HStack {
+                            UserAvatarView(
+                                initials: authManager.userInitials,
+                                size: 32,
+                                showOnlineIndicator: false
+                            )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(authManager.userEmail ?? "User")
+                                    .font(DesignSystem.Typography.bodyMedium)
+                                Text("View Profile")
+                                    .font(DesignSystem.Typography.caption)
+                                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle("Oralable")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { showDevices = true }) {
+                        Image(systemName: "wave.3.right.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(ble.isConnected ? .green : .gray)
+                    }
+                }
+            }
+        } detail: {
+            NavigationStack {
+                detailView(for: selectedTab)
+            }
+        }
+    }
+    
+    // MARK: - iPhone Tab View Layout
+    
+    private var iPhoneTabView: some View {
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                DashboardView(ble: ble, isViewerMode: false)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: { showProfile = true }) {
+                                UserAvatarView(
+                                    initials: authManager.userInitials,
+                                    size: 32,
+                                    showOnlineIndicator: false
+                                )
+                            }
+                        }
+                        
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showDevices = true }) {
+                                Image(systemName: "wave.3.right.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(ble.isConnected ? .green : .gray)
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "gauge")
+            }
+            .tag(0)
+            
+            NavigationStack {
+                ShareView(ble: ble, isViewerMode: false)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: { showProfile = true }) {
+                                UserAvatarView(
+                                    initials: authManager.userInitials,
+                                    size: 32,
+                                    showOnlineIndicator: false
+                                )
+                            }
+                        }
+                        
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showDevices = true }) {
+                                Image(systemName: "wave.3.right.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(ble.isConnected ? .green : .gray)
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .tag(1)
+            
+            NavigationStack {
+                SubscriptionSettingsView(ble: ble, selectedMode: $selectedMode)
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gear")
+            }
+            .tag(2)
+        }
+    }
+    
+    // MARK: - Detail View Helper
+    
+    @ViewBuilder
+    private func detailView(for tab: Int) -> some View {
+        switch tab {
+        case 0:
+            DashboardView(ble: ble, isViewerMode: false)
+        case 1:
+            ShareView(ble: ble, isViewerMode: false)
+        case 2:
+            SubscriptionSettingsView(ble: ble, selectedMode: $selectedMode)
+        default:
+            DashboardView(ble: ble, isViewerMode: false)
         }
     }
 }
@@ -170,6 +279,7 @@ struct UserProfileView: View {
 // MARK: - Profile Header
 struct ProfileHeaderView: View {
     @StateObject private var authManager = AuthenticationManager.shared
+    @State private var showAppleIDDebug = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -190,9 +300,40 @@ struct ProfileHeaderView: View {
                 Text(email)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+            } else {
+                Text("Email not available")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Incomplete profile warning
+            if !authManager.hasCompleteProfile {
+                VStack(spacing: 8) {
+                    Label {
+                        Text("Profile data incomplete")
+                            .font(.caption)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                    }
+                    .foregroundColor(.secondary)
+                    
+                    Button(action: { showAppleIDDebug = true }) {
+                        Text("Debug & Fix")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
             }
         }
         .padding()
+        .sheet(isPresented: $showAppleIDDebug) {
+            AppleIDDebugView()
+        }
     }
 }
 

@@ -15,22 +15,34 @@ struct DashboardView: View {
     @ObservedObject var ble: OralableBLE
     var isViewerMode: Bool = false
     
+    @Environment(\.horizontalSizeClass) var sizeClass
+    
+    private var columns: [GridItem] {
+        let columnCount = DesignSystem.Layout.gridColumns(for: sizeClass)
+        return Array(
+            repeating: GridItem(.flexible(), spacing: DesignSystem.Layout.cardSpacing),
+            count: columnCount
+        )
+    }
+    
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: DesignSystem.Spacing.lg) {
-                    // Connection Status Card (only in subscription mode)
-                    if !isViewerMode {
-                        ConnectionStatusCard(ble: ble)
-                    }
-                    
-                    // Device State Card (shows what the device is doing)
-                    if ble.isConnected || isViewerMode {
-                        DeviceStateCard(deviceState: ble.deviceState)
-                    }
-                    
-                    // Sensor Data Cards
-                    if isViewerMode || ble.isConnected {
+        ScrollView {
+            VStack(spacing: DesignSystem.Spacing.lg) {
+                // Connection Status Card (only in subscription mode)
+                if !isViewerMode {
+                    ConnectionStatusCard(ble: ble)
+                        .frame(maxWidth: .infinity)
+                }
+                
+                // Device State Card (shows what the device is doing)
+                if ble.isConnected || isViewerMode {
+                    DeviceStateCard(deviceState: ble.deviceState)
+                        .frame(maxWidth: .infinity)
+                }
+                
+                // Sensor Data Cards in Adaptive Grid
+                if isViewerMode || ble.isConnected {
+                    LazyVGrid(columns: columns, spacing: DesignSystem.Layout.cardSpacing) {
                         // Battery card
                         MetricGraphCard(metric: .battery) {
                             BatteryGraphView(batteryHistory: ble.batteryHistory)
@@ -66,17 +78,17 @@ struct DashboardView: View {
                             PPGGraphView(ppgHistory: ble.ppgHistory)
                         }
                         .environmentObject(ble)
-                    } else {
-                        // No Data State
-                        NoDataView(isViewerMode: isViewerMode)
                     }
+                } else {
+                    // No Data State
+                    NoDataView(isViewerMode: isViewerMode)
                 }
-                .padding(DesignSystem.Spacing.lg)
             }
-            .navigationTitle("Dashboard")
-            .navigationBarTitleDisplayMode(.large)
-            .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
+            .padding(DesignSystem.Layout.edgePadding)
         }
+        .navigationTitle("Dashboard")
+        .navigationBarTitleDisplayMode(DesignSystem.Layout.isIPad ? .inline : .large)
+        .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
     }
 }
 
@@ -357,10 +369,10 @@ struct MetricGraphCard<Content: View>: View {
 struct BatteryGraphView: View {
     let batteryHistory: [BatteryData]
     
-    // Show only last 3 minutes of data
+    // Show only last 1 minute of data
     private var recentData: [BatteryData] {
-        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
-        return batteryHistory.filter { $0.timestamp >= threeMinutesAgo }
+        let oneMinuteAgo = Date().addingTimeInterval(-60) // 1 minute = 60 seconds
+        return batteryHistory.filter { $0.timestamp >= oneMinuteAgo }
     }
     
     var body: some View {
@@ -396,7 +408,7 @@ struct BatteryGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !recentData.isEmpty {
+            if recentData.count >= 2 {
                 Chart {
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
@@ -421,6 +433,7 @@ struct BatteryGraphView: View {
                     }
                 }
                 .chartYScale(domain: 0...100)
+                .chartXScale(domain: Date().addingTimeInterval(-60)...Date())
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisValueLabel(format: .dateTime.minute().second())
@@ -445,10 +458,10 @@ struct BatteryGraphView: View {
 struct PPGGraphView: View {
     let ppgHistory: [PPGData]
     
-    // Show only last 3 minutes of data
+    // Show only last 1 minute of data
     private var recentData: [PPGData] {
-        let threeMinutesAgo = Date().addingTimeInterval(-180)
-        return ppgHistory.filter { $0.timestamp >= threeMinutesAgo }
+        let oneMinuteAgo = Date().addingTimeInterval(-60)
+        return ppgHistory.filter { $0.timestamp >= oneMinuteAgo }
     }
     
     // Calculate dynamic Y-axis range based on actual data
@@ -498,7 +511,7 @@ struct PPGGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !recentData.isEmpty {
+            if recentData.count >= 2 {
                 Chart {
                     // IR channel (primary)
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
@@ -511,6 +524,7 @@ struct PPGGraphView: View {
                     }
                 }
                 .chartYScale(domain: yAxisRange)
+                .chartXScale(domain: Date().addingTimeInterval(-60)...Date())
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisValueLabel(format: .dateTime.minute().second())
@@ -543,10 +557,10 @@ struct PPGGraphView: View {
 struct HeartRateGraphView: View {
     let heartRateHistory: [HeartRateData]
     
-    // Show only last 3 minutes of data
+    // Show only last 1 minute of data
     private var recentData: [HeartRateData] {
-        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
-        return heartRateHistory.filter { $0.timestamp >= threeMinutesAgo }
+        let oneMinuteAgo = Date().addingTimeInterval(-60) // 1 minute = 60 seconds
+        return heartRateHistory.filter { $0.timestamp >= oneMinuteAgo }
     }
     
     // Calculate dynamic Y-axis range based on actual data
@@ -606,7 +620,7 @@ struct HeartRateGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !recentData.isEmpty {
+            if recentData.count >= 2 {
                 Chart {
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
@@ -644,6 +658,7 @@ struct HeartRateGraphView: View {
                     }
                 }
                 .chartYScale(domain: yAxisRange)
+                .chartXScale(domain: Date().addingTimeInterval(-60)...Date())
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisValueLabel(format: .dateTime.minute().second())
@@ -671,10 +686,10 @@ struct HeartRateGraphView: View {
 struct TemperatureGraphView: View {
     let temperatureHistory: [TemperatureData]
     
-    // Show only last 3 minutes of data
+    // Show only last 1 minute of data
     private var recentData: [TemperatureData] {
-        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
-        return temperatureHistory.filter { $0.timestamp >= threeMinutesAgo }
+        let oneMinuteAgo = Date().addingTimeInterval(-60) // 1 minute = 60 seconds
+        return temperatureHistory.filter { $0.timestamp >= oneMinuteAgo }
     }
     
     // Calculate dynamic Y-axis range based on actual data
@@ -734,7 +749,7 @@ struct TemperatureGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !recentData.isEmpty {
+            if recentData.count >= 2 {
                 Chart {
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
@@ -766,6 +781,7 @@ struct TemperatureGraphView: View {
                     }
                 }
                 .chartYScale(domain: yAxisRange)
+                .chartXScale(domain: Date().addingTimeInterval(-60)...Date())
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisValueLabel(format: .dateTime.minute().second())
@@ -798,10 +814,10 @@ struct TemperatureGraphView: View {
 struct AccelerometerGraphView: View {
     let accelerometerHistory: [AccelerometerData]
     
-    // Show only last 3 minutes of data
+    // Show only last 1 minute of data
     private var recentData: [AccelerometerData] {
-        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
-        return accelerometerHistory.filter { $0.timestamp >= threeMinutesAgo }
+        let oneMinuteAgo = Date().addingTimeInterval(-60) // 1 minute = 60 seconds
+        return accelerometerHistory.filter { $0.timestamp >= oneMinuteAgo }
     }
     
     // Calculate dynamic Y-axis range based on actual data
@@ -862,7 +878,7 @@ struct AccelerometerGraphView: View {
             }
             .padding(.horizontal, 4)
             
-            if !recentData.isEmpty {
+            if recentData.count >= 2 {
                 Chart {
                     // Magnitude line
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
@@ -899,6 +915,7 @@ struct AccelerometerGraphView: View {
                     }
                 }
                 .chartYScale(domain: yAxisRange)
+                .chartXScale(domain: Date().addingTimeInterval(-60)...Date())
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisValueLabel(format: .dateTime.minute().second())
@@ -929,10 +946,10 @@ struct AccelerometerGraphView: View {
 struct SpO2GraphView: View {
     let spo2History: [SpO2Data]
     
-    // Show only last 3 minutes of data
+    // Show only last 1 minute of data
     private var recentData: [SpO2Data] {
-        let threeMinutesAgo = Date().addingTimeInterval(-180) // 3 minutes = 180 seconds
-        return spo2History.filter { $0.timestamp >= threeMinutesAgo }
+        let oneMinuteAgo = Date().addingTimeInterval(-60) // 1 minute = 60 seconds
+        return spo2History.filter { $0.timestamp >= oneMinuteAgo }
     }
     
     // Calculate dynamic Y-axis range based on actual data
@@ -1020,7 +1037,7 @@ struct SpO2GraphView: View {
             .padding(.horizontal, 4)
             
             // Chart
-            if !recentData.isEmpty {
+            if recentData.count >= 2 {
                 Chart {
                     ForEach(Array(recentData.enumerated()), id: \.offset) { index, measurement in
                         LineMark(
@@ -1052,6 +1069,7 @@ struct SpO2GraphView: View {
                     }
                 }
                 .chartYScale(domain: yAxisRange)
+                .chartXScale(domain: Date().addingTimeInterval(-60)...Date())
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 4)) { value in
                         AxisValueLabel(format: .dateTime.minute().second())

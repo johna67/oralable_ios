@@ -136,10 +136,12 @@ class DeviceStateDetector: ObservableObject {
         static let ambientTemperatureMax = 28.0 // °C - typical room temperature
         static let temperatureStabilityThreshold = 0.5 // °C change for "stable"
         
-        // Accelerometer (magnitude in mg)
-        static let idleMovementMax = 50.0 // mg - device is stationary
-        static let normalMovementMax = 300.0 // mg - gentle movement
-        static let activeMovementMin = 300.0 // mg - active movement
+        // Accelerometer (magnitude in raw units, typically 16384 = 1g)
+        // Your device reads ~17000-17500 when stationary
+        static let idleMovementMax = 18000.0 // Raw units - device is stationary (±500 from 17000)
+        static let normalMovementMax = 20000.0 // Raw units - gentle movement
+        static let activeMovementMin = 22000.0 // Raw units - active movement
+        static let movementVariabilityThreshold = 1500.0 // Raw units - variation threshold for motion detection
         
         // PPG
         static let ppgSignalMin = 1000 // Minimum valid PPG signal
@@ -313,11 +315,15 @@ class DeviceStateDetector: ObservableObject {
         if metrics.isHighBattery && metrics.batteryTrend >= 0 &&
            metrics.isStationary && !metrics.isBodyTemperature {
             
-            confidence = 0.85
+            confidence = 0.95  // FIXED: Increased from 0.85
             
-            // Increase confidence if battery is increasing
-            if metrics.batteryTrend > 1.0 {
-                confidence += 0.1
+            // 100% confidence if truly not moving and battery at 100%
+            if metrics.averageMovement < Thresholds.idleMovementMax / 2 && metrics.averageBattery >= 99 {
+                confidence = 1.0
+            }
+            // Very high confidence if battery is increasing (actively charging)
+            else if metrics.batteryTrend > 1.0 {
+                confidence = 0.98
             }
             
             details = [
@@ -372,15 +378,50 @@ class DeviceStateDetector: ObservableObject {
             )
         }
         
-        // Rule 3: In Motion (High movement variability)
-        if metrics.isActivelyMoving || metrics.movementVariability > 100 {
-            confidence = 0.80
+        // DEBUG: Log motion detection values
+        print("🔍 Motion Detection Debug:")
+        print("   Average Movement: \(metrics.averageMovement) (threshold: \(Thresholds.activeMovementMin))")
+        print("   Movement Variability: \(metrics.movementVariability) (threshold: \(Thresholds.movementVariabilityThreshold))")
+        print("   Is Actively Moving: \(metrics.isActivelyMoving)")
+        print("   Is Stationary: \(metrics.isStationary)")
+        
+        // Rule 3: In Motion (High movement AND high movement variability)
+        // BOTH average movement AND variability must be elevated for motion detection
+        // This prevents false positives from sensor noise when stationary
+        if metrics.isActivelyMoving && metrics.movementVariability > Thresholds.movementVariabilityThreshold {
+            confidence = 0.85
             
             details = [
                 "movement": metrics.averageMovement,
                 "movementVariability": metrics.movementVariability,
-                "reason": "Active movement detected"
+                "activeMovementMin": Thresholds.activeMovementMin,
+                "variabilityThreshold": Thresholds.movementVariabilityThreshold,
+                "reason": "Active movement and high variability detected"
             ]
+            
+            print("🚨 Motion detected: BOTH conditions met")
+            
+            return DeviceStateResult(
+                state: .inMotion,
+                confidence: confidence,
+                timestamp: Date(),
+                details: details
+            )
+        }
+        
+        // Check for very high variability alone (device being actively handled/shaken)
+        // Increased threshold to 3x to avoid false positives from normal sensor noise
+        if metrics.movementVariability > Thresholds.movementVariabilityThreshold * 3.0 {
+            confidence = 0.75
+            
+            details = [
+                "movement": metrics.averageMovement,
+                "movementVariability": metrics.movementVariability,
+                "variabilityThreshold": Thresholds.movementVariabilityThreshold * 3.0,
+                "reason": "Very high movement variability detected (device being handled)"
+            ]
+            
+            print("🚨 Motion detected: Variability ALONE exceeded 3x threshold")
             
             return DeviceStateResult(
                 state: .inMotion,
@@ -395,11 +436,16 @@ class DeviceStateDetector: ObservableObject {
            !metrics.isHighBattery &&
            !metrics.isBodyTemperature {
             
-            confidence = 0.70
+            confidence = 0.90  // FIXED: Increased from 0.70
             
-            // Increase confidence if battery is decreasing
-            if metrics.batteryTrend < 0 {
-                confidence += 0.1
+            // Increase confidence if battery is stable and movement is very low
+            if metrics.averageMovement < Thresholds.idleMovementMax / 2 {
+                confidence = 1.0  // FIXED: 100% confidence when truly not moving
+            }
+            
+            // Also high confidence if battery is decreasing slowly (device just sitting)
+            if metrics.batteryTrend <= 0 && metrics.batteryTrend > -5 {
+                confidence = max(confidence, 0.95)
             }
             
             details = [

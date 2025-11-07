@@ -233,6 +233,56 @@ enum DesignSystem {
         static let slow: Double = 0.3
         static let verySlow: Double = 0.5
     }
+    
+    // MARK: - Layout (iPad-specific)
+    
+    enum Layout {
+        /// Detects if the current device is an iPad
+        static var isIPad: Bool {
+            UIDevice.current.userInterfaceIdiom == .pad
+        }
+        
+        /// Returns content width optimized for readability on iPad
+        static func contentWidth(for geometry: GeometryProxy) -> CGFloat {
+            if isIPad {
+                // On iPad, cap content width for better readability
+                // but use full width if it's narrower than the cap
+                return min(geometry.size.width * 0.9, 800)
+            }
+            return geometry.size.width
+        }
+        
+        /// Number of columns for grid layouts based on device and size class
+        static func gridColumns(for sizeClass: UserInterfaceSizeClass?) -> Int {
+            if isIPad {
+                switch sizeClass {
+                case .regular:
+                    return 3 // Full-width iPad or landscape
+                case .compact:
+                    return 2 // Split view or portrait narrow iPad
+                default:
+                    return 2
+                }
+            }
+            return 1 // iPhone always uses single column
+        }
+        
+        /// Padding for edges based on device
+        static var edgePadding: CGFloat {
+            isIPad ? Spacing.xl : Spacing.lg
+        }
+        
+        /// Card spacing in grids
+        static var cardSpacing: CGFloat {
+            isIPad ? Spacing.lg : Spacing.md
+        }
+        
+        /// Maximum card width on iPad
+        static let maxCardWidth: CGFloat = 400
+        
+        /// Optimal sidebar width on iPad
+        static let sidebarWidth: CGFloat = 320
+    }
 }
 
 // MARK: - Shadow Style Helper
@@ -254,6 +304,28 @@ extension View {
             x: shadow.x,
             y: shadow.y
         )
+    }
+    
+    /// Apply responsive card styling optimized for iPad
+    func responsiveCard() -> some View {
+        self
+            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth : .infinity)
+            .padding(DesignSystem.Spacing.md)
+            .background(DesignSystem.Colors.backgroundPrimary)
+            .cornerRadius(DesignSystem.CornerRadius.lg)
+            .designShadow(DesignSystem.Shadow.md)
+    }
+    
+    /// Center content with optimal reading width on iPad
+    func centeredContent(geometry: GeometryProxy) -> some View {
+        self
+            .frame(maxWidth: DesignSystem.Layout.contentWidth(for: geometry))
+            .frame(maxWidth: .infinity)
+    }
+    
+    /// Apply consistent padding based on device
+    func devicePadding() -> some View {
+        self.padding(DesignSystem.Layout.edgePadding)
     }
 }
 

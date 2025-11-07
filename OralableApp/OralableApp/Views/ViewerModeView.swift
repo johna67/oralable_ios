@@ -5,61 +5,133 @@ struct ViewerModeView: View {
     @StateObject private var ble = OralableBLE()
     @State private var selectedTab = 0
     @State private var showDevices = false
+    
+    @Environment(\.horizontalSizeClass) var sizeClass
 
     var body: some View {
-        ZStack {
-            // Main Tab View for Viewer Mode
-            TabView(selection: $selectedTab) {
-                DashboardView(ble: ble, isViewerMode: true)
-                    .tabItem {
-                        Label("Dashboard", systemImage: "gauge")
-                    }
-                    .tag(0)
-
-                ShareView(ble: ble, isViewerMode: true)
-                    .tabItem {
-                        Label("Import/Export", systemImage: "square.and.arrow.up")
-                    }
-                    .tag(1)
-            }
-
-            // Simple top overlay bar with a "Mode" button and optional devices shortcut
-            VStack {
-                HStack {
-                    Button {
-                        selectedMode = nil
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "chevron.left")
-                            Text("Modes")
-                        }
-                    }
-
-                    Spacer()
-
-                    // Devices button (optional, for quick access if you later want to scan/connect in viewer mode)
-                    Button {
-                        showDevices = true
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(ble.isConnected ? Color.green.opacity(0.2) : Color.gray.opacity(0.15))
-                                .frame(width: 36, height: 36)
-
-                            Image(systemName: "wave.3.right.circle.fill")
-                                .font(.title3)
-                                .foregroundColor(ble.isConnected ? .green : .gray)
-                        }
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-
-                Spacer()
+        Group {
+            if DesignSystem.Layout.isIPad && sizeClass == .regular {
+                // iPad with regular width - use split view
+                iPadSplitView
+            } else {
+                // iPhone or iPad in compact mode - use tab view
+                iPhoneTabView
             }
         }
         .sheet(isPresented: $showDevices) {
             DevicesView(ble: ble)
+        }
+    }
+    
+    // MARK: - iPad Split View Layout
+    
+    private var iPadSplitView: some View {
+        NavigationSplitView {
+            List {
+                Section("Viewer Mode") {
+                    Button {
+                        selectedTab = 0
+                    } label: {
+                        Label("Dashboard", systemImage: "gauge")
+                    }
+                    .listRowBackground(selectedTab == 0 ? Color.accentColor.opacity(0.15) : Color.clear)
+                    
+                    Button {
+                        selectedTab = 1
+                    } label: {
+                        Label("Import/Export", systemImage: "square.and.arrow.up")
+                    }
+                    .listRowBackground(selectedTab == 1 ? Color.accentColor.opacity(0.15) : Color.clear)
+                }
+                
+                Section {
+                    Button(action: { selectedMode = nil }) {
+                        HStack {
+                            Image(systemName: "chevron.left")
+                            Text("Switch Mode")
+                        }
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle("Oralable Viewer")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { showDevices = true }) {
+                        Image(systemName: "wave.3.right.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(ble.isConnected ? .green : .gray)
+                    }
+                }
+            }
+        } detail: {
+            NavigationStack {
+                detailView(for: selectedTab)
+            }
+        }
+    }
+    
+    // MARK: - iPhone Tab View Layout
+    
+    private var iPhoneTabView: some View {
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                DashboardView(ble: ble, isViewerMode: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: { selectedMode = nil }) {
+                                Label("Modes", systemImage: "chevron.left")
+                            }
+                        }
+                        
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showDevices = true }) {
+                                Image(systemName: "wave.3.right.circle.fill")
+                                    .foregroundColor(ble.isConnected ? .green : .gray)
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "gauge")
+            }
+            .tag(0)
+
+            NavigationStack {
+                ShareView(ble: ble, isViewerMode: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: { selectedMode = nil }) {
+                                Label("Modes", systemImage: "chevron.left")
+                            }
+                        }
+                        
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showDevices = true }) {
+                                Image(systemName: "wave.3.right.circle.fill")
+                                    .foregroundColor(ble.isConnected ? .green : .gray)
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Import/Export", systemImage: "square.and.arrow.up")
+            }
+            .tag(1)
+        }
+    }
+    
+    // MARK: - Detail View Helper
+    
+    @ViewBuilder
+    private func detailView(for tab: Int) -> some View {
+        switch tab {
+        case 0:
+            DashboardView(ble: ble, isViewerMode: true)
+        case 1:
+            ShareView(ble: ble, isViewerMode: true)
+        default:
+            DashboardView(ble: ble, isViewerMode: true)
         }
     }
 }

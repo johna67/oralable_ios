@@ -32,6 +32,22 @@ struct LogMessage: Identifiable {
     let message: String
     let timestamp: Date = Date()
 }
+
+// MARK: - PPG Channel Order Configuration
+
+enum PPGChannelOrder: String, CaseIterable {
+    case redIrGreen = "Red, IR, Green (Firmware Docs)"
+    case irRedGreen = "IR, Red, Green"
+    case greenRedIr = "Green, Red, IR" 
+    case redGreenIr = "Red, Green, IR"
+    case irGreenRed = "IR, Green, Red"
+    case greenIrRed = "Green, IR, Red"
+    
+    var description: String {
+        rawValue
+    }
+}
+
 // MARK: - BLE Manager
 
 /// Manages Bluetooth Low Energy communication with Oralable devices
@@ -40,6 +56,21 @@ class OralableBLE: NSObject, ObservableObject {
     
     private var connectionManager: ConnectionManager?
     private var dataParser: DataParser?  // ADD THIS
+    
+    // MARK: - Configuration
+    
+    /// Configurable PPG channel order for debugging
+    /// The firmware sends: Position 0, Position 1, Position 2
+    /// We need to determine which position corresponds to which LED
+    @Published var ppgChannelOrder: PPGChannelOrder = .redIrGreen {
+        didSet {
+            addLogMessage("🔧 PPG channel order changed to: \(ppgChannelOrder.rawValue)")
+            // Clear buffers when changing order to avoid mixed data
+            ppgBufferRed.removeAll()
+            ppgBufferIR.removeAll()
+            ppgBufferGreen.removeAll()
+        }
+    }
     
     // MARK: - Published Properties
     
@@ -205,11 +236,12 @@ class OralableBLE: NSObject, ObservableObject {
         
         connectionTimeoutTimer?.invalidate()
         connectionTimeoutTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
-            self?.addLogMessage("⏰ Connection timeout after 30 seconds")
-            self?.centralManager.cancelPeripheralConnection(peripheral)
-            DispatchQueue.main.async {
-                self?.connectionStatus = "Timeout"
-                self?.connectedPeripheral = nil
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.addLogMessage("⏰ Connection timeout after 30 seconds")
+                self.centralManager.cancelPeripheralConnection(peripheral)
+                self.connectionStatus = "Timeout"
+                self.connectedPeripheral = nil
             }
         }
         
@@ -241,14 +273,13 @@ class OralableBLE: NSObject, ObservableObject {
     /// Clear discovered devices and start fresh scan
     func refreshScan() {
         stopScanning()
-        DispatchQueue.main.async {
-            self.discoveredDevices.removeAll()
-            self.discoveredDeviceUUIDs.removeAll()
-        }
+        discoveredDevices.removeAll()
+        discoveredDeviceUUIDs.removeAll()
         addLogMessage("🔄 Refreshing scan...")
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.startScanning()
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            await startScanning()
         }
     }
     
@@ -263,16 +294,14 @@ class OralableBLE: NSObject, ObservableObject {
             centralManager.cancelPeripheralConnection(peripheral)
         }
         
-        DispatchQueue.main.async {
-            self.isConnected = false
-            self.isScanning = false
-            self.connectedDevice = nil
-            self.connectedPeripheral = nil
-            self.connectionStatus = "Disconnected"
-            self.discoveredDevices.removeAll()
-            self.discoveredDeviceUUIDs.removeAll()
-            self.sensorData = CurrentSensorData()
-        }
+        isConnected = false
+        isScanning = false
+        connectedDevice = nil
+        connectedPeripheral = nil
+        connectionStatus = "Disconnected"
+        discoveredDevices.removeAll()
+        discoveredDeviceUUIDs.removeAll()
+        sensorData = CurrentSensorData()
         
         ppgBufferRed.removeAll()
         ppgBufferIR.removeAll()
@@ -281,24 +310,23 @@ class OralableBLE: NSObject, ObservableObject {
         addLogMessage("✅ Reset complete")
         
         if centralManager.state == .poweredOn {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.startScanning()
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1.0 seconds
+                await startScanning()
             }
         }
     }
     
     /// Clear all logs and historical data
     func clearLogs() {
-        DispatchQueue.main.async {
-            self.logMessages.removeAll()
-            self.sensorDataHistory.removeAll()
-            self.batteryHistory.removeAll()
-            self.ppgHistory.removeAll()
-            self.heartRateHistory.removeAll()
-            self.spo2History.removeAll()
-            self.temperatureHistory.removeAll()
-            self.accelerometerHistory.removeAll()
-        }
+        logMessages.removeAll()
+        sensorDataHistory.removeAll()
+        batteryHistory.removeAll()
+        ppgHistory.removeAll()
+        heartRateHistory.removeAll()
+        spo2History.removeAll()
+        temperatureHistory.removeAll()
+        accelerometerHistory.removeAll()
         addLogMessage("🗑️ Cleared all data")
     }
     
@@ -356,150 +384,144 @@ class OralableBLE: NSObject, ObservableObject {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         let formattedMessage = "[\(timestamp)] \(message)"
         
-        DispatchQueue.main.async {
-            self.logMessages.append(LogMessage(message: formattedMessage))
-        }
+        logMessages.append(LogMessage(message: formattedMessage))
         print(formattedMessage)
     }
     
     /// Process PPG data and calculate heart rate and SpO2
-    private func processPPGData(red: [Int32], ir: [Int32], green: [Int32]) {
-        ppgBufferRed.append(contentsOf: red)
-        ppgBufferIR.append(contentsOf: ir)
-        ppgBufferGreen.append(contentsOf: green)
-        
-        addLogMessage("📈 PPG Buffer: Red=\(ppgBufferRed.count), IR=\(ppgBufferIR.count), Green=\(ppgBufferGreen.count) samples")
-        
-        let maxBufferSize = 300
-        if ppgBufferRed.count > maxBufferSize {
-            ppgBufferRed.removeFirst(ppgBufferRed.count - maxBufferSize)
-            ppgBufferIR.removeFirst(ppgBufferIR.count - maxBufferSize)
-            ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxBufferSize)
-        }
-        
-        // Heart Rate Calculation
-        if ppgBufferIR.count >= 20 {
-            let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
-            if let heartRate = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
-                let bpm = heartRate.bpm
-                addLogMessage("❤️ Heart Rate Calculated: \(bpm) BPM (quality: \(String(format: "%.1f", heartRate.quality)))")
-                
-                DispatchQueue.main.async {
-                    self.sensorData.heartRate = bpm
+    nonisolated private func processPPGData(red: [Int32], ir: [Int32], green: [Int32]) {
+        Task { @MainActor in
+            ppgBufferRed.append(contentsOf: red)
+            ppgBufferIR.append(contentsOf: ir)
+            ppgBufferGreen.append(contentsOf: green)
+            
+            addLogMessage("📈 PPG Buffer: Red=\(ppgBufferRed.count), IR=\(ppgBufferIR.count), Green=\(ppgBufferGreen.count) samples")
+            
+            let maxBufferSize = 300
+            if ppgBufferRed.count > maxBufferSize {
+                ppgBufferRed.removeFirst(ppgBufferRed.count - maxBufferSize)
+                ppgBufferIR.removeFirst(ppgBufferIR.count - maxBufferSize)
+                ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxBufferSize)
+            }
+            
+            // Heart Rate Calculation
+            if ppgBufferIR.count >= 20 {
+                let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
+                if let heartRate = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
+                    let bpm = heartRate.bpm
+                    addLogMessage("❤️ Heart Rate Calculated: \(bpm) BPM (quality: \(String(format: "%.1f", heartRate.quality)))")
+                    
+                    sensorData.heartRate = bpm
                     
                     // FIXED: Add to history array so dashboard shows it!
                     let hrData = HeartRateData(bpm: bpm, quality: heartRate.quality, timestamp: Date())
-                    self.heartRateHistory.append(hrData)
-                    if self.heartRateHistory.count > 1000 {
-                        self.heartRateHistory.removeFirst(self.heartRateHistory.count - 1000)
+                    heartRateHistory.append(hrData)
+                    if heartRateHistory.count > 1000 {
+                        heartRateHistory.removeFirst(heartRateHistory.count - 1000)
                     }
                     
-                    self.addLogMessage("📊 Heart Rate History: \(self.heartRateHistory.count) readings")
+                    addLogMessage("📊 Heart Rate History: \(heartRateHistory.count) readings")
+                } else {
+                    addLogMessage("⚠️ Heart Rate: Calculation failed (insufficient signal quality)")
                 }
             } else {
-                addLogMessage("⚠️ Heart Rate: Calculation failed (insufficient signal quality)")
+                addLogMessage("⏳ Heart Rate: Waiting for more data (\(ppgBufferIR.count)/20 samples)")
             }
-        } else {
-            addLogMessage("⏳ Heart Rate: Waiting for more data (\(ppgBufferIR.count)/20 samples)")
-        }
-        
-        // SpO2 Calculation
-        if ppgBufferRed.count >= 150, ppgBufferIR.count >= 150 {
-            if let result = spo2Calculator.calculateSpO2WithQuality(
-                redSamples: ppgBufferRed,
-                irSamples: ppgBufferIR
-            ) {
-                let spo2Value = result.spo2
-                addLogMessage("🫁 SpO2 Calculated: \(String(format: "%.1f", spo2Value))% (quality: \(String(format: "%.1f", result.quality)))")
-                
-                DispatchQueue.main.async {
-                    self.sensorData.spo2 = spo2Value
+            
+            // SpO2 Calculation
+            if ppgBufferRed.count >= 150, ppgBufferIR.count >= 150 {
+                if let result = spo2Calculator.calculateSpO2WithQuality(
+                    redSamples: ppgBufferRed,
+                    irSamples: ppgBufferIR
+                ) {
+                    let spo2Value = result.spo2
+                    addLogMessage("🫁 SpO2 Calculated: \(String(format: "%.1f", spo2Value))% (quality: \(String(format: "%.1f", result.quality)))")
+                    
+                    sensorData.spo2 = spo2Value
                     
                     // FIXED: Add to history array so dashboard shows it!
                     let spo2Data = SpO2Data(percentage: spo2Value, quality: result.quality, timestamp: Date())
-                    self.spo2History.append(spo2Data)
-                    if self.spo2History.count > 1000 {
-                        self.spo2History.removeFirst(self.spo2History.count - 1000)
+                    spo2History.append(spo2Data)
+                    if spo2History.count > 1000 {
+                        spo2History.removeFirst(spo2History.count - 1000)
                     }
                     
-                    self.addLogMessage("📊 SpO2 History: \(self.spo2History.count) readings")
+                    addLogMessage("📊 SpO2 History: \(spo2History.count) readings")
+                } else {
+                    addLogMessage("⚠️ SpO2: Calculation failed (poor signal quality)")
                 }
             } else {
-                addLogMessage("⚠️ SpO2: Calculation failed (poor signal quality)")
+                addLogMessage("⏳ SpO2: Waiting for more data (\(ppgBufferRed.count)/150 samples)")
             }
-        } else {
-            addLogMessage("⏳ SpO2: Waiting for more data (\(ppgBufferRed.count)/150 samples)")
+            
+            // CRITICAL FIX: Consolidate all sensor data into sensorDataHistory
+            consolidateSensorData()
         }
-        
-        // CRITICAL FIX: Consolidate all sensor data into sensorDataHistory
-        consolidateSensorData()
     }
     
     /// Consolidates individual sensor readings into complete SensorData objects
     /// This is required for HistoricalDetailView to work properly
     private func consolidateSensorData() {
-        DispatchQueue.main.async {
-            // DEBUG: Log sensor availability
-            print("🔄 Attempting to consolidate sensor data:")
-            print("   PPG: \(self.ppgHistory.count)")
-            print("   Temperature: \(self.temperatureHistory.count)")
-            print("   Battery: \(self.batteryHistory.count)")
-            print("   Accelerometer: \(self.accelerometerHistory.count)")
-            print("   Heart Rate: \(self.heartRateHistory.count)")
-            print("   SpO2: \(self.spo2History.count)")
-            
-            // RELAXED REQUIREMENTS: Only require PPG and accelerometer as minimum
-            // Battery and temperature can be missing or zero
-            guard !self.ppgHistory.isEmpty,
-                  !self.accelerometerHistory.isEmpty else {
-                print("⚠️ Need at least PPG and Accelerometer data to consolidate")
-                return
-            }
-            
-            // Get the latest readings from each sensor
-            guard let latestPPG = self.ppgHistory.last,
-                  let latestAccel = self.accelerometerHistory.last else {
-                print("⚠️ Could not get latest PPG or Accelerometer readings")
-                return
-            }
-            
-            // Use latest or create default values for optional sensors
-            let latestTemp = self.temperatureHistory.last ?? TemperatureData(celsius: 0.0, timestamp: Date())
-            let latestBattery = self.batteryHistory.last ?? BatteryData(percentage: 0, timestamp: Date())
-            
-            // Get optional calculated metrics
-            let latestHeartRate = self.heartRateHistory.last
-            let latestSpO2 = self.spo2History.last
-            
-            // Create consolidated sensor data
-            let consolidatedData = SensorData(
-                timestamp: Date(),
-                ppg: latestPPG,
-                accelerometer: latestAccel,
-                temperature: latestTemp,
-                battery: latestBattery,
-                heartRate: latestHeartRate,
-                spo2: latestSpO2
-            )
-            
-            // Add to history
-            self.sensorDataHistory.append(consolidatedData)
-            
-            // Limit history size
-            if self.sensorDataHistory.count > 10000 {
-                self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
-            }
-            
-            print("✅ Consolidated! Total sensorDataHistory: \(self.sensorDataHistory.count)")
-            self.addLogMessage("📦 Consolidated sensor data: \(self.sensorDataHistory.count) complete readings")
-            
-            // Detect device state based on recent sensor data
-            Task {
-                if let stateResult = await self.deviceStateDetector.analyzeDeviceState(sensorData: self.sensorDataHistory) {
-                    await MainActor.run {
-                        self.deviceState = stateResult
-                        self.addLogMessage("🔍 Device State: \(stateResult.state.rawValue) (confidence: \(String(format: "%.0f", stateResult.confidence * 100))%)")
-                    }
+        // DEBUG: Log sensor availability
+        print("🔄 Attempting to consolidate sensor data:")
+        print("   PPG: \(ppgHistory.count)")
+        print("   Temperature: \(temperatureHistory.count)")
+        print("   Battery: \(batteryHistory.count)")
+        print("   Accelerometer: \(accelerometerHistory.count)")
+        print("   Heart Rate: \(heartRateHistory.count)")
+        print("   SpO2: \(spo2History.count)")
+        
+        // RELAXED REQUIREMENTS: Battery and temperature should always be visible
+        // Only require accelerometer as minimum for device state detection
+        // PPG can be invalid (zeros) if device is not on tissue
+        guard !accelerometerHistory.isEmpty else {
+            print("⚠️ Need at least Accelerometer data to consolidate")
+            return
+        }
+        
+        // Get the latest readings from each sensor (use defaults if missing)
+        let latestPPG = ppgHistory.last ?? PPGData(red: 0, ir: 0, green: 0, timestamp: Date())
+        guard let latestAccel = accelerometerHistory.last else {
+            print("⚠️ Could not get latest Accelerometer reading")
+            return
+        }
+        
+        // Use latest or create default values for optional sensors
+        let latestTemp = temperatureHistory.last ?? TemperatureData(celsius: 0.0, timestamp: Date())
+        let latestBattery = batteryHistory.last ?? BatteryData(percentage: 0, timestamp: Date())
+        
+        // Get optional calculated metrics
+        let latestHeartRate = heartRateHistory.last
+        let latestSpO2 = spo2History.last
+        
+        // Create consolidated sensor data
+        let consolidatedData = SensorData(
+            timestamp: Date(),
+            ppg: latestPPG,
+            accelerometer: latestAccel,
+            temperature: latestTemp,
+            battery: latestBattery,
+            heartRate: latestHeartRate,
+            spo2: latestSpO2
+        )
+        
+        // Add to history
+        sensorDataHistory.append(consolidatedData)
+        
+        // Limit history size
+        if sensorDataHistory.count > 10000 {
+            sensorDataHistory.removeFirst(sensorDataHistory.count - 10000)
+        }
+        
+        print("✅ Consolidated! Total sensorDataHistory: \(sensorDataHistory.count)")
+        addLogMessage("📦 Consolidated sensor data: \(sensorDataHistory.count) complete readings")
+        
+        // Detect device state based on recent sensor data
+        Task {
+            if let stateResult = await deviceStateDetector.analyzeDeviceState(sensorData: sensorDataHistory) {
+                await MainActor.run {
+                    deviceState = stateResult
+                    addLogMessage("🔍 Device State: \(stateResult.state.rawValue) (confidence: \(String(format: "%.0f", stateResult.confidence * 100))%)")
                 }
             }
         }
@@ -510,127 +532,127 @@ class OralableBLE: NSObject, ObservableObject {
 
 extension OralableBLE: CBCentralManagerDelegate {
     
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        DispatchQueue.main.async {
+    nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        Task { @MainActor in
             switch central.state {
             case .poweredOn:
-                self.connectionStatus = "Ready"
-                self.addLogMessage("✅ Bluetooth ready")
+                connectionStatus = "Ready"
+                addLogMessage("✅ Bluetooth ready")
             case .poweredOff:
-                self.connectionStatus = "Bluetooth Off"
-                self.addLogMessage("❌ Bluetooth is off")
+                connectionStatus = "Bluetooth Off"
+                addLogMessage("❌ Bluetooth is off")
             case .unauthorized:
-                self.connectionStatus = "Unauthorized"
-                self.addLogMessage("❌ Bluetooth unauthorized")
+                connectionStatus = "Unauthorized"
+                addLogMessage("❌ Bluetooth unauthorized")
             case .unsupported:
-                self.connectionStatus = "Unsupported"
-                self.addLogMessage("❌ BLE not supported")
+                connectionStatus = "Unsupported"
+                addLogMessage("❌ BLE not supported")
             default:
-                self.connectionStatus = "Not Ready"
-                self.addLogMessage("⚠️ Bluetooth: \(central.state.rawValue)")
+                connectionStatus = "Not Ready"
+                addLogMessage("⚠️ Bluetooth: \(central.state.rawValue)")
             }
         }
     }
     
-    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        
-        guard !discoveredDeviceUUIDs.contains(peripheral.identifier) else {
-            return
-        }
-        
-        let deviceName = peripheral.name ?? ""
-        
-        // Skip devices with no name
-        guard !deviceName.isEmpty else {
-            return
-        }
-        
-        let deviceNameLower = deviceName.lowercased()
-        let namePatterns = ["oralable", "tgm", "nrf", "tooth", "dental", "bruxism"]
-        let matchesName = namePatterns.contains { deviceNameLower.contains($0) }
-        
-        let advertisedUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-        let hasTGMService = advertisedUUIDs.contains(tgmServiceUUID)
-        
-        // Only add devices that match our criteria
-        if matchesName || hasTGMService {
-            discoveredDeviceUUIDs.insert(peripheral.identifier)
-            
-            DispatchQueue.main.async {
-                self.discoveredDevices.append(peripheral)
+    nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        Task { @MainActor in
+            guard !discoveredDeviceUUIDs.contains(peripheral.identifier) else {
+                return
             }
             
-            addLogMessage("✅ Found: \(deviceName) (RSSI: \(RSSI)dB)")
+            let deviceName = peripheral.name ?? ""
             
-            if !advertisedUUIDs.isEmpty {
-                addLogMessage("   Services: \(advertisedUUIDs.map { $0.uuidString }.joined(separator: ", "))")
+            // Skip devices with no name
+            guard !deviceName.isEmpty else {
+                return
+            }
+            
+            let deviceNameLower = deviceName.lowercased()
+            let namePatterns = ["oralable", "tgm", "nrf", "tooth", "dental", "bruxism"]
+            let matchesName = namePatterns.contains { deviceNameLower.contains($0) }
+            
+            let advertisedUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
+            let hasTGMService = advertisedUUIDs.contains(tgmServiceUUID)
+            
+            // Only add devices that match our criteria
+            if matchesName || hasTGMService {
+                discoveredDeviceUUIDs.insert(peripheral.identifier)
+                discoveredDevices.append(peripheral)
+                
+                addLogMessage("✅ Found: \(deviceName) (RSSI: \(RSSI)dB)")
+                
+                if !advertisedUUIDs.isEmpty {
+                    addLogMessage("   Services: \(advertisedUUIDs.map { $0.uuidString }.joined(separator: ", "))")
+                }
             }
         }
     }
     
-    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        connectionTimeoutTimer?.invalidate()
-        connectionTimeoutTimer = nil
-        retryCount = 0
-        
-        addLogMessage("✅ Connected to \(peripheral.name ?? "device")")
-        addLogMessage("🔍 Starting service discovery...")
-        
-        DispatchQueue.main.async {
-            self.isConnected = true
-            self.connectedDevice = peripheral
-            self.deviceName = peripheral.name ?? "Unknown"
-            self.sensorData.isConnected = true
-            self.connectionStatus = "Connected"
-        }
-        
-        addLogMessage("📊 Discovering Oralable service...")
+    nonisolated func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        Task { @MainActor in
+            connectionTimeoutTimer?.invalidate()
+            connectionTimeoutTimer = nil
+            retryCount = 0
+            
+            addLogMessage("✅ Connected to \(peripheral.name ?? "device")")
+            addLogMessage("🔍 Starting service discovery...")
+            
+            isConnected = true
+            connectedDevice = peripheral
+            deviceName = peripheral.name ?? "Unknown"
+            sensorData.isConnected = true
+            connectionStatus = "Connected"
+            
+            addLogMessage("📊 Discovering Oralable service...")
 
-        peripheral.discoverServices([tgmServiceUUID])    }
-    
-    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        connectionTimeoutTimer?.invalidate()
-        connectionTimeoutTimer = nil
-        
-        let errorMsg = error?.localizedDescription ?? "Unknown error"
-        addLogMessage("❌ Connection failed: \(errorMsg)")
-        
-        DispatchQueue.main.async {
-            self.connectionStatus = "Failed"
-            self.connectedPeripheral = nil
+            peripheral.discoverServices([tgmServiceUUID])
         }
-        
-        if retryCount < maxRetries {
-            retryCount += 1
-            addLogMessage("🔄 Retry \(retryCount)/\(maxRetries) in 2 seconds...")
+    }
+    
+    nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        Task { @MainActor in
+            connectionTimeoutTimer?.invalidate()
+            connectionTimeoutTimer = nil
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.connect(to: peripheral)
+            let errorMsg = error?.localizedDescription ?? "Unknown error"
+            addLogMessage("❌ Connection failed: \(errorMsg)")
+            
+            connectionStatus = "Failed"
+            connectedPeripheral = nil
+            
+            if retryCount < maxRetries {
+                retryCount += 1
+                addLogMessage("🔄 Retry \(retryCount)/\(maxRetries) in 2 seconds...")
+                
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    await connect(to: peripheral)
+                }
             }
         }
     }
     
-    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        connectionTimeoutTimer?.invalidate()
-        connectionTimeoutTimer = nil
-        
-        if let error = error {
-            addLogMessage("⚠️ Disconnected: \(error.localizedDescription)")
-        } else {
-            addLogMessage("📱 Disconnected")
+    nonisolated func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        Task { @MainActor in
+            connectionTimeoutTimer?.invalidate()
+            connectionTimeoutTimer = nil
+            
+            if let error = error {
+                addLogMessage("⚠️ Disconnected: \(error.localizedDescription)")
+            } else {
+                addLogMessage("📱 Disconnected")
+            }
+            
+            isConnected = false
+            connectedDevice = nil
+            connectedPeripheral = nil
+            connectionStatus = "Disconnected"
+            sensorData.isConnected = false
+            
+            ppgBufferRed.removeAll()
+            ppgBufferIR.removeAll()
+            ppgBufferGreen.removeAll()
         }
-        
-        DispatchQueue.main.async {
-            self.isConnected = false
-            self.connectedDevice = nil
-            self.connectedPeripheral = nil
-            self.connectionStatus = "Disconnected"
-            self.sensorData.isConnected = false
-        }
-        
-        ppgBufferRed.removeAll()
-        ppgBufferIR.removeAll()
-        ppgBufferGreen.removeAll()
     }
 }
 
@@ -638,113 +660,119 @@ extension OralableBLE: CBCentralManagerDelegate {
 
 extension OralableBLE: CBPeripheralDelegate {
     
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        if let error = error {
-            addLogMessage("❌ Service discovery error: \(error.localizedDescription)")
-            return
-        }
-        
-        guard let services = peripheral.services else {
-            addLogMessage("⚠️ No services found on device")
-            return
-        }
-        
-        addLogMessage("📊 Found \(services.count) service(s):")
-        
-        for service in services {
-            addLogMessage("   • \(service.uuid.uuidString)")
-        }
-        
-        var tgmServiceFound = false
-        for service in services {
-            if service.uuid == tgmServiceUUID {
-                tgmServiceFound = true
-                addLogMessage("✅ TGM Service found!")
-                addLogMessage("🔍 Discovering characteristics...")
-                peripheral.discoverCharacteristics(nil, for: service)
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        Task { @MainActor in
+            if let error = error {
+                addLogMessage("❌ Service discovery error: \(error.localizedDescription)")
+                return
             }
-        }
-        
-        if !tgmServiceFound {
-            addLogMessage("⚠️ TGM Service NOT found")
-            addLogMessage("   Expected: \(tgmServiceUUID.uuidString)")
-            addLogMessage("   Trying to discover characteristics on all services...")
+            
+            guard let services = peripheral.services else {
+                addLogMessage("⚠️ No services found on device")
+                return
+            }
+            
+            addLogMessage("📊 Found \(services.count) service(s):")
             
             for service in services {
-                peripheral.discoverCharacteristics(nil, for: service)
+                addLogMessage("   • \(service.uuid.uuidString)")
             }
-        }
-    }
-    
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        if let error = error {
-            addLogMessage("❌ Characteristic error: \(error.localizedDescription)")
-            return
-        }
-        
-        guard let characteristics = service.characteristics else {
-            addLogMessage("⚠️ No characteristics in service: \(service.uuid.uuidString)")
-            return
-        }
-        
-        addLogMessage("📊 Service \(service.uuid.uuidString): \(characteristics.count) characteristic(s)")
-        
-        var foundAnyKnownCharacteristic = false
-        
-        for characteristic in characteristics {
-            addLogMessage("   • Char: \(characteristic.uuid.uuidString)")
             
-            switch characteristic.uuid {
-            case ppgDataUUID:
-                ppgCharacteristic = characteristic
-                peripheral.setNotifyValue(true, for: characteristic)
-                addLogMessage("   ✅ PPG Data - notifications enabled")
-                foundAnyKnownCharacteristic = true
-                
-            case accelerometerUUID:
-                accelerometerCharacteristic = characteristic
-                peripheral.setNotifyValue(true, for: characteristic)
-                addLogMessage("   ✅ Accelerometer - notifications enabled")
-                foundAnyKnownCharacteristic = true
-                
-            case temperatureUUID:
-                temperatureCharacteristic = characteristic
-                peripheral.setNotifyValue(true, for: characteristic)
-                addLogMessage("   ✅ Temperature - notifications enabled")
-                foundAnyKnownCharacteristic = true
-                
-            case batteryUUID:
-                batteryCharacteristic = characteristic
-                peripheral.setNotifyValue(true, for: characteristic)
-                peripheral.readValue(for: characteristic)
-                addLogMessage("   ✅ Battery - notifications enabled")
-                foundAnyKnownCharacteristic = true
-                
-            case deviceUUIDChar:
-                deviceUUIDCharacteristic = characteristic
-                peripheral.readValue(for: characteristic)
-                addLogMessage("   ✅ Device UUID - reading")
-                foundAnyKnownCharacteristic = true
-                
-            case firmwareVersionUUID:
-                firmwareVersionCharacteristic = characteristic
-                peripheral.readValue(for: characteristic)
-                addLogMessage("   ✅ Firmware Version - reading")
-                foundAnyKnownCharacteristic = true
-                
-            default:
-                addLogMessage("   ⚪ Unknown characteristic")
+            var tgmServiceFound = false
+            for service in services {
+                if service.uuid == tgmServiceUUID {
+                    tgmServiceFound = true
+                    addLogMessage("✅ TGM Service found!")
+                    addLogMessage("🔍 Discovering characteristics...")
+                    peripheral.discoverCharacteristics(nil, for: service)
+                }
             }
-        }
-        
-        if !foundAnyKnownCharacteristic {
-            addLogMessage("⚠️ No known TGM characteristics found in this service")
+            
+            if !tgmServiceFound {
+                addLogMessage("⚠️ TGM Service NOT found")
+                addLogMessage("   Expected: \(tgmServiceUUID.uuidString)")
+                addLogMessage("   Trying to discover characteristics on all services...")
+                
+                for service in services {
+                    peripheral.discoverCharacteristics(nil, for: service)
+                }
+            }
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        Task { @MainActor in
+            if let error = error {
+                addLogMessage("❌ Characteristic error: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let characteristics = service.characteristics else {
+                addLogMessage("⚠️ No characteristics in service: \(service.uuid.uuidString)")
+                return
+            }
+            
+            addLogMessage("📊 Service \(service.uuid.uuidString): \(characteristics.count) characteristic(s)")
+            
+            var foundAnyKnownCharacteristic = false
+            
+            for characteristic in characteristics {
+                addLogMessage("   • Char: \(characteristic.uuid.uuidString)")
+                
+                switch characteristic.uuid {
+                case ppgDataUUID:
+                    ppgCharacteristic = characteristic
+                    peripheral.setNotifyValue(true, for: characteristic)
+                    addLogMessage("   ✅ PPG Data - notifications enabled")
+                    foundAnyKnownCharacteristic = true
+                    
+                case accelerometerUUID:
+                    accelerometerCharacteristic = characteristic
+                    peripheral.setNotifyValue(true, for: characteristic)
+                    addLogMessage("   ✅ Accelerometer - notifications enabled")
+                    foundAnyKnownCharacteristic = true
+                    
+                case temperatureUUID:
+                    temperatureCharacteristic = characteristic
+                    peripheral.setNotifyValue(true, for: characteristic)
+                    addLogMessage("   ✅ Temperature - notifications enabled")
+                    foundAnyKnownCharacteristic = true
+                    
+                case batteryUUID:
+                    batteryCharacteristic = characteristic
+                    peripheral.setNotifyValue(true, for: characteristic)
+                    peripheral.readValue(for: characteristic)
+                    addLogMessage("   ✅ Battery - notifications enabled")
+                    foundAnyKnownCharacteristic = true
+                    
+                case deviceUUIDChar:
+                    deviceUUIDCharacteristic = characteristic
+                    peripheral.readValue(for: characteristic)
+                    addLogMessage("   ✅ Device UUID - reading")
+                    foundAnyKnownCharacteristic = true
+                    
+                case firmwareVersionUUID:
+                    firmwareVersionCharacteristic = characteristic
+                    peripheral.readValue(for: characteristic)
+                    addLogMessage("   ✅ Firmware Version - reading")
+                    foundAnyKnownCharacteristic = true
+                    
+                default:
+                    addLogMessage("   ⚪ Unknown characteristic")
+                }
+            }
+            
+            if !foundAnyKnownCharacteristic {
+                addLogMessage("⚠️ No known TGM characteristics found in this service")
+            }
+        }
+    }
+    
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            addLogMessage("❌ Read error: \(error.localizedDescription)")
+            Task { @MainActor in
+                addLogMessage("❌ Read error: \(error.localizedDescription)")
+            }
             return
         }
         
@@ -770,315 +798,389 @@ extension OralableBLE: CBPeripheralDelegate {
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
-        if let error = error {
-            addLogMessage("❌ Notification error for \(characteristic.uuid): \(error.localizedDescription)")
-        } else if characteristic.isNotifying {
-            addLogMessage("✅ Notifications active for \(characteristic.uuid)")
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        Task { @MainActor in
+            if let error = error {
+                addLogMessage("❌ Notification error for \(characteristic.uuid): \(error.localizedDescription)")
+            } else if characteristic.isNotifying {
+                addLogMessage("✅ Notifications active for \(characteristic.uuid)")
+            }
         }
     }
     
     // MARK: - FIXED Data Parsing - Handles actual firmware format
     
-    private func parsePPGData(_ data: Data) {
-        addLogMessage("📊 PPG: Received \(data.count) bytes")
-        
-        guard data.count >= 244 else {
-            addLogMessage("⚠️ PPG data too short: \(data.count) bytes (expected 244)")
-            return
-        }
-        
-        var redSamples: [Int32] = []
-        var irSamples: [Int32] = []
-        var greenSamples: [Int32] = []
-        
-        // DEBUG: Log first few bytes
-        let firstBytes = data.prefix(24).map { String(format: "%02X", $0) }.joined(separator: " ")
-        addLogMessage("🔍 First 24 bytes: \(firstBytes)")
-        
-        // Parse 20 samples, each 12 bytes (3 x UInt32)
-        for i in 0..<20 {
-            let offset = 4 + (i * 12)
+    nonisolated private func parsePPGData(_ data: Data) {
+        Task { @MainActor in
+            addLogMessage("📊 PPG: Received \(data.count) bytes")
             
-            guard offset + 12 <= data.count else { break }
+            // Firmware packet structure (from tgm_service.h):
+            // Bytes 0-3: frame counter (uint32_t)
+            // Then for each sample (20 samples, CONFIG_PPG_SAMPLES_PER_FRAME):
+            //   Bytes 0-3: Red   (uint32_t)
+            //   Bytes 4-7: IR    (uint32_t)
+            //   Bytes 8-11: Green (uint32_t)
+            // Total: 4 + (20 * 12) = 244 bytes
             
-            // Read as bytes array to avoid alignment issues
-            let redBytes = data.subdata(in: offset..<(offset + 4))
-            let irBytes = data.subdata(in: (offset + 4)..<(offset + 8))
-            let greenBytes = data.subdata(in: (offset + 8)..<(offset + 12))
-            
-            let red = redBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            let ir = irBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            let green = greenBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            
-            // DEBUG: Log first sample values
-            if i == 0 {
-                addLogMessage("🔍 Sample 0: Red=\(red), IR=\(ir), Green=\(green)")
+            guard data.count >= 244 else {
+                addLogMessage("⚠️ PPG data too short: \(data.count) bytes (expected 244)")
+                return
             }
             
-            redSamples.append(Int32(bitPattern: red))
-            irSamples.append(Int32(bitPattern: ir))
-            greenSamples.append(Int32(bitPattern: green))
-        }
+            // Parse frame counter
+            let frameCounterBytes = data.subdata(in: 0..<4)
+            let frameCounter = frameCounterBytes.withUnsafeBytes { $0.load(as: UInt32.self) }
+            addLogMessage("🔢 Frame counter: \(frameCounter)")
+            
+            var redSamples: [Int32] = []
+            var irSamples: [Int32] = []
+            var greenSamples: [Int32] = []
+            
+            // DEBUG: Log first few bytes
+            let firstBytes = data.prefix(28).map { String(format: "%02X", $0) }.joined(separator: " ")
+            addLogMessage("🔍 First 28 bytes: \(firstBytes)")
+            addLogMessage("🔧 Using channel order: \(ppgChannelOrder.rawValue)")
         
-        // DEBUG: Log parsed sample statistics
-        if !irSamples.isEmpty {
-            let avgIR = irSamples.map { Double($0) }.reduce(0, +) / Double(irSamples.count)
-            let minIR = irSamples.min() ?? 0
-            let maxIR = irSamples.max() ?? 0
-            addLogMessage("📈 IR Stats: Min=\(minIR), Max=\(maxIR), Avg=\(Int(avgIR))")
-        }
-        
-        addLogMessage("💓 PPG parsed: \(redSamples.count) samples")
-        processPPGData(red: redSamples, ir: irSamples, green: greenSamples)
-        
-        if let lastRed = redSamples.last, let lastIR = irSamples.last, let lastGreen = greenSamples.last {
-            let ppgData = PPGData(red: lastRed, ir: lastIR, green: lastGreen, timestamp: Date())
-            DispatchQueue.main.async {
-                self.ppgHistory.append(ppgData)
-                if self.ppgHistory.count > 1000 {
-                    self.ppgHistory.removeFirst(self.ppgHistory.count - 1000)
-                }
-                self.sensorData.lastUpdate = Date()
+            // Parse 20 samples, each 12 bytes (3 x UInt32 in little-endian format)
+            // FIRMWARE FORMAT: Red, IR, Green (confirmed from tgm_service.h)
+            for i in 0..<20 {
+                let offset = 4 + (i * 12)  // Skip 4-byte frame counter
                 
-                self.addLogMessage("📊 PPG History: \(self.ppgHistory.count) readings (R=\(lastRed), IR=\(lastIR), G=\(lastGreen))")
+                guard offset + 12 <= data.count else { break }
+                
+                // Read three 4-byte values
+                let bytes0to3 = data.subdata(in: offset..<(offset + 4))       // Position 0
+                let bytes4to7 = data.subdata(in: (offset + 4)..<(offset + 8))  // Position 1
+                let bytes8to11 = data.subdata(in: (offset + 8)..<(offset + 12)) // Position 2
+                
+                // Parse as little-endian UInt32 (firmware standard)
+                let val0 = UInt32(littleEndian: bytes0to3.withUnsafeBytes { $0.load(as: UInt32.self) })
+                let val1 = UInt32(littleEndian: bytes4to7.withUnsafeBytes { $0.load(as: UInt32.self) })
+                let val2 = UInt32(littleEndian: bytes8to11.withUnsafeBytes { $0.load(as: UInt32.self) })
+                
+                // Assign to channels based on configured order
+                let (red, ir, green): (UInt32, UInt32, UInt32)
+                switch ppgChannelOrder {
+                case .redIrGreen:  // Firmware default
+                    (red, ir, green) = (val0, val1, val2)
+                case .irRedGreen:
+                    (red, ir, green) = (val1, val0, val2)
+                case .greenRedIr:
+                    (red, ir, green) = (val1, val2, val0)
+                case .redGreenIr:
+                    (red, ir, green) = (val0, val2, val1)
+                case .irGreenRed:
+                    (red, ir, green) = (val2, val0, val1)
+                case .greenIrRed:
+                    (red, ir, green) = (val2, val1, val0)
+                }
+                
+                // DEBUG: Log first 3 samples to show LED time-multiplexing pattern
+                if i < 3 {
+                    let hex0 = bytes0to3.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    let hex1 = bytes4to7.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    let hex2 = bytes8to11.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    addLogMessage("🔍 Sample \(i) raw (firmware order: Red, IR, Green):")
+                    addLogMessage("   Pos 0 [\(hex0)] = \(val0)")
+                    addLogMessage("   Pos 1 [\(hex1)] = \(val1)")
+                    addLogMessage("   Pos 2 [\(hex2)] = \(val2)")
+                    addLogMessage("   → Assigned: R=\(red), IR=\(ir), G=\(green)")
+                }
+                
+                // Store in correct arrays
+                redSamples.append(Int32(bitPattern: red))
+                irSamples.append(Int32(bitPattern: ir))
+                greenSamples.append(Int32(bitPattern: green))
             }
+            
+            // DEBUG: Log parsed sample statistics with validation
+            if !irSamples.isEmpty {
+                let avgIR = irSamples.map { Double($0) }.reduce(0, +) / Double(irSamples.count)
+                let minIR = irSamples.min() ?? 0
+                let maxIR = irSamples.max() ?? 0
+                let avgRed = redSamples.map { Double($0) }.reduce(0, +) / Double(redSamples.count)
+                let avgGreen = greenSamples.map { Double($0) }.reduce(0, +) / Double(greenSamples.count)
+                
+                addLogMessage("📈 IR    Stats: Min=\(minIR), Max=\(maxIR), Avg=\(Int(avgIR))")
+                addLogMessage("📈 Red   Stats: Avg=\(Int(avgRed))")
+                addLogMessage("📈 Green Stats: Avg=\(Int(avgGreen))")
+                
+                // Validation: PPG values should typically be in range 10k-500k
+                let validRange = 10_000...500_000
+                let irValid = validRange.contains(Int(avgIR))
+                let redValid = validRange.contains(Int(avgRed))
+                let greenValid = validRange.contains(Int(avgGreen))
+                
+                if !irValid || !redValid || !greenValid {
+                    addLogMessage("⚠️ WARNING: PPG values outside expected range (10k-500k)")
+                    addLogMessage("   This may indicate:")
+                    addLogMessage("   1. Wrong channel order in parsing")
+                    addLogMessage("   2. Sensor not in contact with tissue")
+                    addLogMessage("   3. LED power settings incorrect")
+                }
+            }
+            
+            addLogMessage("💓 PPG parsed: \(redSamples.count) samples")
+            
+            // CRITICAL FIX: The firmware time-multiplexes LEDs - only one LED is on per sample
+            // Pattern from logs:
+            //   Sample 0: Red LED ON  → Red reads ~138k, IR=0, Green=524287 (max ADC)
+            //   Sample 1: IR LED ON   → IR reads ~138k, Red=~138k, Green=0
+            //   Sample 2: Green LED ON → Green reads ~138k, Red=0, IR=524287 (max ADC)
+            //
+            // The 524287 (0x7FFFF) is the ADC maximum when LED is off (ambient light/noise)
+            // Valid tissue readings are in the range ~10k-300k
+            
+            // Extract valid samples for each channel (reasonable tissue absorption range)
+            let validRedSamples = redSamples.filter { $0 > 10_000 && $0 < 300_000 }
+            let validIRSamples = irSamples.filter { $0 > 10_000 && $0 < 300_000 }
+            let validGreenSamples = greenSamples.filter { $0 > 10_000 && $0 < 300_000 }
+            
+            addLogMessage("🔍 Valid samples: Red=\(validRedSamples.count), IR=\(validIRSamples.count), Green=\(validGreenSamples.count)")
+            
+            // Check if we have enough valid readings from any channel
+            // During time-multiplexing, we expect ~6-7 valid samples per LED (out of 20 total)
+            let hasValidData = validRedSamples.count >= 3 || validIRSamples.count >= 3 || validGreenSamples.count >= 3
+            
+            if !hasValidData {
+                addLogMessage("⚠️ No valid PPG readings - device not on tissue or LEDs off")
+                addLogMessage("   Device may be in standby, charging, or not properly positioned")
+                
+                // Still add to history but mark as invalid
+                let ppgData = PPGData(red: 0, ir: 0, green: 0, timestamp: Date())
+                ppgHistory.append(ppgData)
+                if ppgHistory.count > 1000 {
+                    ppgHistory.removeFirst(ppgHistory.count - 1000)
+                }
+                
+                return  // Don't process this data for HR/SpO2
+            }
+            
+            // Use average of valid samples for history (more robust than last sample)
+            if !validRedSamples.isEmpty || !validIRSamples.isEmpty || !validGreenSamples.isEmpty {
+                let avgRed = validRedSamples.isEmpty ? 0 : Int32(validRedSamples.map { Double($0) }.reduce(0, +) / Double(validRedSamples.count))
+                let avgIR = validIRSamples.isEmpty ? 0 : Int32(validIRSamples.map { Double($0) }.reduce(0, +) / Double(validIRSamples.count))
+                let avgGreen = validGreenSamples.isEmpty ? 0 : Int32(validGreenSamples.map { Double($0) }.reduce(0, +) / Double(validGreenSamples.count))
+                
+                let ppgData = PPGData(red: avgRed, ir: avgIR, green: avgGreen, timestamp: Date())
+                ppgHistory.append(ppgData)
+                if ppgHistory.count > 1000 {
+                    ppgHistory.removeFirst(ppgHistory.count - 1000)
+                }
+                sensorData.lastUpdate = Date()
+                
+                addLogMessage("📊 PPG History: \(ppgHistory.count) readings (R=\(avgRed), IR=\(avgIR), G=\(avgGreen))")
+            }
+            
+            // Process ALL samples for heart rate/SpO2 calculation (they handle filtering internally)
+            processPPGData(red: redSamples, ir: irSamples, green: greenSamples)
         }
     }
     
-    private func parseAccelerometerData(_ data: Data) {
-        addLogMessage("📊 Accel: Received \(data.count) bytes")
-        
-        guard data.count >= 154 else {
-            addLogMessage("⚠️ Accel data too short: \(data.count) bytes (expected 154)")
-            return
-        }
-        
-        // Parse last sample (25th sample at offset 4 + 24*6)
-        let lastSampleOffset = 4 + (24 * 6)
-        
-        guard lastSampleOffset + 6 <= data.count else {
-            addLogMessage("⚠️ Accel offset out of range")
-            return
-        }
-        
-        let xBytes = data.subdata(in: lastSampleOffset..<(lastSampleOffset + 2))
-        let yBytes = data.subdata(in: (lastSampleOffset + 2)..<(lastSampleOffset + 4))
-        let zBytes = data.subdata(in: (lastSampleOffset + 4)..<(lastSampleOffset + 6))
-        
-        let x = xBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-        let y = yBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-        let z = zBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-        
-        addLogMessage("📐 Accel: X=\(x), Y=\(y), Z=\(z)")
-        
-        let accelData = AccelerometerData(x: x, y: y, z: z, timestamp: Date())
-        
-        DispatchQueue.main.async {
-            self.accelerometerHistory.append(accelData)
-            if self.accelerometerHistory.count > 1000 {
-                self.accelerometerHistory.removeFirst(self.accelerometerHistory.count - 1000)
-            }
-            self.sensorData.lastUpdate = Date()
+    nonisolated private func parseAccelerometerData(_ data: Data) {
+        Task { @MainActor in
+            addLogMessage("📊 Accel: Received \(data.count) bytes")
             
-            self.addLogMessage("📊 Accelerometer History: \(self.accelerometerHistory.count) readings")
+            guard data.count >= 154 else {
+                addLogMessage("⚠️ Accel data too short: \(data.count) bytes (expected 154)")
+                return
+            }
+            
+            // Parse last sample (25th sample at offset 4 + 24*6)
+            let lastSampleOffset = 4 + (24 * 6)
+            
+            guard lastSampleOffset + 6 <= data.count else {
+                addLogMessage("⚠️ Accel offset out of range")
+                return
+            }
+            
+            let xBytes = data.subdata(in: lastSampleOffset..<(lastSampleOffset + 2))
+            let yBytes = data.subdata(in: (lastSampleOffset + 2)..<(lastSampleOffset + 4))
+            let zBytes = data.subdata(in: (lastSampleOffset + 4)..<(lastSampleOffset + 6))
+            
+            let x = xBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let y = yBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let z = zBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            
+            addLogMessage("📐 Accel: X=\(x), Y=\(y), Z=\(z)")
+            
+            let accelData = AccelerometerData(x: x, y: y, z: z, timestamp: Date())
+            
+            accelerometerHistory.append(accelData)
+            if accelerometerHistory.count > 1000 {
+                accelerometerHistory.removeFirst(accelerometerHistory.count - 1000)
+            }
+            sensorData.lastUpdate = Date()
+            
+            addLogMessage("📊 Accelerometer History: \(accelerometerHistory.count) readings")
             
             // Consolidate sensor data for historical view
-            self.consolidateSensorData()
+            consolidateSensorData()
         }
     }
     
-    private func parseTemperatureData(_ data: Data) {
-        addLogMessage("📊 Temp: Received \(data.count) bytes")
-        
-        // DEBUG: Print raw bytes to understand the format
-        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        addLogMessage("🔍 Temp raw bytes: \(hexString)")
-        
-        // Handle multiple possible formats
-        var temperature: Double = 0.0
-        
-        if data.count == 8 {
-            // Based on your device's actual format: Two 32-bit integers
-            // Bytes: 82 19 00 00 61 0D 00 00
-            // This appears to be raw sensor values, not temperature yet
+    nonisolated private func parseTemperatureData(_ data: Data) {
+        Task { @MainActor in
+            addLogMessage("📊 Temp: Received \(data.count) bytes")
             
-            let int1Bytes = data.subdata(in: 0..<4)
-            let int2Bytes = data.subdata(in: 4..<8)
-            let val1 = int1Bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            let val2 = int2Bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            // DEBUG: Print raw bytes to understand the format
+            let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+            addLogMessage("🔍 Temp raw bytes: \(hexString)")
             
-            addLogMessage("🔍 Raw sensor values: val1=\(val1), val2=\(val2)")
+            // Firmware format (from documentation):
+            // Bytes 0-3: frame counter (uint32_t)
+            // Bytes 4-5: temperature as signed int16 in centidegrees Celsius (1/100°C)
+            // Total: 8 bytes
+            // Example: value 2137 = 21.37°C
             
-            // Try different interpretations
-            
-            // Option 1: val1 and val2 are in hundredths of degrees (0.01°C units)
-            let temp1 = Double(val1) / 100.0
-            addLogMessage("🔍 Val1 as temp (÷100): \(String(format: "%.2f", temp1))°C")
-            
-            // Option 2: Some devices send object temp and ambient temp
-            let temp2 = Double(val2) / 100.0
-            addLogMessage("🔍 Val2 as temp (÷100): \(String(format: "%.2f", temp2))°C")
-            
-            // Option 3: Kelvin to Celsius (val1 in hundredths of Kelvin)
-            let tempKelvin1 = (Double(val1) / 100.0) - 273.15
-            addLogMessage("🔍 Val1 as Kelvin→Celsius: \(String(format: "%.2f", tempKelvin1))°C")
-            
-            // Option 4: Maybe it's in 10ths or 1000ths
-            let temp1div10 = Double(val1) / 10.0
-            let temp1div1000 = Double(val1) / 1000.0
-            addLogMessage("🔍 Val1 ÷10: \(String(format: "%.2f", temp1div10))°C, ÷1000: \(String(format: "%.2f", temp1div1000))°C")
-            
-            // Use the most reasonable interpretation
-            // 6530 / 100 = 65.30°C (too high)
-            // 6530 / 10 = 653.0°C (way too high)
-            // Let's try: maybe it's actually (val1/100 + val2/100)/2 or just use val2?
-            // Or perhaps it needs to be interpreted as signed int16 values instead?
-            
-            // Try as signed 16-bit values (maybe it's two temp readings)
-            let int16_1 = int1Bytes.subdata(in: 0..<2).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-            let int16_2 = int1Bytes.subdata(in: 2..<4).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-            let int16_3 = int2Bytes.subdata(in: 0..<2).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-            let int16_4 = int2Bytes.subdata(in: 2..<4).withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-            
-            addLogMessage("🔍 As 4 x Int16: [\(int16_1), \(int16_2), \(int16_3), \(int16_4)]")
-            
-            // 0x1982 = 6530, 0x0D61 = 3425
-            // If we divide by 100: 65.30°C and 34.25°C
-            // 34.25°C is a reasonable body temperature!
-            
-            // Use val2 (the second value) as it seems more reasonable
-            temperature = Double(val2) / 100.0
-            addLogMessage("🌡️ Using val2/100 = \(String(format: "%.2f", temperature))°C")
-            
-        } else if data.count == 6 {
-            // Format 1: int16_t + uint32_t (6 bytes)
-            let intBytes = data.subdata(in: 0..<2)
-            let fracBytes = data.subdata(in: 2..<6)
-            
-            let integerPart = intBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-            let fractionalPart = fracBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            
-            temperature = Double(integerPart) + (Double(fractionalPart) / 1000000.0)
-            addLogMessage("🌡️ Temp format: 6-byte split = \(String(format: "%.2f", temperature))°C")
-        } else if data.count == 4 {
-            // Format 2: float (4 bytes)
-            let floatTemp = data.withUnsafeBytes { $0.loadUnaligned(as: Float.self) }
-            temperature = floatTemp.isNaN ? 0.0 : Double(floatTemp)
-            addLogMessage("🌡️ Temp format: 4-byte float = \(String(format: "%.2f", temperature))°C")
-        } else if data.count == 2 {
-            // Format 3: int16_t in 0.1°C units (2 bytes)
-            let intBytes = data.subdata(in: 0..<2)
-            let rawValue = intBytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
-            temperature = Double(rawValue) / 10.0
-            addLogMessage("🌡️ Temp format: 2-byte int16 = \(String(format: "%.2f", temperature))°C")
-        } else {
-            addLogMessage("⚠️ Temp data unexpected size: \(data.count) bytes")
-            return
-        }
-        
-        // Validate temperature is in reasonable range for body temperature
-        // Typical range: 30°C to 45°C (86°F to 113°F)
-        if temperature < 20.0 || temperature > 50.0 {
-            addLogMessage("⚠️ Temperature \(String(format: "%.2f", temperature))°C is out of reasonable range")
-            // Still add it to history but with 0 value
-            temperature = 0.0
-        }
-        
-        let tempData = TemperatureData(celsius: temperature, timestamp: Date())
-        
-        DispatchQueue.main.async {
-            self.sensorData.temperature = temperature
-            self.temperatureHistory.append(tempData)
-            if self.temperatureHistory.count > 1000 {
-                self.temperatureHistory.removeFirst(self.temperatureHistory.count - 1000)
+            guard data.count >= 6 else {
+                addLogMessage("⚠️ Temp data too short: \(data.count) bytes (expected 8)")
+                return
             }
-            self.sensorData.lastUpdate = Date()
             
-            self.addLogMessage("🌡️ Temp: \(String(format: "%.1f", temperature))°C")
-            self.addLogMessage("📊 Temperature History: \(self.temperatureHistory.count) readings")
+            var temperature: Double = 0.0
+            
+            if data.count == 8 {
+                // Parse frame counter (first 4 bytes)
+                let frameCounterBytes = data.subdata(in: 0..<4)
+                let frameCounter = frameCounterBytes.withUnsafeBytes { $0.load(as: UInt32.self) }
+                
+                // Parse temperature (bytes 4-5 as signed int16)
+                let tempBytes = data.subdata(in: 4..<6)
+                let tempRaw = Int16(littleEndian: tempBytes.withUnsafeBytes { $0.load(as: Int16.self) })
+                
+                // Convert from centidegrees to degrees Celsius
+                temperature = Double(tempRaw) / 100.0
+                
+                addLogMessage("🔢 Frame counter: \(frameCounter)")
+                addLogMessage("🔍 Raw temperature value: \(tempRaw) centidegrees")
+                addLogMessage("🌡️ Temperature: \(String(format: "%.2f", temperature))°C")
+                
+            } else if data.count == 6 {
+                // Alternative format without frame counter?
+                // Bytes 0-3: Some value
+                // Bytes 4-5: Temperature
+                let tempBytes = data.subdata(in: 4..<6)
+                let tempRaw = Int16(littleEndian: tempBytes.withUnsafeBytes { $0.load(as: Int16.self) })
+                temperature = Double(tempRaw) / 100.0
+                addLogMessage("🌡️ Temp (6-byte format): \(String(format: "%.2f", temperature))°C")
+                
+            } else if data.count == 2 {
+                // Just temperature, no frame counter
+                let tempRaw = Int16(littleEndian: data.withUnsafeBytes { $0.load(as: Int16.self) })
+                temperature = Double(tempRaw) / 100.0
+                addLogMessage("🌡️ Temp (2-byte format): \(String(format: "%.2f", temperature))°C")
+                
+            } else {
+                addLogMessage("⚠️ Unexpected temperature data size: \(data.count) bytes")
+                return
+            }
+            
+            // Validate temperature is in reasonable range
+            // BLE module temp can be higher than body temp (0°C to 60°C is reasonable)
+            if temperature < -10.0 || temperature > 80.0 {
+                addLogMessage("⚠️ Temperature \(String(format: "%.2f", temperature))°C is out of reasonable range")
+                // Still add it to history but with 0 value
+                temperature = 0.0
+            }
+            
+            let tempData = TemperatureData(celsius: temperature, timestamp: Date())
+            
+            sensorData.temperature = temperature
+            temperatureHistory.append(tempData)
+            if temperatureHistory.count > 1000 {
+                temperatureHistory.removeFirst(temperatureHistory.count - 1000)
+            }
+            sensorData.lastUpdate = Date()
+            
+            addLogMessage("🌡️ Temp: \(String(format: "%.1f", temperature))°C")
+            addLogMessage("📊 Temperature History: \(temperatureHistory.count) readings")
             
             // Consolidate sensor data for historical view
-            self.consolidateSensorData()
+            consolidateSensorData()
         }
     }
     
-    private func parseBatteryData(_ data: Data) {
-        addLogMessage("📊 Battery: Received \(data.count) bytes")
-        
-        var batteryLevel: Int = 0
-        
-        if data.count >= 4 {
-            // Format 1: uint32_t (4 bytes)
-            let bytes = data.subdata(in: 0..<4)
-            let rawValue = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            addLogMessage("🔋 Battery: Raw UInt32 value = \(rawValue)")
-            batteryLevel = Int(rawValue)
-        } else if data.count >= 2 {
-            // Format 2: uint16_t (2 bytes) - ACTUAL FORMAT FROM YOUR DEVICE
-            let bytes = data.subdata(in: 0..<2)
-            let rawValue = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt16.self) }
-            addLogMessage("🔋 Battery: Raw UInt16 value = \(rawValue)")
-            batteryLevel = Int(rawValue)
-        } else if data.count >= 1 {
-            // Format 3: uint8_t (1 byte)
-            batteryLevel = Int(data[0])
-            addLogMessage("🔋 Battery: Raw UInt8 value = \(batteryLevel)")
-        } else {
-            addLogMessage("⚠️ Battery data too short: \(data.count) bytes")
-            return
-        }
-        
-        // Clamp to valid range
-        batteryLevel = max(0, min(100, batteryLevel))
-        
-        let batteryData = BatteryData(percentage: batteryLevel, timestamp: Date())
-        
-        DispatchQueue.main.async {
-            self.sensorData.batteryLevel = batteryLevel
-            self.batteryHistory.append(batteryData)
-            if self.batteryHistory.count > 1000 {
-                self.batteryHistory.removeFirst(self.batteryHistory.count - 1000)
-            }
-            self.sensorData.lastUpdate = Date()
+    nonisolated private func parseBatteryData(_ data: Data) {
+        Task { @MainActor in
+            addLogMessage("📊 Battery: Received \(data.count) bytes")
             
-            self.addLogMessage("🔋 Battery: \(batteryLevel)%")
-            self.addLogMessage("📊 Battery History: \(self.batteryHistory.count) readings")
+            // Firmware format (from documentation):
+            // int32_t battery voltage in millivolts (mV)
+            // 4 bytes total
+            
+            guard data.count >= 4 else {
+                addLogMessage("⚠️ Battery data too short: \(data.count) bytes (expected 4)")
+                return
+            }
+            
+            // Parse as int32_t in millivolts
+            let voltageBytes = data.subdata(in: 0..<4)
+            let voltageMillivolts = Int32(littleEndian: voltageBytes.withUnsafeBytes { $0.load(as: Int32.self) })
+            let voltageVolts = Double(voltageMillivolts) / 1000.0
+            
+            addLogMessage("🔋 Battery voltage: \(voltageMillivolts) mV (\(String(format: "%.2f", voltageVolts)) V)")
+            
+            // Convert voltage to percentage estimate
+            // Typical Li-ion battery: 4.2V (100%) to 3.0V (0%)
+            // Adjust these values based on your specific battery
+            let maxVoltage: Double = 4200.0  // 4.2V in mV
+            let minVoltage: Double = 3000.0  // 3.0V in mV
+            
+            let voltageRange = maxVoltage - minVoltage
+            let currentVoltage = Double(voltageMillivolts)
+            let percentage = ((currentVoltage - minVoltage) / voltageRange) * 100.0
+            
+            // Clamp to valid range
+            let batteryLevel = max(0, min(100, Int(percentage)))
+            
+            addLogMessage("🔋 Battery level: \(batteryLevel)% (estimated from voltage)")
+            
+            let batteryData = BatteryData(percentage: batteryLevel, timestamp: Date())
+            
+            sensorData.batteryLevel = batteryLevel
+            batteryHistory.append(batteryData)
+            if batteryHistory.count > 1000 {
+                batteryHistory.removeFirst(batteryHistory.count - 1000)
+            }
+            sensorData.lastUpdate = Date()
+            
+            addLogMessage("📊 Battery History: \(batteryHistory.count) readings")
             
             // Consolidate sensor data for historical view
-            self.consolidateSensorData()
+            consolidateSensorData()
         }
     }
     
-    private func parseDeviceUUID(_ data: Data) {
-        addLogMessage("📊 UUID: Received \(data.count) bytes")
-        
-        guard data.count >= 8 else {
-            addLogMessage("⚠️ UUID data too short: \(data.count) bytes (expected 8)")
-            return
-        }
-        
-        // Safe way to read UInt64 from Data
-        let uuid = data.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> UInt64 in
-            guard pointer.count >= 8 else { return 0 }
-            return pointer.load(as: UInt64.self)
-        }
-        
-        DispatchQueue.main.async {
-            self.sensorData.deviceUUID = uuid
-        }
-        
-        addLogMessage("🆔 UUID: \(String(format: "%016llX", uuid))")
-    }
-    
-    private func parseFirmwareVersion(_ data: Data) {
-        if let version = String(data: data, encoding: .utf8) {
-            DispatchQueue.main.async {
-                self.sensorData.firmwareVersion = version
+    nonisolated private func parseDeviceUUID(_ data: Data) {
+        Task { @MainActor in
+            addLogMessage("📊 UUID: Received \(data.count) bytes")
+            
+            guard data.count >= 8 else {
+                addLogMessage("⚠️ UUID data too short: \(data.count) bytes (expected 8)")
+                return
             }
-            addLogMessage("📱 Firmware: \(version)")
-        } else {
-            addLogMessage("⚠️ Could not parse firmware version")
+            
+            // Safe way to read UInt64 from Data
+            let uuid = data.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> UInt64 in
+                guard pointer.count >= 8 else { return 0 }
+                return pointer.load(as: UInt64.self)
+            }
+            
+            sensorData.deviceUUID = uuid
+            
+            addLogMessage("🆔 UUID: \(String(format: "%016llX", uuid))")
+        }
+    }
+    
+    nonisolated private func parseFirmwareVersion(_ data: Data) {
+        Task { @MainActor in
+            if let version = String(data: data, encoding: .utf8) {
+                sensorData.firmwareVersion = version
+                addLogMessage("📱 Firmware: \(version)")
+            } else {
+                addLogMessage("⚠️ Could not parse firmware version")
+            }
         }
     }
 }

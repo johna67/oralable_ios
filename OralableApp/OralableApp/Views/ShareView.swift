@@ -8,7 +8,9 @@ struct ShareView: View {
     var isViewerMode: Bool = false
     
     @State private var showShareSheet = false
+    @State private var showDocumentExporter = false
     @State private var exportURL: URL?
+    @State private var exportDocument: CSVDocument?
     @State private var showClearConfirmation = false
     @State private var showImportPicker = false
     @State private var showImportSuccess = false
@@ -16,81 +18,116 @@ struct ShareView: View {
     @State private var showImportError = false
     @State private var importErrorMessage = ""
     
+    @Environment(\.horizontalSizeClass) var sizeClass
+    
+    private var columns: [GridItem] {
+        let columnCount = DesignSystem.Layout.gridColumns(for: sizeClass)
+        return Array(
+            repeating: GridItem(.flexible(), spacing: DesignSystem.Layout.cardSpacing),
+            count: columnCount
+        )
+    }
+    
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: DesignSystem.Spacing.lg) {
-                    // Viewer Mode Import Section
-                    if isViewerMode {
-                        ImportSection(
-                            showImportPicker: $showImportPicker,
-                            ble: ble,
-                            showImportSuccess: $showImportSuccess,
-                            importedCount: $importedCount,
-                            showImportError: $showImportError,
-                            importErrorMessage: $importErrorMessage
-                        )
-                    }
-                    
-                    // Data Summary Card
-                    DataSummaryCard(ble: ble)
-                    
-                    // Export Button
-                    ExportButton(
-                        showShareSheet: $showShareSheet,
-                        exportURL: $exportURL,
-                        ble: ble
+        ScrollView {
+            VStack(spacing: DesignSystem.Spacing.lg) {
+                // Viewer Mode Import Section
+                if isViewerMode {
+                    ImportSection(
+                        showImportPicker: $showImportPicker,
+                        ble: ble,
+                        showImportSuccess: $showImportSuccess,
+                        importedCount: $importedCount,
+                        showImportError: $showImportError,
+                        importErrorMessage: $importErrorMessage
                     )
-                    
-                    // Recent Logs Preview
-                    RecentLogsPreview(ble: ble)
-                    
-                    // Device Info Card (collapsed/minimal)
-                    DeviceInfoCard(isViewerMode: isViewerMode)
-                    
-                    // Clear Data Button
-                    ClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
-                    
-                    // Debug Section (only in debug builds)
-                    #if DEBUG
-                    DebugConnectionSection(ble: ble)
-                    #endif
+                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
                 }
-                .padding(DesignSystem.Spacing.lg)
+                
+                // Data Summary Card
+                DataSummaryCard(ble: ble)
+                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+                
+                // Export Button
+                ExportButton(
+                    showShareSheet: $showShareSheet,
+                    showDocumentExporter: $showDocumentExporter,
+                    exportURL: $exportURL,
+                    exportDocument: $exportDocument,
+                    ble: ble
+                )
+                .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+                
+                // Recent Logs Preview
+                RecentLogsPreview(ble: ble)
+                    .frame(maxWidth: .infinity)
+                
+                // Device Info Card (collapsed/minimal)
+                DeviceInfoCard(isViewerMode: isViewerMode)
+                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+                
+                // Clear Data Button
+                ClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
+                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+                
+                // Debug Section (only in debug builds)
+                #if DEBUG
+                DebugConnectionSection(ble: ble)
+                    .frame(maxWidth: .infinity)
+                #endif
             }
-            .navigationTitle(isViewerMode ? "Import & Export" : "Share Data")
-            .navigationBarTitleDisplayMode(.large)
-            .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
-            .sheet(isPresented: $showShareSheet) {
-                if let url = exportURL {
-                    ShareSheet(items: [url])
+            .padding(DesignSystem.Layout.edgePadding)
+            .frame(maxWidth: .infinity)
+        }
+        .navigationTitle(isViewerMode ? "Import & Export" : "Share Data")
+        .navigationBarTitleDisplayMode(DesignSystem.Layout.isIPad ? .inline : .large)
+        .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
+        .sheet(isPresented: $showShareSheet) {
+            if let url = exportURL {
+                ShareSheet(items: [url])
+            }
+        }
+        .fileExporter(
+            isPresented: $showDocumentExporter,
+            document: exportDocument,
+            contentType: .commaSeparatedText,
+            defaultFilename: "oralable_data_\(Date().formatted(.iso8601.year().month().day()))"
+        ) { result in
+            switch result {
+            case .success(let url):
+                print("✅ File saved successfully to: \(url)")
+                // Clean up the temporary file
+                if let exportURL = exportURL {
+                    try? FileManager.default.removeItem(at: exportURL)
                 }
+            case .failure(let error):
+                print("❌ File save failed: \(error.localizedDescription)")
             }
-            .fileImporter(
-                isPresented: $showImportPicker,
-                allowedContentTypes: [.commaSeparatedText, .text],
-                allowsMultipleSelection: false
-            ) { result in
-                handleImport(result: result)
+        }
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [.commaSeparatedText, .text],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result: result)
+        }
+        .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Imported \(importedCount) data points. View them in the Dashboard and History tabs.")
+        }
+        .alert("Import Error", isPresented: $showImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importErrorMessage)
+        }
+        .alert("Clear All Data?", isPresented: $showClearConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                ble.clearLogs()
             }
-            .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Imported \(importedCount) data points. View them in the Dashboard and History tabs.")
-            }
-            .alert("Import Error", isPresented: $showImportError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(importErrorMessage)
-            }
-            .alert("Clear All Data?", isPresented: $showClearConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Clear", role: .destructive) {
-                    ble.clearLogs()
-                }
-            } message: {
-                Text("This will clear all logs and historical data. This action cannot be undone.")
-            }
+        } message: {
+            Text("This will clear all logs and historical data. This action cannot be undone.")
         }
     }
     
@@ -135,8 +172,85 @@ struct ShareView: View {
                 
                 // Now import from the copied file
                 if let imported = CSVImportManager.shared.importData(from: tempURL) {
-                    // Add imported data to BLE manager
+                    // Calculate time offset to make imported data "recent" for 3-minute window
+                    // Find the most recent timestamp in imported data
+                    guard let oldestTimestamp = imported.sensorData.first?.timestamp,
+                          let newestTimestamp = imported.sensorData.last?.timestamp else {
+                        importErrorMessage = "No valid sensor data in CSV file."
+                        showImportError = true
+                        try? FileManager.default.removeItem(at: tempURL)
+                        return
+                    }
+                    
+                    // Calculate offset to bring the newest data point to "now"
+                    let timeOffset = Date().timeIntervalSince(newestTimestamp)
+                    
+                    // Add imported data to BLE manager with adjusted timestamps
                     ble.sensorDataHistory.append(contentsOf: imported.sensorData)
+                    
+                    // IMPORTANT: Populate individual sensor history arrays for dashboard graphs
+                    // with adjusted timestamps so they appear in the 3-minute window
+                    for sensorData in imported.sensorData {
+                        let adjustedTimestamp = sensorData.timestamp.addingTimeInterval(timeOffset)
+                        
+                        // Add PPG data with adjusted timestamp
+                        var adjustedPPG = sensorData.ppg
+                        adjustedPPG = PPGData(
+                            red: adjustedPPG.red,
+                            ir: adjustedPPG.ir,
+                            green: adjustedPPG.green,
+                            timestamp: adjustedTimestamp
+                        )
+                        ble.ppgHistory.append(adjustedPPG)
+                        
+                        // Add accelerometer data with adjusted timestamp
+                        var adjustedAccel = sensorData.accelerometer
+                        adjustedAccel = AccelerometerData(
+                            x: adjustedAccel.x,
+                            y: adjustedAccel.y,
+                            z: adjustedAccel.z,
+                            timestamp: adjustedTimestamp
+                        )
+                        ble.accelerometerHistory.append(adjustedAccel)
+                        
+                        // Add temperature data with adjusted timestamp
+                        var adjustedTemp = sensorData.temperature
+                        adjustedTemp = TemperatureData(
+                            celsius: adjustedTemp.celsius,
+                            timestamp: adjustedTimestamp
+                        )
+                        ble.temperatureHistory.append(adjustedTemp)
+                        
+                        // Add battery data with adjusted timestamp
+                        var adjustedBattery = sensorData.battery
+                        adjustedBattery = BatteryData(
+                            percentage: adjustedBattery.percentage,
+                            timestamp: adjustedTimestamp
+                        )
+                        ble.batteryHistory.append(adjustedBattery)
+                        
+                        // Add heart rate data if available with adjusted timestamp
+                        if let heartRate = sensorData.heartRate {
+                            var adjustedHR = heartRate
+                            adjustedHR = HeartRateData(
+                                bpm: adjustedHR.bpm,
+                                quality: adjustedHR.quality,
+                                timestamp: adjustedTimestamp
+                            )
+                            ble.heartRateHistory.append(adjustedHR)
+                        }
+                        
+                        // Add SpO2 data if available with adjusted timestamp
+                        if let spo2 = sensorData.spo2 {
+                            var adjustedSpO2 = spo2
+                            adjustedSpO2 = SpO2Data(
+                                percentage: adjustedSpO2.percentage,
+                                quality: adjustedSpO2.quality,
+                                timestamp: adjustedTimestamp
+                            )
+                            ble.spo2History.append(adjustedSpO2)
+                        }
+                    }
                     
                     // Convert imported string logs to LogMessage objects
                     for logString in imported.logs {
@@ -145,12 +259,19 @@ struct ShareView: View {
                     
                     // Sort by timestamp
                     ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
+                    ble.ppgHistory.sort { $0.timestamp < $1.timestamp }
+                    ble.accelerometerHistory.sort { $0.timestamp < $1.timestamp }
+                    ble.temperatureHistory.sort { $0.timestamp < $1.timestamp }
+                    ble.batteryHistory.sort { $0.timestamp < $1.timestamp }
+                    ble.heartRateHistory.sort { $0.timestamp < $1.timestamp }
+                    ble.spo2History.sort { $0.timestamp < $1.timestamp }
                     
                     importedCount = imported.sensorData.count
                     
-                    // Log success
+                    // Log success with time adjustment info
+                    let timeAdjustmentMinutes = Int(timeOffset / 60)
                     ble.logMessages.append(LogMessage(
-                        message: "✅ Successfully imported \(imported.sensorData.count) sensor data points and \(imported.logs.count) log entries"
+                        message: "✅ Successfully imported \(imported.sensorData.count) sensor data points and \(imported.logs.count) log entries (timestamps adjusted by \(timeAdjustmentMinutes) minutes to current time)"
                     ))
                     
                     showImportSuccess = true
@@ -497,7 +618,9 @@ struct MetricBox: View {
 // MARK: - Export Button
 struct ExportButton: View {
     @Binding var showShareSheet: Bool
+    @Binding var showDocumentExporter: Bool
     @Binding var exportURL: URL?
+    @Binding var exportDocument: CSVDocument?
     @ObservedObject var ble: OralableBLE
     @State private var isExporting = false
     
@@ -546,6 +669,10 @@ struct ExportButton: View {
         isExporting = true
         
         DispatchQueue.global(qos: .userInitiated).async {
+            // Clean up old exports first
+            CSVExportManager.shared.cleanupOldExports()
+            
+            // Perform the export
             let exportResult = CSVExportManager.shared.exportData(
                 sensorData: ble.sensorDataHistory,
                 logs: ble.logMessages.map { $0.message }
@@ -553,8 +680,21 @@ struct ExportButton: View {
             
             DispatchQueue.main.async {
                 isExporting = false
-                exportURL = exportResult
-                showShareSheet = true
+                if let url = exportResult {
+                    exportURL = url
+                    
+                    // Try to create a document from the URL
+                    if let csvContent = try? String(contentsOf: url, encoding: .utf8) {
+                        exportDocument = CSVDocument(csvContent: csvContent)
+                        showDocumentExporter = true
+                    } else {
+                        // Fallback to share sheet if document creation fails
+                        showShareSheet = true
+                    }
+                } else {
+                    // Export failed
+                    print("⚠️ Export failed - no URL returned")
+                }
             }
         }
     }
@@ -695,14 +835,144 @@ struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
+        // Convert URL items to use a proper item provider for file sharing
+        var activityItems: [Any] = []
+        
+        for item in items {
+            if let fileURL = item as? URL {
+                // Create an activity item source that properly provides the file
+                let itemSource = FileActivityItemSource(fileURL: fileURL)
+                activityItems.append(itemSource)
+            } else {
+                activityItems.append(item)
+            }
+        }
+        
+        // Create the activity view controller
         let controller = UIActivityViewController(
-            activityItems: items,
+            activityItems: activityItems,
             applicationActivities: nil
         )
+        
+        // Explicitly set completion handler to clean up temporary files
+        controller.completionWithItemsHandler = { activityType, completed, returnedItems, error in
+            if let error = error {
+                print("Share sheet error: \(error.localizedDescription)")
+            }
+            
+            // Clean up any temporary files after sharing (or canceling)
+            for item in items {
+                if let url = item as? URL {
+                    // Only remove files in the Caches/Exports directory
+                    if url.path.contains("/Caches/Exports/") {
+                        // Delay cleanup slightly to ensure sharing is complete
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            try? FileManager.default.removeItem(at: url)
+                            print("Cleaned up temporary export file: \(url.lastPathComponent)")
+                        }
+                    }
+                }
+            }
+        }
+        
+        // iPad support - configure popover presentation
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+            controller.popoverPresentationController?.sourceView = rootViewController.view
+            controller.popoverPresentationController?.sourceRect = CGRect(
+                x: rootViewController.view.bounds.midX,
+                y: rootViewController.view.bounds.midY,
+                width: 0,
+                height: 0
+            )
+            controller.popoverPresentationController?.permittedArrowDirections = []
+        }
+        
         return controller
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - File Activity Item Source
+class FileActivityItemSource: NSObject, UIActivityItemSource {
+    private let fileURL: URL
+    private let fileName: String
+    
+    init(fileURL: URL) {
+        self.fileURL = fileURL
+        self.fileName = fileURL.lastPathComponent
+        super.init()
+    }
+    
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        // Return the filename as placeholder
+        return fileName
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
+        // For file-based activities, we need to copy to a more accessible location
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempFile = tempDir.appendingPathComponent(fileName)
+        
+        do {
+            // Remove existing temp file if present
+            if FileManager.default.fileExists(atPath: tempFile.path) {
+                try? FileManager.default.removeItem(at: tempFile)
+            }
+            
+            // Copy file to temp directory
+            try FileManager.default.copyItem(at: fileURL, to: tempFile)
+            
+            // For Save to Files activity, we need to return the URL
+            // For other activities, return the data
+            if activityType == .saveToCameraRoll || activityType == .copyToPasteboard {
+                return try? Data(contentsOf: tempFile)
+            }
+            
+            return tempFile
+        } catch {
+            print("Error preparing file for sharing: \(error)")
+            // Fallback to returning the data directly
+            return try? Data(contentsOf: fileURL)
+        }
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
+        return "public.comma-separated-values-text"
+    }
+    
+    func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
+        return fileURL.deletingPathExtension().lastPathComponent
+    }
+}
+
+// MARK: - CSV Document
+struct CSVDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText, .text] }
+    
+    var csvContent: String
+    
+    init(csvContent: String) {
+        self.csvContent = csvContent
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents,
+              let string = String(data: data, encoding: .utf8)
+        else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        csvContent = string
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard let data = csvContent.data(using: .utf8) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        return FileWrapper(regularFileWithContents: data)
+    }
 }
 
 // MARK: - Debug Connection Section (Temporary)

@@ -896,6 +896,8 @@ struct HistoricalDetailView: View {
     let metricType: MetricType
     
     @Environment(\.dismiss) var dismiss
+    @Environment(\.horizontalSizeClass) var sizeClass
+    
     @State private var selectedTimeRange: TimeRange = .day
     @State private var selectedDate = Date()
     
@@ -904,23 +906,27 @@ struct HistoricalDetailView: View {
     
     @StateObject private var processor = HistoricalDataProcessor()
     
+    private var chartHeight: CGFloat {
+        DesignSystem.Layout.isIPad ? 400 : 300
+    }
+    
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                TimeRangePicker(selectedRange: $selectedTimeRange)
-                    .padding()
-                    .onChange(of: selectedTimeRange) { _, _ in
-                        selectedDate = Date()
-                        refreshProcessing()
-                    }
-                
-                DateNavigationView(selectedDate: $selectedDate, timeRange: selectedTimeRange)
-                    .padding(.horizontal)
-                    .onChange(of: selectedDate) { _, _ in
-                        refreshProcessing()
-                    }
-                
-                ScrollView {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 0) {
+                    TimeRangePicker(selectedRange: $selectedTimeRange)
+                        .padding()
+                        .onChange(of: selectedTimeRange) { _, _ in
+                            selectedDate = Date()
+                            refreshProcessing()
+                        }
+                    
+                    DateNavigationView(selectedDate: $selectedDate, timeRange: selectedTimeRange)
+                        .padding(.horizontal)
+                        .onChange(of: selectedDate) { _, _ in
+                            refreshProcessing()
+                        }
+                    
                     VStack(spacing: 20) {
                         EnhancedHistoricalChartCardUnified(
                             metricType: metricType,
@@ -928,6 +934,7 @@ struct HistoricalDetailView: View {
                             selectedDataPoint: $processor.selectedDataPoint,
                             processed: processor.processedData
                         )
+                        .frame(height: chartHeight)
                         
                         EnhancedStatisticsCardUnified(
                             metricType: metricType,
@@ -942,30 +949,32 @@ struct HistoricalDetailView: View {
                             )
                         }
                     }
-                    .padding()
+                    .padding(DesignSystem.Layout.edgePadding)
+                    .frame(maxWidth: DesignSystem.Layout.contentWidth(for: geometry))
+                    .frame(maxWidth: .infinity) // Center the content
                 }
             }
-            .navigationTitle("\(metricType.title)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        }
+        .navigationTitle("\(metricType.title)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
-            .task {
-                await processor.processData(
-                    from: ble,
-                    metricType: metricType,
-                    timeRange: selectedTimeRange,
-                    selectedDate: selectedDate,
-                    appMode: appMode
-                )
-            }
-            .onChange(of: ble.sensorDataHistory.count) { _, _ in
-                refreshProcessing()
-            }
+        }
+        .task {
+            await processor.processData(
+                from: ble,
+                metricType: metricType,
+                timeRange: selectedTimeRange,
+                selectedDate: selectedDate,
+                appMode: appMode
+            )
+        }
+        .onChange(of: ble.sensorDataHistory.count) { _, _ in
+            refreshProcessing()
         }
     }
     
@@ -1146,6 +1155,40 @@ struct EnhancedHistoricalChartCardUnified: View {
     @Binding var selectedDataPoint: SensorData?
     let processed: HistoricalDataProcessor.ProcessedHistoricalData?
     
+    // X-axis domain - the full time range regardless of data points
+    private var xAxisDomain: ClosedRange<Date> {
+        guard let processed = processed, !processed.rawData.isEmpty else {
+            // Default to "now" if no data
+            let now = Date()
+            return now.addingTimeInterval(-3600)...now
+        }
+        
+        let calendar = Calendar.current
+        let referenceDate = processed.rawData.first?.timestamp ?? Date()
+        
+        switch timeRange {
+        case .hour:
+            if let hourInterval = calendar.dateInterval(of: .hour, for: referenceDate) {
+                return hourInterval.start...hourInterval.end
+            }
+        case .day:
+            let startOfDay = calendar.startOfDay(for: referenceDate)
+            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+            return startOfDay...endOfDay
+        case .week:
+            if let weekInterval = calendar.dateInterval(of: .weekOfYear, for: referenceDate) {
+                return weekInterval.start...weekInterval.end
+            }
+        case .month:
+            if let monthInterval = calendar.dateInterval(of: .month, for: referenceDate) {
+                return monthInterval.start...monthInterval.end
+            }
+        }
+        
+        // Fallback
+        return referenceDate...referenceDate.addingTimeInterval(3600)
+    }
+    
     // X-axis stride based on time range
     private var xAxisStride: Calendar.Component {
         switch timeRange {
@@ -1263,6 +1306,7 @@ struct EnhancedHistoricalChartCardUnified: View {
                     }
                 }
                 .frame(height: 250)
+                .chartXScale(domain: xAxisDomain)
                 .chartXAxis {
                     AxisMarks(values: .stride(by: xAxisStride)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
