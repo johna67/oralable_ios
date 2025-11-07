@@ -29,105 +29,135 @@ struct ShareView: View {
     }
     
     var body: some View {
+        contentView
+            .navigationTitle(navigationTitle)
+            .navigationBarTitleDisplayMode(navigationBarTitleDisplayMode)
+            .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
+            .sheet(isPresented: $showShareSheet) {
+                shareSheetContent
+            }
+            .fileExporter(
+                isPresented: $showDocumentExporter,
+                document: exportDocument,
+                contentType: .commaSeparatedText,
+                defaultFilename: defaultExportFilename
+            ) { result in
+                handleExportResult(result)
+            }
+            .fileImporter(
+                isPresented: $showImportPicker,
+                allowedContentTypes: [.commaSeparatedText, .text],
+                allowsMultipleSelection: false
+            ) { result in
+                handleImport(result: result)
+            }
+            .modifier(AlertsModifier(
+                showImportSuccess: $showImportSuccess,
+                showImportError: $showImportError,
+                showClearConfirmation: $showClearConfirmation,
+                importedCount: importedCount,
+                importErrorMessage: importErrorMessage,
+                ble: ble
+            ))
+    }
+    
+    // MARK: - Computed Properties for Body
+    
+    private var navigationTitle: String {
+        isViewerMode ? "Import & Export" : "Share Data"
+    }
+    
+    private var navigationBarTitleDisplayMode: NavigationBarItem.TitleDisplayMode {
+        DesignSystem.Layout.isIPad ? .inline : .large
+    }
+    
+    private var defaultExportFilename: String {
+        "oralable_data_\(Date().formatted(.iso8601.year().month().day()))"
+    }
+    
+    @ViewBuilder
+    private var shareSheetContent: some View {
+        if let url = exportURL {
+            ShareSheet(items: [url])
+        }
+    }
+    
+    private var importSuccessMessage: some View {
+        Text("Imported \(importedCount) data points. View them in the Dashboard and History tabs.")
+    }
+    
+    private var clearConfirmationMessage: some View {
+        Text("This will clear all logs and historical data. This action cannot be undone.")
+    }
+    
+    private var contentView: some View {
         ScrollView {
             VStack(spacing: DesignSystem.Spacing.lg) {
-                // Viewer Mode Import Section
-                if isViewerMode {
-                    ImportSection(
-                        showImportPicker: $showImportPicker,
-                        ble: ble,
-                        showImportSuccess: $showImportSuccess,
-                        importedCount: $importedCount,
-                        showImportError: $showImportError,
-                        importErrorMessage: $importErrorMessage
-                    )
-                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-                }
-                
-                // Data Summary Card
-                DataSummaryCard(ble: ble)
-                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-                
-                // Export Button
-                ExportButton(
-                    showShareSheet: $showShareSheet,
-                    showDocumentExporter: $showDocumentExporter,
-                    exportURL: $exportURL,
-                    exportDocument: $exportDocument,
-                    ble: ble
-                )
-                .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-                
-                // Recent Logs Preview
-                RecentLogsPreview(ble: ble)
-                    .frame(maxWidth: .infinity)
-                
-                // Device Info Card (collapsed/minimal)
-                DeviceInfoCard(isViewerMode: isViewerMode)
-                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-                
-                // Clear Data Button
-                ClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
-                    .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-                
-                // Debug Section (only in debug builds)
-                #if DEBUG
-                DebugConnectionSection(ble: ble)
-                    .frame(maxWidth: .infinity)
-                #endif
+                mainContentStack
             }
             .padding(DesignSystem.Layout.edgePadding)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle(isViewerMode ? "Import & Export" : "Share Data")
-        .navigationBarTitleDisplayMode(DesignSystem.Layout.isIPad ? .inline : .large)
-        .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
-        .sheet(isPresented: $showShareSheet) {
-            if let url = exportURL {
-                ShareSheet(items: [url])
+    }
+    
+    @ViewBuilder
+    private var mainContentStack: some View {
+        // Viewer Mode Import Section
+        if isViewerMode {
+            ImportSection(
+                showImportPicker: $showImportPicker,
+                ble: ble,
+                showImportSuccess: $showImportSuccess,
+                importedCount: $importedCount,
+                showImportError: $showImportError,
+                importErrorMessage: $importErrorMessage
+            )
+            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+        }
+        
+        // Data Summary Card
+        DataSummaryCard(ble: ble)
+            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+        
+        // Export Button
+        ExportButton(
+            showShareSheet: $showShareSheet,
+            showDocumentExporter: $showDocumentExporter,
+            exportURL: $exportURL,
+            exportDocument: $exportDocument,
+            ble: ble
+        )
+        .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+        
+        // Recent Logs Preview
+        RecentLogsPreview(ble: ble)
+            .frame(maxWidth: .infinity)
+        
+        // Device Info Card (collapsed/minimal)
+        DeviceInfoCard(isViewerMode: isViewerMode)
+            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+        
+        // Clear Data Button
+        ClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
+            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+        
+        // Debug Section (only in debug builds)
+        #if DEBUG
+        DebugConnectionSection(ble: ble)
+            .frame(maxWidth: .infinity)
+        #endif
+    }
+    
+    private func handleExportResult(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            print("✅ File saved successfully to: \(url)")
+            // Clean up the temporary file
+            if let exportURL = exportURL {
+                try? FileManager.default.removeItem(at: exportURL)
             }
-        }
-        .fileExporter(
-            isPresented: $showDocumentExporter,
-            document: exportDocument,
-            contentType: .commaSeparatedText,
-            defaultFilename: "oralable_data_\(Date().formatted(.iso8601.year().month().day()))"
-        ) { result in
-            switch result {
-            case .success(let url):
-                print("✅ File saved successfully to: \(url)")
-                // Clean up the temporary file
-                if let exportURL = exportURL {
-                    try? FileManager.default.removeItem(at: exportURL)
-                }
-            case .failure(let error):
-                print("❌ File save failed: \(error.localizedDescription)")
-            }
-        }
-        .fileImporter(
-            isPresented: $showImportPicker,
-            allowedContentTypes: [.commaSeparatedText, .text],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImport(result: result)
-        }
-        .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Imported \(importedCount) data points. View them in the Dashboard and History tabs.")
-        }
-        .alert("Import Error", isPresented: $showImportError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(importErrorMessage)
-        }
-        .alert("Clear All Data?", isPresented: $showClearConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clear", role: .destructive) {
-                ble.clearLogs()
-            }
-        } message: {
-            Text("This will clear all logs and historical data. This action cannot be undone.")
+        case .failure(let error):
+            print("❌ File save failed: \(error.localizedDescription)")
         }
     }
     
@@ -975,6 +1005,38 @@ struct CSVDocument: FileDocument {
     }
 }
 
+// MARK: - Alerts Modifier
+struct AlertsModifier: ViewModifier {
+    @Binding var showImportSuccess: Bool
+    @Binding var showImportError: Bool
+    @Binding var showClearConfirmation: Bool
+    let importedCount: Int
+    let importErrorMessage: String
+    @ObservedObject var ble: OralableBLE
+    
+    func body(content: Content) -> some View {
+        content
+            .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Imported \(importedCount) data points. View them in the Dashboard and History tabs.")
+            }
+            .alert("Import Error", isPresented: $showImportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(importErrorMessage)
+            }
+            .alert("Clear All Data?", isPresented: $showClearConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Clear", role: .destructive) {
+                    ble.clearLogs()
+                }
+            } message: {
+                Text("This will clear all logs and historical data. This action cannot be undone.")
+            }
+    }
+}
+
 // MARK: - Debug Connection Section (Temporary)
 struct DebugConnectionSection: View {
     @ObservedObject var ble: OralableBLE
@@ -1039,7 +1101,12 @@ struct DebugConnectionSection: View {
                     
                     Button("Connect") {
                         if !testDeviceName.isEmpty {
-                            ble.connectToDeviceWithName(testDeviceName)
+                            // Find device by name in discovered devices
+                            if let device = ble.discoveredDevices.first(where: { 
+                                $0.name?.contains(testDeviceName) == true 
+                            }) {
+                                ble.connect(to: device)
+                            }
                         }
                     }
                     .buttonStyle(.bordered)
