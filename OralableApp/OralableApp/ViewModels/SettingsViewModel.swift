@@ -1,0 +1,258 @@
+//
+//  SettingsViewModel.swift
+//  OralableApp
+//
+//  Created by John A Cogan on 07/11/2025.
+//
+
+
+//
+//  SettingsViewModel.swift
+//  OralableApp
+//
+//  Created: November 7, 2025
+//  MVVM Architecture - Settings management business logic
+//
+
+import Foundation
+import Combine
+
+@MainActor
+class SettingsViewModel: ObservableObject {
+    
+    // MARK: - Published Properties (Observable by View)
+    
+    @Published var ppgChannelOrder: PPGChannelOrder = .standard
+    @Published var notificationsEnabled: Bool = true
+    @Published var exportFormat: ExportFormat = .csv
+    @Published var dataRetentionDays: Int = 30
+    @Published var autoConnectEnabled: Bool = true
+    @Published var showDebugInfo: Bool = false
+    
+    // Notification settings
+    @Published var connectionAlerts: Bool = true
+    @Published var batteryAlerts: Bool = true
+    @Published var lowBatteryThreshold: Int = 20
+    
+    // Display settings
+    @Published var useMetricUnits: Bool = true
+    @Published var show24HourTime: Bool = true
+    @Published var chartRefreshRate: ChartRefreshRate = .realTime
+    
+    // Privacy settings
+    @Published var shareAnalytics: Bool = false
+    @Published var localStorageOnly: Bool = true
+    
+    // UI State
+    @Published var showResetConfirmation: Bool = false
+    @Published var showClearDataConfirmation: Bool = false
+    
+    // MARK: - Private Properties
+    
+    private let userDefaults = UserDefaults.standard
+    private let bleManager: OralableBLE
+    private var cancellables = Set<AnyCancellable>()
+    
+    // UserDefaults Keys
+    private enum Keys {
+        static let ppgChannelOrder = "ppgChannelOrder"
+        static let notificationsEnabled = "notificationsEnabled"
+        static let exportFormat = "exportFormat"
+        static let dataRetentionDays = "dataRetentionDays"
+        static let autoConnectEnabled = "autoConnectEnabled"
+        static let showDebugInfo = "showDebugInfo"
+        static let connectionAlerts = "connectionAlerts"
+        static let batteryAlerts = "batteryAlerts"
+        static let lowBatteryThreshold = "lowBatteryThreshold"
+        static let useMetricUnits = "useMetricUnits"
+        static let show24HourTime = "show24HourTime"
+        static let chartRefreshRate = "chartRefreshRate"
+        static let shareAnalytics = "shareAnalytics"
+        static let localStorageOnly = "localStorageOnly"
+    }
+    
+    // MARK: - Computed Properties
+    
+    var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+    
+    var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+    
+    var versionText: String {
+        "Version \(appVersion) (\(buildNumber))"
+    }
+    
+    // MARK: - Initialization
+    
+    init(bleManager: OralableBLE) {
+        self.bleManager = bleManager
+        loadSettings()
+        setupBindings()
+    }
+    
+    // MARK: - Setup
+    
+    private func setupBindings() {
+        // Sync PPG channel order with BLE manager
+        bleManager.$ppgChannelOrder
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$ppgChannelOrder)
+        
+        // Save settings when they change
+        $ppgChannelOrder
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.saveSetting(Keys.ppgChannelOrder, value: value.rawValue)
+                self?.bleManager.ppgChannelOrder = value
+            }
+            .store(in: &cancellables)
+        
+        $notificationsEnabled
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.saveSetting(Keys.notificationsEnabled, value: value)
+            }
+            .store(in: &cancellables)
+        
+        $dataRetentionDays
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.saveSetting(Keys.dataRetentionDays, value: value)
+            }
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Settings Management
+    
+    func loadSettings() {
+        ppgChannelOrder = PPGChannelOrder(rawValue: userDefaults.string(forKey: Keys.ppgChannelOrder) ?? "") ?? .standard
+        notificationsEnabled = userDefaults.bool(forKey: Keys.notificationsEnabled, defaultValue: true)
+        dataRetentionDays = userDefaults.integer(forKey: Keys.dataRetentionDays, defaultValue: 30)
+        autoConnectEnabled = userDefaults.bool(forKey: Keys.autoConnectEnabled, defaultValue: true)
+        showDebugInfo = userDefaults.bool(forKey: Keys.showDebugInfo, defaultValue: false)
+        connectionAlerts = userDefaults.bool(forKey: Keys.connectionAlerts, defaultValue: true)
+        batteryAlerts = userDefaults.bool(forKey: Keys.batteryAlerts, defaultValue: true)
+        lowBatteryThreshold = userDefaults.integer(forKey: Keys.lowBatteryThreshold, defaultValue: 20)
+        useMetricUnits = userDefaults.bool(forKey: Keys.useMetricUnits, defaultValue: true)
+        show24HourTime = userDefaults.bool(forKey: Keys.show24HourTime, defaultValue: true)
+        shareAnalytics = userDefaults.bool(forKey: Keys.shareAnalytics, defaultValue: false)
+        localStorageOnly = userDefaults.bool(forKey: Keys.localStorageOnly, defaultValue: true)
+    }
+    
+    func saveSetting(_ key: String, value: Any) {
+        userDefaults.set(value, forKey: key)
+    }
+    
+    func resetToDefaults() {
+        ppgChannelOrder = .standard
+        notificationsEnabled = true
+        exportFormat = .csv
+        dataRetentionDays = 30
+        autoConnectEnabled = true
+        showDebugInfo = false
+        connectionAlerts = true
+        batteryAlerts = true
+        lowBatteryThreshold = 20
+        useMetricUnits = true
+        show24HourTime = true
+        shareAnalytics = false
+        localStorageOnly = true
+        
+        // Remove all saved settings
+        Keys.allCases.forEach { userDefaults.removeObject(forKey: $0) }
+    }
+    
+    func validateSettings() -> Bool {
+        guard dataRetentionDays > 0 && dataRetentionDays <= 365 else { return false }
+        guard lowBatteryThreshold > 0 && lowBatteryThreshold <= 100 else { return false }
+        return true
+    }
+    
+    // MARK: - Data Management
+    
+    func clearAllData() {
+        bleManager.clearHistory()
+    }
+    
+    func exportSettings() -> [String: Any] {
+        return [
+            Keys.ppgChannelOrder: ppgChannelOrder.rawValue,
+            Keys.notificationsEnabled: notificationsEnabled,
+            Keys.exportFormat: exportFormat == .csv ? "csv" : "json",
+            Keys.dataRetentionDays: dataRetentionDays,
+            Keys.autoConnectEnabled: autoConnectEnabled,
+            Keys.showDebugInfo: showDebugInfo,
+            Keys.connectionAlerts: connectionAlerts,
+            Keys.batteryAlerts: batteryAlerts,
+            Keys.lowBatteryThreshold: lowBatteryThreshold,
+            Keys.useMetricUnits: useMetricUnits,
+            Keys.show24HourTime: show24HourTime,
+            Keys.shareAnalytics: shareAnalytics,
+            Keys.localStorageOnly: localStorageOnly
+        ]
+    }
+    
+    func importSettings(from dictionary: [String: Any]) {
+        if let value = dictionary[Keys.ppgChannelOrder] as? String {
+            ppgChannelOrder = PPGChannelOrder(rawValue: value) ?? .standard
+        }
+        if let value = dictionary[Keys.notificationsEnabled] as? Bool {
+            notificationsEnabled = value
+        }
+        if let value = dictionary[Keys.dataRetentionDays] as? Int {
+            dataRetentionDays = value
+        }
+        // ... import other settings
+    }
+}
+
+// MARK: - Supporting Types
+
+enum ChartRefreshRate: String, CaseIterable {
+    case realTime = "Real-time"
+    case everySecond = "Every Second"
+    case everyFiveSeconds = "Every 5 Seconds"
+}
+
+// MARK: - UserDefaults Extension
+
+extension UserDefaults {
+    func bool(forKey key: String, defaultValue: Bool) -> Bool {
+        if object(forKey: key) == nil {
+            return defaultValue
+        }
+        return bool(forKey: key)
+    }
+    
+    func integer(forKey key: String, defaultValue: Int) -> Int {
+        if object(forKey: key) == nil {
+            return defaultValue
+        }
+        return integer(forKey: key)
+    }
+}
+
+// MARK: - Keys Extension
+
+extension SettingsViewModel.Keys {
+    static var allCases: [String] {
+        return [
+            ppgChannelOrder, notificationsEnabled, exportFormat, dataRetentionDays,
+            autoConnectEnabled, showDebugInfo, connectionAlerts, batteryAlerts,
+            lowBatteryThreshold, useMetricUnits, show24HourTime, chartRefreshRate,
+            shareAnalytics, localStorageOnly
+        ]
+    }
+}
+
+// MARK: - Mock for Previews
+
+extension SettingsViewModel {
+    static func mock() -> SettingsViewModel {
+        let mockBLE = OralableBLE.mock()
+        return SettingsViewModel(bleManager: mockBLE)
+    }
+}

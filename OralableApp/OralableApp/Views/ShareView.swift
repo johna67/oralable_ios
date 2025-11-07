@@ -582,8 +582,8 @@ struct DataSummaryCard: View {
                 )
             }
             
-            if !ble.sensorDataHistory.isEmpty, 
-               let first = ble.sensorDataHistory.first, 
+            if !ble.sensorDataHistory.isEmpty,
+               let first = ble.sensorDataHistory.first,
                let last = ble.sensorDataHistory.last {
                 Divider()
                 
@@ -676,7 +676,7 @@ struct ExportButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, DesignSystem.Spacing.md)
             .background(
-                hasData ? 
+                hasData ?
                     LinearGradient(
                         colors: [Color.blue, Color.blue.opacity(0.8)],
                         startPoint: .leading,
@@ -1012,7 +1012,7 @@ struct AlertsModifier: ViewModifier {
     @Binding var showClearConfirmation: Bool
     let importedCount: Int
     let importErrorMessage: String
-    @ObservedObject var ble: OralableBLE
+    var ble: OralableBLE
     
     func body(content: Content) -> some View {
         content
@@ -1029,7 +1029,7 @@ struct AlertsModifier: ViewModifier {
             .alert("Clear All Data?", isPresented: $showClearConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Clear", role: .destructive) {
-                    ble.clearLogs()
+                    ble.clearHistory()
                 }
             } message: {
                 Text("This will clear all logs and historical data. This action cannot be undone.")
@@ -1102,8 +1102,8 @@ struct DebugConnectionSection: View {
                     Button("Connect") {
                         if !testDeviceName.isEmpty {
                             // Find device by name in discovered devices
-                            if let device = ble.discoveredDevices.first(where: { 
-                                $0.name?.contains(testDeviceName) == true 
+                            if let device = ble.discoveredDevices.first(where: {
+                                $0.name?.contains(testDeviceName) == true
                             }) {
                                 ble.connect(to: device)
                             }
