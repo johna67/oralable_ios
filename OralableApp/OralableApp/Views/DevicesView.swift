@@ -2,618 +2,376 @@
 //  DevicesView.swift
 //  OralableApp
 //
-//  Updated: November 7, 2025
-//  Refactored to use DevicesViewModel (MVVM pattern)
+//  Created: November 8, 2025
+//  Simplified device view for single-device launch
 //
 
 import SwiftUI
-import CoreBluetooth
-
-// MARK: - DeviceConnectionState View Extensions
-
-extension DeviceConnectionState {
-    var color: Color {
-        switch self {
-        case .connected:
-            return .green
-        case .connecting:
-            return .yellow
-        case .disconnecting:
-            return .orange
-        case .disconnected:
-            return .gray
-        case .error:
-            return .red
-        }
-    }
-    
-    var displayText: String {
-        self.displayName
-    }
-}
-
-// MARK: - DeviceType View Extensions
-
-extension DeviceType {
-    var icon: String {
-        self.iconName
-    }
-    
-    var color: Color {
-        switch self {
-        case .oralable:
-            return .blue
-        case .anrMuscleSense:
-            return .purple
-        case .unknown:
-            return .gray
-        }
-    }
-}
-
-// MARK: - DeviceInfo View Extensions
-
-extension DeviceInfo {
-    var deviceType: DeviceType {
-        self.type
-    }
-    
-    var connectionStatus: DeviceConnectionState {
-        self.connectionState
-    }
-    
-    var rssi: Int? {
-        self.signalStrength
-    }
-    
-    var services: [CBUUID] {
-        // Return service UUIDs based on device type
-        if let serviceUUID = type.serviceUUID {
-            return [serviceUUID]
-        }
-        return []
-    }
-}
 
 struct DevicesView: View {
-    // MVVM: Use ViewModel instead of direct manager access
-    @EnvironmentObject var deviceManager: DeviceManager
-    @StateObject private var viewModel: DevicesViewModel
+    @StateObject private var viewModel = DevicesViewModel()
     @EnvironmentObject var designSystem: DesignSystem
-    @State private var showingDeviceDetails = false
-    @State private var selectedDevice: DeviceInfo?
+    @Environment(\.dismiss) var dismiss
     
-    init() {
-        // We need to use a temporary workaround for @StateObject initialization
-        // The actual initialization will happen in the body's first render
-        _viewModel = StateObject(wrappedValue: DevicesViewModel(deviceManager: .shared))
-    }
+    @State private var showingDeviceDetails = false
+    @State private var showingScanSheet = false
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
-                    // Scanning Status
-                    scanningStatusCard
-                    
-                    // Primary Device Section
-                    if let primaryDevice = viewModel.primaryDevice {
-                        primaryDeviceCard(primaryDevice)
+                    // Connected Device Card
+                    if viewModel.isConnected {
+                        connectedDeviceCard
                     }
                     
-                    // Connected Devices Section
-                    if viewModel.hasConnectedDevices {
-                        connectedDevicesSection
+                    // Scan Button (if not connected)
+                    if !viewModel.isConnected {
+                        scanSection
                     }
                     
-                    // Discovered Devices Section
-                    if viewModel.hasDiscoveredDevices {
+                    // Discovered Devices (if scanning)
+                    if viewModel.isScanning && !viewModel.discoveredDevices.isEmpty {
                         discoveredDevicesSection
                     }
                     
-                    // Empty State
-                    if !viewModel.hasConnectedDevices && !viewModel.hasDiscoveredDevices && !viewModel.isScanning {
-                        emptyStateView
+                    // Device Information
+                    if viewModel.isConnected {
+                        deviceInfoSection
+                    }
+                    
+                    // Device Settings
+                    if viewModel.isConnected {
+                        deviceSettingsSection
                     }
                 }
                 .padding(designSystem.spacing.md)
             }
             .navigationTitle("Devices")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { viewModel.toggleScanning() }) {
-                        if viewModel.isScanning {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(designSystem.colors.textPrimary)
-                        }
+                    Button("Done") {
+                        dismiss()
                     }
+                    .foregroundColor(designSystem.colors.textPrimary)
                 }
             }
-            .refreshable {
-                await viewModel.refreshDevices()
-            }
+            .background(designSystem.colors.backgroundPrimary)
         }
-        .onAppear {
-            viewModel.checkBluetoothPermission()
-        }
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.dismissError()
-            }
-        } message: {
-            Text(viewModel.errorMessage ?? "An unknown error occurred")
-        }
-        .sheet(item: $selectedDevice) { device in
-            DeviceDetailView(device: device, viewModel: viewModel)
+        .sheet(isPresented: $showingDeviceDetails) {
+            DeviceDetailsSheet(device: viewModel.connectedDevice)
         }
     }
     
-    // MARK: - Scanning Status Card
+    // MARK: - Connected Device Card
     
-    private var scanningStatusCard: some View {
-        VStack(spacing: designSystem.spacing.sm) {
+    private var connectedDeviceCard: some View {
+        VStack(spacing: designSystem.spacing.md) {
             HStack {
-                Circle()
-                    .fill(viewModel.isScanning ? Color.green : Color.gray)
-                    .frame(width: 12, height: 12)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.green, lineWidth: viewModel.isScanning ? 2 : 0)
-                            .scaleEffect(viewModel.isScanning ? 2 : 1)
-                            .opacity(viewModel.isScanning ? 0 : 1)
-                            .animation(
-                                viewModel.isScanning ? .easeInOut(duration: 1).repeatForever() : .default,
-                                value: viewModel.isScanning
-                            )
-                    )
-                
-                Text(viewModel.statusText)
-                    .font(designSystem.typography.body)
+                // Device Icon
+                Image(systemName: "cpu")
+                    .font(.system(size: 40))
                     .foregroundColor(designSystem.colors.textPrimary)
+                    .frame(width: 60, height: 60)
+                    .background(designSystem.colors.backgroundTertiary)
+                    .cornerRadius(designSystem.cornerRadius.medium)
+                
+                VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
+                    Text(viewModel.deviceName)
+                        .font(designSystem.typography.h3)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                    
+                    Text("Oralable PPG Device")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    
+                    HStack(spacing: designSystem.spacing.sm) {
+                        // Connection Status
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text("Connected")
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(.green)
+                        }
+                        
+                        // Battery
+                        HStack(spacing: 4) {
+                            Image(systemName: batteryIcon)
+                                .font(.system(size: 12))
+                            Text("\(viewModel.batteryLevel)%")
+                                .font(designSystem.typography.caption)
+                        }
+                        .foregroundColor(batteryColor)
+                        
+                        // Signal Strength
+                        HStack(spacing: 4) {
+                            Image(systemName: "wifi")
+                                .font(.system(size: 12))
+                            Text("\(viewModel.signalStrength)dB")
+                                .font(designSystem.typography.caption)
+                        }
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
                 
                 Spacer()
             }
             
-            HStack(spacing: designSystem.spacing.lg) {
-                // Scan Button
-                Button(action: { viewModel.toggleScanning() }) {
-                    HStack {
-                        Image(systemName: viewModel.isScanning ? "stop.fill" : "magnifyingglass")
-                        Text(viewModel.scanButtonText)
-                    }
+            // Disconnect Button
+            Button(action: { viewModel.disconnect() }) {
+                Text("Disconnect")
+                    .font(designSystem.typography.button)
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(designSystem.spacing.sm)
-                    .background(viewModel.isScanning ? Color.red : designSystem.colors.primaryBlack)
-                    .foregroundColor(designSystem.colors.primaryWhite)
-                    .cornerRadius(designSystem.cornerRadius.sm)
-                }
-                
-                // Disconnect All Button
-                if viewModel.hasConnectedDevices {
-                    Button(action: { viewModel.disconnectAll() }) {
-                        HStack {
-                            Image(systemName: "wifi.slash")
-                            Text("Disconnect All")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(designSystem.spacing.sm)
-                        .background(designSystem.colors.backgroundTertiary)
-                        .foregroundColor(designSystem.colors.textPrimary)
-                        .cornerRadius(designSystem.cornerRadius.sm)
-                    }
-                }
+                    .background(Color.red)
+                    .cornerRadius(designSystem.cornerRadius.medium)
             }
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.md)
+        .cornerRadius(designSystem.cornerRadius.large)
     }
     
-    // MARK: - Primary Device Card
+    // MARK: - Scan Section
     
-    private func primaryDeviceCard(_ device: DeviceInfo) -> some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            HStack {
-                Label("Primary Device", systemImage: "star.fill")
-                    .font(designSystem.typography.headline)
-                    .foregroundColor(.yellow)
+    private var scanSection: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            // No Device Connected Message
+            VStack(spacing: designSystem.spacing.sm) {
+                Image(systemName: "cpu")
+                    .font(.system(size: 48))
+                    .foregroundColor(designSystem.colors.textSecondary)
                 
-                Spacer()
+                Text("No Device Connected")
+                    .font(designSystem.typography.h3)
+                    .foregroundColor(designSystem.colors.textPrimary)
                 
-                ConnectionBadge(status: device.connectionStatus)
+                Text("Scan for nearby Oralable devices")
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .multilineTextAlignment(.center)
             }
+            .padding(designSystem.spacing.xl)
             
-            DeviceRow(
-                device: device,
-                isPrimary: true,
-                onTap: {
-                    selectedDevice = device
-                },
-                onConnect: {
-                    Task {
-                        await viewModel.connect(to: device)
+            // Scan Button
+            Button(action: { viewModel.toggleScanning() }) {
+                HStack {
+                    if viewModel.isScanning {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "magnifyingglass")
                     }
-                },
-                onDisconnect: {
-                    Task {
-                        await viewModel.disconnect(from: device)
-                    }
+                    
+                    Text(viewModel.isScanning ? "Scanning..." : "Scan for Devices")
                 }
-            )
+                .font(designSystem.typography.button)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(designSystem.spacing.md)
+                .background(viewModel.isScanning ? Color.orange : designSystem.colors.primaryBlack)
+                .cornerRadius(designSystem.cornerRadius.medium)
+            }
         }
         .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundTertiary)
-        .cornerRadius(designSystem.cornerRadius.md)
-    }
-    
-    // MARK: - Connected Devices Section
-    
-    private var connectedDevicesSection: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            HStack {
-                SectionHeaderView(title: "Connected Devices", icon: "wifi")
-                Spacer()
-                Text("\(viewModel.connectedDevices.count)")
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textSecondary)
-            }
-            
-            ForEach(viewModel.connectedDevices.filter { $0.id != viewModel.primaryDevice?.id }) { device in
-                DeviceRow(
-                    device: device,
-                    isPrimary: false,
-                    onTap: {
-                        selectedDevice = device
-                    },
-                    onConnect: nil,
-                    onDisconnect: {
-                        Task {
-                            await viewModel.disconnect(from: device)
-                        }
-                    },
-                    onSetPrimary: {
-                        viewModel.setPrimaryDevice(device)
-                    }
-                )
-                .padding(designSystem.spacing.md)
-                .background(designSystem.colors.backgroundSecondary)
-                .cornerRadius(designSystem.cornerRadius.md)
-            }
-        }
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
     }
     
     // MARK: - Discovered Devices Section
     
     private var discoveredDevicesSection: some View {
-        let availableDevicesCount = viewModel.discoveredDevices.filter { device in
-            !viewModel.connectedDevices.contains(where: { $0.id == device.id })
-        }.count
-        
-        return VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            HStack {
-                SectionHeaderView(title: "Available Devices", icon: "dot.radiowaves.left.and.right")
-                Spacer()
-                Text("\(availableDevicesCount)")
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textSecondary)
-            }
-            
-            ForEach(viewModel.discoveredDevices.filter { device in
-                !viewModel.connectedDevices.contains(where: { $0.id == device.id })
-            }) { device in
-                DeviceRow(
-                    device: device,
-                    isPrimary: false,
-                    onTap: {
-                        selectedDevice = device
-                    },
-                    onConnect: {
-                        Task {
-                            await viewModel.connect(to: device)
-                        }
-                    },
-                    onDisconnect: nil
-                )
-                .padding(designSystem.spacing.md)
-                .background(designSystem.colors.backgroundSecondary)
-                .cornerRadius(designSystem.cornerRadius.md)
-            }
-        }
-    }
-    
-    // MARK: - Empty State View
-    
-    private var emptyStateView: some View {
-        VStack(spacing: designSystem.spacing.lg) {
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                .font(.system(size: 60))
-                .foregroundColor(designSystem.colors.textTertiary)
-            
-            Text("No Devices Found")
-                .font(designSystem.typography.headline)
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("Discovered Devices")
+                .font(designSystem.typography.h3)
                 .foregroundColor(designSystem.colors.textPrimary)
+                .padding(.horizontal, designSystem.spacing.sm)
             
-            Text("Make sure your Oralable device is powered on and within range")
-                .font(designSystem.typography.body)
-                .foregroundColor(designSystem.colors.textSecondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: designSystem.spacing.sm) {
+                ForEach(viewModel.discoveredDevices) { device in
+                    DiscoveredDeviceRow(device: device) {
+                        viewModel.connect(to: device)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Device Info Section
+    
+    private var deviceInfoSection: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("Device Information")
+                .font(designSystem.typography.h3)
+                .foregroundColor(designSystem.colors.textPrimary)
+                .padding(.horizontal, designSystem.spacing.sm)
             
-            Button(action: { viewModel.startScanning() }) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                    Text("Start Scanning")
+            VStack(spacing: 0) {
+                DeviceInfoRow(label: "Model", value: "Oralable v1.0")
+                Divider().padding(.horizontal)
+                DeviceInfoRow(label: "Serial", value: viewModel.serialNumber)
+                Divider().padding(.horizontal)
+                DeviceInfoRow(label: "Firmware", value: viewModel.firmwareVersion)
+                Divider().padding(.horizontal)
+                DeviceInfoRow(label: "Last Sync", value: viewModel.lastSyncTime)
+            }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
+    }
+    
+    // MARK: - Device Settings Section
+    
+    private var deviceSettingsSection: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("Settings")
+                .font(designSystem.typography.h3)
+                .foregroundColor(designSystem.colors.textPrimary)
+                .padding(.horizontal, designSystem.spacing.sm)
+            
+            VStack(spacing: 0) {
+                // Auto-connect Toggle
+                Toggle(isOn: $viewModel.autoConnect) {
+                    HStack {
+                        Image(systemName: "link.circle")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Auto-connect")
+                            .font(designSystem.typography.body)
+                            .foregroundColor(designSystem.colors.textPrimary)
+                    }
                 }
                 .padding(designSystem.spacing.md)
-                .background(designSystem.colors.primaryBlack)
-                .foregroundColor(designSystem.colors.primaryWhite)
-                .cornerRadius(designSystem.cornerRadius.md)
+                
+                Divider().padding(.horizontal)
+                
+                // LED Brightness Slider
+                VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                    HStack {
+                        Image(systemName: "light.max")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("LED Brightness")
+                            .font(designSystem.typography.body)
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        Spacer()
+                        Text("\(Int(viewModel.ledBrightness * 100))%")
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                    
+                    Slider(value: $viewModel.ledBrightness, in: 0.1...1.0)
+                        .accentColor(designSystem.colors.primaryBlack)
+                }
+                .padding(designSystem.spacing.md)
+                
+                Divider().padding(.horizontal)
+                
+                // Sample Rate Picker
+                HStack {
+                    Image(systemName: "waveform.path.ecg")
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    Text("Sample Rate")
+                        .font(designSystem.typography.body)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                    Spacer()
+                    Picker("", selection: $viewModel.sampleRate) {
+                        Text("25 Hz").tag(25)
+                        Text("50 Hz").tag(50)
+                        Text("100 Hz").tag(100)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .frame(width: 150)
+                }
+                .padding(designSystem.spacing.md)
             }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
         }
-        .padding(designSystem.spacing.xl)
+    }
+    
+    // MARK: - Helpers
+    
+    private var batteryIcon: String {
+        switch viewModel.batteryLevel {
+        case 0..<25: return "battery.25"
+        case 25..<50: return "battery.50"
+        case 50..<75: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+    
+    private var batteryColor: Color {
+        switch viewModel.batteryLevel {
+        case 0..<20: return .red
+        case 20..<50: return .orange
+        default: return .green
+        }
     }
 }
 
-// MARK: - Device Row Component
+// MARK: - Supporting Views
 
-struct DeviceRow: View {
+struct DiscoveredDeviceRow: View {
+    let device: DiscoveredDevice
+    let onConnect: () -> Void
     @EnvironmentObject var designSystem: DesignSystem
     
-    let device: DeviceInfo
-    let isPrimary: Bool
-    let onTap: () -> Void
-    let onConnect: (() async -> Void)?
-    let onDisconnect: (() async -> Void)?
-    var onSetPrimary: (() -> Void)? = nil
-    
     var body: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            HStack {
-                // Device Icon
-                Image(systemName: device.deviceType.icon)
-                    .font(.title2)
-                    .foregroundColor(device.deviceType.color)
-                    .frame(width: 40, height: 40)
-                    .background(device.deviceType.color.opacity(0.1))
-                    .cornerRadius(designSystem.cornerRadius.sm)
+        HStack {
+            Image(systemName: "cpu")
+                .foregroundColor(designSystem.colors.textPrimary)
+                .frame(width: 40, height: 40)
+                .background(designSystem.colors.backgroundTertiary)
+                .cornerRadius(designSystem.cornerRadius.small)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(device.name)
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textPrimary)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(device.name)
-                            .font(designSystem.typography.headline)
-                            .foregroundColor(designSystem.colors.textPrimary)
-                        
-                        if isPrimary {
-                            Image(systemName: "star.fill")
-                                .font(.caption)
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                    
-                    Text(device.deviceType.displayName)
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
+                HStack(spacing: designSystem.spacing.sm) {
+                    Text("RSSI: \(device.rssi) dBm")
+                    Text("•")
+                    Text(device.isOralable ? "Oralable" : "Unknown")
                 }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    if device.isConnected {
-                        // Battery Level
-                        if let battery = device.batteryLevel {
-                            HStack(spacing: 4) {
-                                Text("\(battery)%")
-                                    .font(designSystem.typography.caption)
-                                Image(systemName: batteryIcon(for: battery))
-                            }
-                            .foregroundColor(batteryColor(for: battery))
-                        }
-                        
-                        // RSSI Signal
-                        if let rssi = device.rssi {
-                            HStack(spacing: 4) {
-                                Text("\(rssi) dBm")
-                                    .font(designSystem.typography.caption)
-                                Image(systemName: signalIcon(for: rssi))
-                            }
-                            .foregroundColor(designSystem.colors.textTertiary)
-                        }
-                    } else if let rssi = device.rssi {
-                        // RSSI Signal for discovered devices
-                        HStack(spacing: 4) {
-                            Text("\(rssi) dBm")
-                                .font(designSystem.typography.caption)
-                            Image(systemName: signalIcon(for: rssi))
-                        }
-                        .foregroundColor(designSystem.colors.textTertiary)
-                    }
-                }
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textSecondary)
             }
             
-            // Action Buttons
-            HStack(spacing: designSystem.spacing.sm) {
-                if device.isConnected {
-                    if let onDisconnect = onDisconnect {
-                        Button(action: { Task { await onDisconnect() } }) {
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                Text("Disconnect")
-                            }
-                            .font(designSystem.typography.caption)
-                            .frame(maxWidth: .infinity)
-                            .padding(designSystem.spacing.xs)
-                            .background(Color.red.opacity(0.1))
-                            .foregroundColor(.red)
-                            .cornerRadius(designSystem.cornerRadius.sm)
-                        }
-                    }
-                    
-                    if !isPrimary, let onSetPrimary = onSetPrimary {
-                        Button(action: onSetPrimary) {
-                            HStack {
-                                Image(systemName: "star")
-                                Text("Set Primary")
-                            }
-                            .font(designSystem.typography.caption)
-                            .frame(maxWidth: .infinity)
-                            .padding(designSystem.spacing.xs)
-                            .background(Color.yellow.opacity(0.1))
-                            .foregroundColor(.yellow)
-                            .cornerRadius(designSystem.cornerRadius.sm)
-                        }
-                    }
-                } else if let onConnect = onConnect {
-                    Button(action: { Task { await onConnect() } }) {
-                        HStack {
-                            Image(systemName: "link")
-                            Text("Connect")
-                        }
-                        .font(designSystem.typography.caption)
-                        .frame(maxWidth: .infinity)
-                        .padding(designSystem.spacing.xs)
-                        .background(Color.green.opacity(0.1))
-                        .foregroundColor(.green)
-                        .cornerRadius(designSystem.cornerRadius.sm)
-                    }
-                }
-                
-                Button(action: onTap) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                        Text("Details")
-                    }
-                    .font(designSystem.typography.caption)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.xs)
-                    .background(designSystem.colors.backgroundTertiary)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .cornerRadius(designSystem.cornerRadius.sm)
-                }
+            Spacer()
+            
+            Button("Connect") {
+                onConnect()
             }
+            .font(designSystem.typography.button)
+            .foregroundColor(designSystem.colors.primaryBlack)
         }
-    }
-    
-    private func batteryIcon(for level: Int) -> String {
-        switch level {
-        case 76...100: return "battery.100"
-        case 51...75: return "battery.75"
-        case 26...50: return "battery.50"
-        case 11...25: return "battery.25"
-        default: return "battery.0"
-        }
-    }
-    
-    private func batteryColor(for level: Int) -> Color {
-        switch level {
-        case 51...100: return .green
-        case 21...50: return .yellow
-        default: return .red
-        }
-    }
-    
-    private func signalIcon(for rssi: Int) -> String {
-        switch rssi {
-        case -50...0: return "wifi"
-        case -70...(-51): return "wifi"
-        case -85...(-71): return "wifi"
-        default: return "wifi.slash"
-        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.medium)
     }
 }
 
-// MARK: - Connection Badge
-
-struct ConnectionBadge: View {
-    let status: DeviceConnectionState
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(status.color)
-                .frame(width: 8, height: 8)
-            Text(status.displayText)
-                .font(.caption)
-                .foregroundColor(status.color)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(status.color.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Device Detail View
-
-struct DeviceDetailView: View {
+struct DeviceDetailsSheet: View {
+    let device: ConnectedDeviceInfo?
+    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var designSystem: DesignSystem
-    @Environment(\.dismiss) private var dismiss
-    
-    let device: DeviceInfo
-    let viewModel: DevicesViewModel
     
     var body: some View {
         NavigationView {
-            List {
-                Section("Device Information") {
-                    InfoRowView(icon: "tag", title: "Name", value: device.name)
-                    InfoRowView(icon: "cube.box", title: "Type", value: device.deviceType.displayName)
-                    InfoRowView(icon: "number", title: "ID", value: device.id.uuidString)
-                    InfoRowView(icon: "link", title: "Status", value: device.connectionStatus.displayText)
-                }
-                
-                if device.isConnected {
-                    Section("Connection Details") {
-                        if let battery = device.batteryLevel {
-                            InfoRowView(icon: "battery.100", title: "Battery", value: "\(battery)%")
-                        }
-                        if let rssi = device.rssi {
-                            InfoRowView(icon: "wifi", title: "Signal", value: "\(rssi) dBm")
-                        }
-                        if let firmware = device.firmwareVersion {
-                            InfoRowView(icon: "cpu", title: "Firmware", value: firmware)
-                        }
+            ScrollView {
+                if let device = device {
+                    VStack(spacing: designSystem.spacing.lg) {
+                        Text("Device details will be shown here")
                     }
-                    
-                    Section("Services") {
-                        ForEach(device.services, id: \.self) { service in
-                            Text(service.uuidString)
-                                .font(designSystem.typography.caption)
-                                .foregroundColor(designSystem.colors.textSecondary)
-                        }
-                    }
-                }
-                
-                Section {
-                    if device.isConnected {
-                        Button(action: {
-                            Task {
-                                await viewModel.disconnect(from: device)
-                                dismiss()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                Text("Disconnect Device")
-                            }
-                            .foregroundColor(.red)
-                        }
-                    } else {
-                        Button(action: {
-                            Task {
-                                await viewModel.connect(to: device)
-                                dismiss()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "link")
-                                Text("Connect to Device")
-                            }
-                            .foregroundColor(.green)
-                        }
-                    }
+                    .padding()
+                } else {
+                    Text("No device connected")
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
             }
             .navigationTitle("Device Details")
@@ -626,6 +384,27 @@ struct DeviceDetailView: View {
                 }
             }
         }
+    }
+}
+
+struct DeviceInfoRow: View {
+    let label: String
+    let value: String
+    @EnvironmentObject var designSystem: DesignSystem
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(designSystem.typography.bodyMedium)
+                .foregroundColor(designSystem.colors.textPrimary)
+        }
+        .padding(designSystem.spacing.md)
     }
 }
 

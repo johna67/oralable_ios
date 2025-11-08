@@ -2,8 +2,8 @@
 //  DashboardViewModel.swift
 //  OralableApp
 //
-//  Created: November 7, 2025
-//  MVVM Architecture - Dashboard business logic
+//  Updated: November 8, 2025
+//  Added: MAM state properties and position detection logic
 //
 
 import Foundation
@@ -26,6 +26,13 @@ class DashboardViewModel: ObservableObject {
     @Published var connectionStatus: String = "Disconnected"
     @Published var isRecording: Bool = false
     
+    // MAM State Properties (NEW)
+    @Published var isCharging: Bool = false
+    @Published var isMoving: Bool = false
+    @Published var positionQuality: String = "Unknown"  // "Good", "Adjust", "Off"
+    @Published var ppgQuality: String = "--"
+    @Published var movementIntensity: String = "Low"
+    
     // Historical data for charts
     @Published var batteryHistory: [BatteryData] = []
     @Published var heartRateHistory: [HeartRateData] = []
@@ -42,6 +49,8 @@ class DashboardViewModel: ObservableObject {
     
     private let bleManager: OralableBLE
     private var cancellables = Set<AnyCancellable>()
+    private var movementThreshold: Double = 0.1  // G-force threshold for movement
+    private var ppgSignalThreshold: Double = 100.0  // Minimum amplitude for good signal
     
     // MARK: - Computed Properties
     
@@ -89,16 +98,16 @@ class DashboardViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    // Convenience initializer that uses shared instance
     init() {
         self.bleManager = OralableBLE.shared
         setupBindings()
+        setupMAMStateDetection()
     }
     
-    // Full initializer for testing/injection
     init(bleManager: OralableBLE) {
         self.bleManager = bleManager
         setupBindings()
+        setupMAMStateDetection()
     }
     
     // MARK: - Setup
@@ -126,7 +135,11 @@ class DashboardViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] history in
                 self?.batteryHistory = history
-                self?.batteryLevel = history.last?.percentage ?? 0
+                if let lastBattery = history.last {
+                    self?.batteryLevel = lastBattery.percentage
+                    // Detect charging state from battery trend
+                    self?.detectChargingState(history: history)
+                }
             }
             .store(in: &cancellables)
         
@@ -157,15 +170,23 @@ class DashboardViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Subscribe to accelerometer data
+        // Subscribe to accelerometer data for movement detection
         bleManager.$accelerometerHistory
             .receive(on: DispatchQueue.main)
-            .assign(to: &$accelerometerHistory)
+            .sink { [weak self] history in
+                self?.accelerometerHistory = history
+                self?.detectMovement(history: history)
+            }
+            .store(in: &cancellables)
         
-        // Subscribe to PPG data
+        // Subscribe to PPG data for signal quality
         bleManager.$ppgHistory
             .receive(on: DispatchQueue.main)
-            .assign(to: &$ppgHistory)
+            .sink { [weak self] history in
+                self?.ppgHistory = history
+                self?.detectPPGSignalQuality(history: history)
+            }
+            .store(in: &cancellables)
         
         // For real-time waveform display - convert PPG history to display points
         bleManager.$ppgHistory
@@ -212,6 +233,130 @@ class DashboardViewModel: ObservableObject {
             .assign(to: &$connectionStatus)
     }
     
+    // MARK: - MAM State Detection (NEW)
+    
+    private func setupMAMStateDetection() {
+        // Device state detection from DeviceStateResult
+        bleManager.$deviceState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] stateResult in
+                guard let stateResult = stateResult else { return }
+                
+                // Update MAM indicators based on device state
+                switch stateResult.state {
+                case .onChargerIdle:
+                    self?.isCharging = true
+                    self?.isMoving = false
+                    self?.positionQuality = "Off"
+                    
+                case .offChargerIdle:
+                    self?.isCharging = false
+                    self?.isMoving = false
+                    self?.positionQuality = "Off"
+                    
+                case .onMuscle:
+                    self?.isCharging = false
+                    self?.isMoving = false
+                    self?.positionQuality = "Good"
+                    
+                case .inMotion:
+                    self?.isCharging = false
+                    self?.isMoving = true
+                    self?.positionQuality = stateResult.confidence > 0.7 ? "Good" : "Adjust"
+                    
+                case .unknown:
+                    self?.positionQuality = "Unknown"
+                }
+                
+                // Check details dictionary for additional info if available
+                if let details = stateResult.details as? [String: Any] {
+                    if let charging = details["charging"] as? Bool {
+                        self?.isCharging = charging
+                    }
+                    if let moving = details["moving"] as? Bool {
+                        self?.isMoving = moving
+                    }
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func detectChargingState(history: [BatteryData]) {
+        guard history.count > 5 else { return }
+        
+        // Check if battery is increasing over last 5 readings
+        let recent = Array(history.suffix(5))
+        let isIncreasing = recent.enumerated().allSatisfy { index, data in
+            index == 0 || data.percentage >= recent[index - 1].percentage
+        }
+        
+        // If battery is at 100% or increasing, likely charging
+        isCharging = batteryLevel == 100 || isIncreasing
+    }
+    
+    private func detectMovement(history: [AccelerometerData]) {
+        guard let lastData = history.last else {
+            isMoving = false
+            movementIntensity = "Low"
+            return
+        }
+        
+        // Calculate magnitude of acceleration - convert to Double explicitly
+        let x = Double(lastData.x)
+        let y = Double(lastData.y)
+        let z = Double(lastData.z)
+        let magnitude = sqrt(x * x + y * y + z * z)
+        
+        // Subtract gravity (approximately 1.0 G when still)
+        let movement = abs(magnitude - 1.0)
+        
+        // Determine movement state
+        isMoving = movement > movementThreshold
+        
+        // Classify movement intensity
+        switch movement {
+        case 0..<0.1:
+            movementIntensity = "None"
+        case 0.1..<0.3:
+            movementIntensity = "Low"
+        case 0.3..<0.6:
+            movementIntensity = "Medium"
+        default:
+            movementIntensity = "High"
+        }
+    }
+    
+    private func detectPPGSignalQuality(history: [PPGData]) {
+        guard let lastData = history.last else {
+            ppgQuality = "--"
+            positionQuality = "Unknown"
+            return
+        }
+        
+        // Calculate signal amplitude
+        let redAmplitude = Double(lastData.red)
+        let irAmplitude = Double(lastData.ir)
+        
+        // Simple signal quality assessment
+        if redAmplitude < 10 || irAmplitude < 10 {
+            ppgQuality = "No Signal"
+            positionQuality = "Off"
+        } else if redAmplitude < ppgSignalThreshold || irAmplitude < ppgSignalThreshold {
+            ppgQuality = "Poor"
+            positionQuality = "Adjust"
+        } else {
+            ppgQuality = "Good"
+            positionQuality = "Good"
+        }
+        
+        // Additional check: if HR or SpO2 are being calculated successfully
+        if currentHeartRate != nil && currentSpO2 != nil {
+            positionQuality = "Good"
+        } else if currentHeartRate != nil || currentSpO2 != nil {
+            positionQuality = "Adjust"
+        }
+    }
+    
     // MARK: - Public Methods
     
     func startScanning() {
@@ -256,7 +401,17 @@ class DashboardViewModel: ObservableObject {
     
     func toggleRecording() {
         isRecording.toggle()
-        // Implement recording logic if needed
+        // TODO: Implement actual recording logic
+        // For now, just toggle the state for UI purposes
+        if isRecording {
+            print("Recording started")
+            // When BLE recording is implemented:
+            // bleManager.startRecording()
+        } else {
+            print("Recording stopped")
+            // When BLE recording is implemented:
+            // bleManager.stopRecording()
+        }
     }
     
     // MARK: - Data Access
@@ -272,7 +427,6 @@ class DashboardViewModel: ObservableObject {
     
     func exportData(range: TimeRange) -> URL? {
         // Implement data export
-        // This would create a CSV or JSON file and return its URL
         return nil
     }
     
@@ -288,26 +442,6 @@ class DashboardViewModel: ObservableObject {
     
     var connectedDevice: CBPeripheral? {
         bleManager.connectedDevice
-    }
-    
-    // MARK: - Formatting Helpers
-    
-    func formatHeartRate(_ value: Double?) -> String {
-        guard let value = value else { return "--" }
-        return String(format: "%.0f bpm", value)
-    }
-    
-    func formatSpO2(_ value: Double?) -> String {
-        guard let value = value else { return "--%" }
-        return String(format: "%.0f%%", value)
-    }
-    
-    func formatTemperature(_ value: Double) -> String {
-        return String(format: "%.1f°C", value)
-    }
-    
-    func formatBattery(_ percentage: Int) -> String {
-        return "\(percentage)%"
     }
 }
 
@@ -343,6 +477,13 @@ extension DashboardViewModel {
         viewModel.currentSpO2 = 98
         viewModel.currentTemperature = 36.5
         viewModel.connectionStatus = "Connected"
+        
+        // Set MAM states
+        viewModel.isCharging = false
+        viewModel.isMoving = false
+        viewModel.positionQuality = "Good"
+        viewModel.ppgQuality = "Good"
+        viewModel.movementIntensity = "Low"
         
         // Generate mock PPG data
         let now = Date()

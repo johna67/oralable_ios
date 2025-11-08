@@ -297,6 +297,18 @@ class OralableBLE: ObservableObject {
         // Small delay before restarting scan
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.startScanning()
+            
+       
+        }
+        
+        func startRecording() {
+            // TODO: Implement recording session start
+            print("Recording started")
+        }
+
+        func stopRecording() {
+            // TODO: Implement recording session stop
+            print("Recording stopped")
         }
     }
     
