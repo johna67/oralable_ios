@@ -2,49 +2,48 @@
 //  ProfileView.swift
 //  OralableApp
 //
-//  Created by John A Cogan on 08/11/2025.
-//
-
-
-//
-//  ProfileView.swift
-//  OralableApp
-//
-//  Created: November 8, 2025
-//  Basic profile view for single-device launch
+//  User profile and account management
 //
 
 import SwiftUI
 import AuthenticationServices
 
 struct ProfileView: View {
-    @ObservedObject private var authManager = AuthenticationManager.shared
+    @StateObject private var authManager = AuthenticationManager.shared
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
     
-    @State private var showingSignOutAlert = false
+    @State private var showingPrivacyPolicy = false
+    @State private var showingTerms = false
+    @State private var showingSignOut = false
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: designSystem.spacing.lg) {
+                VStack(spacing: designSystem.spacing.xl) {
                     // Profile Header
                     profileHeader
                     
-                    // Account Section
+                    // User Info Section
+                    userInfoSection
+                    
+                    // Settings Section
+                    settingsSection
+                    
+                    // Account Actions
                     accountSection
                     
-                    // Device Info Section
-                    deviceInfoSection
-                    
-                    // App Info Section
+                    // App Information
                     appInfoSection
                     
                     // Support Section
                     supportSection
+                    
+                    Spacer(minLength: 50)
                 }
-                .padding(designSystem.spacing.md)
+                .padding(designSystem.spacing.lg)
             }
+            .background(designSystem.colors.backgroundPrimary)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -52,15 +51,15 @@ struct ProfileView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(designSystem.colors.primaryBlack)
+                    .foregroundColor(designSystem.colors.textPrimary)
                 }
             }
-            .background(designSystem.colors.backgroundPrimary)
         }
-        .alert("Sign Out", isPresented: $showingSignOutAlert) {
+        .alert("Sign Out", isPresented: $showingSignOut) {
             Button("Cancel", role: .cancel) { }
             Button("Sign Out", role: .destructive) {
                 authManager.signOut()
+                dismiss()
             }
         } message: {
             Text("Are you sure you want to sign out?")
@@ -68,43 +67,140 @@ struct ProfileView: View {
     }
     
     // MARK: - Profile Header
-    
     private var profileHeader: some View {
         VStack(spacing: designSystem.spacing.md) {
-            // Profile Image
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(designSystem.colors.textSecondary)
+            // Avatar
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [designSystem.colors.backgroundSecondary, designSystem.colors.backgroundTertiary],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 100, height: 100)
+                
+                Image(systemName: "person.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
             
-            // User Name
+            // Name
             Text(authManager.displayName)
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
             
-            // User Email
+            // Email
             Text(authManager.userEmail ?? "Not signed in")
                 .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
         }
-        .padding(designSystem.spacing.xl)
-        .frame(maxWidth: .infinity)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.large)
+        .padding(.top, designSystem.spacing.lg)
+    }
+    
+    // MARK: - User Info Section
+    private var userInfoSection: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("USER INFORMATION")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
+            
+            VStack(spacing: 0) {
+                ProfileInfoRow(
+                    icon: "calendar",
+                    label: "Member Since",
+                    value: formattedMemberDate
+                )
+                
+                Divider()
+                    .background(designSystem.colors.divider)
+                
+                ProfileInfoRow(
+                    icon: "cpu",
+                    label: "Device",
+                    value: "Oralable PPG"
+                )
+                
+                Divider()
+                    .background(designSystem.colors.divider)
+                
+                ProfileInfoRow(
+                    icon: "moon.fill",
+                    label: "Sessions Recorded",
+                    value: "\(sessionCount)"
+                )
+                
+                Divider()
+                    .background(designSystem.colors.divider)
+                
+                ProfileInfoRow(
+                    icon: "clock.fill",
+                    label: "Total Sleep Time",
+                    value: totalSleepTime
+                )
+            }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
+    }
+    
+    // MARK: - Settings Section
+    private var settingsSection: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("PREFERENCES")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
+            
+            VStack(spacing: 0) {
+                NavigationLink(destination: EmptyView()) {
+                    SettingRow(
+                        icon: "bell",
+                        label: "Notifications",
+                        value: "On"
+                    )
+                }
+                
+                Divider()
+                    .background(designSystem.colors.divider)
+                
+                NavigationLink(destination: EmptyView()) {
+                    SettingRow(
+                        icon: "heart.text.square",
+                        label: "Health Data",
+                        value: "Synced"
+                    )
+                }
+                
+                Divider()
+                    .background(designSystem.colors.divider)
+                
+                NavigationLink(destination: EmptyView()) {
+                    SettingRow(
+                        icon: "arrow.up.doc",
+                        label: "Auto Export",
+                        value: "Off"
+                    )
+                }
+            }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
     }
     
     // MARK: - Account Section
-    
     private var accountSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            Text("Account")
-                .font(designSystem.typography.h3)
-                .foregroundColor(designSystem.colors.textPrimary)
-                .padding(.horizontal, designSystem.spacing.sm)
+            Text("ACCOUNT")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
             
             VStack(spacing: 0) {
                 if authManager.isAuthenticated {
-                    // Sign Out Button
-                    Button(action: { showingSignOutAlert = true }) {
+                    Button(action: {
+                        showingSignOut = true
+                    }) {
                         HStack {
                             Image(systemName: "arrow.right.square")
                                 .foregroundColor(.red)
@@ -115,64 +211,14 @@ struct ProfileView: View {
                         .padding(designSystem.spacing.md)
                     }
                 } else {
-                    // Sign In with Apple Button
                     SignInWithAppleButton(
-                        .signIn,
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            authManager.handleSignIn(result: result)
-                        }
+                        onRequest: { _ in },
+                        onCompletion: authManager.handleSignIn
                     )
                     .signInWithAppleButtonStyle(.black)
-                    .frame(height: 50)
-                    .cornerRadius(designSystem.cornerRadius.medium)
-                    .padding(designSystem.spacing.md)
+                    .frame(height: 44)
+                    .padding(designSystem.spacing.sm)
                 }
-            }
-            .background(designSystem.colors.backgroundSecondary)
-            .cornerRadius(designSystem.cornerRadius.medium)
-        }
-    }
-    
-    // MARK: - Device Info Section
-    
-    private var deviceInfoSection: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            Text("Device")
-                .font(designSystem.typography.h3)
-                .foregroundColor(designSystem.colors.textPrimary)
-                .padding(.horizontal, designSystem.spacing.sm)
-            
-            VStack(spacing: 0) {
-                // Device Type
-                InfoRowView(
-                    icon: "cpu",
-                    title: "Device Type",
-                    value: "Oralable PPG"
-                )
-                
-                Divider()
-                    .padding(.horizontal, designSystem.spacing.md)
-                
-                // Firmware Version
-                InfoRowView(
-                    icon: "shippingbox",
-                    title: "Firmware",
-                    value: "1.0.0"
-                )
-                
-                Divider()
-                    .padding(.horizontal, designSystem.spacing.md)
-                
-                // Connection Status
-                InfoRowView(
-                    icon: "dot.radiowaves.left.and.right",
-                    title: "Status",
-                    value: OralableBLE.shared.isConnected ? "Connected" : "Disconnected",
-                    iconColor: OralableBLE.shared.isConnected ? .green : .gray
-                )
             }
             .background(designSystem.colors.backgroundSecondary)
             .cornerRadius(designSystem.cornerRadius.medium)
@@ -180,41 +226,62 @@ struct ProfileView: View {
     }
     
     // MARK: - App Info Section
-    
     private var appInfoSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            Text("App Information")
-                .font(designSystem.typography.h3)
-                .foregroundColor(designSystem.colors.textPrimary)
-                .padding(.horizontal, designSystem.spacing.sm)
+            Text("ABOUT")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
             
             VStack(spacing: 0) {
-                // App Version
-                InfoRowView(
-                    icon: "app.badge",
-                    title: "Version",
-                    value: "1.0.0 (Build 1)"
+                ProfileInfoRow(
+                    icon: "info.circle",
+                    label: "Version",
+                    value: appVersion
                 )
                 
                 Divider()
-                    .padding(.horizontal, designSystem.spacing.md)
+                    .background(designSystem.colors.divider)
                 
-                // iOS Version
-                InfoRowView(
-                    icon: "iphone",
-                    title: "iOS Required",
-                    value: "15.0+"
+                ProfileInfoRow(
+                    icon: "hammer",
+                    label: "Build",
+                    value: buildNumber
                 )
                 
                 Divider()
-                    .padding(.horizontal, designSystem.spacing.md)
+                    .background(designSystem.colors.divider)
                 
-                // Company
-                InfoRowView(
-                    icon: "building.2",
-                    title: "Developer",
-                    value: "JAC Dental Solutions"
-                )
+                Button(action: { showingPrivacyPolicy = true }) {
+                    HStack {
+                        Image(systemName: "lock.shield")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Privacy Policy")
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
+                    }
+                    .padding(designSystem.spacing.md)
+                }
+                
+                Divider()
+                    .background(designSystem.colors.divider)
+                
+                Button(action: { showingTerms = true }) {
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Terms of Service")
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
+                    }
+                    .padding(designSystem.spacing.md)
+                }
             }
             .background(designSystem.colors.backgroundSecondary)
             .cornerRadius(designSystem.cornerRadius.medium)
@@ -222,59 +289,41 @@ struct ProfileView: View {
     }
     
     // MARK: - Support Section
-    
     private var supportSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            Text("Support")
-                .font(designSystem.typography.h3)
-                .foregroundColor(designSystem.colors.textPrimary)
-                .padding(.horizontal, designSystem.spacing.sm)
+            Text("SUPPORT")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
             
             VStack(spacing: 0) {
-                // User Guide
-                NavigationLink(destination: Text("User Guide Coming Soon")) {
-                    HStack {
-                        Image(systemName: "book")
-                            .foregroundColor(designSystem.colors.primaryBlack)
-                        Text("User Guide")
-                            .foregroundColor(designSystem.colors.textPrimary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                    .padding(designSystem.spacing.md)
-                }
-                
-                Divider()
-                    .padding(.horizontal, designSystem.spacing.md)
-                
-                // Support Email
-                Button(action: openSupportEmail) {
+                Button(action: { sendSupportEmail() }) {
                     HStack {
                         Image(systemName: "envelope")
-                            .foregroundColor(designSystem.colors.primaryBlack)
+                            .foregroundColor(designSystem.colors.textSecondary)
                         Text("Contact Support")
                             .foregroundColor(designSystem.colors.textPrimary)
                         Spacer()
-                        Image(systemName: "arrow.up.right.square")
-                            .foregroundColor(designSystem.colors.textSecondary)
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
                     }
                     .padding(designSystem.spacing.md)
                 }
                 
                 Divider()
-                    .padding(.horizontal, designSystem.spacing.md)
+                    .background(designSystem.colors.divider)
                 
-                // Privacy Policy
-                Button(action: openPrivacyPolicy) {
+                Button(action: { openUserGuide() }) {
                     HStack {
-                        Image(systemName: "lock.shield")
-                            .foregroundColor(designSystem.colors.primaryBlack)
-                        Text("Privacy Policy")
+                        Image(systemName: "book")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("User Guide")
                             .foregroundColor(designSystem.colors.textPrimary)
                         Spacer()
-                        Image(systemName: "arrow.up.right.square")
-                            .foregroundColor(designSystem.colors.textSecondary)
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
                     }
                     .padding(designSystem.spacing.md)
                 }
@@ -284,23 +333,104 @@ struct ProfileView: View {
         }
     }
     
-    // MARK: - Actions
+    // MARK: - Helper Properties
+    private var formattedMemberDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: Date(timeIntervalSinceNow: -30*24*60*60)) // Mock: 30 days ago
+    }
     
-    private func openSupportEmail() {
+    private var sessionCount: Int {
+        UserDefaults.standard.integer(forKey: "sessionCount")
+    }
+    
+    private var totalSleepTime: String {
+        let hours = UserDefaults.standard.integer(forKey: "totalSleepHours")
+        if hours == 0 { return "0 hours" }
+        return "\(hours) hours"
+    }
+    
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+    
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "2025.1.15"
+    }
+    
+    // MARK: - Helper Methods
+    private func sendSupportEmail() {
         if let url = URL(string: "mailto:support@oralable.com") {
             UIApplication.shared.open(url)
         }
     }
     
-    private func openPrivacyPolicy() {
-        if let url = URL(string: "https://oralable.com/privacy") {
+    private func openUserGuide() {
+        if let url = URL(string: "https://oralable.com/guide") {
             UIApplication.shared.open(url)
         }
     }
 }
 
-// MARK: - Preview
+// MARK: - Supporting Views
+struct ProfileInfoRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    let icon: String?
+    let label: String
+    let value: String
+    
+    init(icon: String? = nil, label: String, value: String) {
+        self.icon = icon
+        self.label = label
+        self.value = value
+    }
+    
+    var body: some View {
+        HStack {
+            if let icon = icon {
+                Image(systemName: icon)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .frame(width: 20)
+            }
+            Text(label)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
+            Spacer()
+            Text(value)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textPrimary)
+        }
+        .padding(designSystem.spacing.md)
+    }
+}
 
+struct SettingRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    let icon: String
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(designSystem.colors.textSecondary)
+                .frame(width: 20)
+            Text(label)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textPrimary)
+            Spacer()
+            Text(value)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+        }
+        .padding(designSystem.spacing.md)
+    }
+}
+
+// MARK: - Preview
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()

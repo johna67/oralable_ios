@@ -185,56 +185,62 @@ struct HistoricalView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
                 // Heart Rate
                 MetricCard(
+                    icon: "heart.fill",
                     title: "Avg Heart Rate",
                     value: viewModel.averageHeartRateText,
                     unit: "BPM",
-                    icon: "heart.fill",
-                    color: .red
+                    color: .red,
+                    designSystem: designSystem
                 )
                 
                 // SpO2
                 MetricCard(
+                    icon: "lungs.fill",
                     title: "Avg SpO2",
                     value: viewModel.averageSpO2Text,
                     unit: "%",
-                    icon: "lungs.fill",
-                    color: .blue
+                    color: .blue,
+                    designSystem: designSystem
                 )
                 
                 // Temperature
                 MetricCard(
+                    icon: "thermometer",
                     title: "Avg Temperature",
                     value: viewModel.averageTemperatureText,
                     unit: "°C",
-                    icon: "thermometer",
-                    color: .orange
+                    color: .orange,
+                    designSystem: designSystem
                 )
                 
                 // Activity
                 MetricCard(
+                    icon: "figure.walk",
                     title: "Active Time",
                     value: viewModel.activeTimeText,
                     unit: "",
-                    icon: "figure.walk",
-                    color: .green
+                    color: .green,
+                    designSystem: designSystem
                 )
                 
                 // Battery Usage
                 MetricCard(
+                    icon: "battery.75",
                     title: "Avg Battery",
                     value: viewModel.averageBatteryText,
                     unit: "%",
-                    icon: "battery.75",
-                    color: .yellow
+                    color: .yellow,
+                    designSystem: designSystem
                 )
                 
                 // Data Points
                 MetricCard(
+                    icon: "circle.grid.3x3.fill",
                     title: "Data Points",
                     value: viewModel.dataPointsCountText,
                     unit: "",
-                    icon: "circle.grid.3x3.fill",
-                    color: .purple
+                    color: .purple,
+                    designSystem: designSystem
                 )
             }
         }

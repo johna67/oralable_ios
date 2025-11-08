@@ -12,7 +12,9 @@ import CoreBluetooth
 
 @MainActor
 class OralableBLE: ObservableObject {
-    static let shared = OralableBLE() 
+    static let shared = OralableBLE()
+    
+    
     
     // MARK: - Published Properties
     
@@ -25,6 +27,21 @@ class OralableBLE: ObservableObject {
     @Published var deviceState: DeviceStateResult?
     @Published var logMessages: [LogMessage] = []
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
+    
+    // ADD THESE PROPERTIES
+    @Published var accelX: Double = 0.0
+    @Published var accelY: Double = 0.0
+    @Published var accelZ: Double = 0.0
+    @Published var temperature: Double = 36.5
+    @Published var ppgRedValue: Double = 0.0
+    @Published var batteryLevel: Double = 85.0
+    @Published var isRecording: Bool = false
+    @Published var packetsReceived: Int = 0
+    @Published var rssi: Int = -50
+    @Published var connectionState: String = "disconnected"
+    @Published var lastError: String? = nil
+    @Published var deviceUUID: UUID? = nil
+    @Published var discoveredServices: [String] = []
     
     // MARK: - Published History Arrays (Legacy Format - Mutable for Import)
     
@@ -297,19 +314,21 @@ class OralableBLE: ObservableObject {
         // Small delay before restarting scan
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.startScanning()
-            
-       
         }
-        
-        func startRecording() {
-            // TODO: Implement recording session start
-            print("Recording started")
-        }
-
-        func stopRecording() {
-            // TODO: Implement recording session stop
-            print("Recording stopped")
-        }
+    }
+    
+    func startRecording() {
+        isRecording = true
+        addLog("Recording session started")
+        // TODO: Implement actual recording session management
+        // This could include starting data logging, creating a session file, etc.
+    }
+    
+    func stopRecording() {
+        isRecording = false
+        addLog("Recording session stopped")
+        // TODO: Implement actual recording session management
+        // This could include stopping data logging, saving session data, etc.
     }
     
     func resetBLE() {
@@ -401,4 +420,6 @@ extension OralableBLE {
         ble.deviceName = "Oralable-Mock"
         return ble
     }
+
+    
 }
