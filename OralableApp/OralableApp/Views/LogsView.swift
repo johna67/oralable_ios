@@ -358,7 +358,7 @@ class LogsManager: ObservableObject {
 
 // MARK: - Share Sheet (keep this since it's used)
 
-struct ShareSheet: UIViewControllerRepresentable {
+struct LogsShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     
     func makeUIViewController(context: Context) -> UIActivityViewController {

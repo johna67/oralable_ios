@@ -90,7 +90,7 @@ enum MetricType: String, CaseIterable {
 }
 
 // MARK: - App Mode and Subscription Management
-enum AppMode: String, CaseIterable {
+enum HistoricalAppMode: String, CaseIterable {
     case viewer = "Viewer"
     case subscription = "Subscription"
     
@@ -323,7 +323,7 @@ class HistoricalDataProcessor: ObservableObject {
         metricType: MetricType,
         timeRange: TimeRange,
         selectedDate: Date,
-        appMode: AppMode
+        appMode: HistoricalAppMode
     ) async {
         // Create normalized cache key based on the actual time period
         let calendar = Calendar.current
@@ -444,7 +444,7 @@ class HistoricalDataProcessor: ObservableObject {
         return filtered
     }
     
-    private func processMetricData(_ data: [SensorData], metricType: MetricType, appMode: AppMode) async -> [(timestamp: Date, value: Double)] {
+    private func processMetricData(_ data: [SensorData], metricType: MetricType, appMode: HistoricalAppMode) async -> [(timestamp: Date, value: Double)] {
         switch metricType {
         case .ppg:
             if appMode.allowsAdvancedAnalytics {
@@ -902,7 +902,7 @@ struct HistoricalDetailView: View {
     @State private var selectedDate = Date()
     
     // Inject or derive app mode; default to subscription for now
-    @State private var appMode: AppMode = .subscription
+    @State private var appMode: HistoricalAppMode = .subscription
     
     @StateObject private var processor = HistoricalDataProcessor()
     

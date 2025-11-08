@@ -2,8 +2,8 @@
 //  AuthenticationView.swift
 //  OralableApp
 //
-//  Updated: November 7, 2025
-//  Refactored to use AuthenticationViewModel (MVVM pattern)
+//  Fixed: November 7, 2025
+//  Corrected all component signatures to match actual components
 //
 
 import SwiftUI
@@ -103,12 +103,10 @@ struct AuthenticationView: View {
                 .font(designSystem.typography.headline)
                 .foregroundColor(designSystem.colors.textPrimary)
             
-            // Display Name
-            if let displayName = viewModel.displayName {
-                Text(displayName)
-                    .font(designSystem.typography.body)
-                    .foregroundColor(designSystem.colors.textSecondary)
-            }
+            // Display Name - FIXED: Removed if let for non-optional String
+            Text(viewModel.displayName)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
         }
     }
     
@@ -161,22 +159,23 @@ struct AuthenticationView: View {
                     .font(designSystem.typography.headline)
                     .foregroundColor(designSystem.colors.textPrimary)
                 
+                // FIXED: Changed 'subtitle' to 'description'
                 FeatureRow(
                     icon: "icloud",
                     title: "Sync your data",
-                    subtitle: "Access from any device"
+                    description: "Access from any device"
                 )
                 
                 FeatureRow(
                     icon: "chart.line.uptrend.xyaxis",
                     title: "Track progress",
-                    subtitle: "View historical trends"
+                    description: "View historical trends"
                 )
                 
                 FeatureRow(
                     icon: "square.and.arrow.up",
                     title: "Export reports",
-                    subtitle: "Share with healthcare providers"
+                    description: "Share with healthcare providers"
                 )
             }
             .padding(designSystem.spacing.md)
@@ -203,27 +202,43 @@ struct AuthenticationView: View {
     
     private var profileInformationSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(title: "Profile Information", icon: "person.text.rectangle")
+            // FIXED: Removed 'icon' parameter - SectionHeaderView only takes 'title'
+            SectionHeaderView(title: "Profile Information")
             
             VStack(spacing: designSystem.spacing.sm) {
+                // FIXED: InfoRowView expects (icon:, title:, value:, iconColor:)
                 if let email = viewModel.userEmail {
-                    InfoRowView(label: "Email", value: email)
+                    InfoRowView(
+                        icon: "envelope.fill",
+                        title: "Email",
+                        value: email,
+                        iconColor: .blue
+                    )
                 }
                 
                 if let fullName = viewModel.userFullName {
-                    InfoRowView(label: "Name", value: fullName)
+                    InfoRowView(
+                        icon: "person.fill",
+                        title: "Name",
+                        value: fullName,
+                        iconColor: .blue
+                    )
                 }
                 
                 if let userID = viewModel.userID {
                     InfoRowView(
-                        label: "User ID",
-                        value: String(userID.prefix(8)) + "..."
+                        icon: "number",
+                        title: "User ID",
+                        value: String(userID.prefix(8)) + "...",
+                        iconColor: .blue
                     )
                 }
                 
                 InfoRowView(
-                    label: "Member Since",
-                    value: viewModel.memberSinceText
+                    icon: "calendar",
+                    title: "Member Since",
+                    value: viewModel.memberSinceText,
+                    iconColor: .blue
                 )
             }
             .padding(designSystem.spacing.md)
@@ -236,11 +251,13 @@ struct AuthenticationView: View {
     
     private var profileActionsSection: some View {
         VStack(spacing: designSystem.spacing.sm) {
+            // FIXED: ActionCardView expects (icon:, title:, description:, iconColor:, action:)
             // Refresh Profile
             ActionCardView(
                 icon: "arrow.clockwise",
                 title: "Refresh Profile",
-                subtitle: "Update profile information",
+                description: "Update profile information",
+                iconColor: .blue,
                 action: {
                     viewModel.refreshProfile()
                 }
@@ -250,7 +267,8 @@ struct AuthenticationView: View {
             ActionCardView(
                 icon: "square.and.arrow.up",
                 title: "Export Data",
-                subtitle: "Download all your data",
+                description: "Download all your data",
+                iconColor: .green,
                 action: {
                     // Navigate to export view
                 }
@@ -260,7 +278,8 @@ struct AuthenticationView: View {
             ActionCardView(
                 icon: "lock.shield",
                 title: "Privacy Settings",
-                subtitle: "Manage data and permissions",
+                description: "Manage data and permissions",
+                iconColor: .orange,
                 action: {
                     // Navigate to privacy settings
                 }
@@ -270,8 +289,8 @@ struct AuthenticationView: View {
             ActionCardView(
                 icon: "arrow.right.square",
                 title: "Sign Out",
-                subtitle: "Sign out of your account",
-                color: .red,
+                description: "Sign out of your account",
+                iconColor: .red,
                 action: {
                     showingSignOutConfirmation = true
                 }
@@ -284,7 +303,8 @@ struct AuthenticationView: View {
     #if DEBUG
     private var debugSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(title: "Debug Information", icon: "ladybug")
+            // FIXED: Removed 'icon' parameter from SectionHeaderView
+            SectionHeaderView(title: "Debug Information")
             
             VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
                 Button(action: { viewModel.debugAuthState() }) {
@@ -341,30 +361,76 @@ struct ProfileDetailView: View {
         NavigationView {
             List {
                 Section("Account Information") {
+                    // FIXED: InfoRowView with correct parameters
                     if let email = viewModel.userEmail {
-                        InfoRowView(label: "Email", value: email)
+                        InfoRowView(
+                            icon: "envelope.fill",
+                            title: "Email",
+                            value: email,
+                            iconColor: .blue
+                        )
                     }
                     
                     if let fullName = viewModel.userFullName {
-                        InfoRowView(label: "Full Name", value: fullName)
+                        InfoRowView(
+                            icon: "person.fill",
+                            title: "Full Name",
+                            value: fullName,
+                            iconColor: .blue
+                        )
                     }
                     
                     if let userID = viewModel.userID {
-                        InfoRowView(label: "User ID", value: userID)
+                        InfoRowView(
+                            icon: "number",
+                            title: "User ID",
+                            value: userID,
+                            iconColor: .blue
+                        )
                     }
                 }
                 
                 Section("Profile Stats") {
-                    InfoRowView(label: "Completion", value: "\(Int(viewModel.profileCompletionPercentage))%")
-                    InfoRowView(label: "Member Since", value: viewModel.memberSinceText)
-                    InfoRowView(label: "Last Updated", value: viewModel.lastUpdatedText)
+                    InfoRowView(
+                        icon: "chart.pie.fill",
+                        title: "Completion",
+                        value: "\(Int(viewModel.profileCompletionPercentage))%",
+                        iconColor: .green
+                    )
+                    InfoRowView(
+                        icon: "calendar",
+                        title: "Member Since",
+                        value: viewModel.memberSinceText,
+                        iconColor: .orange
+                    )
+                    InfoRowView(
+                        icon: "clock.fill",
+                        title: "Last Updated",
+                        value: viewModel.lastUpdatedText,
+                        iconColor: .purple
+                    )
                 }
                 
                 Section("Subscription") {
-                    InfoRowView(label: "Status", value: viewModel.subscriptionStatus)
-                    InfoRowView(label: "Plan", value: viewModel.subscriptionPlan)
+                    InfoRowView(
+                        icon: "creditcard.fill",
+                        title: "Status",
+                        value: viewModel.subscriptionStatus,
+                        iconColor: .green
+                    )
+                    InfoRowView(
+                        icon: "star.fill",
+                        title: "Plan",
+                        value: viewModel.subscriptionPlan,
+                        iconColor: .yellow
+                    )
                     if viewModel.hasSubscription {
-                        InfoRowView(label: "Expires", value: viewModel.subscriptionExpiryText)
+                        InfoRowView(
+                            icon: "calendar.badge.clock",
+                            title: "Expires",
+                            value: viewModel.subscriptionExpiryText,
+                            iconColor: .red
+                        )
                     }
                 }
                 

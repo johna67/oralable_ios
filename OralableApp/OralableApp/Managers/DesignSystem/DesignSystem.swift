@@ -1,8 +1,8 @@
 //
-//  DesignSystem_WithAliases.swift
+//  DesignSystem.swift
 //  OralableApp
 //
-//  Version with both lowercase (correct) and uppercase (compatibility) properties
+//  TRULY FINAL version - adds bodyMedium
 //
 
 import SwiftUI
@@ -32,6 +32,23 @@ class DesignSystem: ObservableObject {
         self.spacing = SpacingSystem()
         self.cornerRadius = CornerRadiusSystem()
     }
+}
+
+// MARK: - Static Accessors
+extension DesignSystem {
+    // Static accessors so views can use DesignSystem.Spacing directly without .shared
+    static var Spacing: SpacingSystem { shared.spacing }
+    static var Colors: ColorSystem { shared.colors }
+    static var Typography: TypographySystem { shared.typography }
+    static var CornerRadius: CornerRadiusSystem { shared.cornerRadius }
+    static var Sizing: SizingSystem { SizingSystem() }  // Returns new instance
+    
+    // Lowercase versions for consistency
+    static var spacing: SpacingSystem { shared.spacing }
+    static var colors: ColorSystem { shared.colors }
+    static var typography: TypographySystem { shared.typography }
+    static var cornerRadius: CornerRadiusSystem { shared.cornerRadius }
+    static var sizing: SizingSystem { SizingSystem() }
 }
 
 // MARK: - Color System
@@ -69,13 +86,22 @@ struct ColorSystem {
     let pressed = Color("Pressed", bundle: nil)
     let border = Color("Border", bundle: nil)
     let divider = Color("Divider", bundle: nil)
+    
+    // Semantic Colors
+    let info = Color.blue
+    let warning = Color.orange
+    let error = Color.red
+    let success = Color.green
+    
+    // Shadow color
+    let shadow = Color.black.opacity(0.1)
 }
 
 // MARK: - Typography System
 
 struct TypographySystem {
     // Open Sans font with fallbacks
-    private let fontFamily = "Open Sans"
+    let fontFamily = "Open Sans"
     
     // Headings
     var h1: Font {
@@ -94,7 +120,7 @@ struct TypographySystem {
         Font.custom(fontFamily, size: 18).weight(.medium)
     }
     
-    // Add missing properties that AuthenticationView needs
+    // Large title and headline
     var largeTitle: Font {
         Font.custom(fontFamily, size: 34).weight(.bold)
     }
@@ -103,7 +129,7 @@ struct TypographySystem {
         Font.custom(fontFamily, size: 17).weight(.semibold)
     }
     
-    // Body
+    // Body variants
     var body: Font {
         Font.custom(fontFamily, size: 16).weight(.regular)
     }
@@ -112,7 +138,32 @@ struct TypographySystem {
         Font.custom(fontFamily, size: 16).weight(.bold)
     }
     
-    // Small
+    var bodyMedium: Font {  // ADDED THIS - FIXES THE LAST 2 ERRORS!
+        Font.custom(fontFamily, size: 16).weight(.medium)
+    }
+    
+    var bodyLarge: Font {
+        Font.custom(fontFamily, size: 18).weight(.regular)
+    }
+    
+    var bodySmall: Font {
+        Font.custom(fontFamily, size: 14).weight(.regular)
+    }
+    
+    // Label variants
+    var labelLarge: Font {
+        Font.custom(fontFamily, size: 16).weight(.medium)
+    }
+    
+    var labelMedium: Font {
+        Font.custom(fontFamily, size: 14).weight(.medium)
+    }
+    
+    var labelSmall: Font {
+        Font.custom(fontFamily, size: 12).weight(.medium)
+    }
+    
+    // Small text
     var caption: Font {
         Font.custom(fontFamily, size: 14).weight(.regular)
     }
@@ -143,17 +194,46 @@ struct TypographySystem {
 
 struct SpacingSystem {
     // 4pt grid system
-    let xs: CGFloat = 4
-    let sm: CGFloat = 8
-    let md: CGFloat = 16
-    let lg: CGFloat = 24
-    let xl: CGFloat = 32
-    let xxl: CGFloat = 48
+    let xxs: CGFloat = 2   // extra extra small
+    let xs: CGFloat = 4    // extra small
+    let sm: CGFloat = 8    // small
+    let md: CGFloat = 16   // medium
+    let lg: CGFloat = 24   // large
+    let xl: CGFloat = 32   // extra large
+    let xxl: CGFloat = 48  // extra extra large
     
     // Specific use cases
     let buttonPadding: CGFloat = 12
     let cardPadding: CGFloat = 16
     let screenPadding: CGFloat = 20
+    let icon: CGFloat = 20  // Added for icon spacing
+    let Icon: CGFloat = 20  // Capitalized version
+}
+
+// MARK: - Sizing System (Icon is instance property)
+
+struct SizingSystem {
+    // Icon as instance property with nested struct
+    let Icon = IconSizes()
+    
+    // Icon sizes struct
+    struct IconSizes {
+        let xs: CGFloat = 16
+        let sm: CGFloat = 20
+        let md: CGFloat = 24
+        let lg: CGFloat = 32
+        let xl: CGFloat = 40
+    }
+    
+    // Direct properties (for backward compatibility)
+    let iconXS: CGFloat = 16
+    let iconSM: CGFloat = 20
+    let iconMD: CGFloat = 24
+    let iconLG: CGFloat = 32
+    let iconXL: CGFloat = 40
+    
+    // Card size
+    let card: CGFloat = 12
 }
 
 // MARK: - Corner Radius System
@@ -165,11 +245,58 @@ struct CornerRadiusSystem {
     let xl: CGFloat = 16
     let full: CGFloat = 9999  // For circular shapes
     
-    // Add alias for 'md' that AuthenticationView uses
+    // Aliases
     var md: CGFloat { medium }
+    var sm: CGFloat { small }
+    var lg: CGFloat { large }
     
     // Specific use cases
     let button: CGFloat = 8
     let card: CGFloat = 12
     let modal: CGFloat = 16
+}
+
+// MARK: - CGFloat Extensions
+
+extension CGFloat {
+    static let xxs: CGFloat = 2
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 24
+    static let xl: CGFloat = 32
+    static let xxl: CGFloat = 48
+}
+
+// MARK: - View Extensions
+
+extension View {
+    // Card Styling
+    func cardStyle() -> some View {
+        self
+            .background(DesignSystem.colors.backgroundPrimary)
+            .cornerRadius(DesignSystem.sizing.card)
+            .shadow(color: DesignSystem.colors.shadow, radius: 4, x: 0, y: 2)
+    }
+    
+    // Button Styling
+    func primaryButtonStyle() -> some View {
+        self
+            .foregroundColor(.white)
+            .font(DesignSystem.typography.headline)
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(DesignSystem.colors.primaryBlack)
+            .cornerRadius(DesignSystem.cornerRadius.button)
+    }
+    
+    func secondaryButtonStyle() -> some View {
+        self
+            .foregroundColor(DesignSystem.colors.primaryBlack)
+            .font(DesignSystem.typography.headline)
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(DesignSystem.colors.backgroundSecondary)
+            .cornerRadius(DesignSystem.cornerRadius.button)
+    }
 }

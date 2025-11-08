@@ -9,7 +9,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ShareView: View {
+struct SettingsShareView: View {
     @StateObject private var viewModel = ShareViewModel()
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) private var dismiss
@@ -524,7 +524,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 // MARK: - Preview
 
-struct ShareView_Previews: PreviewProvider {
+struct SettingsShareView_Previews: PreviewProvider {
     static var previews: some View {
         ShareView()
             .environmentObject(DesignSystem.shared)
