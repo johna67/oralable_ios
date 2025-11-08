@@ -322,6 +322,21 @@ class OralableBLE: ObservableObject {
         addLog("BLE system reset")
     }
     
+    // Add this method
+    func autoConnectToOralable() {
+        if let oralable = discoveredDevices.first(where: {
+            $0.name?.contains("Oralable") == true
+        }) {
+            print("🔷 Found Oralable, connecting...")
+            stopScanning()  // Important: stop scanning first
+            
+            // Small delay then connect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.connect(to: oralable)
+            }
+        }
+    }
+    
     func connect(to peripheral: CBPeripheral) {
         addLog("Connecting to \(peripheral.name ?? "Unknown")...")
         connectedDevice = peripheral

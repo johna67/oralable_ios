@@ -361,6 +361,11 @@ class DashboardViewModel: ObservableObject {
     
     func startScanning() {
         bleManager.startScanning()
+        
+        // Auto-connect after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.bleManager.autoConnectToOralable()
+        }
     }
     
     func stopScanning() {

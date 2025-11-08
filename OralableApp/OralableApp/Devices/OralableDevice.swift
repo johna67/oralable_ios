@@ -426,3 +426,4 @@ extension DeviceCommand {
         return commandString.data(using: .utf8) ?? Data()
     }
 }
+
