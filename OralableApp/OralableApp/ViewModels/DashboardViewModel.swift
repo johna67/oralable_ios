@@ -189,9 +189,9 @@ class DashboardViewModel: ObservableObject {
                 history.suffix(100).map { data in
                     AccelerometerDataPoint(
                         timestamp: data.timestamp,
-                        x: data.x,
-                        y: data.y,
-                        z: data.z
+                        x: Double(data.x),
+                        y: Double(data.y),
+                        z: Double(data.z)
                     )
                 }
             }

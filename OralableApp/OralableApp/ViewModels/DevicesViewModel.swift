@@ -169,6 +169,23 @@ class DevicesViewModel: ObservableObject {
         }
     }
     
+    /// Refresh devices - used by pull-to-refresh
+    func refreshDevices() async {
+        stopScanning()
+        // Brief delay before restarting
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        await deviceManager.startScanning()
+    }
+    
+    /// Check Bluetooth permission status
+    func checkBluetoothPermission() {
+        // Check if Bluetooth is available and authorized
+        // The DeviceManager will handle the actual permission state
+        if !isScanning && connectedDevices.isEmpty {
+            startScanning()
+        }
+    }
+    
     // MARK: - Public Methods - Connection
     
     /// Connect to a specific device

@@ -252,10 +252,10 @@ struct SubscriptionSettingsView: View {
         }
         .navigationTitle("Settings")
         .sheet(isPresented: $showLogs) {
-            LogsView(logs: ble.logMessages)
+            BLELogsView(logs: ble.logMessages)
         }
         .sheet(isPresented: $showSubscriptionInfo) {
-            SubscriptionTierSelectionView()
+            SubscriptionInfoView()
         }
         .sheet(isPresented: $showAppleIDDebug) {
             AppleIDDebugView()
@@ -268,6 +268,292 @@ struct SubscriptionSettingsView: View {
             }
         } message: {
             Text("Are you sure you want to sign out? You'll need to sign in again to access subscription features.")
+        }
+    }
+}
+
+// MARK: - Subscription Info View
+
+struct SubscriptionInfoView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @State private var isUpgrading = false
+    @State private var showSuccessAlert = false
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Image(systemName: "star.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.orange)
+                        
+                        Text("Choose Your Plan")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        
+                        Text("Unlock premium features and get the most out of your device")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .padding(.top)
+                    
+                    // Subscription Tiers
+                    VStack(spacing: 16) {
+                        // Basic Tier
+                        SubscriptionTierCard(
+                            tier: .basic,
+                            isCurrentTier: subscriptionManager.currentTier == .basic,
+                            action: {
+                                // Already on basic, no action needed
+                            }
+                        )
+                        
+                        // Premium Tier
+                        SubscriptionTierCard(
+                            tier: .paid,
+                            isCurrentTier: subscriptionManager.currentTier == .paid,
+                            action: {
+                                upgradeToPremium()
+                            }
+                        )
+                    }
+                    .padding(.horizontal)
+                    
+                    // Footer
+                    VStack(spacing: 12) {
+                        Text("All plans include:")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            FeatureBullet(text: "Secure data encryption")
+                            FeatureBullet(text: "Regular firmware updates")
+                            FeatureBullet(text: "Customer support")
+                        }
+                        .padding(.horizontal, 32)
+                    }
+                    .padding(.top)
+                    
+                    Spacer()
+                }
+                .padding()
+            }
+            .navigationTitle("Subscription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .alert("Success!", isPresented: $showSuccessAlert) {
+                Button("OK") {
+                    dismiss()
+                }
+            } message: {
+                Text("You've been upgraded to Premium! Enjoy all the premium features.")
+            }
+            .disabled(isUpgrading)
+            .overlay {
+                if isUpgrading {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                }
+            }
+        }
+    }
+    
+    private func upgradeToPremium() {
+        guard subscriptionManager.currentTier != .paid else { return }
+        
+        isUpgrading = true
+        subscriptionManager.upgradeToPaid { success in
+            isUpgrading = false
+            if success {
+                showSuccessAlert = true
+            }
+        }
+    }
+}
+
+// MARK: - Subscription Tier Card
+
+struct SubscriptionTierCard: View {
+    let tier: SubscriptionTier
+    let isCurrentTier: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tier.displayName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    if tier == .paid {
+                        Text("$9.99/month")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                if tier == .paid {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.orange)
+                        .font(.title2)
+                }
+            }
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(tier.features, id: \.self) { feature in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.body)
+                        Text(feature)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            
+            if isCurrentTier {
+                HStack {
+                    Spacer()
+                    Text("Current Plan")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Spacer()
+                }
+                .padding(.vertical, 12)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(8)
+            } else if tier == .paid {
+                Button(action: action) {
+                    HStack {
+                        Spacer()
+                        Text("Upgrade Now")
+                            .fontWeight(.semibold)
+                        Spacer()
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isCurrentTier ? Color.green : Color.gray.opacity(0.3), lineWidth: isCurrentTier ? 2 : 1)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+        )
+    }
+}
+
+// MARK: - Feature Bullet
+
+struct FeatureBullet: View {
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "checkmark.circle")
+                .foregroundColor(.blue)
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - BLE Logs View
+
+struct BLELogsView: View {
+    @Environment(\.dismiss) private var dismiss
+    let logs: [LogMessage]
+    @State private var searchText = ""
+    
+    var filteredLogs: [LogMessage] {
+        if searchText.isEmpty {
+            return logs
+        }
+        return logs.filter { $0.message.localizedCaseInsensitiveContains(searchText) }
+    }
+    
+    var body: some View {
+        NavigationView {
+            Group {
+                if filteredLogs.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 50))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Logs")
+                            .font(.headline)
+                        
+                        Text(searchText.isEmpty ? "No logs available" : "No logs matching '\(searchText)'")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    List {
+                        ForEach(Array(filteredLogs.enumerated().reversed()), id: \.offset) { index, log in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(log.message)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.primary)
+                                
+                                HStack {
+                                    Text("Entry #\(filteredLogs.count - index)")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                    
+                                    Spacer()
+                                    
+                                    Text(log.timestamp, style: .time)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("BLE Logs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search logs...")
         }
     }
 }

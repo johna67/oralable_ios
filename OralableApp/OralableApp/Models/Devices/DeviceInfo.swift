@@ -11,7 +11,9 @@ import CoreBluetooth
 
 /// Complete device information
 struct DeviceInfo: Identifiable, Codable, Equatable {
-    
+    enum ConnectionStatus: String {
+          case disconnected, connecting, connected, disconnecting
+      }
     // MARK: - Properties
     
     /// Unique identifier

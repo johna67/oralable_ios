@@ -77,7 +77,7 @@ struct DashboardView: View {
                 }
             }
             .sheet(isPresented: $showingExportSheet) {
-                ShareView()
+                ShareView(ble: OralableBLE.shared)
             }
         }
     }

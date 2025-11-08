@@ -202,8 +202,7 @@ struct AuthenticationView: View {
     
     private var profileInformationSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            // FIXED: Removed 'icon' parameter - SectionHeaderView only takes 'title'
-            SectionHeaderView(title: "Profile Information")
+            SectionHeaderView(title: "Profile Information", icon: "person.circle")
             
             VStack(spacing: designSystem.spacing.sm) {
                 // FIXED: InfoRowView expects (icon:, title:, value:, iconColor:)
@@ -303,8 +302,7 @@ struct AuthenticationView: View {
     #if DEBUG
     private var debugSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            // FIXED: Removed 'icon' parameter from SectionHeaderView
-            SectionHeaderView(title: "Debug Information")
+            SectionHeaderView(title: "Debug Information", icon: "ant.circle")
             
             VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
                 Button(action: { viewModel.debugAuthState() }) {

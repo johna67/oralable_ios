@@ -692,7 +692,7 @@ struct ExportButton: View {
             .designShadow(hasData ? DesignSystem.Shadow.md : DesignSystem.Shadow.sm)
         }
         .disabled(!hasData || isExporting)
-        .animation(.easeInOut(duration: DesignSystem.Animation.fast), value: isExporting)
+        .animation(DesignSystem.Animation.fast, value: isExporting)
     }
     
     private func exportData() {
@@ -1164,7 +1164,8 @@ struct DebugConnectionSection: View {
         .cornerRadius(12)
         .sheet(isPresented: $showFullLogs) {
             NavigationView {
-                LogsView(logs: ble.logMessages)
+                LogsView()
+                    .environmentObject(DesignSystem.shared)
             }
         }
     }

@@ -8,13 +8,34 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct SettingsShareView: View {
-    @StateObject private var viewModel = ShareViewModel()
+    @EnvironmentObject var deviceManager: DeviceManager
+    @EnvironmentObject var historicalDataManager: HistoricalDataManager
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) private var dismiss
     @State private var showingShareSheet = false
     @State private var shareItems: [Any] = []
+    @State private var viewModelInstance: ShareViewModel?
+    
+    // Computed property that safely unwraps the viewModel
+    private var viewModel: ShareViewModel {
+        if let vm = viewModelInstance {
+            return vm
+        }
+        // Initialize if not already done
+        // Create a BLE-backed repository adapter
+        let repository = BLESensorRepository(ble: OralableBLE.shared)
+        let vm = ShareViewModel(
+            deviceManager: deviceManager,
+            repository: repository
+        )
+        DispatchQueue.main.async {
+            viewModelInstance = vm
+        }
+        return vm
+    }
     
     var body: some View {
         NavigationView {
@@ -59,7 +80,10 @@ struct SettingsShareView: View {
                 }
             }
         }
-        .alert("Export Complete", isPresented: $viewModel.showExportSuccess) {
+        .alert("Export Complete", isPresented: Binding(
+            get: { viewModel.showExportSuccess },
+            set: { _ in }
+        )) {
             Button("Share") {
                 shareExportedData()
             }
@@ -69,7 +93,10 @@ struct SettingsShareView: View {
         } message: {
             Text("Your data has been exported successfully.")
         }
-        .alert("Export Error", isPresented: $viewModel.showError) {
+        .alert("Export Error", isPresented: Binding(
+            get: { viewModel.showError },
+            set: { _ in }
+        )) {
             Button("OK") {
                 viewModel.dismissError()
             }
@@ -78,6 +105,10 @@ struct SettingsShareView: View {
         }
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(items: shareItems)
+        }
+        .onAppear {
+            // Ensure viewModel is initialized
+            _ = viewModel
         }
     }
     
@@ -147,7 +178,10 @@ struct SettingsShareView: View {
                     
                     DatePicker(
                         "",
-                        selection: $viewModel.startDate,
+                        selection: Binding(
+                            get: { viewModel.startDate },
+                            set: { viewModel.startDate = $0 }
+                        ),
                         in: ...Date(),
                         displayedComponents: [.date]
                     )
@@ -163,7 +197,10 @@ struct SettingsShareView: View {
                     
                     DatePicker(
                         "",
-                        selection: $viewModel.endDate,
+                        selection: Binding(
+                            get: { viewModel.endDate },
+                            set: { viewModel.endDate = $0 }
+                        ),
                         in: viewModel.startDate...Date(),
                         displayedComponents: [.date]
                     )
@@ -510,23 +547,17 @@ struct FormatRow: View {
     }
 }
 
-// MARK: - Share Sheet
 
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
+
+
 
 // MARK: - Preview
 
 struct SettingsShareView_Previews: PreviewProvider {
     static var previews: some View {
-        ShareView()
+        SettingsShareView()
             .environmentObject(DesignSystem.shared)
+            .environmentObject(DeviceManager())
+            .environmentObject(HistoricalDataManager(bleManager: OralableBLE.shared))
     }
 }

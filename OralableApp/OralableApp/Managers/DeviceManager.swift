@@ -14,6 +14,8 @@ import Combine
 /// Manager for coordinating multiple BLE devices
 @MainActor
 class DeviceManager: ObservableObject {
+    static let shared = DeviceManager()  // ADD THIS LINE
+
     
     // MARK: - Published Properties
     

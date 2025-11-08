@@ -42,6 +42,9 @@ extension DesignSystem {
     static var Typography: TypographySystem { shared.typography }
     static var CornerRadius: CornerRadiusSystem { shared.cornerRadius }
     static var Sizing: SizingSystem { SizingSystem() }  // Returns new instance
+    static var Layout: LayoutSystem { LayoutSystem() }  // Added
+    static var Shadow: ShadowSystem { ShadowSystem() }  // Added
+    static var Animation: AnimationSystem { AnimationSystem() }  // Added
     
     // Lowercase versions for consistency
     static var spacing: SpacingSystem { shared.spacing }
@@ -176,13 +179,35 @@ struct TypographySystem {
         Font.custom(fontFamily, size: 14).weight(.semibold)
     }
     
+    var captionSmall: Font {  // Added
+        Font.custom(fontFamily, size: 12).weight(.regular)
+    }
+    
     var footnote: Font {
         Font.custom(fontFamily, size: 12).weight(.regular)
+    }
+    
+    // Display variants
+    var displaySmall: Font {  // Added
+        Font.custom(fontFamily, size: 24).weight(.bold)
+    }
+    
+    // Title variant
+    var title: Font {  // Added
+        Font.custom(fontFamily, size: 20).weight(.semibold)
     }
     
     // Interactive
     var button: Font {
         Font.custom(fontFamily, size: 16).weight(.semibold)
+    }
+    
+    var buttonMedium: Font {  // Added
+        Font.custom(fontFamily, size: 16).weight(.medium)
+    }
+    
+    var buttonSmall: Font {  // Added
+        Font.custom(fontFamily, size: 14).weight(.semibold)
     }
     
     var link: Font {
@@ -239,6 +264,7 @@ struct SizingSystem {
 // MARK: - Corner Radius System
 
 struct CornerRadiusSystem {
+    let xs: CGFloat = 2  // Added
     let small: CGFloat = 4
     let medium: CGFloat = 8
     let large: CGFloat = 12
@@ -299,4 +325,104 @@ extension View {
             .background(DesignSystem.colors.backgroundSecondary)
             .cornerRadius(DesignSystem.cornerRadius.button)
     }
+    
+    // Design Shadow modifier with ShadowLevel enum
+    func designShadow(_ level: ShadowSystem.ShadowLevel = .medium) -> some View {
+        let shadow = ShadowSystem().shadowFor(level)
+        return self.shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
+    }
+    
+    // Design Shadow modifier with ShadowStyle directly
+    func designShadow(_ style: ShadowSystem.ShadowStyle) -> some View {
+        return self.shadow(color: style.color, radius: style.radius, x: style.x, y: style.y)
+    }
 }
+
+// MARK: - Layout System
+
+struct LayoutSystem {
+    // Grid columns based on size class
+    func gridColumns(for sizeClass: UserInterfaceSizeClass?) -> Int {
+        sizeClass == .regular ? 2 : 1
+    }
+    
+    // Default grid columns (no arguments)
+    var gridColumns: Int {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .pad ? 2 : 1
+        #else
+        return 2
+        #endif
+    }
+    
+    // Device detection
+    var isIPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+    
+    // Spacing
+    let cardSpacing: CGFloat = 16
+    let edgePadding: CGFloat = 20
+    let sectionSpacing: CGFloat = 24
+    
+    // Content widths
+    let contentWidth: CGFloat = 600  // Max width for content on larger screens
+    let maxCardWidth: CGFloat = 400  // Max width for cards
+    let maxFormWidth: CGFloat = 500  // Max width for forms
+}
+
+// MARK: - Shadow System
+
+struct ShadowSystem {
+    enum ShadowLevel {
+        case small
+        case medium
+        case large
+    }
+    
+    struct ShadowStyle {
+        let color: Color
+        let radius: CGFloat
+        let x: CGFloat
+        let y: CGFloat
+    }
+    
+    func shadowFor(_ level: ShadowLevel) -> ShadowStyle {
+        switch level {
+        case .small:
+            return ShadowStyle(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        case .medium:
+            return ShadowStyle(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+        case .large:
+            return ShadowStyle(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+        }
+    }
+    
+    // Convenience properties
+    let small = ShadowStyle(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+    let medium = ShadowStyle(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+    let large = ShadowStyle(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+    
+    // Aliases for different naming conventions
+    var sm: ShadowStyle { small }
+    var md: ShadowStyle { medium }
+    var lg: ShadowStyle { large }
+}
+
+// MARK: - Animation System
+
+struct AnimationSystem {
+    // Animation instances
+    let fast = Animation.easeInOut(duration: 0.15)
+    let quick = Animation.easeInOut(duration: 0.2)
+    let standard = Animation.easeInOut(duration: 0.3)
+    let slow = Animation.easeInOut(duration: 0.5)
+    let spring = Animation.spring(response: 0.3, dampingFraction: 0.7)
+    
+    // Duration values (TimeInterval/Double) for use in functions that need raw durations
+    let fastDuration: TimeInterval = 0.15
+    let quickDuration: TimeInterval = 0.2
+    let standardDuration: TimeInterval = 0.3
+    let slowDuration: TimeInterval = 0.5
+}
+

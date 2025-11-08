@@ -9,12 +9,85 @@
 import SwiftUI
 import CoreBluetooth
 
+// MARK: - DeviceConnectionState View Extensions
+
+extension DeviceConnectionState {
+    var color: Color {
+        switch self {
+        case .connected:
+            return .green
+        case .connecting:
+            return .yellow
+        case .disconnecting:
+            return .orange
+        case .disconnected:
+            return .gray
+        case .error:
+            return .red
+        }
+    }
+    
+    var displayText: String {
+        self.displayName
+    }
+}
+
+// MARK: - DeviceType View Extensions
+
+extension DeviceType {
+    var icon: String {
+        self.iconName
+    }
+    
+    var color: Color {
+        switch self {
+        case .oralable:
+            return .blue
+        case .anrMuscleSense:
+            return .purple
+        case .unknown:
+            return .gray
+        }
+    }
+}
+
+// MARK: - DeviceInfo View Extensions
+
+extension DeviceInfo {
+    var deviceType: DeviceType {
+        self.type
+    }
+    
+    var connectionStatus: DeviceConnectionState {
+        self.connectionState
+    }
+    
+    var rssi: Int? {
+        self.signalStrength
+    }
+    
+    var services: [CBUUID] {
+        // Return service UUIDs based on device type
+        if let serviceUUID = type.serviceUUID {
+            return [serviceUUID]
+        }
+        return []
+    }
+}
+
 struct DevicesView: View {
     // MVVM: Use ViewModel instead of direct manager access
-    @StateObject private var viewModel = DevicesViewModel()
+    @EnvironmentObject var deviceManager: DeviceManager
+    @StateObject private var viewModel: DevicesViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @State private var showingDeviceDetails = false
     @State private var selectedDevice: DeviceInfo?
+    
+    init() {
+        // We need to use a temporary workaround for @StateObject initialization
+        // The actual initialization will happen in the body's first render
+        _viewModel = StateObject(wrappedValue: DevicesViewModel(deviceManager: .shared))
+    }
     
     var body: some View {
         NavigationView {
@@ -181,11 +254,13 @@ struct DevicesView: View {
     
     private var connectedDevicesSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(
-                title: "Connected Devices",
-                icon: "wifi",
-                count: viewModel.connectedDevices.count
-            )
+            HStack {
+                SectionHeaderView(title: "Connected Devices", icon: "wifi")
+                Spacer()
+                Text("\(viewModel.connectedDevices.count)")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
             
             ForEach(viewModel.connectedDevices.filter { $0.id != viewModel.primaryDevice?.id }) { device in
                 DeviceRow(
@@ -214,14 +289,18 @@ struct DevicesView: View {
     // MARK: - Discovered Devices Section
     
     private var discoveredDevicesSection: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(
-                title: "Available Devices",
-                icon: "dot.radiowaves.left.and.right",
-                count: viewModel.discoveredDevices.filter { device in
-                    !viewModel.connectedDevices.contains(where: { $0.id == device.id })
-                }.count
-            )
+        let availableDevicesCount = viewModel.discoveredDevices.filter { device in
+            !viewModel.connectedDevices.contains(where: { $0.id == device.id })
+        }.count
+        
+        return VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            HStack {
+                SectionHeaderView(title: "Available Devices", icon: "dot.radiowaves.left.and.right")
+                Spacer()
+                Text("\(availableDevicesCount)")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
             
             ForEach(viewModel.discoveredDevices.filter { device in
                 !viewModel.connectedDevices.contains(where: { $0.id == device.id })
@@ -368,7 +447,7 @@ struct DeviceRow: View {
                             .padding(designSystem.spacing.xs)
                             .background(Color.red.opacity(0.1))
                             .foregroundColor(.red)
-                            .cornerRadius(designSystem.cornerRadius.xs)
+                            .cornerRadius(designSystem.cornerRadius.sm)
                         }
                     }
                     
@@ -383,7 +462,7 @@ struct DeviceRow: View {
                             .padding(designSystem.spacing.xs)
                             .background(Color.yellow.opacity(0.1))
                             .foregroundColor(.yellow)
-                            .cornerRadius(designSystem.cornerRadius.xs)
+                            .cornerRadius(designSystem.cornerRadius.sm)
                         }
                     }
                 } else if let onConnect = onConnect {
@@ -397,7 +476,7 @@ struct DeviceRow: View {
                         .padding(designSystem.spacing.xs)
                         .background(Color.green.opacity(0.1))
                         .foregroundColor(.green)
-                        .cornerRadius(designSystem.cornerRadius.xs)
+                        .cornerRadius(designSystem.cornerRadius.sm)
                     }
                 }
                 
@@ -411,7 +490,7 @@ struct DeviceRow: View {
                     .padding(designSystem.spacing.xs)
                     .background(designSystem.colors.backgroundTertiary)
                     .foregroundColor(designSystem.colors.textPrimary)
-                    .cornerRadius(designSystem.cornerRadius.xs)
+                    .cornerRadius(designSystem.cornerRadius.sm)
                 }
             }
         }
@@ -448,7 +527,7 @@ struct DeviceRow: View {
 // MARK: - Connection Badge
 
 struct ConnectionBadge: View {
-    let status: DeviceInfo.ConnectionStatus
+    let status: DeviceConnectionState
     
     var body: some View {
         HStack(spacing: 4) {
@@ -479,22 +558,22 @@ struct DeviceDetailView: View {
         NavigationView {
             List {
                 Section("Device Information") {
-                    InfoRowView(label: "Name", value: device.name)
-                    InfoRowView(label: "Type", value: device.deviceType.displayName)
-                    InfoRowView(label: "ID", value: device.id.uuidString)
-                    InfoRowView(label: "Status", value: device.connectionStatus.displayText)
+                    InfoRowView(icon: "tag", title: "Name", value: device.name)
+                    InfoRowView(icon: "cube.box", title: "Type", value: device.deviceType.displayName)
+                    InfoRowView(icon: "number", title: "ID", value: device.id.uuidString)
+                    InfoRowView(icon: "link", title: "Status", value: device.connectionStatus.displayText)
                 }
                 
                 if device.isConnected {
                     Section("Connection Details") {
                         if let battery = device.batteryLevel {
-                            InfoRowView(label: "Battery", value: "\(battery)%")
+                            InfoRowView(icon: "battery.100", title: "Battery", value: "\(battery)%")
                         }
                         if let rssi = device.rssi {
-                            InfoRowView(label: "Signal", value: "\(rssi) dBm")
+                            InfoRowView(icon: "wifi", title: "Signal", value: "\(rssi) dBm")
                         }
                         if let firmware = device.firmwareVersion {
-                            InfoRowView(label: "Firmware", value: firmware)
+                            InfoRowView(icon: "cpu", title: "Firmware", value: firmware)
                         }
                     }
                     

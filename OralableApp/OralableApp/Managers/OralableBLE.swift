@@ -12,6 +12,7 @@ import CoreBluetooth
 
 @MainActor
 class OralableBLE: ObservableObject {
+    static let shared = OralableBLE() 
     
     // MARK: - Published Properties
     

@@ -1,8 +1,8 @@
 //
-//  MainTabView_Fixed.swift
+//  MainTabView.swift
 //  OralableApp
 //
-//  Main tab coordinator with all fixes applied
+//  Fixed version - no duplicate views, correct parameters
 //
 
 import SwiftUI
@@ -24,12 +24,14 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
+            // Use the real HistoricalView from your Views folder
             HistoricalView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
                 .tag(2)
             
+            // Use SettingsView, not ShareView
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
@@ -40,27 +42,9 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - Temporary View Placeholders (Replace with actual implementations)
+// REMOVE THE DUPLICATE HistoricalView struct - you already have one in Views/HistoricalView.swift
 
-struct HistoricalView: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: designSystem.spacing.lg) {
-                    Text("Historical data and charts will appear here")
-                        .font(designSystem.typography.body)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                        .padding()
-                }
-            }
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
-
+// If you don't have a real SettingsView elsewhere, keep this one:
 struct SettingsView: View {
     @EnvironmentObject var designSystem: DesignSystem
     

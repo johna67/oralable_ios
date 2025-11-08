@@ -186,81 +186,112 @@ struct SensorReadingPreview: View {
     var body: some View {
         NavigationView {
             List {
-                Section("Sensor Readings") {
-                    ForEach(readings) { reading in
-                        HStack {
-                            Image(systemName: reading.sensorType.iconName)
-                                .font(.system(size: DesignSystem.Sizing.Icon.lg))
-                                .foregroundColor(DesignSystem.Colors.textPrimary)
-                                .frame(width: 40)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(reading.sensorType.displayName)
-                                    .font(DesignSystem.Typography.bodyLarge)
-                                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                                
-                                Text("Device: \(reading.deviceId ?? "Unknown")")
-                                    .font(DesignSystem.Typography.caption)
-                                    .foregroundColor(DesignSystem.Colors.textTertiary)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text(reading.formattedValue)
-                                    .font(DesignSystem.Typography.labelLarge)
-                                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                                
-                                Text(reading.isValid ? "Valid" : "Invalid")
-                                    .font(DesignSystem.Typography.captionSmall)
-                                    .foregroundColor(reading.isValid ? DesignSystem.Colors.success : DesignSystem.Colors.error)
-                            }
-                        }
-                        .padding(.vertical, DesignSystem.Spacing.xs)
-                    }
-                }
-                
-                Section("Array Extensions") {
-                    if let avgHeartRate = readings.average(for: .heartRate) {
-                        HStack {
-                            Text("Average Heart Rate")
-                                .font(DesignSystem.Typography.bodyMedium)
-                            Spacer()
-                            Text(String(format: "%.0f bpm", avgHeartRate))
-                                .font(DesignSystem.Typography.labelMedium)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
-                        }
-                    }
-                    
-                    if let latest = readings.latest(for: .emg) {
-                        HStack {
-                            Text("Latest EMG Reading")
-                                .font(DesignSystem.Typography.bodyMedium)
-                            Spacer()
-                            Text(latest.formattedValue)
-                                .font(DesignSystem.Typography.labelMedium)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
-                        }
-                    }
-                }
-                
-                Section("Validation Tests") {
-                    ValidationTest(
-                        label: "Valid Heart Rate",
-                        reading: SensorReading(sensorType: .heartRate, value: 72)
-                    )
-                    ValidationTest(
-                        label: "Invalid Heart Rate (too low)",
-                        reading: SensorReading(sensorType: .heartRate, value: 20)
-                    )
-                    ValidationTest(
-                        label: "Invalid Heart Rate (too high)",
-                        reading: SensorReading(sensorType: .heartRate, value: 300)
-                    )
-                }
+                sensorReadingsSection
+                arrayExtensionsSection
+                validationTestsSection
             }
             .navigationTitle("Sensor Readings")
             .background(DesignSystem.Colors.backgroundPrimary)
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var sensorReadingsSection: some View {
+        Section("Sensor Readings") {
+            ForEach(readings, id: \.id) { reading in
+                SensorReadingRow(reading: reading)
+            }
+        }
+    }
+    
+    private var arrayExtensionsSection: some View {
+        Section("Array Extensions") {
+            if let avgHeartRate = readings.average(for: .heartRate) {
+                HStack {
+                    Text("Average Heart Rate")
+                        .font(DesignSystem.Typography.bodyMedium)
+                    Spacer()
+                    Text(String(format: "%.0f bpm", avgHeartRate))
+                        .font(DesignSystem.Typography.labelMedium)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                }
+            }
+            
+            if let latest = readings.latest(for: .emg) {
+                HStack {
+                    Text("Latest EMG Reading")
+                        .font(DesignSystem.Typography.bodyMedium)
+                    Spacer()
+                    Text(latest.formattedValue)
+                        .font(DesignSystem.Typography.labelMedium)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                }
+            }
+        }
+    }
+    
+    private var validationTestsSection: some View {
+        Section("Validation Tests") {
+            ValidationTest(
+                label: "Valid Heart Rate",
+                reading: SensorReading(sensorType: .heartRate, value: 72)
+            )
+            ValidationTest(
+                label: "Invalid Heart Rate (too low)",
+                reading: SensorReading(sensorType: .heartRate, value: 20)
+            )
+            ValidationTest(
+                label: "Invalid Heart Rate (too high)",
+                reading: SensorReading(sensorType: .heartRate, value: 300)
+            )
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct SensorReadingRow: View {
+    let reading: SensorReading
+    
+    var body: some View {
+        HStack {
+            iconView
+            deviceInfoView
+            Spacer()
+            valueInfoView
+        }
+        .padding(.vertical, DesignSystem.Spacing.xs)
+    }
+    
+    private var iconView: some View {
+        Image(systemName: reading.sensorType.iconName)
+            .font(.system(size: DesignSystem.Sizing.Icon.lg))
+            .foregroundColor(DesignSystem.Colors.textPrimary)
+            .frame(width: 40)
+    }
+    
+    private var deviceInfoView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(reading.sensorType.displayName)
+                .font(DesignSystem.Typography.bodyLarge)
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+            
+            Text("Device: \(reading.deviceId ?? "Unknown")")
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textTertiary)
+        }
+    }
+    
+    private var valueInfoView: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            Text(reading.formattedValue)
+                .font(DesignSystem.Typography.labelLarge)
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+            
+            Text(reading.isValid ? "Valid" : "Invalid")
+                .font(DesignSystem.Typography.caption2)
+                .foregroundColor(reading.isValid ? DesignSystem.Colors.success : DesignSystem.Colors.error)
         }
     }
 }

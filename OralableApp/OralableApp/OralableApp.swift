@@ -34,7 +34,7 @@ struct OralableApp: App {
 
 enum AppMode {
     case viewer
-    case fullAccess
+    case subscription
     case demo
 }
 

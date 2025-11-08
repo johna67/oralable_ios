@@ -108,11 +108,11 @@ class AppLoggingService: LoggingService, ObservableObject {
             timestamp: Date(),
             level: level,
             message: message,
-            source: source
+            category: source ?? "App"
         )
         
         // Console logging
-        print("[\(level.emoji) \(formatTimestamp(entry.timestamp))] \(source ?? "App"): \(message)")
+        print("[\(level.icon) \(formatTimestamp(entry.timestamp))] \(source ?? "App"): \(message)")
         
         // File logging (if enabled)
         fileLogger?.log(entry)
@@ -145,15 +145,15 @@ class AppLoggingService: LoggingService, ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         
-        var logContent = "Timestamp,Level,Source,Message\n"
+        var logContent = "Timestamp,Level,Category,Message\n"
         
         for entry in logs.sorted(by: { $0.timestamp < $1.timestamp }) {
             let timestamp = dateFormatter.string(from: entry.timestamp)
             let level = entry.level.rawValue
-            let source = entry.source ?? ""
+            let category = entry.category
             let message = entry.message.replacingOccurrences(of: "\"", with: "\"\"")
             
-            logContent += "\"\(timestamp)\",\"\(level)\",\"\(source)\",\"\(message)\"\n"
+            logContent += "\"\(timestamp)\",\"\(level)\",\"\(category)\",\"\(message)\"\n"
         }
         
         let tempDir = FileManager.default.temporaryDirectory
@@ -228,7 +228,7 @@ private class FileLogger {
     
     private func writeToFile(_ entry: LogEntry) {
         let timestamp = ISO8601DateFormatter().string(from: entry.timestamp)
-        let logLine = "[\(timestamp)] [\(entry.level.rawValue.uppercased())] \(entry.source ?? "App"): \(entry.message)\n"
+        let logLine = "[\(timestamp)] [\(entry.level.rawValue.uppercased())] \(entry.category): \(entry.message)\n"
         
         // Check file size and rotate if needed
         if let fileAttributes = try? FileManager.default.attributesOfItem(atPath: logFileURL.path),
@@ -277,13 +277,13 @@ class MockLoggingService: LoggingService, ObservableObject {
     init() {
         // Add some sample logs for preview
         recentLogs = [
-            LogEntry(timestamp: Date().addingTimeInterval(-300), level: .info, message: "App started", source: "App"),
-            LogEntry(timestamp: Date().addingTimeInterval(-250), level: .debug, message: "Scanning for devices", source: "DeviceManager"),
-            LogEntry(timestamp: Date().addingTimeInterval(-200), level: .info, message: "Found Oralable device", source: "BLE"),
-            LogEntry(timestamp: Date().addingTimeInterval(-150), level: .info, message: "Connected successfully", source: "OralableDevice"),
-            LogEntry(timestamp: Date().addingTimeInterval(-100), level: .debug, message: "Received PPG data: 20 samples", source: "OralableDevice"),
-            LogEntry(timestamp: Date().addingTimeInterval(-50), level: .warning, message: "Low battery: 15%", source: "BatteryMonitor"),
-            LogEntry(timestamp: Date().addingTimeInterval(-10), level: .info, message: "Heart rate calculated: 72 bpm", source: "HeartRateCalculator")
+            LogEntry(timestamp: Date().addingTimeInterval(-300), level: .info, message: "App started", category: "App"),
+            LogEntry(timestamp: Date().addingTimeInterval(-250), level: .debug, message: "Scanning for devices", category: "DeviceManager"),
+            LogEntry(timestamp: Date().addingTimeInterval(-200), level: .info, message: "Found Oralable device", category: "BLE"),
+            LogEntry(timestamp: Date().addingTimeInterval(-150), level: .info, message: "Connected successfully", category: "OralableDevice"),
+            LogEntry(timestamp: Date().addingTimeInterval(-100), level: .debug, message: "Received PPG data: 20 samples", category: "OralableDevice"),
+            LogEntry(timestamp: Date().addingTimeInterval(-50), level: .warning, message: "Low battery: 15%", category: "BatteryMonitor"),
+            LogEntry(timestamp: Date().addingTimeInterval(-10), level: .info, message: "Heart rate calculated: 72 bpm", category: "HeartRateCalculator")
         ]
     }
     
@@ -304,7 +304,7 @@ class MockLoggingService: LoggingService, ObservableObject {
     }
     
     func log(level: LogLevel, message: String, source: String?) {
-        let entry = LogEntry(level: level, message: message, source: source)
+        let entry = LogEntry(level: level, message: message, category: source ?? "App")
         recentLogs.append(entry)
         logSubject.send(entry)
         
