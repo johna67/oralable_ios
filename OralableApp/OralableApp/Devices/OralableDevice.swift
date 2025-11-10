@@ -249,12 +249,13 @@ extension OralableDevice: CBPeripheralDelegate {
             
             // Mark as connected once characteristics are discovered
             self.connectionState = .connected
+            
         }
     }
     
     nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard error == nil, let value = characteristic.value else { return }
-        
+        print("📊 Data: \(characteristic.uuid.uuidString.suffix(8)) = \(value.count) bytes")
         Task { @MainActor in
             switch characteristic.uuid {
             case ppgCharacteristicUUID:

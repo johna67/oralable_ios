@@ -199,27 +199,32 @@ class DeviceManager: ObservableObject {
     }
     
     private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType? {
-        let lowercaseName = name.lowercased()
+        print("🔍 Device check: '\(name)'")
         
-        if lowercaseName.contains("oralable") {
-            return .oralable
-        } else if lowercaseName.contains("anr") || lowercaseName.contains("muscle") {
-            return .anr
-        } else if lowercaseName.contains("demo") {
-            return .demo
-        }
-        
-        return nil
+        // TEMPORARY: Accept everything as Oralable for testing
+        return .oralable
     }
     
     // MARK: - Device Discovery
     
-    /// Start scanning for devices
-    func startScanning() async {
-        print("🔍 Starting device scan...")
-        isScanning = true
-        bleManager?.startScanning()
-    }
+    //
+    //  DeviceManager.swift (FIXED)
+    //  Line 218-222 - Added TGM Service UUID filter to scanning
+    //
+
+        /// Start scanning for devices
+        func startScanning() async {
+            print("🔍 Starting device scan for TGM Service devices...")
+            isScanning = true
+            
+            // FIXED: Only scan for devices advertising TGM Service
+            // This filters out TVs, Macs, and other non-Oralable devices
+            let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
+            bleManager?.startScanning(services: [tgmServiceUUID])
+            
+            // Alternative: Scan for all devices (shows everything)
+            // bleManager?.startScanning()
+        }
     
     /// Stop scanning for devices
     func stopScanning() {

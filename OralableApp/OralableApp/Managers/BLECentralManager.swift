@@ -92,15 +92,33 @@ extension BLECentralManager: CBCentralManagerDelegate {
         }
     }
     
-    func centralManager(
-        _ central: CBCentralManager,
-        didDiscover peripheral: CBPeripheral,
-        advertisementData: [String : Any],
-        rssi RSSI: NSNumber
-    ) {
-        let name = peripheral.name ?? (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? "Unknown"
-        onDeviceDiscovered?(peripheral, name, RSSI.intValue)
-    }
+    //
+    //  BLECentralManager.swift (DEBUG VERSION)
+    //  Lines 95-103 - Add detailed logging to see what's being advertised
+    //
+
+        func centralManager(
+            _ central: CBCentralManager,
+            didDiscover peripheral: CBPeripheral,
+            advertisementData: [String : Any],
+            rssi RSSI: NSNumber
+        ) {
+            // DEBUG: Log everything about the discovered device
+            print("\n📱 Discovered BLE Device:")
+            print("  UUID: \(peripheral.identifier)")
+            print("  Peripheral.name: \(peripheral.name ?? "nil")")
+            print("  Advertisement Name: \(advertisementData[CBAdvertisementDataLocalNameKey] ?? "nil")")
+            print("  Manufacturer Data: \(advertisementData[CBAdvertisementDataManufacturerDataKey] ?? "nil")")
+            print("  Service UUIDs: \(advertisementData[CBAdvertisementDataServiceUUIDsKey] ?? "nil")")
+            print("  Service Data: \(advertisementData[CBAdvertisementDataServiceDataKey] ?? "nil")")
+            print("  Is Connectable: \(advertisementData[CBAdvertisementDataIsConnectable] ?? "unknown")")
+            print("  TX Power: \(advertisementData[CBAdvertisementDataTxPowerLevelKey] ?? "unknown")")
+            print("  RSSI: \(RSSI) dBm")
+            print("  ---")
+            
+            let name = peripheral.name ?? (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? "Unknown"
+            onDeviceDiscovered?(peripheral, name, RSSI.intValue)
+        }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedPeripherals.insert(peripheral.identifier)

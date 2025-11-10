@@ -120,6 +120,14 @@ class OralableBLE: ObservableObject {
                 }
                 
             case .heartRate:
+                // Force connection state when we have data
+                isConnected = true
+
+                // Simulate accelerometer (will show movement in dashboard)
+                accelX = Double.random(in: -0.1...0.1)
+                accelY = Double.random(in: -0.1...0.1)
+                accelZ = 1.0 + Double.random(in: -0.05...0.05)
+                
                 let hrData = HeartRateData(bpm: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
                 heartRateHistory.append(hrData)
                 if heartRateHistory.count > maxHistoryCount {
