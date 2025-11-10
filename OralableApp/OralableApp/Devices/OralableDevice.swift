@@ -1,358 +1,361 @@
 //
-//  BLEDeviceProtocol.swift
+//  OralableDevice.swift
 //  OralableApp
 //
-//  Created: November 3, 2025
-//  Updated: November 10, 2025 - Consolidated DeviceError enum
-//  Protocol defining interface for all BLE devices
+//  Created: November 10, 2025
+//  Oralable device implementation conforming to BLEDeviceProtocol
 //
 
 import Foundation
 import CoreBluetooth
 import Combine
 
-/// Protocol that all BLE devices must implement
-protocol BLEDeviceProtocol: AnyObject {
+/// Oralable device implementation
+class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
-    // MARK: - Device Information
+    // MARK: - BLE Service & Characteristic UUIDs
     
-    /// Device information structure
-    var deviceInfo: DeviceInfo { get }
-    
-    /// Device type
-    var deviceType: DeviceType { get }
-    
-    /// Device name
-    var name: String { get }
-    
-    /// BLE peripheral
-    var peripheral: CBPeripheral? { get }
-    
-    // MARK: - Connection State
-    
-    /// Current connection state
-    var connectionState: DeviceConnectionState { get }
-    
-    /// Whether device is currently connected
-    var isConnected: Bool { get }
-    
-    /// Signal strength (RSSI)
-    var signalStrength: Int? { get }
-    
-    // MARK: - Battery & System Info
-    
-    /// Current battery level (0-100)
-    var batteryLevel: Int? { get }
-    
-    /// Firmware version
-    var firmwareVersion: String? { get }
-    
-    /// Hardware version
-    var hardwareVersion: String? { get }
-    
-    // MARK: - Sensor Data
-    
-    /// Publisher for sensor readings
-    var sensorReadings: AnyPublisher<SensorReading, Never> { get }
-    
-    /// Latest readings by sensor type
-    var latestReadings: [SensorType: SensorReading] { get }
-    
-    /// List of supported sensors
-    var supportedSensors: [SensorType] { get }
-    
-    // MARK: - Connection Management
-    
-    /// Connect to the device
-    func connect() async throws
-    
-    /// Disconnect from the device
-    func disconnect() async
-    
-    /// Check if device is available
-    func isAvailable() -> Bool
-    
-    // MARK: - Data Operations
-    
-    /// Start streaming sensor data
-    func startDataStream() async throws
-    
-    /// Stop streaming sensor data
-    func stopDataStream() async
-    
-    /// Request current sensor reading
-    func requestReading(for sensorType: SensorType) async throws -> SensorReading?
-    
-    /// Parse raw BLE data into sensor readings
-    func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading]
-    
-    // MARK: - Device Control
-    
-    /// Send command to device
-    func sendCommand(_ command: DeviceCommand) async throws
-    
-    /// Update device configuration
-    func updateConfiguration(_ config: DeviceConfiguration) async throws
-    
-    /// Request device information update
-    func updateDeviceInfo() async throws
-}
-
-// MARK: - Device Command
-
-/// Commands that can be sent to devices
-enum DeviceCommand {
-    case startSensors
-    case stopSensors
-    case reset
-    case calibrate
-    case setSamplingRate(Hz: Int)
-    case enableSensor(SensorType)
-    case disableSensor(SensorType)
-    case requestBatteryLevel
-    case requestFirmwareVersion
-    
-    var rawValue: String {
-        switch self {
-        case .startSensors:
-            return "START"
-        case .stopSensors:
-            return "STOP"
-        case .reset:
-            return "RESET"
-        case .calibrate:
-            return "CALIBRATE"
-        case .setSamplingRate(let hz):
-            return "RATE:\(hz)"
-        case .enableSensor(let type):
-            return "ENABLE:\(type.rawValue)"
-        case .disableSensor(let type):
-            return "DISABLE:\(type.rawValue)"
-        case .requestBatteryLevel:
-            return "BATTERY?"
-        case .requestFirmwareVersion:
-            return "VERSION?"
-        }
-    }
-}
-
-// MARK: - Device Configuration
-
-/// Configuration settings for devices
-struct DeviceConfiguration {
-    
-    /// Sampling rate in Hz
-    var samplingRate: Int
-    
-    /// Enabled sensors
-    var enabledSensors: Set<SensorType>
-    
-    /// Auto-reconnect on disconnect
-    var autoReconnect: Bool
-    
-    /// Notification preferences
-    var notificationsEnabled: Bool
-    
-    /// Data buffer size
-    var bufferSize: Int
-    
-    // MARK: - Default Configurations
-    
-    static let defaultOralable = DeviceConfiguration(
-        samplingRate: 50,
-        enabledSensors: [
-            .ppgRed,
-            .ppgInfrared,
-            .ppgGreen,
-            .accelerometerX,
-            .accelerometerY,
-            .accelerometerZ,
-            .temperature,
-            .battery
-        ],
-        autoReconnect: true,
-        notificationsEnabled: true,
-        bufferSize: 100
-    )
-    
-    static let defaultANR = DeviceConfiguration(
-        samplingRate: 100,
-        enabledSensors: [
-            .emg,
-            .battery
-        ],
-        autoReconnect: true,
-        notificationsEnabled: true,
-        bufferSize: 200
-    )
-}
-
-// MARK: - Device Error
-
-/// Errors that can occur with BLE devices
-enum DeviceError: LocalizedError {
-    // Connection errors
-    case notConnected
-    case connectionFailed(String)
-    case disconnected
-    case invalidPeripheral
-    
-    // BLE characteristic/service errors
-    case characteristicNotFound(String)
-    case serviceNotFound(String)
-    
-    // Operation errors
-    case writeCommandFailed(String)
-    case readFailed(String)
-    case dataParsingFailed(String)
-    case dataParsingError  // Alias for compatibility
-    
-    // Sensor errors
-    case unsupportedSensor(SensorType)
-    case sensorNotAvailable(SensorType)
-    
-    // Other errors
-    case operationNotSupported
-    case timeout
-    case unknownError(String)
-    
-    var errorDescription: String? {
-        switch self {
-        case .notConnected:
-            return "Device is not connected"
-        case .connectionFailed(let message):
-            return "Connection failed: \(message)"
-        case .disconnected:
-            return "Device disconnected unexpectedly"
-        case .invalidPeripheral:
-            return "Invalid BLE peripheral"
-        case .characteristicNotFound(let uuid):
-            return "Characteristic not found: \(uuid)"
-        case .serviceNotFound(let uuid):
-            return "Service not found: \(uuid)"
-        case .writeCommandFailed(let message):
-            return "Failed to write command: \(message)"
-        case .readFailed(let message):
-            return "Failed to read data: \(message)"
-        case .dataParsingFailed(let message):
-            return "Failed to parse data: \(message)"
-        case .dataParsingError:
-            return "Failed to parse sensor data"
-        case .unsupportedSensor(let type):
-            return "Sensor not supported: \(type.displayName)"
-        case .sensorNotAvailable(let type):
-            return "\(type.displayName) sensor is not available"
-        case .operationNotSupported:
-            return "Operation not supported"
-        case .timeout:
-            return "Operation timed out"
-        case .unknownError(let message):
-            return "Unknown error: \(message)"
-        }
-    }
-}
-
-// MARK: - Protocol Extension (Default Implementations)
-
-extension BLEDeviceProtocol {
-    
-    /// Check if specific sensor is supported
-    func supports(sensor: SensorType) -> Bool {
-        supportedSensors.contains(sensor)
+    private struct BLEConstants {
+        static let serviceUUID = CBUUID(string: "180D") // Replace with actual Oralable service UUID
+        static let sensorDataCharacteristicUUID = CBUUID(string: "2A37") // Replace with actual UUID
+        static let controlCharacteristicUUID = CBUUID(string: "2A39") // Replace with actual UUID
+        static let batteryServiceUUID = CBUUID(string: "180F")
+        static let batteryLevelCharacteristicUUID = CBUUID(string: "2A19")
+        static let deviceInfoServiceUUID = CBUUID(string: "180A")
+        static let firmwareVersionCharacteristicUUID = CBUUID(string: "2A26")
+        static let hardwareVersionCharacteristicUUID = CBUUID(string: "2A27")
     }
     
-    /// Get latest reading for sensor type
-    func latestReading(for sensorType: SensorType) -> SensorReading? {
-        latestReadings[sensorType]
-    }
+    // MARK: - Properties
     
-    /// Check if device is streaming data
-    var isStreaming: Bool {
-        isConnected && connectionState == .connected
-    }
-}
-
-// MARK: - Preview Helper
-
-#if DEBUG
-
-/// Mock device for testing
-class MockBLEDevice: BLEDeviceProtocol {
-    
-    var deviceInfo: DeviceInfo
-    var deviceType: DeviceType
+    @Published private(set) var deviceInfo: DeviceInfo
+    let deviceType: DeviceType = .oralable
     var name: String
-    var peripheral: CBPeripheral?
-    var connectionState: DeviceConnectionState = .disconnected
-    var signalStrength: Int? = -55
-    var batteryLevel: Int? = 85
-    var firmwareVersion: String? = "1.0.0"
-    var hardwareVersion: String? = "2.0"
+    weak var peripheral: CBPeripheral?
+    
+    @Published private(set) var connectionState: DeviceConnectionState = .disconnected
+    @Published private(set) var signalStrength: Int?
+    @Published private(set) var batteryLevel: Int?
+    @Published private(set) var firmwareVersion: String?
+    @Published private(set) var hardwareVersion: String?
     
     private let sensorReadingsSubject = PassthroughSubject<SensorReading, Never>()
     var sensorReadings: AnyPublisher<SensorReading, Never> {
         sensorReadingsSubject.eraseToAnyPublisher()
     }
     
-    var latestReadings: [SensorType: SensorReading] = [:]
-    var supportedSensors: [SensorType]
+    @Published private(set) var latestReadings: [SensorType: SensorReading] = [:]
+    
+    let supportedSensors: [SensorType] = [
+        .ppgRed,
+        .ppgInfrared,
+        .ppgGreen,
+        .accelerometerX,
+        .accelerometerY,
+        .accelerometerZ,
+        .temperature,
+        .battery
+    ]
     
     var isConnected: Bool {
         connectionState == .connected
     }
     
-    init(type: DeviceType) {
-        self.deviceType = type
-        self.name = type.displayName
-        self.deviceInfo = DeviceInfo.demo(type: type)
-        self.supportedSensors = type.defaultSensors
+    // MARK: - Private Properties
+    
+    private var configuration: DeviceConfiguration = .defaultOralable
+    private var isStreaming = false
+    private var sensorDataCharacteristic: CBCharacteristic?
+    private var controlCharacteristic: CBCharacteristic?
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Initialization
+    
+    init(peripheral: CBPeripheral, deviceInfo: DeviceInfo? = nil) {
+        self.peripheral = peripheral
+        self.name = peripheral.name ?? "Oralable Device"
+        self.deviceInfo = deviceInfo ?? DeviceInfo(
+            type: .oralable,
+            name: peripheral.name ?? "Oralable Device",
+            peripheralIdentifier: peripheral.identifier,
+            connectionState: .disconnected
+        )
+        
+        super.init()
+        peripheral.delegate = self
     }
     
+    // MARK: - Connection Management
+    
     func connect() async throws {
+        guard let peripheral = peripheral else {
+            throw DeviceError.invalidPeripheral
+        }
+        
         connectionState = .connecting
-        try await Task.sleep(nanoseconds: 500_000_000)
-        connectionState = .connected
+        
+        // Note: Actual connection is handled by CBCentralManager
+        // This method should be called after the central manager connects
+        peripheral.discoverServices([
+            BLEConstants.serviceUUID,
+            BLEConstants.batteryServiceUUID,
+            BLEConstants.deviceInfoServiceUUID
+        ])
     }
     
     func disconnect() async {
         connectionState = .disconnecting
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        isStreaming = false
+        
+        // Disable notifications
+        if let characteristic = sensorDataCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+        
+        // Note: Actual disconnection is handled by CBCentralManager
         connectionState = .disconnected
     }
     
     func isAvailable() -> Bool {
-        true
+        guard let peripheral = peripheral else { return false }
+        return peripheral.state == .connected || peripheral.state == .connecting
     }
     
+    // MARK: - Data Operations
+    
     func startDataStream() async throws {
-        guard isConnected else { throw DeviceError.notConnected }
-        // Simulate data streaming
+        guard isConnected else {
+            throw DeviceError.notConnected
+        }
+        
+        guard let characteristic = sensorDataCharacteristic else {
+            throw DeviceError.characteristicNotFound("Sensor Data")
+        }
+        
+        peripheral?.setNotifyValue(true, for: characteristic)
+        try await sendCommand(.startSensors)
+        isStreaming = true
     }
     
     func stopDataStream() async {
-        // Stop streaming
+        guard let characteristic = sensorDataCharacteristic else { return }
+        
+        peripheral?.setNotifyValue(false, for: characteristic)
+        try? await sendCommand(.stopSensors)
+        isStreaming = false
     }
     
     func requestReading(for sensorType: SensorType) async throws -> SensorReading? {
-        guard isConnected else { throw DeviceError.notConnected }
-        return SensorReading.mock(sensorType: sensorType)
+        guard isConnected else {
+            throw DeviceError.notConnected
+        }
+        
+        guard supportedSensors.contains(sensorType) else {
+            throw DeviceError.operationNotSupported
+        }
+        
+        // Return cached reading or request new one
+        return latestReadings[sensorType]
     }
     
     func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
-        []
+        // Parse based on characteristic UUID
+        if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
+            return parseSensorData(data)
+        } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
+            return parseBatteryData(data)
+        }
+        
+        return []
     }
     
+    // MARK: - Device Control
+    
     func sendCommand(_ command: DeviceCommand) async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else {
+            throw DeviceError.notConnected
+        }
+        
+        guard let characteristic = controlCharacteristic else {
+            throw DeviceError.characteristicNotFound("Control")
+        }
+        
+        let commandData = command.rawValue.data(using: .utf8) ?? Data()
+        peripheral?.writeValue(commandData, for: characteristic, type: .withResponse)
     }
     
     func updateConfiguration(_ config: DeviceConfiguration) async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else {
+            throw DeviceError.notConnected
+        }
+        
+        // Update sampling rate
+        if config.samplingRate != configuration.samplingRate {
+            try await sendCommand(.setSamplingRate(Hz: config.samplingRate))
+        }
+        
+        // Update enabled sensors
+        let toEnable = config.enabledSensors.subtracting(configuration.enabledSensors)
+        let toDisable = configuration.enabledSensors.subtracting(config.enabledSensors)
+        
+        for sensor in toEnable {
+            try await sendCommand(.enableSensor(sensor))
+        }
+        
+        for sensor in toDisable {
+            try await sendCommand(.disableSensor(sensor))
+        }
+        
+        configuration = config
     }
     
     func updateDeviceInfo() async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else {
+            throw DeviceError.notConnected
+        }
+        
+        try await sendCommand(.requestBatteryLevel)
+        try await sendCommand(.requestFirmwareVersion)
+    }
+    
+    // MARK: - Private Parsing Methods
+    
+    private func parseSensorData(_ data: Data) -> [SensorReading] {
+        var readings: [SensorReading] = []
+        
+        // Example parsing logic - adjust based on actual Oralable protocol
+        guard data.count >= 20 else { return [] }
+        
+        let timestamp = Date()
+        
+        // Parse PPG data (bytes 0-5, 16-bit values)
+        if data.count >= 6 {
+            let ppgRed = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt16.self) })
+            let ppgIR = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 2, as: UInt16.self) })
+            let ppgGreen = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 4, as: UInt16.self) })
+            
+            readings.append(SensorReading(sensorType: .ppgRed, value: ppgRed, timestamp: timestamp))
+            readings.append(SensorReading(sensorType: .ppgInfrared, value: ppgIR, timestamp: timestamp))
+            readings.append(SensorReading(sensorType: .ppgGreen, value: ppgGreen, timestamp: timestamp))
+        }
+        
+        // Parse accelerometer data (bytes 6-11, 16-bit signed values)
+        if data.count >= 12 {
+            let accelX = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 6, as: Int16.self) }) / 1000.0
+            let accelY = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 8, as: Int16.self) }) / 1000.0
+            let accelZ = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 10, as: Int16.self) }) / 1000.0
+            
+            readings.append(SensorReading(sensorType: .accelerometerX, value: accelX, timestamp: timestamp))
+            readings.append(SensorReading(sensorType: .accelerometerY, value: accelY, timestamp: timestamp))
+            readings.append(SensorReading(sensorType: .accelerometerZ, value: accelZ, timestamp: timestamp))
+        }
+        
+        // Parse temperature (bytes 12-13, 16-bit value)
+        if data.count >= 14 {
+            let temp = Double(data.withUnsafeBytes { $0.load(fromByteOffset: 12, as: UInt16.self) }) / 100.0
+            readings.append(SensorReading(sensorType: .temperature, value: temp, timestamp: timestamp))
+        }
+        
+        // Update latest readings
+        for reading in readings {
+            latestReadings[reading.sensorType] = reading
+            sensorReadingsSubject.send(reading)
+        }
+        
+        return readings
+    }
+    
+    private func parseBatteryData(_ data: Data) -> [SensorReading] {
+        guard let batteryValue = data.first else { return [] }
+        
+        batteryLevel = Int(batteryValue)
+        
+        let reading = SensorReading(
+            sensorType: .battery,
+            value: Double(batteryValue),
+            timestamp: Date()
+        )
+        
+        latestReadings[.battery] = reading
+        sensorReadingsSubject.send(reading)
+        
+        return [reading]
     }
 }
 
-#endif
+// MARK: - CBPeripheralDelegate
+
+extension OralableDevice: CBPeripheralDelegate {
+    
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard error == nil else {
+            connectionState = .disconnected
+            return
+        }
+        
+        peripheral.services?.forEach { service in
+            peripheral.discoverCharacteristics(nil, for: service)
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard error == nil else { return }
+        
+        service.characteristics?.forEach { characteristic in
+            switch characteristic.uuid {
+            case BLEConstants.sensorDataCharacteristicUUID:
+                sensorDataCharacteristic = characteristic
+                
+            case BLEConstants.controlCharacteristicUUID:
+                controlCharacteristic = characteristic
+                
+            case BLEConstants.batteryLevelCharacteristicUUID:
+                peripheral.readValue(for: characteristic)
+                
+            case BLEConstants.firmwareVersionCharacteristicUUID:
+                peripheral.readValue(for: characteristic)
+                
+            case BLEConstants.hardwareVersionCharacteristicUUID:
+                peripheral.readValue(for: characteristic)
+                
+            default:
+                break
+            }
+        }
+        
+        // All characteristics discovered
+        if sensorDataCharacteristic != nil && controlCharacteristic != nil {
+            connectionState = .connected
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard error == nil, let data = characteristic.value else { return }
+        
+        let readings = parseData(data, from: characteristic)
+        
+        // Handle firmware/hardware version updates
+        if characteristic.uuid == BLEConstants.firmwareVersionCharacteristicUUID {
+            firmwareVersion = String(data: data, encoding: .utf8)
+        } else if characteristic.uuid == BLEConstants.hardwareVersionCharacteristicUUID {
+            hardwareVersion = String(data: data, encoding: .utf8)
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            print("Write failed: \(error.localizedDescription)")
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            print("Notification state update failed: \(error.localizedDescription)")
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        guard error == nil else { return }
+        signalStrength = RSSI.intValue
+    }
+}

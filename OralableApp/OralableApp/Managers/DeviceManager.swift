@@ -175,12 +175,11 @@ class DeviceManager: ObservableObject {
         // Create device info
         print("🔍 [DeviceManager] Creating DeviceInfo object...")
         let deviceInfo = DeviceInfo(
-            id: peripheral.identifier,
-            peripheralIdentifier: peripheral.identifier,
-            name: name,
             type: deviceType,
-            signalStrength: rssi,
-            connectionState: .disconnected
+            name: name,
+            peripheralIdentifier: peripheral.identifier,
+            connectionState: .disconnected,
+            signalStrength: rssi
         )
         print("🔍 [DeviceManager] ✅ DeviceInfo created")
         
@@ -200,7 +199,15 @@ class DeviceManager: ObservableObject {
             device = OralableDevice(peripheral: peripheral)
         case .anr:
             print("🔍 [DeviceManager] Creating ANRMuscleSenseDevice instance...")
-            device = ANRMuscleSenseDevice(peripheral: peripheral)
+            device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
+        case .demo:
+            print("🔍 [DeviceManager] Creating Demo device (using MockBLEDevice)...")
+            #if DEBUG
+            device = MockBLEDevice(type: .demo)
+            #else
+            // In release builds, treat demo as oralable
+            device = OralableDevice(peripheral: peripheral)
+            #endif
         }
         
         print("🔍 [DeviceManager] ✅ Device instance created")
@@ -470,7 +477,7 @@ class DeviceManager: ObservableObject {
         allSensorReadings.append(reading)
         
         // Update latest readings
-        latestReadings[reading.type] = reading
+        latestReadings[reading.sensorType] = reading
         
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
@@ -483,32 +490,26 @@ class DeviceManager: ObservableObject {
     func device(withId id: UUID) -> DeviceInfo? {
         return discoveredDevices.first { $0.id == id }
     }
-}
-
-// MARK: - Device Error
-
-enum DeviceError: LocalizedError {
-    case invalidPeripheral
-    case connectionFailed
-    case connectionLost
-    case notConnected
-    case dataCollectionFailed
-    case unknownError(String)
     
-    var errorDescription: String? {
-        switch self {
-        case .invalidPeripheral:
-            return "Invalid peripheral"
-        case .connectionFailed:
-            return "Connection failed"
-        case .connectionLost:
-            return "Connection lost"
-        case .notConnected:
-            return "Device not connected"
-        case .dataCollectionFailed:
-            return "Data collection failed"
-        case .unknownError(let message):
-            return message
+    // MARK: - Data Management
+    
+    /// Clear all sensor readings
+    func clearReadings() {
+        print("\n🗑️ [DeviceManager] clearReadings() called")
+        allSensorReadings.removeAll()
+        latestReadings.removeAll()
+        print("🗑️ [DeviceManager] All readings cleared")
+    }
+    
+    /// Set a device as the primary device
+    func setPrimaryDevice(_ deviceInfo: DeviceInfo?) {
+        print("\n📌 [DeviceManager] setPrimaryDevice() called")
+        if let device = deviceInfo {
+            print("📌 [DeviceManager] Setting primary device to: \(device.name)")
+        } else {
+            print("📌 [DeviceManager] Clearing primary device")
         }
+        primaryDevice = deviceInfo
     }
 }
+
