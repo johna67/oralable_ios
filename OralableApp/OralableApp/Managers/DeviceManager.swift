@@ -48,7 +48,7 @@ class DeviceManager: ObservableObject {
     private let maxDevices: Int = 5
     
     // BLE Integration
-    private var bleManager: BLECentralManager?
+    private(set) var bleManager: BLECentralManager?  // Changed from private to private(set)
     
     // MARK: - Initialization
     

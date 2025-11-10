@@ -3,23 +3,24 @@
 //  OralableApp
 //
 //  FIXED: November 10, 2025
-//  - Connect button now actually connects to device
-//  - Proper peripheral tracking and connection
-//  - Fixed commented-out connection code
+//  - CRITICAL FIX: Now properly observes bleManager.discoveredDevicesInfo
+//  - Devices discovered via BLE now appear in UI
+//  - Connect button works with proper peripheral references
+//  - Removed local discoveredDevices array in favor of observing bleManager
 //
 
 import SwiftUI
 import CoreBluetooth
 
 struct DevicesView: View {
-    @StateObject private var bleManager = OralableBLE.shared
+    @ObservedObject private var bleManager = OralableBLE.shared
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
     
     @State private var showingSettings = false
     @State private var isScanning = false
     @State private var showingForgetDevice = false
-    @State private var discoveredDevices: [(name: String, peripheral: CBPeripheral, rssi: Int)] = []
+    @State private var lastActionTime: Date = .distantPast
     
     var body: some View {
         NavigationView {
@@ -65,8 +66,7 @@ struct DevicesView: View {
             Text("Are you sure you want to forget this device? You'll need to reconnect it later.")
         }
         .onAppear {
-            // Subscribe to discovered devices from BLE manager
-            setupDiscoveredDevicesObserver()
+            synchronizeScanningState()
         }
     }
     
@@ -127,15 +127,15 @@ struct DevicesView: View {
                     .foregroundColor(designSystem.colors.textSecondary)
             }
             
-            // Available Devices List
-            if !discoveredDevices.isEmpty {
+            // CRITICAL FIX: Now observes bleManager.discoveredDevicesInfo directly
+            if !bleManager.discoveredDevicesInfo.isEmpty {
                 VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
                     Text("AVAILABLE DEVICES")
                         .font(designSystem.typography.caption)
                         .foregroundColor(designSystem.colors.textTertiary)
                         .padding(.top, designSystem.spacing.md)
                     
-                    ForEach(Array(discoveredDevices.enumerated()), id: \.offset) { index, device in
+                    ForEach(bleManager.discoveredDevicesInfo) { deviceInfo in
                         HStack {
                             // Device Icon
                             Image(systemName: "sensor")
@@ -145,19 +145,19 @@ struct DevicesView: View {
                             
                             // Device Info
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(device.name)
+                                Text(deviceInfo.name)
                                     .font(designSystem.typography.body)
                                     .foregroundColor(designSystem.colors.textPrimary)
-                                Text("Signal: \(device.rssi) dBm")
+                                Text("Signal: \(deviceInfo.rssi) dBm")
                                     .font(designSystem.typography.caption)
                                     .foregroundColor(designSystem.colors.textSecondary)
                             }
                             
                             Spacer()
                             
-                            // FIXED: Connect button now actually connects!
+                            // Connect button
                             Button("Connect") {
-                                connectToDevice(peripheral: device.peripheral)
+                                connectToDevice(peripheral: deviceInfo.peripheral)
                             }
                             .font(designSystem.typography.button)
                             .foregroundColor(.white)
@@ -403,6 +403,12 @@ struct DevicesView: View {
                     .font(.system(.caption, design: .monospaced))
                 Text("Services: \(bleManager.discoveredServices.count)")
                     .font(.system(.caption, design: .monospaced))
+                Text("Local Scanning: \(isScanning ? "Yes" : "No")")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Manager Scanning: \(bleManager.isScanning ? "Yes" : "No")")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Discovered: \(bleManager.discoveredDevicesInfo.count) device(s)")
+                    .font(.system(.caption, design: .monospaced))
             }
             .foregroundColor(designSystem.colors.textSecondary)
             .padding(designSystem.spacing.sm)
@@ -447,11 +453,22 @@ struct DevicesView: View {
     
     // MARK: - Actions
     private func primaryAction() {
+        // Debounce: Prevent rapid repeated calls (within 500ms)
+        let now = Date()
+        guard now.timeIntervalSince(lastActionTime) > 0.5 else {
+            print("[DevicesView] Ignoring rapid button press (debounced)")
+            return
+        }
+        lastActionTime = now
+        
         if bleManager.isConnected {
+            print("[DevicesView] Action: Disconnect")
             bleManager.disconnect()
         } else if isScanning {
+            print("[DevicesView] Action: Stop scanning")
             stopScanning()
         } else {
+            print("[DevicesView] Action: Start scanning")
             startScanning()
         }
     }
@@ -459,13 +476,16 @@ struct DevicesView: View {
     private func startScanning() {
         print("[DevicesView] Starting scan...")
         isScanning = true
-        discoveredDevices = []
         bleManager.startScanning()
         
         // Auto-stop after 10 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            if isScanning && !bleManager.isConnected {
-                stopScanning()
+            // Check both local and bleManager state to be safe
+            if self.isScanning || self.bleManager.isScanning {
+                if !self.bleManager.isConnected {
+                    print("[DevicesView] Auto-stopping scan after 10 seconds")
+                    self.stopScanning()
+                }
             }
         }
     }
@@ -474,9 +494,16 @@ struct DevicesView: View {
         print("[DevicesView] Stopping scan...")
         isScanning = false
         bleManager.stopScanning()
+        
+        // Report findings
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if !self.isScanning && !self.bleManager.isScanning {
+                print("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s)")
+            }
+        }
     }
     
-    // FIXED: Now actually connects to the device!
+    // Connect to discovered device
     private func connectToDevice(peripheral: CBPeripheral) {
         print("[DevicesView] Connecting to device: \(peripheral.name ?? "Unknown")")
         stopScanning()
@@ -485,10 +512,10 @@ struct DevicesView: View {
         bleManager.connect(to: peripheral)
     }
     
-    private func setupDiscoveredDevicesObserver() {
-        // This would be better implemented with Combine publishers
-        // For now, we'll rely on BLE manager's internal discovery
-        print("[DevicesView] Setting up device discovery observer")
+    // Synchronize scanning state with bleManager
+    private func synchronizeScanningState() {
+        // Sync local isScanning with bleManager.isScanning
+        isScanning = bleManager.isScanning
     }
     
     private func forgetDevice() {

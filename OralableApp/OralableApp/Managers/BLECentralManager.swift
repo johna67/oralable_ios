@@ -48,11 +48,24 @@ final class BLECentralManager: NSObject {
     
     func startScanning(services: [CBUUID]? = nil) {
         serviceFilter = services
-        guard central.state == .poweredOn else { return }
+        guard central.state == .poweredOn else {
+            print("[BLECentralManager] Cannot start scan - Bluetooth not powered on")
+            return
+        }
+        guard !central.isScanning else {
+            print("[BLECentralManager] Already scanning, ignoring start request")
+            return
+        }
+        print("[BLECentralManager] Starting scan for services: \(services?.map { $0.uuidString } ?? ["all"])")
         central.scanForPeripherals(withServices: services, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
     }
     
     func stopScanning() {
+        guard central.isScanning else {
+            print("[BLECentralManager] Already stopped, ignoring stop request")
+            return
+        }
+        print("[BLECentralManager] Stopping scan")
         central.stopScan()
     }
     
@@ -84,12 +97,8 @@ extension BLECentralManager: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         onBluetoothStateChanged?(central.state)
         
-        // Auto-start scanning if desired when powered on
-        if central.state == .poweredOn, central.isScanning == false {
-            if let services = serviceFilter {
-                startScanning(services: services)
-            }
-        }
+        // FIXED: Removed auto-start logic that was causing scan loops
+        // Scanning should only start when explicitly requested by the app
     }
     
     //
