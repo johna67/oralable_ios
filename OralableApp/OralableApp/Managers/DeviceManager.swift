@@ -176,11 +176,11 @@ class DeviceManager: ObservableObject {
         print("🔍 [DeviceManager] Creating DeviceInfo object...")
         let deviceInfo = DeviceInfo(
             id: peripheral.identifier,
-            type: deviceType,
-            name: name,
             peripheralIdentifier: peripheral.identifier,
-            connectionState: .disconnected,
-            signalStrength: rssi
+            name: name,
+            type: deviceType,
+            signalStrength: rssi,
+            connectionState: .disconnected
         )
         print("🔍 [DeviceManager] ✅ DeviceInfo created")
         
@@ -197,14 +197,10 @@ class DeviceManager: ObservableObject {
         switch deviceType {
         case .oralable:
             print("🔍 [DeviceManager] Creating OralableDevice instance...")
-            device = OralableDevice(peripheral: peripheral, name: name)
+            device = OralableDevice(peripheral: peripheral)
         case .anr:
             print("🔍 [DeviceManager] Creating ANRMuscleSenseDevice instance...")
-            device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
-        case .demo:
-            print("🔍 [DeviceManager] Creating OralableDevice instance (demo mode)...")
-            // Demo devices use the same implementation as Oralable
-            device = OralableDevice(peripheral: peripheral, name: name)
+            device = ANRMuscleSenseDevice(peripheral: peripheral)
         }
         
         print("🔍 [DeviceManager] ✅ Device instance created")
@@ -256,10 +252,10 @@ class DeviceManager: ObservableObject {
         
         // Start device operations
         if let device = devices[peripheral.identifier] {
-            print("✅ [DeviceManager] Starting device data stream...")
+            print("✅ [DeviceManager] Starting device data collection...")
             Task {
-                try? await device.startDataStream()
-                print("✅ [DeviceManager] Data stream started")
+                try? await device.startDataCollection()
+                print("✅ [DeviceManager] Data collection started")
             }
         } else {
             print("⚠️ [DeviceManager] Device not found in devices dictionary!")
@@ -273,7 +269,7 @@ class DeviceManager: ObservableObject {
         
         if let error = error {
             print("🔌 [DeviceManager] Error: \(error.localizedDescription)")
-            lastError = .disconnected
+            lastError = .connectionLost
         }
         
         isConnecting = false
@@ -433,11 +429,11 @@ class DeviceManager: ObservableObject {
         print("🔌 [DeviceManager] Calling bleManager.disconnect()...")
         bleManager?.disconnect(from: peripheral)
         
-        // Stop data stream
-        print("🔌 [DeviceManager] Stopping data stream...")
+        // Stop data collection
+        print("🔌 [DeviceManager] Stopping data collection...")
         Task {
-            await device.stopDataStream()
-            print("🔌 [DeviceManager] Data stream stopped")
+            try? await device.stopDataCollection()
+            print("🔌 [DeviceManager] Data collection stopped")
         }
     }
     
@@ -459,7 +455,7 @@ class DeviceManager: ObservableObject {
         print("📊 [DeviceManager] subscribeToDevice")
         print("📊 [DeviceManager] Device: \(device.deviceInfo.name)")
         
-        device.sensorReadings
+        device.sensorReadingsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] reading in
                 self?.handleSensorReading(reading, from: device)
@@ -474,7 +470,7 @@ class DeviceManager: ObservableObject {
         allSensorReadings.append(reading)
         
         // Update latest readings
-        latestReadings[reading.sensorType] = reading
+        latestReadings[reading.type] = reading
         
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
@@ -482,36 +478,37 @@ class DeviceManager: ObservableObject {
         }
     }
     
-    // MARK: - Data Management
-    
-    /// Clear all sensor readings
-    func clearReadings() {
-        print("\n🗑️ [DeviceManager] clearReadings() called")
-        print("🗑️ [DeviceManager] Clearing \(allSensorReadings.count) sensor readings")
-        print("🗑️ [DeviceManager] Clearing \(latestReadings.count) latest readings")
-        
-        allSensorReadings.removeAll()
-        latestReadings.removeAll()
-        
-        print("🗑️ [DeviceManager] All readings cleared")
-    }
-    
     // MARK: - Device Info Access
     
     func device(withId id: UUID) -> DeviceInfo? {
         return discoveredDevices.first { $0.id == id }
     }
+}
+
+// MARK: - Device Error
+
+enum DeviceError: LocalizedError {
+    case invalidPeripheral
+    case connectionFailed
+    case connectionLost
+    case notConnected
+    case dataCollectionFailed
+    case unknownError(String)
     
-    /// Set the primary device
-    func setPrimaryDevice(_ device: DeviceInfo) {
-        print("\n📱 [DeviceManager] setPrimaryDevice() called")
-        print("📱 [DeviceManager] New primary device: \(device.name)")
-        
-        if let previousPrimary = primaryDevice {
-            print("📱 [DeviceManager] Previous primary: \(previousPrimary.name)")
+    var errorDescription: String? {
+        switch self {
+        case .invalidPeripheral:
+            return "Invalid peripheral"
+        case .connectionFailed:
+            return "Connection failed"
+        case .connectionLost:
+            return "Connection lost"
+        case .notConnected:
+            return "Device not connected"
+        case .dataCollectionFailed:
+            return "Data collection failed"
+        case .unknownError(let message):
+            return message
         }
-        
-        primaryDevice = device
-        print("📱 [DeviceManager] Primary device updated")
     }
 }
