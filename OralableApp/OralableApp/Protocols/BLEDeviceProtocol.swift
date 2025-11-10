@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Created: November 3, 2025
+//  Updated: November 10, 2025 - Consolidated DeviceError enum
 //  Protocol defining interface for all BLE devices
 //
 
@@ -190,16 +191,28 @@ struct DeviceConfiguration {
 
 /// Errors that can occur with BLE devices
 enum DeviceError: LocalizedError {
+    // Connection errors
     case notConnected
     case connectionFailed(String)
     case disconnected
     case invalidPeripheral
+    
+    // BLE characteristic/service errors
     case characteristicNotFound(String)
     case serviceNotFound(String)
+    
+    // Operation errors
     case writeCommandFailed(String)
     case readFailed(String)
     case dataParsingFailed(String)
+    case dataParsingError  // Alias for compatibility
+    
+    // Sensor errors
     case unsupportedSensor(SensorType)
+    case sensorNotAvailable(SensorType)
+    
+    // Other errors
+    case operationNotSupported
     case timeout
     case unknownError(String)
     
@@ -223,8 +236,14 @@ enum DeviceError: LocalizedError {
             return "Failed to read data: \(message)"
         case .dataParsingFailed(let message):
             return "Failed to parse data: \(message)"
+        case .dataParsingError:
+            return "Failed to parse sensor data"
         case .unsupportedSensor(let type):
             return "Sensor not supported: \(type.displayName)"
+        case .sensorNotAvailable(let type):
+            return "\(type.displayName) sensor is not available"
+        case .operationNotSupported:
+            return "Operation not supported"
         case .timeout:
             return "Operation timed out"
         case .unknownError(let message):
@@ -285,7 +304,7 @@ class MockBLEDevice: BLEDeviceProtocol {
     init(type: DeviceType) {
         self.deviceType = type
         self.name = type.displayName
-        self.deviceInfo = DeviceInfo.mock(type: type)
+        self.deviceInfo = DeviceInfo.demo(type: type)
         self.supportedSensors = type.defaultSensors
     }
     

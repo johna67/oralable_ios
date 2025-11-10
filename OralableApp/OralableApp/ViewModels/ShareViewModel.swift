@@ -567,7 +567,7 @@ class MockDeviceManager: DeviceManager {
         super.init()
         
         // Set up a connected mock device state without real BLE
-        let mock = DeviceInfo.mock()
+        let mock = DeviceInfo.demo()
         self.connectedDevices = [mock]
         self.primaryDevice = mock
         self.discoveredDevices = [mock]

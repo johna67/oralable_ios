@@ -102,7 +102,7 @@ class DeviceManager: ObservableObject {
         // Determine device type
         let deviceType = detectDeviceType(from: name, peripheral: peripheral)
         
-        guard deviceType != .unknown else {
+        guard let deviceType = deviceType else {
             print("⚠️ Unknown device type: \(name)")
             return
         }
@@ -112,10 +112,11 @@ class DeviceManager: ObservableObject {
         switch deviceType {
         case .oralable:
             device = OralableDevice(peripheral: peripheral, name: name)
-        case .anrMuscleSense:
+        case .anr:
             device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
-        case .unknown:
-            return
+        case .demo:
+            // For now, treat demo devices as Oralable
+            device = OralableDevice(peripheral: peripheral, name: name)
         }
         
         // Update signal strength
@@ -197,16 +198,18 @@ class DeviceManager: ObservableObject {
         isConnecting = false
     }
     
-    private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType {
+    private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType? {
         let lowercaseName = name.lowercased()
         
         if lowercaseName.contains("oralable") {
             return .oralable
         } else if lowercaseName.contains("anr") || lowercaseName.contains("muscle") {
-            return .anrMuscleSense
+            return .anr
+        } else if lowercaseName.contains("demo") {
+            return .demo
         }
         
-        return .unknown
+        return nil
     }
     
     // MARK: - Device Discovery
@@ -463,7 +466,7 @@ extension DeviceManager {
     
     /// Get ANR device if connected
     var anrDevice: DeviceInfo? {
-        connectedDevice(ofType: .anrMuscleSense)
+        connectedDevice(ofType: .anr)
     }
     
     /// Check if any device is connected
@@ -488,7 +491,7 @@ extension DeviceManager {
     
     /// Get all ANR devices (discovered)
     var anrDevices: [DeviceInfo] {
-        discoveredDevices.filter { $0.type == .anrMuscleSense }
+        discoveredDevices.filter { $0.type == .anr }
     }
 }
 
@@ -507,7 +510,7 @@ extension DeviceManager {
         manager.addDiscoveredDevice(oralableDevice)
         
         // Add mock ANR device
-        let anrDevice = MockBLEDevice(type: .anrMuscleSense)
+        let anrDevice = MockBLEDevice(type: .anr)
         manager.addDiscoveredDevice(anrDevice)
         
         // Simulate some sensor readings
@@ -564,7 +567,7 @@ extension DeviceManager {
     static func mockWithANR() -> DeviceManager {
         let manager = DeviceManager()
         
-        let anrDevice = MockBLEDevice(type: .anrMuscleSense)
+        let anrDevice = MockBLEDevice(type: .anr)
         manager.addDiscoveredDevice(anrDevice)
         
         var connectedInfo = anrDevice.deviceInfo

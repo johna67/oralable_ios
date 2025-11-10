@@ -168,7 +168,7 @@ struct DeviceRowView: View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
             // Device Name and Icon
             HStack {
-                Image(systemName: device.type.iconName)
+                Image(systemName: device.type.icon)
                     .font(.system(size: DesignSystem.Sizing.Icon.lg))
                     .foregroundColor(DesignSystem.Colors.textPrimary)
                 
@@ -185,11 +185,11 @@ struct DeviceRowView: View {
                 Spacer()
                 
                 // Connection Status
-                if device.isConnected {
+                if device.connectionState == .connected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(DesignSystem.Colors.success)
                         .font(.system(size: DesignSystem.Sizing.Icon.lg))
-                } else if device.isConnecting {
+                } else if device.connectionState == .connecting {
                     ProgressView()
                 }
             }
@@ -201,14 +201,14 @@ struct DeviceRowView: View {
                         .font(.system(size: DesignSystem.Sizing.Icon.sm))
                         .foregroundColor(signalColor(for: rssi))
                     
-                    Text("\(device.signalText ?? "Unknown") (\(rssi) dB)")
+                    Text("\(signalText(for: rssi)) (\(rssi) dBm)")
                         .font(DesignSystem.Typography.captionSmall)
                         .foregroundColor(DesignSystem.Colors.textTertiary)
                 }
             }
             
             // Connection Button
-            if !device.isConnected && !device.isConnecting {
+            if device.connectionState != .connected && device.connectionState != .connecting {
                 Button {
                     Task {
                         do {
@@ -230,7 +230,7 @@ struct DeviceRowView: View {
                     .cornerRadius(DesignSystem.CornerRadius.md)
                 }
                 .buttonStyle(.plain)
-            } else if device.isConnected {
+            } else if device.connectionState == .connected {
                 Button {
                     Task {
                         await deviceManager.disconnect(from: device)
@@ -270,6 +270,15 @@ struct DeviceRowView: View {
         default: return DesignSystem.Colors.error
         }
     }
+    
+    private func signalText(for rssi: Int) -> String {
+        switch rssi {
+        case -50...0: return "Excellent"
+        case -70 ..< -50: return "Good"
+        case -85 ..< -70: return "Fair"
+        default: return "Weak"
+        }
+    }
 }
 
 // MARK: - Connected Device Row View
@@ -282,7 +291,7 @@ struct ConnectedDeviceRowView: View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
             // Device Name
             HStack {
-                Image(systemName: device.type.iconName)
+                Image(systemName: device.type.icon)
                     .foregroundColor(DesignSystem.Colors.textPrimary)
                 
                 Text(device.name)
@@ -421,10 +430,11 @@ struct SensorReadingRowView: View {
 
 #Preview("With Mock Data") {
     let mockDeviceManager = DeviceManager()
-    mockDeviceManager.discoveredDevices = [
-        DeviceInfo.mock(type: .oralable),
-        DeviceInfo.mock(type: .anrMuscleSense)
+    let demoDevices: [DeviceInfo] = [
+        DeviceInfo.demo(type: .oralable),
+        DeviceInfo.demo(type: .anr)
     ]
+    mockDeviceManager.discoveredDevices = demoDevices
     
     return DeviceTestView(previewDeviceManager: mockDeviceManager)
 }

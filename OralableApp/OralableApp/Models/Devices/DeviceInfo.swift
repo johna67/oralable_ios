@@ -3,6 +3,8 @@
 //  OralableApp
 //
 //  Created: November 3, 2025
+//  Updated: November 10, 2025 - Fixed Codable conformance and removed duplicate enum
+//  Updated: November 10, 2025 - Now uses DeviceConnectionState (from DeviceType.swift) and SensorType (from SensorType.swift)
 //  Device information model for multi-device support
 //
 
@@ -11,9 +13,7 @@ import CoreBluetooth
 
 /// Complete device information
 struct DeviceInfo: Identifiable, Codable, Equatable {
-    enum ConnectionStatus: String {
-          case disconnected, connecting, connected, disconnecting
-      }
+    
     // MARK: - Properties
     
     /// Unique identifier
@@ -77,78 +77,116 @@ struct DeviceInfo: Identifiable, Codable, Equatable {
         self.supportedSensors = supportedSensors ?? type.defaultSensors
     }
     
-    // MARK: - Computed Properties
+    // MARK: - Codable Implementation
     
-    /// Display name with connection state
-    var statusText: String {
-        "\(name) - \(connectionState.displayName)"
+    enum CodingKeys: String, CodingKey {
+        case id, type, name, peripheralIdentifier
+        case connectionState, batteryLevel, signalStrength
+        case firmwareVersion, hardwareVersion
+        case lastConnected, supportedSensors
     }
     
-    /// Battery level text
-    var batteryText: String? {
-        guard let level = batteryLevel else { return nil }
-        return "\(level)%"
-    }
-    
-    /// Signal strength description
-    var signalText: String? {
-        guard let rssi = signalStrength else { return nil }
-        switch rssi {
-        case -50...0:
-            return "Excellent"
-        case -70 ..< -50:
-            return "Good"
-        case -85 ..< -70:
-            return "Fair"
-        default:
-            return "Poor"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        type = try container.decode(DeviceType.self, forKey: .type)
+        name = try container.decode(String.self, forKey: .name)
+        
+        // Handle optional UUID specially
+        if let uuidString = try container.decodeIfPresent(String.self, forKey: .peripheralIdentifier) {
+            peripheralIdentifier = UUID(uuidString: uuidString)
+        } else {
+            peripheralIdentifier = nil
         }
+        
+        connectionState = try container.decode(DeviceConnectionState.self, forKey: .connectionState)
+        batteryLevel = try container.decodeIfPresent(Int.self, forKey: .batteryLevel)
+        signalStrength = try container.decodeIfPresent(Int.self, forKey: .signalStrength)
+        firmwareVersion = try container.decodeIfPresent(String.self, forKey: .firmwareVersion)
+        hardwareVersion = try container.decodeIfPresent(String.self, forKey: .hardwareVersion)
+        lastConnected = try container.decodeIfPresent(Date.self, forKey: .lastConnected)
+        supportedSensors = try container.decode([SensorType].self, forKey: .supportedSensors)
     }
     
-    /// Whether device is currently connected
-    var isConnected: Bool {
-        connectionState == .connected
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(type, forKey: .type)
+        try container.encode(name, forKey: .name)
+        try container.encode(peripheralIdentifier?.uuidString, forKey: .peripheralIdentifier)
+        try container.encode(connectionState, forKey: .connectionState)
+        try container.encodeIfPresent(batteryLevel, forKey: .batteryLevel)
+        try container.encodeIfPresent(signalStrength, forKey: .signalStrength)
+        try container.encodeIfPresent(firmwareVersion, forKey: .firmwareVersion)
+        try container.encodeIfPresent(hardwareVersion, forKey: .hardwareVersion)
+        try container.encodeIfPresent(lastConnected, forKey: .lastConnected)
+        try container.encode(supportedSensors, forKey: .supportedSensors)
     }
     
-    /// Whether device is connecting
-    var isConnecting: Bool {
-        connectionState == .connecting
-    }
+    // MARK: - Equatable
     
-    // MARK: - Static Helpers
-    
-    /// Create a mock device for testing
-    static func mock(type: DeviceType = .oralable) -> DeviceInfo {
-        DeviceInfo(
-            type: type,
-            name: type == .oralable ? "Oralable-001" : "ANR-MS-001",
-            peripheralIdentifier: UUID(),
-            connectionState: .connected,
-            batteryLevel: 85,
-            signalStrength: -55,
-            firmwareVersion: "1.2.3",
-            hardwareVersion: "2.0",
-            lastConnected: Date()
-        )
+    static func == (lhs: DeviceInfo, rhs: DeviceInfo) -> Bool {
+        lhs.id == rhs.id
     }
 }
 
-// MARK: - Array Extension
+// MARK: - Helper Methods
+
+extension DeviceInfo {
+    
+    /// Whether the device is currently active
+    var isActive: Bool {
+        connectionState == .connected || connectionState == .connecting
+    }
+    
+    /// Create demo device for testing
+    static func demo(type: DeviceType = .oralable) -> DeviceInfo {
+        DeviceInfo(
+            type: type,
+            name: "\(type.displayName) Demo",
+            connectionState: .connected,
+            batteryLevel: 85,
+            signalStrength: -45,
+            firmwareVersion: "1.0.0",
+            hardwareVersion: "Rev A"
+        )
+    }
+    
+    /// Update connection state
+    mutating func updateConnectionState(_ state: DeviceConnectionState) {
+        connectionState = state
+        if state == .connected {
+            lastConnected = Date()
+        }
+    }
+    
+    /// Update battery level
+    mutating func updateBatteryLevel(_ level: Int) {
+        batteryLevel = max(0, min(100, level))
+    }
+    
+    /// Update signal strength
+    mutating func updateSignalStrength(_ rssi: Int) {
+        signalStrength = rssi
+    }
+}
+
+// MARK: - Collection Extension
 
 extension Array where Element == DeviceInfo {
     
-    /// Get connected devices
+    /// Filter connected devices
     var connected: [DeviceInfo] {
-        self.filter { $0.isConnected }
+        filter { $0.connectionState == .connected }
     }
     
-    /// Get devices by type
-    func devices(ofType type: DeviceType) -> [DeviceInfo] {
-        self.filter { $0.type == type }
+    /// Filter by device type
+    func ofType(_ type: DeviceType) -> [DeviceInfo] {
+        filter { $0.type == type }
     }
     
     /// Find device by peripheral identifier
-    func device(withPeripheralId peripheralId: UUID) -> DeviceInfo? {
-        self.first { $0.peripheralIdentifier == peripheralId }
+    func device(withPeripheralId id: UUID) -> DeviceInfo? {
+        first { $0.peripheralIdentifier == id }
     }
 }
