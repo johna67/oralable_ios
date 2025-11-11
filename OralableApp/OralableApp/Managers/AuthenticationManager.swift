@@ -75,12 +75,10 @@ class AuthenticationManager: NSObject, ObservableObject {
                 let email = appleIDCredential.email
                 let fullName = appleIDCredential.fullName
                 
-                print("🔐 Apple ID Sign In:")
-                print("  User ID: \(userID)")
-                print("  Email: \(email?.description ?? "nil")")
-                print("  Full Name: \(fullName?.description ?? "nil")")
-                print("  Given Name: \(fullName?.givenName ?? "nil")")
-                print("  Family Name: \(fullName?.familyName ?? "nil")")
+                Task { @MainActor in
+                    Logger.shared.info("Apple ID Sign In - User ID: \(userID)")
+                    Logger.shared.debug("Email: \(email?.description ?? "nil"), Full Name: \(fullName?.description ?? "nil")")
+                }
 
                 // Prepare values to save
                 var emailToSave: String? = nil
@@ -89,11 +87,15 @@ class AuthenticationManager: NSObject, ObservableObject {
                 // Handle email (only provided on first sign-in)
                 if let email = email, !email.isEmpty {
                     emailToSave = email
-                    print("✅ Email received: \(email)")
+                    Task { @MainActor in
+                        Logger.shared.info("Email received: \(email)")
+                    }
                 } else {
                     // Load existing email from Keychain for subsequent sign-ins
                     emailToSave = KeychainManager.shared.retrieve(forKey: .userEmail)
-                    print("⚠️ Email not provided (loading from Keychain)")
+                    Task { @MainActor in
+                        Logger.shared.debug("Email not provided, loading from Keychain")
+                    }
                 }
 
                 // Handle full name (only provided on first sign-in)
@@ -106,11 +108,15 @@ class AuthenticationManager: NSObject, ObservableObject {
                         .joined(separator: " ")
 
                     fullNameToSave = displayName
-                    print("✅ Full name received: \(displayName)")
+                    Task { @MainActor in
+                        Logger.shared.info("Full name received: \(displayName)")
+                    }
                 } else {
                     // Load existing full name from Keychain for subsequent sign-ins
                     fullNameToSave = KeychainManager.shared.retrieve(forKey: .userFullName)
-                    print("⚠️ Full name not provided (loading from Keychain)")
+                    Task { @MainActor in
+                        Logger.shared.debug("Full name not provided, loading from Keychain")
+                    }
                 }
 
                 // Save to Keychain securely
@@ -128,14 +134,16 @@ class AuthenticationManager: NSObject, ObservableObject {
                     self.isAuthenticated = true
                     self.authenticationError = nil
 
-                    print("📱 Updated properties:")
-                    print("  Published email: \(self.userEmail ?? "nil")")
-                    print("  Published name: \(self.userFullName ?? "nil")")
+                    Task { @MainActor in
+                        Logger.shared.info("Authentication successful - Email: \(self.userEmail ?? "nil"), Name: \(self.userFullName ?? "nil")")
+                    }
                 }
             }
             
         case .failure(let error):
-            print("❌ Apple ID Sign In failed: \(error.localizedDescription)")
+            Task { @MainActor in
+                Logger.shared.error("Apple ID Sign In failed: \(error.localizedDescription)")
+            }
             DispatchQueue.main.async {
                 self.authenticationError = error.localizedDescription
                 self.isAuthenticated = false
@@ -159,35 +167,33 @@ class AuthenticationManager: NSObject, ObservableObject {
     
     /// Debug method to print current authentication state
     func debugAuthState() {
-        print("🔍 Current Authentication State:")
-        print("  isAuthenticated: \(isAuthenticated)")
-        print("  userID: \(userID ?? "nil")")
-        print("  userEmail: \(userEmail ?? "nil")")
-        print("  userFullName: \(userFullName ?? "nil")")
-        print("  userInitials: \(userInitials)")
-        print("  displayName: \(displayName)")
-        print("  hasCompleteProfile: \(hasCompleteProfile)")
+        Task { @MainActor in
+            Logger.shared.debug("Authentication State - isAuthenticated: \(self.isAuthenticated), userID: \(self.userID ?? "nil")")
+            Logger.shared.debug("User Info - Email: \(self.userEmail ?? "nil"), Name: \(self.userFullName ?? "nil")")
+            Logger.shared.debug("Display - Initials: \(self.userInitials), DisplayName: \(self.displayName), Complete: \(self.hasCompleteProfile)")
 
-        print("\n🔐 Keychain Storage:")
-        let auth = KeychainManager.shared.retrieveUserAuthentication()
-        print("  userID: \(auth.userID ?? "nil")")
-        print("  userEmail: \(auth.email ?? "nil")")
-        print("  userFullName: \(auth.fullName ?? "nil")")
+            let auth = KeychainManager.shared.retrieveUserAuthentication()
+            Logger.shared.debug("Keychain Storage - userID: \(auth.userID ?? "nil"), email: \(auth.email ?? "nil"), name: \(auth.fullName ?? "nil")")
+        }
     }
-    
+
     /// Reset Apple ID authentication (for testing - forces fresh sign-in)
     func resetAppleIDAuth() {
-        print("🔄 Resetting Apple ID authentication...")
+        Task { @MainActor in
+            Logger.shared.info("Resetting Apple ID authentication")
+        }
         signOut()
         // Note: To get fresh Apple ID data, user needs to:
         // 1. Go to Settings > Apple ID > Sign-In & Security > Apps Using Apple ID
         // 2. Find your app and tap "Stop Using Apple ID"
         // 3. Then sign in again to get fresh data
     }
-    
+
     /// Force refresh from Keychain (useful after app updates)
     func refreshFromStorage() {
-        print("🔄 Refreshing from Keychain...")
+        Task { @MainActor in
+            Logger.shared.info("Refreshing authentication state from Keychain")
+        }
 
         DispatchQueue.main.async {
             let auth = KeychainManager.shared.retrieveUserAuthentication()
@@ -196,7 +202,9 @@ class AuthenticationManager: NSObject, ObservableObject {
             self.userFullName = auth.fullName
             self.isAuthenticated = self.userID != nil
 
-            print("✅ Refreshed authentication state")
+            Task { @MainActor in
+                Logger.shared.info("Refreshed authentication state successfully")
+            }
             self.debugAuthState()
         }
     }
