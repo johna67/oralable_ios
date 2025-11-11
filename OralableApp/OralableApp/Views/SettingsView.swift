@@ -52,10 +52,12 @@ struct SettingsShareView: View {
                     NavigationLink {
                         PPGChannelOrderView(selectedOrder: $viewModel.ppgChannelOrder)
                     } label: {
-                        InfoRowView(
-                            label: "PPG Channel Order",
-                            value: viewModel.ppgChannelOrder.displayName
-                        )
+                        HStack {
+                            Text("PPG Channel Order")
+                            Spacer()
+                            Text(viewModel.ppgChannelOrder.displayName)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
                     }
 
                     // Auto-connect
@@ -372,8 +374,8 @@ struct SettingsShareView: View {
 
                 // About Section
                 Section {
-                    InfoRowView(label: "Version", value: viewModel.appVersion)
-                    InfoRowView(label: "Build", value: viewModel.buildNumber)
+                    InfoRowView(icon: "info.circle", title: "Version", value: viewModel.appVersion)
+                    InfoRowView(icon: "number", title: "Build", value: viewModel.buildNumber)
 
                     Button {
                         viewModel.showResetConfirmation = true
