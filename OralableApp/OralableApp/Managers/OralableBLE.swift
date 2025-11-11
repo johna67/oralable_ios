@@ -153,7 +153,7 @@ class OralableBLE: ObservableObject {
         deviceManager.$primaryDevice.map { $0?.name ?? "No Device" }.assign(to: &$deviceName)
         
         // CRITICAL FIX: Bind discovered devices with full info
-        deviceManager.$discoveredDevices
+     /*   deviceManager.$discoveredDevices
             .sink { [weak self] deviceInfos in
                 guard let self = self else { return }
                 
@@ -184,7 +184,7 @@ class OralableBLE: ObservableObject {
                     print("[OralableBLE] Total discovered devices: \(deviceInfos.count)")
                 }
             }
-            .store(in: &cancellables)
+            .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
             .sink { [weak self] readings in
