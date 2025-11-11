@@ -76,7 +76,15 @@ class SettingsViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    
+
+    // Convenience initializer that uses shared instance
+    init() {
+        self.bleManager = OralableBLE.shared
+        loadSettings()
+        setupBindings()
+    }
+
+    // Full initializer for testing/injection
     init(bleManager: OralableBLE) {
         self.bleManager = bleManager
         loadSettings()
