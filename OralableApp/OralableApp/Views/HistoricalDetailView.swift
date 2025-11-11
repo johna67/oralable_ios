@@ -950,7 +950,7 @@ struct HistoricalDetailView: View {
                         }
                     }
                     .padding(DesignSystem.Layout.edgePadding)
-                    .frame(maxWidth: DesignSystem.Layout.contentWidth(for: geometry))
+                    .frame(maxWidth: DesignSystem.Layout.contentWidth)
                     .frame(maxWidth: .infinity) // Center the content
                 }
             }

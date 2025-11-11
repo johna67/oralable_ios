@@ -6,11 +6,17 @@
 //
 
 import Foundation
+import SwiftUI
 import Combine
 
 /// View model for the Share screen using modern architecture
 @MainActor
 class ShareViewModel: ObservableObject {
+    enum ExportFormat: String, CaseIterable {
+        case csv = "CSV"
+        case pdf = "PDF"
+        case json = "JSON"
+    }
     
     // MARK: - Published Properties
     
@@ -28,6 +34,38 @@ class ShareViewModel: ObservableObject {
     @Published var exportProgress: Double = 0.0
     @Published var importResult: CSVImportResult?
     @Published var showImportResults: Bool = false
+    
+    // Export configuration
+    @Published var startDate: Date = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+    @Published var endDate: Date = Date()
+    @Published var selectedFormat: ExportFormat = .csv
+    @Published var quickExportOption: QuickExportOption = .thisWeek
+    
+    // Data type selections
+    @Published var includeHeartRate: Bool = true
+    @Published var includeSpO2: Bool = true
+    @Published var includeTemperature: Bool = true
+    @Published var includeAccelerometer: Bool = true
+    @Published var includeNotes: Bool = true
+    
+    // Export results
+    @Published var exportedFileURL: URL?
+    @Published var showExportSuccess: Bool = false
+    @Published var showError: Bool = false
+    
+    // Data counts
+    @Published var heartRateDataCount: Int = 0
+    @Published var spo2DataCount: Int = 0
+    @Published var temperatureDataCount: Int = 0
+    @Published var accelerometerDataCount: Int = 0
+    @Published var notesCount: Int = 0
+    
+    enum QuickExportOption {
+        case today
+        case thisWeek
+        case thisMonth
+        case custom
+    }
     
     // MARK: - Dependencies
     
@@ -308,6 +346,146 @@ class ShareViewModel: ObservableObject {
         NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
         #endif
     }
+    
+    // MARK: - Export Configuration Methods
+    
+    func selectQuickExport(_ option: QuickExportOption) {
+        quickExportOption = option
+        let calendar = Calendar.current
+        let now = Date()
+        
+        switch option {
+        case .today:
+            startDate = calendar.startOfDay(for: now)
+            endDate = now
+        case .thisWeek:
+            let weekStart = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))
+            startDate = weekStart ?? calendar.date(byAdding: .day, value: -7, to: now) ?? now
+            endDate = now
+        case .thisMonth:
+            let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now))
+            startDate = monthStart ?? calendar.date(byAdding: .month, value: -1, to: now) ?? now
+            endDate = now
+        case .custom:
+            // User will set dates manually
+            break
+        }
+        
+        // Update data counts
+        Task {
+            await updateDataCounts()
+        }
+    }
+    
+    func selectAllDataTypes() {
+        includeHeartRate = true
+        includeSpO2 = true
+        includeTemperature = true
+        includeAccelerometer = true
+        includeNotes = true
+    }
+    
+    func deselectAllDataTypes() {
+        includeHeartRate = false
+        includeSpO2 = false
+        includeTemperature = false
+        includeAccelerometer = false
+        includeNotes = false
+    }
+    
+    func dismissError() {
+        showError = false
+        errorMessage = nil
+    }
+    
+    private func updateDataCounts() async {
+        do {
+            // In a real implementation, query the repository for counts
+            // For now, using mock data
+            await MainActor.run {
+                heartRateDataCount = 150
+                spo2DataCount = 120
+                temperatureDataCount = 100
+                accelerometerDataCount = 500
+                notesCount = 5
+            }
+        }
+    }
+    
+    var dateRangeDays: Int {
+        let components = Calendar.current.dateComponents([.day], from: startDate, to: endDate)
+        return max(1, components.day ?? 1)
+    }
+    
+    var hasDataToExport: Bool {
+        includeHeartRate || includeSpO2 || includeTemperature || includeAccelerometer || includeNotes
+    }
+    
+    var exportFileName: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: Date())
+        return "Oralable_Export_\(dateString).\(selectedFormat.fileExtension)"
+    }
+    
+    var estimatedFileSize: String {
+        let totalPoints = heartRateDataCount + spo2DataCount + temperatureDataCount + accelerometerDataCount
+        let estimatedBytes = totalPoints * 50 // Rough estimate
+        return ByteCountFormatter.string(fromByteCount: Int64(estimatedBytes), countStyle: .file)
+    }
+    
+    var totalDataPointsText: String {
+        let total = (includeHeartRate ? heartRateDataCount : 0) +
+                    (includeSpO2 ? spo2DataCount : 0) +
+                    (includeTemperature ? temperatureDataCount : 0) +
+                    (includeAccelerometer ? accelerometerDataCount : 0) +
+                    (includeNotes ? notesCount : 0)
+        return "\(total) data points"
+    }
+}
+
+// MARK: - Export Format Extension
+
+extension ShareViewModel.ExportFormat {
+    var fileExtension: String {
+        switch self {
+        case .csv: return "csv"
+        case .json: return "json"
+        case .pdf: return "pdf"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .csv: return "tablecells"
+        case .json: return "curlybraces"
+        case .pdf: return "doc.text"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .csv: return .green
+        case .json: return .blue
+        case .pdf: return .red
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .csv: return "CSV"
+        case .json: return "JSON"
+        case .pdf: return "PDF Report"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .csv: return "Spreadsheet format, compatible with Excel"
+        case .json: return "Structured data format for developers"
+        case .pdf: return "Visual report with charts and summaries"
+        }
+    }
 }
 
 // MARK: - Computed Properties
@@ -389,7 +567,7 @@ class MockDeviceManager: DeviceManager {
         super.init()
         
         // Set up a connected mock device state without real BLE
-        let mock = DeviceInfo.mock()
+        let mock = DeviceInfo.demo()
         self.connectedDevices = [mock]
         self.primaryDevice = mock
         self.discoveredDevices = [mock]

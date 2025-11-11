@@ -18,11 +18,20 @@ import SwiftUI
 import Charts
 
 struct HistoricalView: View {
-    @StateObject private var viewModel = HistoricalViewModel()
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var historicalDataManager: HistoricalDataManager
+    @EnvironmentObject var bleManager: OralableBLE
+    @StateObject private var viewModel: HistoricalViewModel
     @State private var selectedDataPoint: HistoricalDataPoint?
     @State private var showingExportSheet = false
     @State private var showingDatePicker = false
+    
+    init() {
+        // Initialize the view model with the required dependency
+        // Note: We can't access @EnvironmentObject in init, so we use a workaround
+        let manager = HistoricalDataManager.shared
+        _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
+    }
     
     var body: some View {
         NavigationView {
@@ -77,16 +86,6 @@ struct HistoricalView: View {
                                 systemImage: "chart.bar.doc.horizontal"
                             )
                         }
-                        
-                        if viewModel.isAutoUpdateEnabled {
-                            Button(action: { viewModel.stopAutoUpdate() }) {
-                                Label("Stop Auto-Update", systemImage: "pause.circle")
-                            }
-                        } else {
-                            Button(action: { viewModel.startAutoUpdate() }) {
-                                Label("Start Auto-Update", systemImage: "play.circle")
-                            }
-                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .foregroundColor(designSystem.colors.textPrimary)
@@ -101,7 +100,7 @@ struct HistoricalView: View {
             viewModel.updateAllMetrics()
         }
         .sheet(isPresented: $showingExportSheet) {
-            ShareView()
+            ShareView(ble: bleManager)
         }
         .sheet(item: $selectedDataPoint) { dataPoint in
             DataPointDetailView(dataPoint: dataPoint, viewModel: viewModel)
@@ -113,9 +112,9 @@ struct HistoricalView: View {
     private var timeRangeSelector: some View {
         VStack(spacing: designSystem.spacing.sm) {
             Picker("Time Range", selection: $viewModel.selectedTimeRange) {
-                Text("Day").tag(HistoricalViewModel.TimeRange.day)
-                Text("Week").tag(HistoricalViewModel.TimeRange.week)
-                Text("Month").tag(HistoricalViewModel.TimeRange.month)
+                Text("Day").tag(TimeRange.day)
+                Text("Week").tag(TimeRange.week)
+                Text("Month").tag(TimeRange.month)
             }
             .pickerStyle(SegmentedPickerStyle())
             .onChange(of: viewModel.selectedTimeRange) { _ in
@@ -160,11 +159,9 @@ struct HistoricalView: View {
                     .font(designSystem.typography.body)
                     .foregroundColor(designSystem.colors.textPrimary)
                 
-                if let lastUpdate = viewModel.lastUpdateText {
-                    Text("Updated \(lastUpdate)")
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                }
+                Text("Updated \(viewModel.lastUpdateText)")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
             }
             
             Spacer()
@@ -188,62 +185,62 @@ struct HistoricalView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
                 // Heart Rate
                 MetricCard(
+                    icon: "heart.fill",
                     title: "Avg Heart Rate",
                     value: viewModel.averageHeartRateText,
                     unit: "BPM",
-                    icon: "heart.fill",
                     color: .red,
-                    trend: viewModel.heartRateTrendText
+                    designSystem: designSystem
                 )
                 
                 // SpO2
                 MetricCard(
+                    icon: "lungs.fill",
                     title: "Avg SpO2",
                     value: viewModel.averageSpO2Text,
                     unit: "%",
-                    icon: "lungs.fill",
                     color: .blue,
-                    trend: viewModel.spo2TrendText
+                    designSystem: designSystem
                 )
                 
                 // Temperature
                 MetricCard(
+                    icon: "thermometer",
                     title: "Avg Temperature",
                     value: viewModel.averageTemperatureText,
                     unit: "°C",
-                    icon: "thermometer",
                     color: .orange,
-                    trend: viewModel.temperatureTrendText
+                    designSystem: designSystem
                 )
                 
                 // Activity
                 MetricCard(
+                    icon: "figure.walk",
                     title: "Active Time",
                     value: viewModel.activeTimeText,
                     unit: "",
-                    icon: "figure.walk",
                     color: .green,
-                    trend: viewModel.activityTrendText
+                    designSystem: designSystem
                 )
                 
                 // Battery Usage
                 MetricCard(
+                    icon: "battery.75",
                     title: "Avg Battery",
                     value: viewModel.averageBatteryText,
                     unit: "%",
-                    icon: "battery.75",
                     color: .yellow,
-                    trend: viewModel.batteryTrendText
+                    designSystem: designSystem
                 )
                 
                 // Data Points
                 MetricCard(
+                    icon: "circle.grid.3x3.fill",
                     title: "Data Points",
                     value: viewModel.dataPointsCountText,
                     unit: "",
-                    icon: "circle.grid.3x3.fill",
                     color: .purple,
-                    trend: nil
+                    designSystem: designSystem
                 )
             }
         }
@@ -339,13 +336,14 @@ struct HistoricalView: View {
                 }
                 .onTapGesture { location in
                     // Handle tap to show data point details
-                    if let dataPoint = findNearestDataPoint(at: location, in: data) {
-                        selectedDataPoint = HistoricalDataPoint(
-                            timestamp: dataPoint.timestamp,
-                            heartRate: title == "Heart Rate" ? Int(dataPoint.value) : nil,
-                            spo2: title == "SpO2" ? Int(dataPoint.value) : nil,
-                            temperature: title == "Temperature" ? dataPoint.value : nil
-                        )
+                    if let nearestPoint = findNearestDataPoint(at: location, in: data),
+                       let metrics = viewModel.currentMetrics {
+                        // Find the corresponding full data point
+                        if let fullDataPoint = metrics.dataPoints.first(where: { 
+                            abs($0.timestamp.timeIntervalSince(nearestPoint.timestamp)) < 60 
+                        }) {
+                            selectedDataPoint = fullDataPoint
+                        }
                     }
                 }
             }
@@ -500,14 +498,6 @@ struct StatsRow: View {
     }
 }
 
-// MARK: - Chart Data Point
-
-struct ChartDataPoint: Identifiable {
-    let id = UUID()
-    let timestamp: Date
-    let value: Double
-}
-
 // MARK: - Data Point Detail View
 
 struct DataPointDetailView: View {
@@ -521,36 +511,70 @@ struct DataPointDetailView: View {
         NavigationView {
             List {
                 Section("Timestamp") {
-                    InfoRowView(
-                        label: "Date",
-                        value: dataPoint.timestamp.formatted(date: .abbreviated, time: .omitted)
-                    )
-                    InfoRowView(
-                        label: "Time",
-                        value: dataPoint.timestamp.formatted(date: .omitted, time: .standard)
-                    )
+                    HStack {
+                        Text("Date")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Spacer()
+                        Text(dataPoint.timestamp.formatted(date: .abbreviated, time: .omitted))
+                            .foregroundColor(designSystem.colors.textPrimary)
+                    }
+                    HStack {
+                        Text("Time")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Spacer()
+                        Text(dataPoint.timestamp.formatted(date: .omitted, time: .standard))
+                            .foregroundColor(designSystem.colors.textPrimary)
+                    }
                 }
                 
                 Section("Metrics") {
-                    if let heartRate = dataPoint.heartRate {
-                        InfoRowView(label: "Heart Rate", value: "\(heartRate) BPM")
+                    if let heartRate = dataPoint.averageHeartRate {
+                        HStack {
+                            Text("Heart Rate")
+                                .foregroundColor(designSystem.colors.textSecondary)
+                            Spacer()
+                            Text("\(Int(heartRate)) BPM")
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
                     }
-                    if let spo2 = dataPoint.spo2 {
-                        InfoRowView(label: "SpO2", value: "\(spo2)%")
+                    if let spo2 = dataPoint.averageSpO2 {
+                        HStack {
+                            Text("SpO2")
+                                .foregroundColor(designSystem.colors.textSecondary)
+                            Spacer()
+                            Text("\(Int(spo2))%")
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
                     }
-                    if let temperature = dataPoint.temperature {
-                        InfoRowView(label: "Temperature", value: String(format: "%.1f°C", temperature))
-                    }
-                    if let batteryLevel = dataPoint.batteryLevel {
-                        InfoRowView(label: "Battery", value: "\(batteryLevel)%")
-                    }
-                }
-                
-                if let notes = dataPoint.notes {
-                    Section("Notes") {
-                        Text(notes)
-                            .font(designSystem.typography.body)
+                    HStack {
+                        Text("Temperature")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Spacer()
+                        Text(String(format: "%.1f°C", dataPoint.averageTemperature))
                             .foregroundColor(designSystem.colors.textPrimary)
+                    }
+                    HStack {
+                        Text("Battery")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Spacer()
+                        Text("\(dataPoint.averageBattery)%")
+                            .foregroundColor(designSystem.colors.textPrimary)
+                    }
+                    HStack {
+                        Text("Movement Intensity")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Spacer()
+                        Text(String(format: "%.2f", dataPoint.movementIntensity))
+                            .foregroundColor(designSystem.colors.textPrimary)
+                    }
+                    if let grindingEvents = dataPoint.grindingEvents {
+                        HStack {
+                            Text("Grinding Events")
+                                .foregroundColor(designSystem.colors.textSecondary)
+                            Spacer()
+                            Text("\(grindingEvents)")
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
                     }
                 }
             }

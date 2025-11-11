@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Created: November 3, 2025
+//  Updated: November 10, 2025 - Consolidated DeviceError enum
 //  Protocol defining interface for all BLE devices
 //
 
@@ -54,6 +55,9 @@ protocol BLEDeviceProtocol: AnyObject {
     /// Publisher for sensor readings
     var sensorReadings: AnyPublisher<SensorReading, Never> { get }
     
+    /// Publisher for sensor readings (legacy compatibility)
+    var sensorReadingsPublisher: AnyPublisher<SensorReading, Never> { get }
+    
     /// Latest readings by sensor type
     var latestReadings: [SensorType: SensorReading] { get }
     
@@ -76,8 +80,14 @@ protocol BLEDeviceProtocol: AnyObject {
     /// Start streaming sensor data
     func startDataStream() async throws
     
+    /// Start data collection (legacy compatibility)
+    func startDataCollection() async throws
+    
     /// Stop streaming sensor data
     func stopDataStream() async
+    
+    /// Stop data collection (legacy compatibility)
+    func stopDataCollection() async
     
     /// Request current sensor reading
     func requestReading(for sensorType: SensorType) async throws -> SensorReading?
@@ -186,53 +196,6 @@ struct DeviceConfiguration {
     )
 }
 
-// MARK: - Device Error
-
-/// Errors that can occur with BLE devices
-enum DeviceError: LocalizedError {
-    case notConnected
-    case connectionFailed(String)
-    case disconnected
-    case invalidPeripheral
-    case characteristicNotFound(String)
-    case serviceNotFound(String)
-    case writeCommandFailed(String)
-    case readFailed(String)
-    case dataParsingFailed(String)
-    case unsupportedSensor(SensorType)
-    case timeout
-    case unknownError(String)
-    
-    var errorDescription: String? {
-        switch self {
-        case .notConnected:
-            return "Device is not connected"
-        case .connectionFailed(let message):
-            return "Connection failed: \(message)"
-        case .disconnected:
-            return "Device disconnected unexpectedly"
-        case .invalidPeripheral:
-            return "Invalid BLE peripheral"
-        case .characteristicNotFound(let uuid):
-            return "Characteristic not found: \(uuid)"
-        case .serviceNotFound(let uuid):
-            return "Service not found: \(uuid)"
-        case .writeCommandFailed(let message):
-            return "Failed to write command: \(message)"
-        case .readFailed(let message):
-            return "Failed to read data: \(message)"
-        case .dataParsingFailed(let message):
-            return "Failed to parse data: \(message)"
-        case .unsupportedSensor(let type):
-            return "Sensor not supported: \(type.displayName)"
-        case .timeout:
-            return "Operation timed out"
-        case .unknownError(let message):
-            return "Unknown error: \(message)"
-        }
-    }
-}
-
 // MARK: - Protocol Extension (Default Implementations)
 
 extension BLEDeviceProtocol {
@@ -250,6 +213,21 @@ extension BLEDeviceProtocol {
     /// Check if device is streaming data
     var isStreaming: Bool {
         isConnected && connectionState == .connected
+    }
+    
+    /// Default implementation for sensorReadingsPublisher (legacy compatibility)
+    var sensorReadingsPublisher: AnyPublisher<SensorReading, Never> {
+        sensorReadings
+    }
+    
+    /// Default implementation for startDataCollection (legacy compatibility)
+    func startDataCollection() async throws {
+        try await startDataStream()
+    }
+    
+    /// Default implementation for stopDataCollection (legacy compatibility)
+    func stopDataCollection() async {
+        await stopDataStream()
     }
 }
 
@@ -285,7 +263,7 @@ class MockBLEDevice: BLEDeviceProtocol {
     init(type: DeviceType) {
         self.deviceType = type
         self.name = type.displayName
-        self.deviceInfo = DeviceInfo.mock(type: type)
+        self.deviceInfo = DeviceInfo.demo(type: type)
         self.supportedSensors = type.defaultSensors
     }
     

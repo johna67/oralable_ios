@@ -45,6 +45,9 @@ class HistoricalViewModel: ObservableObject {
     /// Selected data point for detail view
     @Published var selectedDataPoint: HistoricalDataPoint?
     
+    /// Current offset from present time (0 = current period, -1 = previous period, etc.)
+    @Published var timeRangeOffset: Int = 0
+    
     // MARK: - Private Properties
     
     private let historicalDataManager: HistoricalDataManager
@@ -62,6 +65,11 @@ class HistoricalViewModel: ObservableObject {
         currentMetrics != nil
     }
     
+    /// Whether the selected time range is the current period (today/this week/this month)
+    var isCurrentTimeRange: Bool {
+        timeRangeOffset == 0
+    }
+    
     /// Total samples for current range
     var totalSamples: Int {
         currentMetrics?.totalSamples ?? 0
@@ -74,7 +82,29 @@ class HistoricalViewModel: ObservableObject {
     
     /// Time range display text
     var timeRangeText: String {
-        selectedTimeRange.rawValue
+        if timeRangeOffset == 0 {
+            switch selectedTimeRange {
+            case .hour: return "This Hour"
+            case .day: return "Today"
+            case .week: return "This Week"
+            case .month: return "This Month"
+            }
+        } else if timeRangeOffset == -1 {
+            switch selectedTimeRange {
+            case .hour: return "Last Hour"
+            case .day: return "Yesterday"
+            case .week: return "Last Week"
+            case .month: return "Last Month"
+            }
+        } else {
+            let absoluteOffset = abs(timeRangeOffset)
+            switch selectedTimeRange {
+            case .hour: return "\(absoluteOffset) Hours Ago"
+            case .day: return "\(absoluteOffset) Days Ago"
+            case .week: return "\(absoluteOffset) Weeks Ago"
+            case .month: return "\(absoluteOffset) Months Ago"
+            }
+        }
     }
     
     /// Date range text for display
@@ -93,22 +123,89 @@ class HistoricalViewModel: ObservableObject {
         return "\(start) - \(end)"
     }
     
+    // MARK: - Metric Text Properties
+    
+    /// Average heart rate text
+    var averageHeartRateText: String {
+        guard let metrics = currentMetrics else { return "--" }
+        let avgHR = metrics.dataPoints.compactMap { $0.averageHeartRate }.reduce(0, +) / Double(max(metrics.dataPoints.count, 1))
+        return avgHR > 0 ? String(format: "%.0f", avgHR) : "--"
+    }
+    
+    /// Average SpO2 text
+    var averageSpO2Text: String {
+        guard let metrics = currentMetrics else { return "--" }
+        let avgSpO2 = metrics.dataPoints.compactMap { $0.averageSpO2 }.reduce(0, +) / Double(max(metrics.dataPoints.count, 1))
+        return avgSpO2 > 0 ? String(format: "%.0f", avgSpO2) : "--"
+    }
+    
     /// Average temperature text
     var averageTemperatureText: String {
         guard let metrics = currentMetrics else { return "--" }
-        return String(format: "%.1f°C", metrics.avgTemperature)
+        return String(format: "%.1f", metrics.avgTemperature)
     }
     
     /// Average battery text
     var averageBatteryText: String {
         guard let metrics = currentMetrics else { return "--" }
-        return String(format: "%.0f%%", metrics.avgBatteryLevel)
+        return String(format: "%.0f", metrics.avgBatteryLevel)
+    }
+    
+    /// Active time text
+    var activeTimeText: String {
+        guard let metrics = currentMetrics else { return "--" }
+        let totalActivity = metrics.dataPoints.map { $0.movementIntensity }.reduce(0, +)
+        let hours = Int(totalActivity)
+        let minutes = Int((totalActivity - Double(hours)) * 60)
+        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
+    }
+    
+    /// Data points count text
+    var dataPointsCountText: String {
+        guard let metrics = currentMetrics else { return "--" }
+        return "\(metrics.dataPoints.count)"
     }
     
     /// Total grinding events text
     var totalGrindingEventsText: String {
         guard let metrics = currentMetrics else { return "--" }
         return "\(metrics.totalGrindingEvents)"
+    }
+    
+    // MARK: - Trend Text Properties (without arrows/symbols)
+    
+    /// Heart rate trend text
+    var heartRateTrendText: String? {
+        guard let metrics = currentMetrics else { return nil }
+        let heartRates = metrics.dataPoints.compactMap { $0.averageHeartRate }
+        guard heartRates.count >= 2 else { return nil }
+        
+        let firstThird = heartRates.prefix(heartRates.count / 3)
+        let lastThird = heartRates.suffix(heartRates.count / 3)
+        
+        let avgFirst = firstThird.reduce(0, +) / Double(max(firstThird.count, 1))
+        let avgLast = lastThird.reduce(0, +) / Double(max(lastThird.count, 1))
+        let trend = avgLast - avgFirst
+        
+        if abs(trend) < 1 { return nil }
+        return trend > 0 ? "+\(Int(trend))" : "\(Int(trend))"
+    }
+    
+    /// SpO2 trend text
+    var spo2TrendText: String? {
+        guard let metrics = currentMetrics else { return nil }
+        let spo2Values = metrics.dataPoints.compactMap { $0.averageSpO2 }
+        guard spo2Values.count >= 2 else { return nil }
+        
+        let firstThird = spo2Values.prefix(spo2Values.count / 3)
+        let lastThird = spo2Values.suffix(spo2Values.count / 3)
+        
+        let avgFirst = firstThird.reduce(0, +) / Double(max(firstThird.count, 1))
+        let avgLast = lastThird.reduce(0, +) / Double(max(lastThird.count, 1))
+        let trend = avgLast - avgFirst
+        
+        if abs(trend) < 0.5 { return nil }
+        return trend > 0 ? "+\(String(format: "%.1f", trend))" : "\(String(format: "%.1f", trend))"
     }
     
     /// Temperature trend text
@@ -148,6 +245,121 @@ class HistoricalViewModel: ObservableObject {
         } else {
             return "↓ Less Active"
         }
+    }
+    
+    // MARK: - Chart Data Properties
+    
+    /// Heart rate chart data points
+    var heartRateChartData: [ChartDataPoint] {
+        guard let metrics = currentMetrics else { return [] }
+        return metrics.dataPoints.compactMap { point in
+            guard let hr = point.averageHeartRate else { return nil }
+            return ChartDataPoint(timestamp: point.timestamp, value: hr)
+        }
+    }
+    
+    /// SpO2 chart data points
+    var spo2ChartData: [ChartDataPoint] {
+        guard let metrics = currentMetrics else { return [] }
+        return metrics.dataPoints.compactMap { point in
+            guard let spo2 = point.averageSpO2 else { return nil }
+            return ChartDataPoint(timestamp: point.timestamp, value: spo2)
+        }
+    }
+    
+    /// Temperature chart data points
+    var temperatureChartData: [ChartDataPoint] {
+        guard let metrics = currentMetrics else { return [] }
+        return metrics.dataPoints.map { point in
+            ChartDataPoint(timestamp: point.timestamp, value: point.averageTemperature)
+        }
+    }
+    
+    /// Activity chart data points
+    var activityChartData: [ChartDataPoint] {
+        guard let metrics = currentMetrics else { return [] }
+        return metrics.dataPoints.map { point in
+            ChartDataPoint(timestamp: point.timestamp, value: point.movementIntensity)
+        }
+    }
+    
+    // MARK: - Detailed Statistics Properties
+    
+    /// Minimum heart rate
+    var minHeartRate: Int {
+        guard let metrics = currentMetrics else { return 0 }
+        let heartRates = metrics.dataPoints.compactMap { $0.averageHeartRate }
+        return Int(heartRates.min() ?? 0)
+    }
+    
+    /// Maximum heart rate
+    var maxHeartRate: Int {
+        guard let metrics = currentMetrics else { return 0 }
+        let heartRates = metrics.dataPoints.compactMap { $0.averageHeartRate }
+        return Int(heartRates.max() ?? 0)
+    }
+    
+    /// Minimum SpO2
+    var minSpO2: Int {
+        guard let metrics = currentMetrics else { return 0 }
+        let spo2Values = metrics.dataPoints.compactMap { $0.averageSpO2 }
+        return Int(spo2Values.min() ?? 0)
+    }
+    
+    /// Maximum SpO2
+    var maxSpO2: Int {
+        guard let metrics = currentMetrics else { return 0 }
+        let spo2Values = metrics.dataPoints.compactMap { $0.averageSpO2 }
+        return Int(spo2Values.max() ?? 0)
+    }
+    
+    /// Minimum temperature
+    var minTemperature: Double {
+        guard let metrics = currentMetrics else { return 0 }
+        let temps = metrics.dataPoints.map { $0.averageTemperature }
+        return temps.min() ?? 0
+    }
+    
+    /// Maximum temperature
+    var maxTemperature: Double {
+        guard let metrics = currentMetrics else { return 0 }
+        let temps = metrics.dataPoints.map { $0.averageTemperature }
+        return temps.max() ?? 0
+    }
+    
+    /// Total sessions text
+    var totalSessionsText: String {
+        guard let metrics = currentMetrics else { return "--" }
+        return "\(metrics.dataPoints.count)"
+    }
+    
+    /// Total duration text
+    var totalDurationText: String {
+        guard let metrics = currentMetrics else { return "--" }
+        let duration = metrics.endDate.timeIntervalSince(metrics.startDate)
+        let hours = Int(duration / 3600)
+        let minutes = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+    
+    /// Data quality text (percentage of non-nil values)
+    var dataQualityText: String {
+        guard let metrics = currentMetrics else { return "--" }
+        let totalPoints = metrics.dataPoints.count
+        guard totalPoints > 0 else { return "--" }
+        
+        let validHRCount = metrics.dataPoints.compactMap { $0.averageHeartRate }.count
+        let validSpO2Count = metrics.dataPoints.compactMap { $0.averageSpO2 }.count
+        let totalValid = validHRCount + validSpO2Count
+        let totalPossible = totalPoints * 2
+        
+        let quality = Double(totalValid) / Double(totalPossible) * 100
+        return String(format: "%.0f%%", quality)
     }
     
     /// Time since last update text
@@ -238,6 +450,13 @@ class HistoricalViewModel: ObservableObject {
         updateCurrentRangeMetrics()
     }
     
+    /// Async refresh for SwiftUI refreshable modifier
+    func refreshAsync() async {
+        refresh()
+        // Give a small delay to ensure UI updates properly
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+    }
+    
     /// Clear all cached metrics
     func clearAllMetrics() {
         historicalDataManager.clearAllMetrics()
@@ -261,22 +480,18 @@ class HistoricalViewModel: ObservableObject {
         selectedTimeRange = range
     }
     
-    /// Cycle to next time range
+    /// Move to next time range (forward in time, toward present)
     func selectNextTimeRange() {
-        let ranges: [TimeRange] = [.day, .week, .month]
-        if let currentIndex = ranges.firstIndex(of: selectedTimeRange) {
-            let nextIndex = (currentIndex + 1) % ranges.count
-            selectedTimeRange = ranges[nextIndex]
+        if timeRangeOffset < 0 {
+            timeRangeOffset += 1
+            updateCurrentRangeMetrics()
         }
     }
     
-    /// Cycle to previous time range
+    /// Move to previous time range (backward in time)
     func selectPreviousTimeRange() {
-        let ranges: [TimeRange] = [.day, .week, .month]
-        if let currentIndex = ranges.firstIndex(of: selectedTimeRange) {
-            let previousIndex = (currentIndex - 1 + ranges.count) % ranges.count
-            selectedTimeRange = ranges[previousIndex]
-        }
+        timeRangeOffset -= 1
+        updateCurrentRangeMetrics()
     }
     
     // MARK: - Public Methods - Data Point Selection
@@ -357,6 +572,15 @@ class HistoricalViewModel: ObservableObject {
         guard let spo2 = spo2 else { return "--" }
         return String(format: "%.0f%%", spo2)
     }
+}
+
+// MARK: - Chart Data Point
+
+/// Represents a single point on a chart
+struct ChartDataPoint: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let value: Double
 }
 
 // MARK: - Mock for Previews

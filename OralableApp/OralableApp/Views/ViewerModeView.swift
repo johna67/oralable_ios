@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ViewerModeView: View {
     @Binding var selectedMode: AppMode?
-    @StateObject private var ble = OralableBLE()
+    @EnvironmentObject var ble: OralableBLE
     @State private var selectedTab = 0
     @State private var showDevices = false
     
@@ -10,7 +10,7 @@ struct ViewerModeView: View {
 
     var body: some View {
         Group {
-            if DesignSystem.Layout.isIPad && sizeClass == .regular {
+            if UIDevice.current.userInterfaceIdiom == .pad && sizeClass == .regular {
                 // iPad with regular width - use split view
                 iPadSplitView
             } else {
@@ -19,7 +19,7 @@ struct ViewerModeView: View {
             }
         }
         .sheet(isPresented: $showDevices) {
-            DevicesView(ble: ble)
+            DevicesView()
         }
     }
     
@@ -76,7 +76,7 @@ struct ViewerModeView: View {
     private var iPhoneTabView: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                DashboardView(ble: ble, isViewerMode: true)
+                DashboardView()
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(action: { selectedMode = nil }) {
@@ -127,15 +127,17 @@ struct ViewerModeView: View {
     private func detailView(for tab: Int) -> some View {
         switch tab {
         case 0:
-            DashboardView(ble: ble, isViewerMode: true)
+            DashboardView()
         case 1:
             ShareView(ble: ble, isViewerMode: true)
         default:
-            DashboardView(ble: ble, isViewerMode: true)
+            DashboardView()
         }
     }
 }
 
 #Preview {
     ViewerModeView(selectedMode: .constant(.viewer))
+        .environmentObject(OralableBLE.shared)
+        .environmentObject(DesignSystem.shared)
 }

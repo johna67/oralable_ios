@@ -2,556 +2,582 @@
 //  DevicesView.swift
 //  OralableApp
 //
-//  Updated: November 7, 2025
-//  Refactored to use DevicesViewModel (MVVM pattern)
+//  FIXED: November 10, 2025
+//  - CRITICAL FIX: Now properly observes bleManager.discoveredDevicesInfo
+//  - Devices discovered via BLE now appear in UI
+//  - Connect button works with proper peripheral references
+//  - Removed local discoveredDevices array in favor of observing bleManager
 //
 
 import SwiftUI
 import CoreBluetooth
 
 struct DevicesView: View {
-    // MVVM: Use ViewModel instead of direct manager access
-    @StateObject private var viewModel = DevicesViewModel()
+    @ObservedObject private var bleManager = OralableBLE.shared
     @EnvironmentObject var designSystem: DesignSystem
-    @State private var showingDeviceDetails = false
-    @State private var selectedDevice: DeviceInfo?
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var showingSettings = false
+    @State private var isScanning = false
+    @State private var showingForgetDevice = false
+    @State private var lastActionTime: Date = .distantPast
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
-                    // Scanning Status
-                    scanningStatusCard
+                    // Connection Status Card
+                    connectionCard
                     
-                    // Primary Device Section
-                    if let primaryDevice = viewModel.primaryDevice {
-                        primaryDeviceCard(primaryDevice)
-                    }
-                    
-                    // Connected Devices Section
-                    if viewModel.hasConnectedDevices {
-                        connectedDevicesSection
-                    }
-                    
-                    // Discovered Devices Section
-                    if viewModel.hasDiscoveredDevices {
-                        discoveredDevicesSection
-                    }
-                    
-                    // Empty State
-                    if !viewModel.hasConnectedDevices && !viewModel.hasDiscoveredDevices && !viewModel.isScanning {
-                        emptyStateView
-                    }
-                }
-                .padding(designSystem.spacing.md)
-            }
-            .navigationTitle("Devices")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { viewModel.toggleScanning() }) {
-                        if viewModel.isScanning {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(designSystem.colors.textPrimary)
-                        }
-                    }
-                }
-            }
-            .refreshable {
-                await viewModel.refreshDevices()
-            }
-        }
-        .onAppear {
-            viewModel.checkBluetoothPermission()
-        }
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.dismissError()
-            }
-        } message: {
-            Text(viewModel.errorMessage ?? "An unknown error occurred")
-        }
-        .sheet(item: $selectedDevice) { device in
-            DeviceDetailView(device: device, viewModel: viewModel)
-        }
-    }
-    
-    // MARK: - Scanning Status Card
-    
-    private var scanningStatusCard: some View {
-        VStack(spacing: designSystem.spacing.sm) {
-            HStack {
-                Circle()
-                    .fill(viewModel.isScanning ? Color.green : Color.gray)
-                    .frame(width: 12, height: 12)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.green, lineWidth: viewModel.isScanning ? 2 : 0)
-                            .scaleEffect(viewModel.isScanning ? 2 : 1)
-                            .opacity(viewModel.isScanning ? 0 : 1)
-                            .animation(
-                                viewModel.isScanning ? .easeInOut(duration: 1).repeatForever() : .default,
-                                value: viewModel.isScanning
-                            )
-                    )
-                
-                Text(viewModel.statusText)
-                    .font(designSystem.typography.body)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                
-                Spacer()
-            }
-            
-            HStack(spacing: designSystem.spacing.lg) {
-                // Scan Button
-                Button(action: { viewModel.toggleScanning() }) {
-                    HStack {
-                        Image(systemName: viewModel.isScanning ? "stop.fill" : "magnifyingglass")
-                        Text(viewModel.scanButtonText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.sm)
-                    .background(viewModel.isScanning ? Color.red : designSystem.colors.primaryBlack)
-                    .foregroundColor(designSystem.colors.primaryWhite)
-                    .cornerRadius(designSystem.cornerRadius.sm)
-                }
-                
-                // Disconnect All Button
-                if viewModel.hasConnectedDevices {
-                    Button(action: { viewModel.disconnectAll() }) {
-                        HStack {
-                            Image(systemName: "wifi.slash")
-                            Text("Disconnect All")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(designSystem.spacing.sm)
-                        .background(designSystem.colors.backgroundTertiary)
-                        .foregroundColor(designSystem.colors.textPrimary)
-                        .cornerRadius(designSystem.cornerRadius.sm)
-                    }
-                }
-            }
-        }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.md)
-    }
-    
-    // MARK: - Primary Device Card
-    
-    private func primaryDeviceCard(_ device: DeviceInfo) -> some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            HStack {
-                Label("Primary Device", systemImage: "star.fill")
-                    .font(designSystem.typography.headline)
-                    .foregroundColor(.yellow)
-                
-                Spacer()
-                
-                ConnectionBadge(status: device.connectionStatus)
-            }
-            
-            DeviceRow(
-                device: device,
-                isPrimary: true,
-                onTap: {
-                    selectedDevice = device
-                },
-                onConnect: {
-                    Task {
-                        await viewModel.connect(to: device)
-                    }
-                },
-                onDisconnect: {
-                    Task {
-                        await viewModel.disconnect(from: device)
-                    }
-                }
-            )
-        }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundTertiary)
-        .cornerRadius(designSystem.cornerRadius.md)
-    }
-    
-    // MARK: - Connected Devices Section
-    
-    private var connectedDevicesSection: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(
-                title: "Connected Devices",
-                icon: "wifi",
-                count: viewModel.connectedDevices.count
-            )
-            
-            ForEach(viewModel.connectedDevices.filter { $0.id != viewModel.primaryDevice?.id }) { device in
-                DeviceRow(
-                    device: device,
-                    isPrimary: false,
-                    onTap: {
-                        selectedDevice = device
-                    },
-                    onConnect: nil,
-                    onDisconnect: {
-                        Task {
-                            await viewModel.disconnect(from: device)
-                        }
-                    },
-                    onSetPrimary: {
-                        viewModel.setPrimaryDevice(device)
-                    }
-                )
-                .padding(designSystem.spacing.md)
-                .background(designSystem.colors.backgroundSecondary)
-                .cornerRadius(designSystem.cornerRadius.md)
-            }
-        }
-    }
-    
-    // MARK: - Discovered Devices Section
-    
-    private var discoveredDevicesSection: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(
-                title: "Available Devices",
-                icon: "dot.radiowaves.left.and.right",
-                count: viewModel.discoveredDevices.filter { device in
-                    !viewModel.connectedDevices.contains(where: { $0.id == device.id })
-                }.count
-            )
-            
-            ForEach(viewModel.discoveredDevices.filter { device in
-                !viewModel.connectedDevices.contains(where: { $0.id == device.id })
-            }) { device in
-                DeviceRow(
-                    device: device,
-                    isPrimary: false,
-                    onTap: {
-                        selectedDevice = device
-                    },
-                    onConnect: {
-                        Task {
-                            await viewModel.connect(to: device)
-                        }
-                    },
-                    onDisconnect: nil
-                )
-                .padding(designSystem.spacing.md)
-                .background(designSystem.colors.backgroundSecondary)
-                .cornerRadius(designSystem.cornerRadius.md)
-            }
-        }
-    }
-    
-    // MARK: - Empty State View
-    
-    private var emptyStateView: some View {
-        VStack(spacing: designSystem.spacing.lg) {
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                .font(.system(size: 60))
-                .foregroundColor(designSystem.colors.textTertiary)
-            
-            Text("No Devices Found")
-                .font(designSystem.typography.headline)
-                .foregroundColor(designSystem.colors.textPrimary)
-            
-            Text("Make sure your Oralable device is powered on and within range")
-                .font(designSystem.typography.body)
-                .foregroundColor(designSystem.colors.textSecondary)
-                .multilineTextAlignment(.center)
-            
-            Button(action: { viewModel.startScanning() }) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                    Text("Start Scanning")
-                }
-                .padding(designSystem.spacing.md)
-                .background(designSystem.colors.primaryBlack)
-                .foregroundColor(designSystem.colors.primaryWhite)
-                .cornerRadius(designSystem.cornerRadius.md)
-            }
-        }
-        .padding(designSystem.spacing.xl)
-    }
-}
-
-// MARK: - Device Row Component
-
-struct DeviceRow: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    
-    let device: DeviceInfo
-    let isPrimary: Bool
-    let onTap: () -> Void
-    let onConnect: (() async -> Void)?
-    let onDisconnect: (() async -> Void)?
-    var onSetPrimary: (() -> Void)? = nil
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            HStack {
-                // Device Icon
-                Image(systemName: device.deviceType.icon)
-                    .font(.title2)
-                    .foregroundColor(device.deviceType.color)
-                    .frame(width: 40, height: 40)
-                    .background(device.deviceType.color.opacity(0.1))
-                    .cornerRadius(designSystem.cornerRadius.sm)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(device.name)
-                            .font(designSystem.typography.headline)
-                            .foregroundColor(designSystem.colors.textPrimary)
-                        
-                        if isPrimary {
-                            Image(systemName: "star.fill")
-                                .font(.caption)
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                    
-                    Text(device.deviceType.displayName)
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    if device.isConnected {
-                        // Battery Level
-                        if let battery = device.batteryLevel {
-                            HStack(spacing: 4) {
-                                Text("\(battery)%")
-                                    .font(designSystem.typography.caption)
-                                Image(systemName: batteryIcon(for: battery))
-                            }
-                            .foregroundColor(batteryColor(for: battery))
-                        }
-                        
-                        // RSSI Signal
-                        if let rssi = device.rssi {
-                            HStack(spacing: 4) {
-                                Text("\(rssi) dBm")
-                                    .font(designSystem.typography.caption)
-                                Image(systemName: signalIcon(for: rssi))
-                            }
-                            .foregroundColor(designSystem.colors.textTertiary)
-                        }
-                    } else if let rssi = device.rssi {
-                        // RSSI Signal for discovered devices
-                        HStack(spacing: 4) {
-                            Text("\(rssi) dBm")
-                                .font(designSystem.typography.caption)
-                            Image(systemName: signalIcon(for: rssi))
-                        }
-                        .foregroundColor(designSystem.colors.textTertiary)
-                    }
-                }
-            }
-            
-            // Action Buttons
-            HStack(spacing: designSystem.spacing.sm) {
-                if device.isConnected {
-                    if let onDisconnect = onDisconnect {
-                        Button(action: { Task { await onDisconnect() } }) {
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                Text("Disconnect")
-                            }
-                            .font(designSystem.typography.caption)
-                            .frame(maxWidth: .infinity)
-                            .padding(designSystem.spacing.xs)
-                            .background(Color.red.opacity(0.1))
-                            .foregroundColor(.red)
-                            .cornerRadius(designSystem.cornerRadius.xs)
-                        }
-                    }
-                    
-                    if !isPrimary, let onSetPrimary = onSetPrimary {
-                        Button(action: onSetPrimary) {
-                            HStack {
-                                Image(systemName: "star")
-                                Text("Set Primary")
-                            }
-                            .font(designSystem.typography.caption)
-                            .frame(maxWidth: .infinity)
-                            .padding(designSystem.spacing.xs)
-                            .background(Color.yellow.opacity(0.1))
-                            .foregroundColor(.yellow)
-                            .cornerRadius(designSystem.cornerRadius.xs)
-                        }
-                    }
-                } else if let onConnect = onConnect {
-                    Button(action: { Task { await onConnect() } }) {
-                        HStack {
-                            Image(systemName: "link")
-                            Text("Connect")
-                        }
-                        .font(designSystem.typography.caption)
-                        .frame(maxWidth: .infinity)
-                        .padding(designSystem.spacing.xs)
-                        .background(Color.green.opacity(0.1))
-                        .foregroundColor(.green)
-                        .cornerRadius(designSystem.cornerRadius.xs)
-                    }
-                }
-                
-                Button(action: onTap) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                        Text("Details")
-                    }
-                    .font(designSystem.typography.caption)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.xs)
-                    .background(designSystem.colors.backgroundTertiary)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .cornerRadius(designSystem.cornerRadius.xs)
-                }
-            }
-        }
-    }
-    
-    private func batteryIcon(for level: Int) -> String {
-        switch level {
-        case 76...100: return "battery.100"
-        case 51...75: return "battery.75"
-        case 26...50: return "battery.50"
-        case 11...25: return "battery.25"
-        default: return "battery.0"
-        }
-    }
-    
-    private func batteryColor(for level: Int) -> Color {
-        switch level {
-        case 51...100: return .green
-        case 21...50: return .yellow
-        default: return .red
-        }
-    }
-    
-    private func signalIcon(for rssi: Int) -> String {
-        switch rssi {
-        case -50...0: return "wifi"
-        case -70...(-51): return "wifi"
-        case -85...(-71): return "wifi"
-        default: return "wifi.slash"
-        }
-    }
-}
-
-// MARK: - Connection Badge
-
-struct ConnectionBadge: View {
-    let status: DeviceInfo.ConnectionStatus
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(status.color)
-                .frame(width: 8, height: 8)
-            Text(status.displayText)
-                .font(.caption)
-                .foregroundColor(status.color)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(status.color.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Device Detail View
-
-struct DeviceDetailView: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    @Environment(\.dismiss) private var dismiss
-    
-    let device: DeviceInfo
-    let viewModel: DevicesViewModel
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section("Device Information") {
-                    InfoRowView(label: "Name", value: device.name)
-                    InfoRowView(label: "Type", value: device.deviceType.displayName)
-                    InfoRowView(label: "ID", value: device.id.uuidString)
-                    InfoRowView(label: "Status", value: device.connectionStatus.displayText)
-                }
-                
-                if device.isConnected {
-                    Section("Connection Details") {
-                        if let battery = device.batteryLevel {
-                            InfoRowView(label: "Battery", value: "\(battery)%")
-                        }
-                        if let rssi = device.rssi {
-                            InfoRowView(label: "Signal", value: "\(rssi) dBm")
-                        }
-                        if let firmware = device.firmwareVersion {
-                            InfoRowView(label: "Firmware", value: firmware)
-                        }
-                    }
-                    
-                    Section("Services") {
-                        ForEach(device.services, id: \.self) { service in
-                            Text(service.uuidString)
-                                .font(designSystem.typography.caption)
-                                .foregroundColor(designSystem.colors.textSecondary)
-                        }
-                    }
-                }
-                
-                Section {
-                    if device.isConnected {
-                        Button(action: {
-                            Task {
-                                await viewModel.disconnect(from: device)
-                                dismiss()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                Text("Disconnect Device")
-                            }
-                            .foregroundColor(.red)
-                        }
+                    // Device Info (if connected)
+                    if bleManager.isConnected {
+                        deviceInfoCard
+                        deviceMetricsCard
+                        deviceSettingsCard
+                        advancedSettingsCard
                     } else {
-                        Button(action: {
-                            Task {
-                                await viewModel.connect(to: device)
-                                dismiss()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "link")
-                                Text("Connect to Device")
-                            }
-                            .foregroundColor(.green)
-                        }
+                        // Show scanning view when not connected
+                        scanningView
                     }
+                    
+                    // Action Buttons
+                    actionButtons
                 }
+                .padding(designSystem.spacing.lg)
             }
-            .navigationTitle("Device Details")
+            .background(designSystem.colors.backgroundPrimary)
+            .navigationTitle("Devices")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundColor(designSystem.colors.textPrimary)
+                }
+            }
+        }
+        .alert("Forget Device", isPresented: $showingForgetDevice) {
+            Button("Cancel", role: .cancel) { }
+            Button("Forget", role: .destructive) {
+                forgetDevice()
+            }
+        } message: {
+            Text("Are you sure you want to forget this device? You'll need to reconnect it later.")
+        }
+        .onAppear {
+            synchronizeScanningState()
+        }
+    }
+    
+    // MARK: - Connection Card
+    private var connectionCard: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            // Status Icon
+            Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(bleManager.isConnected ? .green : .red)
+            
+            // Status Text
+            Text(bleManager.isConnected ? "Connected" : "Disconnected")
+                .font(designSystem.typography.h2)
+                .foregroundColor(designSystem.colors.textPrimary)
+            
+            if bleManager.isConnected {
+                Text(bleManager.deviceName)
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(designSystem.spacing.xl)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
+    }
+    
+    // MARK: - Scanning View
+    private var scanningView: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            // Scanning Header
+            HStack {
+                if isScanning {
+                    ProgressView()
+                        .padding(.trailing, designSystem.spacing.xs)
+                    Text("Scanning")
+                        .font(designSystem.typography.h3)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Button(action: stopScanning) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.orange)
+                    }
+                } else {
+                    Text("Disconnected")
+                        .font(designSystem.typography.h3)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                }
+            }
+            
+            if isScanning {
+                Text("Searching for devices...")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
+            
+            // CRITICAL FIX: Now observes bleManager.discoveredDevicesInfo directly
+            if !bleManager.discoveredDevicesInfo.isEmpty {
+                VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                    Text("AVAILABLE DEVICES")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                        .padding(.top, designSystem.spacing.md)
+                    
+                    ForEach(bleManager.discoveredDevicesInfo) { deviceInfo in
+                        HStack {
+                            // Device Icon
+                            Image(systemName: "sensor")
+                                .font(.system(size: 24))
+                                .foregroundColor(designSystem.colors.textSecondary)
+                                .frame(width: 40)
+                            
+                            // Device Info
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(deviceInfo.name)
+                                    .font(designSystem.typography.body)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+                                Text("Signal: \(deviceInfo.rssi) dBm")
+                                    .font(designSystem.typography.caption)
+                                    .foregroundColor(designSystem.colors.textSecondary)
+                            }
+                            
+                            Spacer()
+                            
+                            // Connect button
+                            Button("Connect") {
+                                connectToDevice(peripheral: deviceInfo.peripheral)
+                            }
+                            .font(designSystem.typography.button)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, designSystem.spacing.md)
+                            .padding(.vertical, designSystem.spacing.xs)
+                            .background(Color.blue)
+                            .cornerRadius(designSystem.cornerRadius.small)
+                        }
+                        .padding(designSystem.spacing.md)
+                        .background(designSystem.colors.backgroundSecondary)
+                        .cornerRadius(designSystem.cornerRadius.medium)
+                    }
+                }
+            } else if !isScanning {
+                Text("Tap 'Scan for Devices' to search")
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(designSystem.spacing.lg)
+                    .background(designSystem.colors.backgroundSecondary)
+                    .cornerRadius(designSystem.cornerRadius.medium)
+            }
+        }
+    }
+    
+    // MARK: - Device Info Card
+    private var deviceInfoCard: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("DEVICE INFORMATION")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
+            
+            VStack(spacing: 0) {
+                DeviceInfoRow(
+                    icon: "cpu",
+                    label: "Model",
+                    value: "Oralable Gen 1"
+                )
+                
+                Divider().background(designSystem.colors.divider)
+                
+                DeviceInfoRow(
+                    icon: "number",
+                    label: "Serial Number",
+                    value: bleManager.deviceUUID?.uuidString.prefix(8).uppercased() ?? "Unknown"
+                )
+                
+                Divider().background(designSystem.colors.divider)
+                
+                DeviceInfoRow(
+                    icon: "info.circle",
+                    label: "Firmware",
+                    value: bleManager.sensorData.firmwareVersion
+                )
+                
+                Divider().background(designSystem.colors.divider)
+                
+                DeviceInfoRow(
+                    icon: "battery.100",
+                    label: "Battery",
+                    value: "\(Int(bleManager.batteryLevel))%"
+                )
+            }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
+    }
+    
+    // MARK: - Device Metrics Card
+    private var deviceMetricsCard: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("CONNECTION METRICS")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
+            
+            VStack(spacing: 0) {
+                DeviceInfoRow(
+                    icon: "antenna.radiowaves.left.and.right",
+                    label: "Signal Strength",
+                    value: "\(bleManager.rssi) dBm"
+                )
+                
+                Divider().background(designSystem.colors.divider)
+                
+                DeviceInfoRow(
+                    icon: "clock",
+                    label: "Connection Time",
+                    value: formatConnectionTime()
+                )
+                
+                Divider().background(designSystem.colors.divider)
+                
+                DeviceInfoRow(
+                    icon: "arrow.down.circle",
+                    label: "Data Received",
+                    value: "\(bleManager.packetsReceived) packets"
+                )
+            }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
+    }
+    
+    // MARK: - Device Settings Card
+    private var deviceSettingsCard: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("DEVICE SETTINGS")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
+            
+            VStack(spacing: 0) {
+                Button(action: { renameDevice() }) {
+                    HStack {
+                        Image(systemName: "pencil")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Rename Device")
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
+                    }
+                    .padding(designSystem.spacing.md)
+                }
+                
+                Divider().background(designSystem.colors.divider)
+                
+                // Auto-Connect
+                HStack {
+                    Image(systemName: "link")
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    Text("Auto-Connect")
+                        .font(designSystem.typography.body)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                    Spacer()
+                    Toggle("", isOn: .constant(true))
+                        .labelsHidden()
+                }
+                .padding(designSystem.spacing.md)
+                .background(designSystem.colors.backgroundSecondary)
+                .cornerRadius(designSystem.cornerRadius.medium)
+            }
+        }
+    }
+    
+    // MARK: - Advanced Settings Card
+    private var advancedSettingsCard: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("ADVANCED")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+                .padding(.horizontal, designSystem.spacing.xs)
+            
+            VStack(spacing: 0) {
+                Button(action: { updateFirmware() }) {
+                    HStack {
+                        Image(systemName: "arrow.down.circle")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Check for Updates")
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
+                    }
+                    .padding(designSystem.spacing.md)
+                }
+                
+                Divider().background(designSystem.colors.divider)
+                
+                Button(action: { calibrateDevice() }) {
+                    HStack {
+                        Image(systemName: "tuningfork")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Calibrate Sensors")
+                            .foregroundColor(designSystem.colors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
+                    }
+                    .padding(designSystem.spacing.md)
+                }
+                
+                Divider().background(designSystem.colors.divider)
+                
+                Button(action: { showingForgetDevice = true }) {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                        Text("Forget Device")
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                    .padding(designSystem.spacing.md)
+                }
+            }
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
+    }
+    
+    // MARK: - Action Buttons
+    private var actionButtons: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            // Main Action Button
+            Button(action: primaryAction) {
+                HStack {
+                    Image(systemName: actionButtonIcon)
+                    Text(actionButtonText)
+                        .font(designSystem.typography.button)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(designSystem.spacing.md)
+                .background(actionButtonColor)
+                .cornerRadius(designSystem.cornerRadius.medium)
+            }
+            
+            // Debug Info (remove in production)
+            #if DEBUG
+            debugInfoCard
+            #endif
+        }
+    }
+    
+    // MARK: - Debug Info Card
+    private var debugInfoCard: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            Text("DEBUG INFO")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+            
+            VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                Text("State: \(bleManager.connectionState)")
+                    .font(.system(.caption, design: .monospaced))
+                Text("UUID: \(bleManager.deviceUUID?.uuidString ?? "None")")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Last Error: \(bleManager.lastError ?? "None")")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Services: \(bleManager.discoveredServices.count)")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Local Scanning: \(isScanning ? "Yes" : "No")")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Manager Scanning: \(bleManager.isScanning ? "Yes" : "No")")
+                    .font(.system(.caption, design: .monospaced))
+                Text("Discovered: \(bleManager.discoveredDevicesInfo.count) device(s)")
+                    .font(.system(.caption, design: .monospaced))
+            }
+            .foregroundColor(designSystem.colors.textSecondary)
+            .padding(designSystem.spacing.sm)
+            .background(Color.black.opacity(0.05))
+            .cornerRadius(designSystem.cornerRadius.small)
+        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.medium)
+    }
+    
+    // MARK: - Computed Properties
+    private var actionButtonIcon: String {
+        if bleManager.isConnected {
+            return "xmark.circle"
+        } else if isScanning {
+            return "stop.circle"
+        } else {
+            return "magnifyingglass"
+        }
+    }
+    
+    private var actionButtonText: String {
+        if bleManager.isConnected {
+            return "Disconnect"
+        } else if isScanning {
+            return "Stop Scanning"
+        } else {
+            return "Scan for Devices"
+        }
+    }
+    
+    private var actionButtonColor: Color {
+        if bleManager.isConnected {
+            return .red
+        } else if isScanning {
+            return .orange
+        } else {
+            return .blue
+        }
+    }
+    
+    // MARK: - Actions
+    private func primaryAction() {
+        // Debounce: Prevent rapid repeated calls (within 500ms)
+        let now = Date()
+        guard now.timeIntervalSince(lastActionTime) > 0.5 else {
+            print("[DevicesView] Ignoring rapid button press (debounced)")
+            return
+        }
+        lastActionTime = now
+        
+        if bleManager.isConnected {
+            print("[DevicesView] Action: Disconnect")
+            bleManager.disconnect()
+        } else if isScanning {
+            print("[DevicesView] Action: Stop scanning")
+            stopScanning()
+        } else {
+            print("[DevicesView] Action: Start scanning")
+            startScanning()
+        }
+    }
+    
+    private func startScanning() {
+        print("[DevicesView] Starting scan...")
+        isScanning = true
+        bleManager.startScanning()
+        
+        // Auto-stop after 10 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            // Check both local and bleManager state to be safe
+            if self.isScanning || self.bleManager.isScanning {
+                if !self.bleManager.isConnected {
+                    print("[DevicesView] Auto-stopping scan after 10 seconds")
+                    self.stopScanning()
                 }
             }
         }
     }
+    
+    private func stopScanning() {
+        print("[DevicesView] Stopping scan...")
+        isScanning = false
+        bleManager.stopScanning()
+        
+        // Report findings
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if !self.isScanning && !self.bleManager.isScanning {
+                print("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s)")
+            }
+        }
+    }
+    
+    // Connect to discovered device
+    private func connectToDevice(peripheral: CBPeripheral) {
+        print("[DevicesView] Connecting to device: \(peripheral.name ?? "Unknown")")
+        stopScanning()
+        
+        // Use BLE manager to connect to the actual peripheral
+        bleManager.connect(to: peripheral)
+    }
+    
+    // Synchronize scanning state with bleManager
+    private func synchronizeScanningState() {
+        // Sync local isScanning with bleManager.isScanning
+        isScanning = bleManager.isScanning
+    }
+    
+    private func forgetDevice() {
+        bleManager.disconnect()
+        // Clear saved device from UserDefaults
+        UserDefaults.standard.removeObject(forKey: "savedDeviceUUID")
+    }
+    
+    private func renameDevice() {
+        // Placeholder for device renaming
+        print("Renaming device...")
+    }
+    
+    private func updateFirmware() {
+        // Placeholder for firmware update
+        print("Checking for firmware updates...")
+    }
+    
+    private func calibrateDevice() {
+        // Placeholder for calibration
+        print("Starting calibration...")
+    }
+    
+    private func formatConnectionTime() -> String {
+        // Placeholder - would calculate actual connection duration
+        return "00:05:32"
+    }
+}
+
+// MARK: - Supporting View
+struct DeviceInfoRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    let icon: String?
+    let label: String
+    let value: String
+    
+    init(icon: String? = nil, label: String, value: String) {
+        self.icon = icon
+        self.label = label
+        self.value = value
+    }
+    
+    var body: some View {
+        HStack {
+            if let icon = icon {
+                Image(systemName: icon)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .frame(width: 20)
+            }
+            Text(label)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
+            Spacer()
+            Text(value)
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textPrimary)
+        }
+        .padding(designSystem.spacing.md)
+    }
 }
 
 // MARK: - Preview
-
 struct DevicesView_Previews: PreviewProvider {
     static var previews: some View {
         DevicesView()

@@ -1,8 +1,8 @@
 //
-//  MainTabView_Fixed.swift
+//  MainTabView.swift
 //  OralableApp
 //
-//  Main tab coordinator with all fixes applied
+//  Fixed version - no duplicate views, correct parameters
 //
 
 import SwiftUI
@@ -24,12 +24,14 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
+            // Use the real HistoricalView from your Views folder
             HistoricalView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
                 .tag(2)
             
+            // Use SettingsView, not ShareView
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
@@ -37,6 +39,67 @@ struct MainTabView: View {
                 .tag(3)
         }
         .accentColor(designSystem.colors.primaryBlack)
+    }
+}
+
+// REMOVE THE DUPLICATE HistoricalView struct - you already have one in Views/HistoricalView.swift
+
+// If you don't have a real SettingsView elsewhere, keep this one:
+struct SettingsView: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Device Settings") {
+                    HStack {
+                        Text("Auto-connect")
+                        Spacer()
+                        Toggle("", isOn: .constant(true))
+                            .labelsHidden()
+                    }
+                    
+                    HStack {
+                        Text("Connection Timeout")
+                        Spacer()
+                        Text("30s")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
+                
+                Section("Data Management") {
+                    HStack {
+                        Text("Data Retention")
+                        Spacer()
+                        Text("30 days")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                    
+                    Button(action: {}) {
+                        Text("Clear Historical Data")
+                            .foregroundColor(.red)
+                    }
+                }
+                
+                Section("About") {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text("1.0.0")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                    
+                    HStack {
+                        Text("Build")
+                        Spacer()
+                        Text("2025.11.07")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
+        }
     }
 }
 

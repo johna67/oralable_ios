@@ -32,7 +32,7 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     // MARK: - Protocol Properties
     
     var deviceInfo: DeviceInfo
-    var deviceType: DeviceType { .anrMuscleSense }
+    var deviceType: DeviceType { .anr }
     var name: String { deviceInfo.name }
     var peripheral: CBPeripheral?
     var connectionState: DeviceConnectionState { deviceInfo.connectionState }
@@ -50,7 +50,7 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     var latestReadings: [SensorType: SensorReading] = [:]
     
     var supportedSensors: [SensorType] {
-        DeviceType.anrMuscleSense.defaultSensors
+        DeviceType.anr.defaultSensors
     }
     
     // MARK: - Private Properties
@@ -63,7 +63,7 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     init(peripheral: CBPeripheral, name: String) {
         self.peripheral = peripheral
         self.deviceInfo = DeviceInfo(
-            type: .anrMuscleSense,
+            type: .anr,
             name: name,
             peripheralIdentifier: peripheral.identifier,
             connectionState: .disconnected

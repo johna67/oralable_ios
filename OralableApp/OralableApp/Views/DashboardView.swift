@@ -2,21 +2,24 @@
 //  DashboardView.swift
 //  OralableApp
 //
-//  Updated: November 7, 2025
-//  Complete MVVM implementation - No duplicate views
+//  COMPLETE VERSION WITH NAVIGATION AND MAM STATES
+//  Replace your entire DashboardView.swift with this code
 //
 
 import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    // MVVM: Use ViewModel with convenience initializer
     @StateObject private var viewModel = DashboardViewModel()
+    @StateObject private var bleManager = OralableBLE.shared
     @EnvironmentObject var designSystem: DesignSystem
     
-    // View State
-    @State private var showingExportSheet = false
-    @State private var selectedTimeRange: TimeRange = .day
+    // NAVIGATION STATE VARIABLES
+    @State private var showingProfile = false
+    @State private var showingDevices = false
+    @State private var showingSettings = false
+    @State private var showingHistorical = false
+    @State private var showingShare = false
     
     var body: some View {
         NavigationView {
@@ -25,343 +28,335 @@ struct DashboardView: View {
                     // Connection Status Card
                     connectionStatusCard
                     
-                    // Real-time Metrics Grid
-                    if viewModel.isConnected {
-                        metricsGrid
-                        
-                        // PPG Waveform Chart
-                        if !viewModel.ppgData.isEmpty {
-                            ppgWaveformCard
-                        }
-                        
-                        // Accelerometer Chart
-                        if !viewModel.accelerometerData.isEmpty {
-                            accelerometerCard
-                        }
+                    // MAM State Card - NEW
+                    if bleManager.isConnected {
+                        mamStateCard
                     }
                     
-                    // Quick Actions
-                    quickActionsCard
+                    // Metrics Grid
+                    metricsGrid
+                    
+                    // Waveform Section
+                    if bleManager.isConnected {
+                        waveformSection
+                    }
+                    
+                    // Action Buttons
+                    actionButtons
                 }
                 .padding(designSystem.spacing.md)
             }
+            .background(designSystem.colors.backgroundPrimary)
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.large)
+            // NAVIGATION TOOLBAR - CRITICAL FIX
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: { viewModel.refreshScan() }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        
-                        Button(action: { showingExportSheet = true }) {
-                            Label("Export Data", systemImage: "square.and.arrow.up")
-                        }
-                        
-                        Button(action: { viewModel.toggleRecording() }) {
-                            Label(
-                                viewModel.isRecording ? "Stop Recording" : "Start Recording",
-                                systemImage: viewModel.isRecording ? "stop.circle" : "record.circle"
-                            )
-                        }
-                        
-                        Divider()
-                        
-                        Button(action: { viewModel.resetBLE() }) {
-                            Label("Reset Connection", systemImage: "exclamationmark.triangle")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showingProfile = true }) {
+                        Image(systemName: "person.circle")
+                            .font(.system(size: 22))
                             .foregroundColor(designSystem.colors.textPrimary)
                     }
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: designSystem.spacing.sm) {
+                        Button(action: { showingDevices = true }) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 20))
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
+                        
+                        Button(action: { showingSettings = true }) {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 20))
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
+                    }
+                }
             }
-            .sheet(isPresented: $showingExportSheet) {
-                ShareView()
+            // SHEET PRESENTATIONS
+            .sheet(isPresented: $showingProfile) {
+                ProfileView()
             }
+            .sheet(isPresented: $showingDevices) {
+                DevicesView()
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
+            .sheet(isPresented: $showingHistorical) {
+                HistoricalView()
+            }
+            .sheet(isPresented: $showingShare) {
+                ShareView(ble: bleManager)
+            }
+        }
+        .onAppear {
+            viewModel.startMonitoring()
+        }
+        .onDisappear {
+            viewModel.stopMonitoring()
         }
     }
     
     // MARK: - Connection Status Card
-    
     private var connectionStatusCard: some View {
-        VStack(spacing: designSystem.spacing.sm) {
+        VStack(spacing: designSystem.spacing.md) {
             HStack {
-                VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
-                    Text("Connection Status")
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                    
-                    Text(viewModel.deviceName)
+                // Status Icon
+                Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(bleManager.isConnected ? .green : .red)
+                
+                // Status Text
+                VStack(alignment: .leading) {
+                    Text(bleManager.isConnected ? "Connected" : "Disconnected")
                         .font(designSystem.typography.h3)
                         .foregroundColor(designSystem.colors.textPrimary)
                     
-                    HStack(spacing: designSystem.spacing.xs) {
-                        Circle()
-                            .fill(viewModel.isConnected ? Color.green : Color.red)
-                            .frame(width: 8, height: 8)
-                        
-                        Text(viewModel.connectionStatus)
-                            .font(designSystem.typography.body)
+                    if bleManager.isConnected {
+                        Text(bleManager.deviceName)
+                            .font(designSystem.typography.caption)
                             .foregroundColor(designSystem.colors.textSecondary)
                     }
                 }
                 
                 Spacer()
                 
-                Button(action: { viewModel.toggleScanning() }) {
-                    HStack {
-                        Image(systemName: viewModel.isConnected ? "stop.circle" :
-                              (viewModel.isScanning ? "pause.circle" : "play.circle"))
-                        Text(viewModel.scanButtonText)
+                // Connect Button
+                Button(action: {
+                    if bleManager.isConnected {
+                        bleManager.disconnect()
+                    } else {
+                        bleManager.startScanning()
                     }
-                    .font(designSystem.typography.button)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, designSystem.spacing.md)
-                    .padding(.vertical, designSystem.spacing.sm)
-                    .background(viewModel.isConnected ? Color.red :
-                               (viewModel.isScanning ? Color.orange : Color.blue))
-                    .cornerRadius(designSystem.cornerRadius.medium)
+                }) {
+                    Text(bleManager.isConnected ? "Disconnect" : "Connect")
+                        .font(designSystem.typography.button)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, designSystem.spacing.md)
+                        .padding(.vertical, designSystem.spacing.sm)
+                        .background(bleManager.isConnected ? Color.red : Color.blue)
+                        .cornerRadius(designSystem.cornerRadius.medium)
                 }
             }
-            .padding(designSystem.spacing.md)
-            .background(designSystem.colors.backgroundSecondary)
-            .cornerRadius(designSystem.cornerRadius.large)
+        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
+    }
+    
+    // MARK: - MAM State Card (NEW)
+    private var mamStateCard: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("MAM STATUS")
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+            
+            HStack(spacing: 0) {
+                // Charging State
+                VStack(spacing: designSystem.spacing.xs) {
+                    Image(systemName: viewModel.isCharging ? "battery.100.bolt" : "battery.100")
+                        .font(.system(size: 28))
+                        .foregroundColor(viewModel.isCharging ? .green : designSystem.colors.textTertiary)
+                    Text(viewModel.isCharging ? "Charging" : "Battery")
+                        .font(.system(size: 11))
+                        .foregroundColor(designSystem.colors.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                
+                // Movement State
+                VStack(spacing: designSystem.spacing.xs) {
+                    Image(systemName: viewModel.isMoving ? "figure.walk" : "figure.stand")
+                        .font(.system(size: 28))
+                        .foregroundColor(viewModel.isMoving ? .orange : designSystem.colors.textTertiary)
+                    Text(viewModel.isMoving ? "Moving" : "Still")
+                        .font(.system(size: 11))
+                        .foregroundColor(designSystem.colors.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                
+                // Position Quality
+                VStack(spacing: designSystem.spacing.xs) {
+                    Image(systemName: positionQualityIcon)
+                        .font(.system(size: 28))
+                        .foregroundColor(positionQualityColor)
+                    Text(viewModel.positionQuality)
+                        .font(.system(size: 11))
+                        .foregroundColor(designSystem.colors.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
+    }
+    
+    private var positionQualityIcon: String {
+        switch viewModel.positionQuality {
+        case "Good": return "checkmark.circle.fill"
+        case "Adjust": return "exclamationmark.triangle.fill"
+        default: return "xmark.circle.fill"
+        }
+    }
+    
+    private var positionQualityColor: Color {
+        switch viewModel.positionQuality {
+        case "Good": return .green
+        case "Adjust": return .orange
+        default: return .red
         }
     }
     
     // MARK: - Metrics Grid
-    
     private var metricsGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible())
-        ], spacing: designSystem.spacing.md) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
+            // Heart Rate
             MetricCard(
-                title: "Heart Rate",
-                value: viewModel.heartRateText,
-                unit: "bpm",
                 icon: "heart.fill",
-                color: .red
+                title: "Heart Rate",
+                value: "\(viewModel.heartRate)",
+                unit: "bpm",
+                color: .red,
+                designSystem: designSystem
             )
             
+            // SpO2
             MetricCard(
-                title: "SpO₂",
-                value: viewModel.spo2Text,
+                icon: "lungs.fill",
+                title: "SpO2",
+                value: "\(viewModel.spO2)",
                 unit: "%",
-                icon: "drop.fill",
-                color: .blue
+                color: .blue,
+                designSystem: designSystem
             )
             
+            // Temperature
             MetricCard(
-                title: "Temperature",
-                value: viewModel.temperatureText,
-                unit: "",
                 icon: "thermometer",
-                color: .orange
+                title: "Temperature",
+                value: String(format: "%.1f", viewModel.temperature),
+                unit: "°C",
+                color: .orange,
+                designSystem: designSystem
             )
             
+            // Battery
             MetricCard(
-                title: "Battery",
-                value: viewModel.batteryPercentageText,
-                unit: "",
                 icon: batteryIcon,
-                color: batteryColor
+                title: "Battery",
+                value: "\(Int(bleManager.batteryLevel))",
+                unit: "%",
+                color: batteryColor,
+                designSystem: designSystem
+            )
+            
+            // Session Time
+            MetricCard(
+                icon: "clock.fill",
+                title: "Session",
+                value: viewModel.sessionDuration,
+                unit: "",
+                color: .purple,
+                designSystem: designSystem
+            )
+            
+            // Signal Quality
+            MetricCard(
+                icon: "wifi",
+                title: "Signal",
+                value: "\(viewModel.signalQuality)",
+                unit: "%",
+                color: .green,
+                designSystem: designSystem
             )
         }
     }
     
-    // Battery icon helper
     private var batteryIcon: String {
-        switch viewModel.batteryLevel {
-        case 0..<25: return "battery.25"
-        case 25..<50: return "battery.50"
-        case 50..<75: return "battery.75"
-        default: return "battery.100"
+        if viewModel.isCharging {
+            return "battery.100.bolt"
         }
+        let level = bleManager.batteryLevel
+        if level > 75 { return "battery.100" }
+        if level > 50 { return "battery.75" }
+        if level > 25 { return "battery.50" }
+        return "battery.25"
     }
     
-    // Battery color helper
     private var batteryColor: Color {
-        switch viewModel.batteryLevel {
-        case 0..<20: return .red
-        case 20..<50: return .orange
-        default: return .green
+        let level = bleManager.batteryLevel
+        if level < 20 { return .red }
+        if level < 50 { return .orange }
+        return .green
+    }
+    
+    // MARK: - Waveform Section
+    private var waveformSection: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            // PPG Waveform
+            WaveformCard(
+                title: "PPG Signal",
+                data: viewModel.ppgData,
+                color: .red,
+                designSystem: designSystem
+            )
+            
+            // Accelerometer
+            WaveformCard(
+                title: "Movement",
+                data: viewModel.accelerometerData,
+                color: .blue,
+                designSystem: designSystem
+            )
         }
     }
     
-    // MARK: - PPG Waveform Card
-    
-    private var ppgWaveformCard: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            HStack {
-                Text("PPG Waveform")
-                    .font(designSystem.typography.h3)
+    // MARK: - Action Buttons
+    private var actionButtons: some View {
+        HStack(spacing: designSystem.spacing.md) {
+            // Historical Data
+            Button(action: { showingHistorical = true }) {
+                Label("History", systemImage: "chart.line.uptrend.xyaxis")
+                    .font(designSystem.typography.button)
                     .foregroundColor(designSystem.colors.textPrimary)
-                
-                Spacer()
-                
-                HStack(spacing: designSystem.spacing.xs) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 8, height: 8)
-                    Text("Red")
-                        .font(designSystem.typography.caption)
-                    
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text("IR")
-                        .font(designSystem.typography.caption)
-                }
-                .foregroundColor(designSystem.colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(designSystem.spacing.md)
+                    .background(designSystem.colors.backgroundSecondary)
+                    .cornerRadius(designSystem.cornerRadius.medium)
             }
             
-            Chart(viewModel.ppgData) { dataPoint in
-                LineMark(
-                    x: .value("Time", dataPoint.timestamp),
-                    y: .value("Red", dataPoint.red)
-                )
-                .foregroundStyle(.red)
-                .lineStyle(StrokeStyle(lineWidth: 1))
-                
-                LineMark(
-                    x: .value("Time", dataPoint.timestamp),
-                    y: .value("IR", dataPoint.ir)
-                )
-                .foregroundStyle(.orange)
-                .lineStyle(StrokeStyle(lineWidth: 1))
-            }
-            .frame(height: 200)
-            .chartXAxis(.hidden)
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
-        }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.large)
-    }
-    
-    // MARK: - Accelerometer Card
-    
-    private var accelerometerCard: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            HStack {
-                Text("Accelerometer")
-                    .font(designSystem.typography.h3)
+            // Share
+            Button(action: { showingShare = true }) {
+                Label("Export", systemImage: "square.and.arrow.up")
+                    .font(designSystem.typography.button)
                     .foregroundColor(designSystem.colors.textPrimary)
-                
-                Spacer()
-                
-                HStack(spacing: designSystem.spacing.xs) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 8, height: 8)
-                    Text("X")
-                    
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("Y")
-                    
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 8, height: 8)
-                    Text("Z")
-                }
-                .font(designSystem.typography.caption)
-                .foregroundColor(designSystem.colors.textSecondary)
-            }
-            
-            Chart(viewModel.accelerometerData) { dataPoint in
-                LineMark(
-                    x: .value("Time", dataPoint.timestamp),
-                    y: .value("X", dataPoint.x)
-                )
-                .foregroundStyle(.red)
-                .lineStyle(StrokeStyle(lineWidth: 1))
-                
-                LineMark(
-                    x: .value("Time", dataPoint.timestamp),
-                    y: .value("Y", dataPoint.y)
-                )
-                .foregroundStyle(.green)
-                .lineStyle(StrokeStyle(lineWidth: 1))
-                
-                LineMark(
-                    x: .value("Time", dataPoint.timestamp),
-                    y: .value("Z", dataPoint.z)
-                )
-                .foregroundStyle(.blue)
-                .lineStyle(StrokeStyle(lineWidth: 1))
-            }
-            .frame(height: 150)
-            .chartXAxis(.hidden)
-            .chartYAxis {
-                AxisMarks(position: .leading)
+                    .frame(maxWidth: .infinity)
+                    .padding(designSystem.spacing.md)
+                    .background(designSystem.colors.backgroundSecondary)
+                    .cornerRadius(designSystem.cornerRadius.medium)
             }
         }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.large)
-    }
-    
-    // MARK: - Quick Actions Card
-    
-    private var quickActionsCard: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Quick Actions")
-                .font(designSystem.typography.h3)
-                .foregroundColor(designSystem.colors.textPrimary)
-            
-            HStack(spacing: designSystem.spacing.md) {
-                QuickActionButton(
-                    title: "Export",
-                    icon: "square.and.arrow.up",
-                    action: { showingExportSheet = true }
-                )
-                
-                NavigationLink(destination: HistoricalView()) {
-                    QuickActionView(
-                        title: "History",
-                        icon: "clock.arrow.circlepath"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                NavigationLink(destination: SettingsView()) {
-                    QuickActionView(
-                        title: "Settings",
-                        icon: "gearshape"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(designSystem.cornerRadius.large)
     }
 }
 
-// MARK: - Supporting Views (Keep these as they're used within DashboardView)
-
+// MARK: - Metric Card Component
 struct MetricCard: View {
+    let icon: String
     let title: String
     let value: String
     let unit: String
-    let icon: String
     let color: Color
-    @EnvironmentObject var designSystem: DesignSystem
+    let designSystem: DesignSystem
     
     var body: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(color)
-                    .font(.system(size: 16))
-                
+                    .font(.system(size: 20))
                 Spacer()
             }
             
@@ -373,64 +368,48 @@ struct MetricCard: View {
                 Text(value)
                     .font(designSystem.typography.h2)
                     .foregroundColor(designSystem.colors.textPrimary)
-                
                 Text(unit)
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textSecondary)
             }
         }
         .padding(designSystem.spacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(designSystem.colors.backgroundTertiary)
+        .background(designSystem.colors.backgroundSecondary)
         .cornerRadius(designSystem.cornerRadius.medium)
     }
 }
 
-struct QuickActionButton: View {
+// MARK: - Waveform Card Component
+struct WaveformCard: View {
     let title: String
-    let icon: String
-    let action: () -> Void
-    @EnvironmentObject var designSystem: DesignSystem
+    let data: [Double]
+    let color: Color
+    let designSystem: DesignSystem
     
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: designSystem.spacing.xs) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                Text(title)
-                    .font(designSystem.typography.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(designSystem.spacing.sm)
-            .foregroundColor(designSystem.colors.textPrimary)
-            .background(designSystem.colors.backgroundTertiary)
-            .cornerRadius(designSystem.cornerRadius.small)
-        }
-    }
-}
-
-struct QuickActionView: View {
-    let title: String
-    let icon: String
-    @EnvironmentObject var designSystem: DesignSystem
-    
-    var body: some View {
-        VStack(spacing: designSystem.spacing.xs) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             Text(title)
                 .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textSecondary)
+            
+            Chart(Array(data.enumerated()), id: \.offset) { index, value in
+                LineMark(
+                    x: .value("Time", index),
+                    y: .value("Value", value)
+                )
+                .foregroundStyle(color)
+            }
+            .frame(height: 100)
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
         }
-        .frame(maxWidth: .infinity)
-        .padding(designSystem.spacing.sm)
-        .foregroundColor(designSystem.colors.textPrimary)
-        .background(designSystem.colors.backgroundTertiary)
-        .cornerRadius(designSystem.cornerRadius.small)
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.medium)
     }
 }
 
-// MARK: - Previews
-
+// MARK: - Preview
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         DashboardView()

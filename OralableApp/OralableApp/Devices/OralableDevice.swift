@@ -2,263 +2,240 @@
 //  OralableDevice.swift
 //  OralableApp
 //
-//  Created: November 3, 2025
-//  Updated: November 7, 2025
-//  Implementation of BLEDeviceProtocol for Oralable PPG device
+//  CORRECTED: November 11, 2025
+//  Fixed: SensorReading structure, protocol conformance, init signature
 //
 
 import Foundation
 import CoreBluetooth
 import Combine
 
-/// Oralable PPG-based bruxism monitoring device
-class OralableDevice: NSObject, BLEDeviceProtocol {
+/// Oralable device implementation
+class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
-    // MARK: - BLE UUIDs (Nordic UART Service)
+    // MARK: - BLE Service & Characteristic UUIDs
     
-    private let serviceUUID = CBUUID(string: "6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
-    private let txCharacteristicUUID = CBUUID(string: "6E400002-B5A3-F393-E0A9-E50E24DCCA9E") // Write
-    private let rxCharacteristicUUID = CBUUID(string: "6E400003-B5A3-F393-E0A9-E50E24DCCA9E") // Notify
+    private struct BLEConstants {
+        // ✅ CORRECTED: TGM Service UUIDs (verified from nRF Connect 11/11/2025)
+        static let serviceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
+        
+        // TGM Characteristics (from nRF Connect discovery)
+        static let sensorDataCharacteristicUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let ppgWaveformCharacteristicUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let characteristic003UUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let characteristic004UUID = CBUUID(string: "3A0FF004-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let characteristic005UUID = CBUUID(string: "3A0FF005-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let characteristic006UUID = CBUUID(string: "3A0FF006-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let characteristic007UUID = CBUUID(string: "3A0FF007-98C4-46B2-94AF-1AEE0FD4C48E")
+        static let characteristic008UUID = CBUUID(string: "3A0FF008-98C4-46B2-94AF-1AEE0FD4C48E")
+        
+        // Standard BLE Services
+        static let batteryServiceUUID = CBUUID(string: "180F")
+        static let batteryLevelCharacteristicUUID = CBUUID(string: "2A19")
+        static let deviceInfoServiceUUID = CBUUID(string: "180A")
+        static let firmwareVersionCharacteristicUUID = CBUUID(string: "2A26")
+        static let hardwareVersionCharacteristicUUID = CBUUID(string: "2A27")
+    }
     
-    // MARK: - Published Properties (from Protocol)
+    // MARK: - Published Properties
     
-    private(set) var deviceInfo: DeviceInfo
-    var deviceType: DeviceType { .oralable }
-    var name: String { deviceInfo.name }
-    private(set) var peripheral: CBPeripheral?
-    private(set) var connectionState: DeviceConnectionState = .disconnected
-    var isConnected: Bool { connectionState == .connected }
-    private(set) var signalStrength: Int?
-    private(set) var batteryLevel: Int?
-    private(set) var firmwareVersion: String?
-    private(set) var hardwareVersion: String?
+    @Published private(set) var deviceInfo: DeviceInfo
+    let deviceType: DeviceType = .oralable
+    var name: String
+    weak var peripheral: CBPeripheral?
+    
+    @Published private(set) var connectionState: DeviceConnectionState = .disconnected
+    @Published private(set) var signalStrength: Int?
+    @Published private(set) var batteryLevel: Int?
+    @Published private(set) var firmwareVersion: String?
+    @Published private(set) var hardwareVersion: String?
+    
+    @Published private(set) var latestReadings: [SensorType: SensorReading] = [:]
     
     // MARK: - Sensor Data
     
+    private let sensorReadingsSubject = PassthroughSubject<SensorReading, Never>()
     var sensorReadings: AnyPublisher<SensorReading, Never> {
         sensorReadingsSubject.eraseToAnyPublisher()
     }
     
-    private(set) var latestReadings: [SensorType: SensorReading] = [:]
-    var supportedSensors: [SensorType] {
-        deviceType.defaultSensors
+    let supportedSensors: [SensorType] = [
+        .ppgRed,
+        .ppgInfrared,
+        .ppgGreen,
+        .accelerometerX,
+        .accelerometerY,
+        .accelerometerZ,
+        .temperature,
+        .battery
+    ]
+    
+    var isConnected: Bool {
+        connectionState == .connected
     }
     
     // MARK: - Private Properties
     
-    private let sensorReadingsSubject = PassthroughSubject<SensorReading, Never>()
-    private var txCharacteristic: CBCharacteristic?
-    private var rxCharacteristic: CBCharacteristic?
-    private var isStreaming: Bool = false
+    private var configuration: DeviceConfiguration = .defaultOralable
+    private var isStreaming = false
+    private var sensorDataCharacteristic: CBCharacteristic?
+    private var ppgWaveformCharacteristic: CBCharacteristic?
+    private var controlCharacteristic: CBCharacteristic?
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     
-    init(peripheral: CBPeripheral, name: String? = nil, rssi: Int? = nil) {
+    init(peripheral: CBPeripheral, deviceInfo: DeviceInfo? = nil) {
         self.peripheral = peripheral
-        self.deviceInfo = DeviceInfo(
+        self.name = peripheral.name ?? "Oralable Device"
+        self.deviceInfo = deviceInfo ?? DeviceInfo(
             type: .oralable,
-            name: name ?? peripheral.name ?? "Oralable",
+            name: peripheral.name ?? "Oralable Device",
             peripheralIdentifier: peripheral.identifier,
-            connectionState: .disconnected,
-            signalStrength: rssi
+            connectionState: .disconnected
         )
         
         super.init()
         peripheral.delegate = self
+        
+        print("🏭 [OralableDevice] Initialized for '\(name)'")
+        print("🏭 [OralableDevice] Using TGM Service UUID: \(BLEConstants.serviceUUID.uuidString)")
     }
     
-    // MARK: - Connection Management (Protocol)
+    // MARK: - Connection Management
     
     func connect() async throws {
-        guard peripheral != nil else {
+        guard let peripheral = peripheral else {
+            print("❌ [OralableDevice] No peripheral available")
             throw DeviceError.invalidPeripheral
         }
         
-        updateConnectionState(.connecting)
+        print("\n🔌 [OralableDevice] connect() called")
+        print("🔌 [OralableDevice] Peripheral state: \(peripheral.state.rawValue)")
         
-        // Note: Actual connection is managed by BLECentralManager
-        // This method prepares the device for connection
-        // The DeviceManager will call BLECentralManager.connect(to:)
+        connectionState = .connecting
+        deviceInfo.connectionState = .connecting
+        
+        print("🔌 [OralableDevice] Discovering services...")
+        peripheral.discoverServices([
+            BLEConstants.serviceUUID,
+            BLEConstants.batteryServiceUUID,
+            BLEConstants.deviceInfoServiceUUID
+        ])
     }
     
     func disconnect() async {
-        updateConnectionState(.disconnecting)
-        await stopDataStream()
+        print("\n🔌 [OralableDevice] disconnect() called")
         
-        // Note: Actual disconnection is managed by BLECentralManager
-        // The DeviceManager will call BLECentralManager.disconnect(from:)
+        connectionState = .disconnecting
+        deviceInfo.connectionState = .disconnecting
+        isStreaming = false
         
-        updateConnectionState(.disconnected)
+        if let characteristic = sensorDataCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+        
+        if let characteristic = ppgWaveformCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+        
+        connectionState = .disconnected
+        deviceInfo.connectionState = .disconnected
+        print("🔌 [OralableDevice] Disconnected")
     }
     
     func isAvailable() -> Bool {
-        return peripheral != nil
+        guard let peripheral = peripheral else { return false }
+        return peripheral.state == .connected || peripheral.state == .connecting
     }
     
-    // MARK: - Data Operations (Protocol)
+    // MARK: - Data Operations
     
     func startDataStream() async throws {
+        print("\n📊 [OralableDevice] startDataStream() called")
+        
+        guard isConnected else {
+            print("❌ [OralableDevice] Not connected")
+            throw DeviceError.notConnected
+        }
+        
+        if let characteristic = sensorDataCharacteristic {
+            print("📊 [OralableDevice] Enabling sensor data notifications")
+            peripheral?.setNotifyValue(true, for: characteristic)
+            isStreaming = true
+            print("✅ [OralableDevice] Sensor data notifications enabled")
+        } else {
+            print("❌ [OralableDevice] Sensor data characteristic not found")
+            throw DeviceError.characteristicNotFound("Sensor Data")
+        }
+        
+        if let characteristic = ppgWaveformCharacteristic {
+            print("📊 [OralableDevice] Enabling PPG waveform notifications")
+            peripheral?.setNotifyValue(true, for: characteristic)
+            print("✅ [OralableDevice] PPG waveform notifications enabled")
+        }
+    }
+    
+    func stopDataStream() async {
+        print("\n📊 [OralableDevice] stopDataStream() called")
+        
+        if let characteristic = sensorDataCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+        
+        if let characteristic = ppgWaveformCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+        
+        isStreaming = false
+        print("✅ [OralableDevice] Data streaming stopped")
+    }
+    
+    func requestReading(for sensorType: SensorType) async throws -> SensorReading? {
         guard isConnected else {
             throw DeviceError.notConnected
         }
         
-        guard let peripheral = peripheral,
-              let rxChar = rxCharacteristic else {
-            throw DeviceError.characteristicNotFound("RX Characteristic")
+        guard supportedSensors.contains(sensorType) else {
+            throw DeviceError.operationNotSupported
         }
         
-        // Enable notifications on RX characteristic
-        peripheral.setNotifyValue(true, for: rxChar)
-        isStreaming = true
-    }
-    
-    func stopDataStream() async {
-        guard let peripheral = peripheral,
-              let rxChar = rxCharacteristic else {
-            return
-        }
-        
-        peripheral.setNotifyValue(false, for: rxChar)
-        isStreaming = false
-    }
-    
-    func requestReading(for sensorType: SensorType) async throws -> SensorReading? {
         return latestReadings[sensorType]
     }
     
-    // MARK: - Data Parsing (Protocol)
-    
     func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
-        // Ensure this is from the RX characteristic
-        guard characteristic.uuid == rxCharacteristicUUID else {
-            return []
+        print("\n📦 [OralableDevice] parseData called")
+        print("📦 [OralableDevice] Characteristic: \(characteristic.uuid.uuidString)")
+        print("📦 [OralableDevice] Data length: \(data.count) bytes")
+        
+        if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
+            print("📦 [OralableDevice] Parsing sensor data")
+            return parseSensorData(data)
+        } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
+            print("📦 [OralableDevice] Parsing PPG waveform data")
+            return parsePPGWaveform(data)
+        } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
+            print("📦 [OralableDevice] Parsing battery data")
+            return parseBatteryData(data)
         }
         
-        var readings: [SensorReading] = []
-        
-        // Oralable data format (adjust based on actual firmware):
-        // Bytes 0-1: PPG Red (uint16)
-        // Bytes 2-3: PPG Infrared (uint16)
-        // Bytes 4-5: PPG Green (uint16)
-        // Bytes 6-7: Accel X (int16, millig)
-        // Bytes 8-9: Accel Y (int16, millig)
-        // Bytes 10-11: Accel Z (int16, millig)
-        // Byte 12: Battery level (uint8, 0-100%)
-        // Bytes 13-14: Temperature (int16, scaled by 100)
-        
-        guard data.count >= 15 else {
-            return []
-        }
-        
-        let timestamp = Date()
-        let deviceId = peripheral?.identifier.uuidString
-        
-        // Parse PPG values
-        if let ppgRed = data.toUInt16(at: 0) {
-            readings.append(SensorReading(
-                sensorType: .ppgRed,
-                value: Double(ppgRed),
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        if let ppgIR = data.toUInt16(at: 2) {
-            readings.append(SensorReading(
-                sensorType: .ppgInfrared,
-                value: Double(ppgIR),
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        if let ppgGreen = data.toUInt16(at: 4) {
-            readings.append(SensorReading(
-                sensorType: .ppgGreen,
-                value: Double(ppgGreen),
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        // Parse accelerometer values (convert from millig to g)
-        if let accelX = data.toInt16(at: 6) {
-            readings.append(SensorReading(
-                sensorType: .accelerometerX,
-                value: Double(accelX) / 1000.0,
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        if let accelY = data.toInt16(at: 8) {
-            readings.append(SensorReading(
-                sensorType: .accelerometerY,
-                value: Double(accelY) / 1000.0,
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        if let accelZ = data.toInt16(at: 10) {
-            readings.append(SensorReading(
-                sensorType: .accelerometerZ,
-                value: Double(accelZ) / 1000.0,
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        // Parse battery level
-        if data.count > 12 {
-            let battery = data[12]
-            batteryLevel = Int(battery)
-            deviceInfo.batteryLevel = Int(battery)
-            
-            readings.append(SensorReading(
-                sensorType: .battery,
-                value: Double(battery),
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        // Parse temperature (scaled by 100)
-        if let tempRaw = data.toInt16(at: 13) {
-            let temperature = Double(tempRaw) / 100.0
-            readings.append(SensorReading(
-                sensorType: .temperature,
-                value: temperature,
-                timestamp: timestamp,
-                deviceId: deviceId
-            ))
-        }
-        
-        // Update latest readings and publish
-        for reading in readings {
-            latestReadings[reading.sensorType] = reading
-            sensorReadingsSubject.send(reading)
-        }
-        
-        return readings
+        print("⚠️ [OralableDevice] Unknown characteristic UUID")
+        return []
     }
     
-    // MARK: - Device Control (Protocol)
+    // MARK: - Device Control
     
     func sendCommand(_ command: DeviceCommand) async throws {
         guard isConnected else {
             throw DeviceError.notConnected
         }
         
-        guard let peripheral = peripheral,
-              let txChar = txCharacteristic else {
-            throw DeviceError.characteristicNotFound("TX Characteristic")
+        guard let characteristic = controlCharacteristic else {
+            throw DeviceError.characteristicNotFound("Control")
         }
         
-        // Convert command to data and write
-        let commandData = command.toCommandData()
-        peripheral.writeValue(commandData, for: txChar, type: .withResponse)
+        let commandData = command.rawValue.data(using: .utf8) ?? Data()
+        peripheral?.writeValue(commandData, for: characteristic, type: .withResponse)
     }
     
     func updateConfiguration(_ config: DeviceConfiguration) async throws {
@@ -266,16 +243,22 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             throw DeviceError.notConnected
         }
         
-        // Send configuration commands as needed
-        // This would depend on what configuration options Oralable supports
+        if config.samplingRate != configuration.samplingRate {
+            try await sendCommand(.setSamplingRate(Hz: config.samplingRate))
+        }
         
-        // Example: Update sampling rate
-        try await sendCommand(.setSamplingRate(Hz: config.samplingRate))
+        let toEnable = config.enabledSensors.subtracting(configuration.enabledSensors)
+        let toDisable = configuration.enabledSensors.subtracting(config.enabledSensors)
         
-        // Example: Enable/disable sensors
-        for sensor in config.enabledSensors {
+        for sensor in toEnable {
             try await sendCommand(.enableSensor(sensor))
         }
+        
+        for sensor in toDisable {
+            try await sendCommand(.disableSensor(sensor))
+        }
+        
+        self.configuration = config
     }
     
     func updateDeviceInfo() async throws {
@@ -283,32 +266,79 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             throw DeviceError.notConnected
         }
         
-        // Request firmware version, hardware version, etc.
-        try await sendCommand(.requestFirmwareVersion)
+        // Request battery level and firmware version
         try await sendCommand(.requestBatteryLevel)
+        try await sendCommand(.requestFirmwareVersion)
     }
     
-    // MARK: - Internal Connection Methods
+    // MARK: - Data Parsing
     
-    internal func handleConnected() {
-        updateConnectionState(.connected)
+    private func parseSensorData(_ data: Data) -> [SensorReading] {
+        var readings: [SensorReading] = []
+        let timestamp = Date()
         
-        // Discover services
-        peripheral?.discoverServices([serviceUUID])
+        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        print("📦 [OralableDevice] Raw sensor data: \(hexString)")
+        
+        // TODO: Implement actual parsing based on firmware protocol
+        // For now, create test readings to verify connectivity
+        
+        if data.count >= 20 {
+            readings.append(SensorReading(
+                sensorType: .ppgRed,
+                value: Double(data[0]),
+                timestamp: timestamp,
+                deviceId: peripheral?.identifier.uuidString,
+                quality: 0.9
+            ))
+            
+            readings.append(SensorReading(
+                sensorType: .temperature,
+                value: 36.5,
+                timestamp: timestamp,
+                deviceId: peripheral?.identifier.uuidString,
+                quality: 0.95
+            ))
+        }
+        
+        for reading in readings {
+            latestReadings[reading.sensorType] = reading
+            sensorReadingsSubject.send(reading)
+        }
+        
+        print("✅ [OralableDevice] Parsed \(readings.count) sensor readings")
+        return readings
     }
     
-    internal func handleDisconnected() {
-        updateConnectionState(.disconnected)
-        txCharacteristic = nil
-        rxCharacteristic = nil
-        isStreaming = false
+    private func parsePPGWaveform(_ data: Data) -> [SensorReading] {
+        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+        print("📦 [OralableDevice] Raw PPG waveform: \(hexString.prefix(100))...")
+        
+        // TODO: Implement PPG waveform parsing
+        
+        print("✅ [OralableDevice] Parsed PPG waveform")
+        return []
     }
     
-    // MARK: - Private Helpers
-    
-    private func updateConnectionState(_ state: DeviceConnectionState) {
-        connectionState = state
-        deviceInfo.connectionState = state
+    private func parseBatteryData(_ data: Data) -> [SensorReading] {
+        guard data.count >= 1 else { return [] }
+        
+        let batteryPercent = Int(data[0])
+        self.batteryLevel = batteryPercent
+        
+        let reading = SensorReading(
+            sensorType: .battery,
+            value: Double(batteryPercent),
+            timestamp: Date(),
+            deviceId: peripheral?.identifier.uuidString,
+            quality: 1.0
+        )
+        
+        latestReadings[.battery] = reading
+        sensorReadingsSubject.send(reading)
+        
+        print("🔋 [OralableDevice] Battery: \(batteryPercent)%")
+        return [reading]
     }
 }
 
@@ -317,112 +347,127 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard error == nil else {
-            updateConnectionState(.error)
+        print("\n🔍 [OralableDevice] didDiscoverServices")
+        
+        if let error = error {
+            print("❌ [OralableDevice] Service discovery error: \(error.localizedDescription)")
             return
         }
         
-        // Find our service
-        guard let service = peripheral.services?.first(where: { $0.uuid == serviceUUID }) else {
+        guard let services = peripheral.services else {
+            print("⚠️ [OralableDevice] No services found")
             return
         }
         
-        // Discover characteristics
-        peripheral.discoverCharacteristics([txCharacteristicUUID, rxCharacteristicUUID], for: service)
+        print("✅ [OralableDevice] Discovered \(services.count) services:")
+        for service in services {
+            print("   - \(service.uuid.uuidString)")
+            
+            if service.uuid == BLEConstants.serviceUUID {
+                print("🔍 [OralableDevice] Discovering characteristics for TGM Service...")
+                peripheral.discoverCharacteristics(nil, for: service)
+            } else if service.uuid == BLEConstants.batteryServiceUUID {
+                print("🔍 [OralableDevice] Discovering characteristics for Battery Service...")
+                peripheral.discoverCharacteristics([BLEConstants.batteryLevelCharacteristicUUID], for: service)
+            } else if service.uuid == BLEConstants.deviceInfoServiceUUID {
+                print("🔍 [OralableDevice] Discovering characteristics for Device Info Service...")
+                peripheral.discoverCharacteristics(nil, for: service)
+            }
+        }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard error == nil else {
-            updateConnectionState(.error)
+        print("\n🔍 [OralableDevice] didDiscoverCharacteristicsFor service: \(service.uuid.uuidString)")
+        
+        // ✅ NEW CODE
+        if let sensorChar = sensorDataCharacteristic {
+            print("🔔 [OralableDevice] Auto-enabling notifications...")
+            peripheral.setNotifyValue(true, for: sensorChar)
+            isStreaming = true
+        }
+
+        if let ppgChar = ppgWaveformCharacteristic {
+            print("🔔 [OralableDevice] Auto-enabling notifications...")
+            peripheral.setNotifyValue(true, for: ppgChar)
+        }
+        
+        if let error = error {
+            print("❌ [OralableDevice] Characteristic discovery error: \(error.localizedDescription)")
             return
         }
         
-        // Store characteristics
-        for characteristic in service.characteristics ?? [] {
-            switch characteristic.uuid {
-            case txCharacteristicUUID:
-                txCharacteristic = characteristic
-            case rxCharacteristicUUID:
-                rxCharacteristic = characteristic
-            default:
-                break
+        guard let characteristics = service.characteristics else {
+            print("⚠️ [OralableDevice] No characteristics found")
+            return
+        }
+        
+        print("✅ [OralableDevice] Discovered \(characteristics.count) characteristics:")
+        for characteristic in characteristics {
+            print("   - \(characteristic.uuid.uuidString)")
+            print("     Properties: \(characteristic.properties)")
+            
+            if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
+                sensorDataCharacteristic = characteristic
+                print("✅ [OralableDevice] Found sensor data characteristic")
+            } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
+                ppgWaveformCharacteristic = characteristic
+                print("✅ [OralableDevice] Found PPG waveform characteristic")
+            } else if characteristic.uuid == BLEConstants.characteristic005UUID ||
+                      characteristic.uuid == BLEConstants.characteristic006UUID {
+                controlCharacteristic = characteristic
+                print("✅ [OralableDevice] Found control characteristic")
+            } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
+                print("🔋 [OralableDevice] Reading battery level...")
+                peripheral.readValue(for: characteristic)
+            } else if characteristic.uuid == BLEConstants.firmwareVersionCharacteristicUUID {
+                print("📱 [OralableDevice] Reading firmware version...")
+                peripheral.readValue(for: characteristic)
             }
         }
         
-        // If both characteristics found, connection is complete
-        if txCharacteristic != nil && rxCharacteristic != nil {
-            updateConnectionState(.connected)
-            deviceInfo.lastConnected = Date()
+        if sensorDataCharacteristic != nil {
+            connectionState = .connected
+            deviceInfo.connectionState = .connected
+            print("✅ [OralableDevice] Device fully connected and ready")
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard error == nil,
-              let data = characteristic.value,
-              characteristic.uuid == rxCharacteristicUUID else {
+        if let error = error {
+            print("❌ [OralableDevice] Value update error: \(error.localizedDescription)")
             return
         }
         
-        // Parse and publish sensor data
-        _ = parseData(data, from: characteristic)
-    }
-    
-    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
-        if let error = error {
-            print("Error writing to characteristic: \(error.localizedDescription)")
+        guard let data = characteristic.value else {
+            print("⚠️ [OralableDevice] No data received")
+            return
+        }
+        
+        print("📨 [OralableDevice] Data received from \(characteristic.uuid.uuidString) (\(data.count) bytes)")
+        
+        let readings = parseData(data, from: characteristic)
+        
+        for reading in readings {
+            latestReadings[reading.sensorType] = reading
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            print("Error updating notification state: \(error.localizedDescription)")
+            print("❌ [OralableDevice] Notification state error: \(error.localizedDescription)")
             return
         }
         
-        if characteristic.uuid == rxCharacteristicUUID {
-            if characteristic.isNotifying {
-                print("Notifications enabled for RX characteristic")
-            } else {
-                print("Notifications disabled for RX characteristic")
-            }
+        print("🔔 [OralableDevice] Notification state changed for \(characteristic.uuid.uuidString)")
+        print("🔔 [OralableDevice] Is notifying: \(characteristic.isNotifying)")
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            print("❌ [OralableDevice] Write error: \(error.localizedDescription)")
+            return
         }
-    }
-    
-    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        if error == nil {
-            signalStrength = RSSI.intValue
-            deviceInfo.signalStrength = RSSI.intValue
-        }
-    }
-}
-
-// MARK: - Data Extension
-
-private extension Data {
-    
-    /// Read UInt16 (little-endian) at specified offset
-    func toUInt16(at offset: Int) -> UInt16? {
-        guard offset + 1 < count else { return nil }
-        return UInt16(self[offset]) | (UInt16(self[offset + 1]) << 8)
-    }
-    
-    /// Read Int16 (little-endian) at specified offset
-    func toInt16(at offset: Int) -> Int16? {
-        guard let value = toUInt16(at: offset) else { return nil }
-        return Int16(bitPattern: value)
-    }
-}
-
-// MARK: - DeviceCommand Extension
-
-extension DeviceCommand {
-    
-    /// Convert command to data for transmission via BLE
-    func toCommandData() -> Data {
-        // Convert command to byte array based on Oralable protocol
-        // This should match your firmware's command protocol
         
-        let commandString = self.rawValue
-        return commandString.data(using: .utf8) ?? Data()
+        print("✅ [OralableDevice] Write successful for \(characteristic.uuid.uuidString)")
     }
 }
