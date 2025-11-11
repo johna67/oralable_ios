@@ -379,6 +379,18 @@ extension OralableDevice: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         print("\n🔍 [OralableDevice] didDiscoverCharacteristicsFor service: \(service.uuid.uuidString)")
         
+        // ✅ NEW CODE
+        if let sensorChar = sensorDataCharacteristic {
+            print("🔔 [OralableDevice] Auto-enabling notifications...")
+            peripheral.setNotifyValue(true, for: sensorChar)
+            isStreaming = true
+        }
+
+        if let ppgChar = ppgWaveformCharacteristic {
+            print("🔔 [OralableDevice] Auto-enabling notifications...")
+            peripheral.setNotifyValue(true, for: ppgChar)
+        }
+        
         if let error = error {
             print("❌ [OralableDevice] Characteristic discovery error: \(error.localizedDescription)")
             return
