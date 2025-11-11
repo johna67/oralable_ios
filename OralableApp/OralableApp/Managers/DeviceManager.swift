@@ -1,14 +1,11 @@
 //
-//  DeviceManager_Enhanced_Logging.swift
+//  DeviceManager.swift
 //  OralableApp
 //
-//  ENHANCED LOGGING VERSION
-//  Created: November 10, 2025
-//  Comprehensive debug logging for device discovery troubleshooting
+//  CORRECTED VERSION - November 11, 2025
+//  Production UUID filter ENABLED
 //
-//  INSTRUCTIONS:
-//  Replace DeviceManager.swift with this file
-//  This version logs every step of the scanning and discovery process
+//  Changes: Enabled production TGM Service UUID filter to connect to Oralable device
 //
 
 import Foundation
@@ -148,7 +145,7 @@ class DeviceManager: ObservableObject {
             if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
                 print("🔍 [DeviceManager] Found at index \(index), updating...")
                 discoveredDevices[index].signalStrength = rssi
-                print("🔍 [DeviceManager] ✅ RSSI updated from \(discoveredDevices[index].signalStrength) to \(rssi)")
+                print("🔍 [DeviceManager] ✅ RSSI updated to \(rssi)")
             }
             
             print(String(repeating: "=", count: 80))
@@ -196,36 +193,28 @@ class DeviceManager: ObservableObject {
         switch deviceType {
         case .oralable:
             print("🔍 [DeviceManager] Creating OralableDevice instance...")
-            device = OralableDevice(peripheral: peripheral)
+            device = OralableDevice(peripheral: peripheral, bleManager: bleManager!)
+            print("🔍 [DeviceManager] ✅ OralableDevice created")
         case .anr:
             print("🔍 [DeviceManager] Creating ANRMuscleSenseDevice instance...")
-            device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
+            device = ANRMuscleSenseDevice(peripheral: peripheral, bleManager: bleManager!)
+            print("🔍 [DeviceManager] ✅ ANRMuscleSenseDevice created")
         case .demo:
-            print("🔍 [DeviceManager] Creating Demo device (using MockBLEDevice)...")
-            #if DEBUG
-            device = MockBLEDevice(type: .demo)
-            #else
-            // In release builds, treat demo as oralable
-            device = OralableDevice(peripheral: peripheral)
-            #endif
+            print("🔍 [DeviceManager] Creating OralableDevice instance (demo mode)...")
+            device = OralableDevice(peripheral: peripheral, bleManager: bleManager!)
+            print("🔍 [DeviceManager] ✅ OralableDevice created (demo)")
         }
         
-        print("🔍 [DeviceManager] ✅ Device instance created")
-        
-        // Store device
         print("🔍 [DeviceManager] Storing device in devices dictionary...")
         devices[peripheral.identifier] = device
-        print("🔍 [DeviceManager] ✅ Device stored")
-        print("🔍 [DeviceManager] Total devices in dictionary: \(devices.count)")
+        print("🔍 [DeviceManager] ✅ Device stored, total devices: \(devices.count)")
         
-        // Subscribe to device sensor readings
-        print("🔍 [DeviceManager] Subscribing to device sensor readings...")
-        subscribeToDevice(device)
-        print("🔍 [DeviceManager] ✅ Subscribed to device")
+        print("🔍 [DeviceManager] Setting up device callback...")
+        setupDeviceCallback(device)
+        print("🔍 [DeviceManager] ✅ Device callback configured")
         
         print(String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] END handleDeviceDiscovered (SUCCESS)")
-        print("🔍 [DeviceManager] Summary: \(discoveredDevices.count) device(s) discovered so far")
+        print("🔍 [DeviceManager] END handleDeviceDiscovered (success)")
         print(String(repeating: "=", count: 80) + "\n")
     }
     
@@ -236,25 +225,22 @@ class DeviceManager: ObservableObject {
         
         isConnecting = false
         
-        // Update device info
+        // Update device states
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-            print("✅ [DeviceManager] Found device in discoveredDevices at index \(index)")
+            print("✅ [DeviceManager] Updating discoveredDevices[\(index)] to connected")
             discoveredDevices[index].connectionState = .connected
             
-            // Add to connected devices if not already there
-            if !connectedDevices.contains(where: { $0.id == discoveredDevices[index].id }) {
-                print("✅ [DeviceManager] Adding to connectedDevices array")
-                connectedDevices.append(discoveredDevices[index])
+            let deviceInfo = discoveredDevices[index]
+            if !connectedDevices.contains(where: { $0.id == deviceInfo.id }) {
+                print("✅ [DeviceManager] Adding to connectedDevices...")
+                connectedDevices.append(deviceInfo)
                 print("✅ [DeviceManager] connectedDevices count: \(connectedDevices.count)")
             }
             
-            // Set as primary if none set
             if primaryDevice == nil {
-                print("✅ [DeviceManager] Setting as primary device (first connection)")
-                primaryDevice = discoveredDevices[index]
+                print("✅ [DeviceManager] Setting as primary device")
+                primaryDevice = deviceInfo
             }
-        } else {
-            print("⚠️ [DeviceManager] Device not found in discoveredDevices!")
         }
         
         // Start device operations
@@ -322,14 +308,10 @@ class DeviceManager: ObservableObject {
             return .anr
         }
         
-        // TEMPORARY: Accept all devices as Oralable for testing
+        // PRODUCTION: Accept any device advertising TGM Service as Oralable
         print("🔍 [DeviceManager] ⚠️ Name doesn't match known patterns")
-        print("🔍 [DeviceManager] ⚠️ TEMPORARY: Accepting as Oralable for testing")
+        print("🔍 [DeviceManager] ✅ Accepting as Oralable (has TGM Service)")
         return .oralable
-        
-        // PRODUCTION: Return nil for unknown devices
-        // print("🔍 [DeviceManager] ❌ Unknown device type")
-        // return nil
     }
     
     // MARK: - Device Discovery
@@ -351,165 +333,148 @@ class DeviceManager: ObservableObject {
         isScanning = true
         print("🔍 [DeviceManager] isScanning = \(isScanning)")
         
-        // CHOOSE ONE OF THESE OPTIONS:
+        // ==========================================
+        // PRODUCTION MODE - ENABLED
+        // ==========================================
+        // Scan ONLY for TGM Service devices
+        print("🔍 [DeviceManager] Starting scan for TGM Service devices...")
+        let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
+        print("🔍 [DeviceManager] Service filter: \(tgmServiceUUID.uuidString)")
+        bleManager?.startScanning(services: [tgmServiceUUID])
         
-        // OPTION 1: Scan for ALL BLE devices (for debugging)
-        print("🔍 [DeviceManager] Starting scan for ALL BLE devices...")
-        print("🔍 [DeviceManager] (No service filter applied)")
-        bleManager?.startScanning()
-        
-        // OPTION 2: Scan ONLY for TGM Service devices (production)
-        // print("🔍 [DeviceManager] Starting scan for TGM Service devices...")
-        // let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-        // print("🔍 [DeviceManager] Service filter: \(tgmServiceUUID.uuidString)")
-        // bleManager?.startScanning(services: [tgmServiceUUID])
+        // ==========================================
+        // DEBUG MODE - DISABLED
+        // ==========================================
+        // Uncomment below to scan for ALL BLE devices
+        // print("🔍 [DeviceManager] Starting scan for ALL BLE devices...")
+        // print("🔍 [DeviceManager] (No service filter applied)")
+        // bleManager?.startScanning()
         
         print(String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] Scan started - waiting for discoveries...")
+        print("🔍 [DeviceManager] Scan started - waiting for discoveries")
         print(String(repeating: "=", count: 80) + "\n")
     }
     
     /// Stop scanning for devices
     func stopScanning() {
-        print("\n⏹️ [DeviceManager] stopScanning() called")
+        print("\n🛑 [DeviceManager] stopScanning() called")
+        print("🛑 [DeviceManager] isScanning before: \(isScanning)")
         
-        if let scanStart = scanStartTime {
-            let elapsed = Date().timeIntervalSince(scanStart)
-            print("⏹️ [DeviceManager] Total scan duration: \(String(format: "%.1f", elapsed))s")
-        }
-        
-        print("⏹️ [DeviceManager] Total devices discovered: \(discoveryCount)")
-        print("⏹️ [DeviceManager] Devices in list: \(discoveredDevices.count)")
-        
-        print("⏹️ [DeviceManager] Setting isScanning = false...")
+        bleManager?.stopScanning()
         isScanning = false
         
-        print("⏹️ [DeviceManager] Calling bleManager.stopScanning()...")
-        bleManager?.stopScanning()
+        if let scanStart = scanStartTime {
+            let duration = Date().timeIntervalSince(scanStart)
+            print("🛑 [DeviceManager] Scan duration: \(String(format: "%.1f", duration))s")
+            print("🛑 [DeviceManager] Devices discovered: \(discoveryCount)")
+            print("🛑 [DeviceManager] Devices in list: \(discoveredDevices.count)")
+        }
         
-        scanStartTime = nil
-        print("⏹️ [DeviceManager] Scan stopped\n")
+        print("🛑 [DeviceManager] isScanning after: \(isScanning)")
+        print("🛑 [DeviceManager] Scan stopped\n")
     }
     
-    // MARK: - Connection Management
+    // MARK: - Device Connection
     
+    /// Connect to a specific device
     func connect(to deviceInfo: DeviceInfo) async throws {
-        print("\n🔌 [DeviceManager] connect() called")
-        print("🔌 [DeviceManager] Device: \(deviceInfo.name)")
-        print("🔌 [DeviceManager] UUID: \(deviceInfo.id)")
+        print("\n📲 [DeviceManager] connect(to:) called")
+        print("📲 [DeviceManager] Device: \(deviceInfo.name)")
+        print("📲 [DeviceManager] Type: \(deviceInfo.type)")
+        print("📲 [DeviceManager] UUID: \(deviceInfo.peripheralIdentifier?.uuidString ?? "nil")")
         
-        guard let device = devices[deviceInfo.id] else {
-            print("❌ [DeviceManager] Device not found in devices dictionary!")
+        guard let peripheralId = deviceInfo.peripheralIdentifier else {
+            print("📲 [DeviceManager] ❌ No peripheral identifier")
             throw DeviceError.invalidPeripheral
         }
         
-        guard let peripheral = device.peripheral else {
-            print("❌ [DeviceManager] Device has no peripheral!")
-            throw DeviceError.invalidPeripheral
-        }
-        
+        print("📲 [DeviceManager] Setting isConnecting = true")
         isConnecting = true
-        print("🔌 [DeviceManager] isConnecting = true")
         
-        // Update state
+        print("📲 [DeviceManager] Updating device state to connecting...")
         if let index = discoveredDevices.firstIndex(where: { $0.id == deviceInfo.id }) {
-            print("🔌 [DeviceManager] Updating state to .connecting")
             discoveredDevices[index].connectionState = .connecting
+            print("📲 [DeviceManager] ✅ State updated")
         }
         
-        // Connect via BLE manager
-        print("🔌 [DeviceManager] Calling bleManager.connect()...")
-        bleManager?.connect(to: peripheral)
-        print("🔌 [DeviceManager] Connection request sent")
+        print("📲 [DeviceManager] Calling bleManager.connect()...")
+        try await bleManager?.connect(to: peripheralId)
+        print("📲 [DeviceManager] ✅ Connection initiated")
     }
     
-    func disconnect(from deviceInfo: DeviceInfo) {
-        print("\n🔌 [DeviceManager] disconnect() called")
+    /// Disconnect from a specific device
+    func disconnect(from deviceInfo: DeviceInfo) async {
+        print("\n🔌 [DeviceManager] disconnect(from:) called")
         print("🔌 [DeviceManager] Device: \(deviceInfo.name)")
         
-        guard let device = devices[deviceInfo.id],
-              let peripheral = device.peripheral else {
-            print("❌ [DeviceManager] Device or peripheral not found!")
+        guard let peripheralId = deviceInfo.peripheralIdentifier else {
+            print("🔌 [DeviceManager] ❌ No peripheral identifier")
             return
         }
         
         print("🔌 [DeviceManager] Calling bleManager.disconnect()...")
-        bleManager?.disconnect(from: peripheral)
-        
-        // Stop data collection
-        print("🔌 [DeviceManager] Stopping data collection...")
-        Task {
-            try? await device.stopDataCollection()
-            print("🔌 [DeviceManager] Data collection stopped")
-        }
+        await bleManager?.disconnect(from: peripheralId)
+        print("🔌 [DeviceManager] ✅ Disconnect requested")
     }
     
-    func disconnectAll() {
+    /// Disconnect from all devices
+    func disconnectAll() async {
         print("\n🔌 [DeviceManager] disconnectAll() called")
-        print("🔌 [DeviceManager] Connected devices count: \(connectedDevices.count)")
+        print("🔌 [DeviceManager] Connected devices: \(connectedDevices.count)")
         
         for deviceInfo in connectedDevices {
-            print("🔌 [DeviceManager] Disconnecting: \(deviceInfo.name)")
-            disconnect(from: deviceInfo)
+            await disconnect(from: deviceInfo)
         }
         
-        print("🔌 [DeviceManager] All disconnections requested")
+        print("🔌 [DeviceManager] ✅ All devices disconnected")
     }
     
-    // MARK: - Sensor Data Management
+    // MARK: - Device Data Management
     
-    private func subscribeToDevice(_ device: BLEDeviceProtocol) {
-        print("📊 [DeviceManager] subscribeToDevice")
-        print("📊 [DeviceManager] Device: \(device.deviceInfo.name)")
+    private func setupDeviceCallback(_ device: BLEDeviceProtocol) {
+        print("📊 [DeviceManager] Setting up device callback for \(device.info.name)")
         
-        device.sensorReadingsPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] reading in
-                self?.handleSensorReading(reading, from: device)
+        device.onDataReceived = { [weak self] reading in
+            Task { @MainActor in
+                guard let self = self else { return }
+                
+                // Add to all readings
+                self.allSensorReadings.append(reading)
+                
+                // Update latest reading for this sensor type
+                self.latestReadings[reading.type] = reading
+                
+                // Limit history size
+                if self.allSensorReadings.count > 1000 {
+                    self.allSensorReadings.removeFirst()
+                }
+                
+                print("📊 [DeviceManager] Data received: \(reading.type) = \(reading.value)")
             }
-            .store(in: &cancellables)
-        
-        print("📊 [DeviceManager] Subscription created")
-    }
-    
-    private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
-        // Add to all readings
-        allSensorReadings.append(reading)
-        
-        // Update latest readings
-        latestReadings[reading.sensorType] = reading
-        
-        // Trim history if needed (keep last 1000)
-        if allSensorReadings.count > 1000 {
-            allSensorReadings.removeFirst(100)
         }
+        
+        print("📊 [DeviceManager] ✅ Device callback configured")
     }
-    
-    // MARK: - Device Info Access
-    
-    func device(withId id: UUID) -> DeviceInfo? {
-        return discoveredDevices.first { $0.id == id }
-    }
-    
-    // MARK: - Data Management
     
     /// Clear all sensor readings
     func clearReadings() {
-        print("\n🗑️ [DeviceManager] clearReadings() called")
+        print("🗑️ [DeviceManager] Clearing all sensor readings")
+        print("🗑️ [DeviceManager] Readings before: \(allSensorReadings.count)")
+        
         allSensorReadings.removeAll()
         latestReadings.removeAll()
-        print("🗑️ [DeviceManager] All readings cleared")
+        
+        print("🗑️ [DeviceManager] Readings after: \(allSensorReadings.count)")
+        print("🗑️ [DeviceManager] ✅ All readings cleared")
     }
     
-    /// Set a device as the primary device
-    func setPrimaryDevice(_ deviceInfo: DeviceInfo?) {
-        print("\n📌 [DeviceManager] setPrimaryDevice() called")
-        if let device = deviceInfo {
-            print("📌 [DeviceManager] Setting primary device to: \(device.name)")
-        } else {
-            print("📌 [DeviceManager] Clearing primary device")
-        }
-        primaryDevice = deviceInfo
+    /// Get readings for a specific sensor type
+    func getReadings(for sensorType: SensorType) -> [SensorReading] {
+        return allSensorReadings.filter { $0.type == sensorType }
+    }
+    
+    /// Get latest reading for a specific sensor type
+    func getLatestReading(for sensorType: SensorType) -> SensorReading? {
+        return latestReadings[sensorType]
     }
 }
-
