@@ -419,17 +419,40 @@ class OralableBLE: ObservableObject {
     }
     
     func startRecording() {
-        isRecording = true
-        addLog("Recording session started")
-        // TODO: Implement actual recording session management
-        // This could include starting data logging, creating a session file, etc.
+        guard !isRecording else {
+            addLog("Recording already in progress")
+            return
+        }
+
+        do {
+            let session = try RecordingSessionManager.shared.startSession(
+                deviceID: deviceUUID?.uuidString,
+                deviceName: deviceName
+            )
+            isRecording = true
+            addLog("Recording session started: \(session.id)")
+            print("📝 [OralableBLE] Started recording session: \(session.formattedDuration)")
+        } catch {
+            addLog("Failed to start recording: \(error.localizedDescription)")
+            print("❌ [OralableBLE] Failed to start recording: \(error)")
+        }
     }
-    
+
     func stopRecording() {
-        isRecording = false
-        addLog("Recording session stopped")
-        // TODO: Implement actual recording session management
-        // This could include stopping data logging, saving session data, etc.
+        guard isRecording else {
+            addLog("No recording in progress")
+            return
+        }
+
+        do {
+            try RecordingSessionManager.shared.stopSession()
+            isRecording = false
+            addLog("Recording session stopped")
+            print("✅ [OralableBLE] Stopped recording session")
+        } catch {
+            addLog("Failed to stop recording: \(error.localizedDescription)")
+            print("❌ [OralableBLE] Failed to stop recording: \(error)")
+        }
     }
     
     func resetBLE() {

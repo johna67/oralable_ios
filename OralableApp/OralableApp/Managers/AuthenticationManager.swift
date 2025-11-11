@@ -50,15 +50,18 @@ class AuthenticationManager: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+        // Migrate any existing UserDefaults data to Keychain
+        KeychainManager.shared.migrateFromUserDefaults()
         checkAuthenticationState()
     }
-    
+
     // Check if user is already authenticated
     func checkAuthenticationState() {
-        if let userID = UserDefaults.standard.string(forKey: "userID") {
+        let auth = KeychainManager.shared.retrieveUserAuthentication()
+        if let userID = auth.userID {
             self.userID = userID
-            self.userEmail = UserDefaults.standard.string(forKey: "userEmail")
-            self.userFullName = UserDefaults.standard.string(forKey: "userFullName")
+            self.userEmail = auth.email
+            self.userFullName = auth.fullName
             self.isAuthenticated = true
         }
     }
@@ -78,42 +81,53 @@ class AuthenticationManager: NSObject, ObservableObject {
                 print("  Full Name: \(fullName?.description ?? "nil")")
                 print("  Given Name: \(fullName?.givenName ?? "nil")")
                 print("  Family Name: \(fullName?.familyName ?? "nil")")
-                
-                // Save to UserDefaults
-                UserDefaults.standard.set(userID, forKey: "userID")
-                
+
+                // Prepare values to save
+                var emailToSave: String? = nil
+                var fullNameToSave: String? = nil
+
                 // Handle email (only provided on first sign-in)
                 if let email = email, !email.isEmpty {
-                    UserDefaults.standard.set(email, forKey: "userEmail")
-                    print("✅ Email saved: \(email)")
+                    emailToSave = email
+                    print("✅ Email received: \(email)")
                 } else {
-                    print("⚠️ Email not provided (likely subsequent sign-in)")
+                    // Load existing email from Keychain for subsequent sign-ins
+                    emailToSave = KeychainManager.shared.retrieve(forKey: .userEmail)
+                    print("⚠️ Email not provided (loading from Keychain)")
                 }
-                
+
                 // Handle full name (only provided on first sign-in)
                 if let fullName = fullName,
                    let givenName = fullName.givenName,
                    !givenName.isEmpty {
-                    
+
                     let displayName = [fullName.givenName, fullName.familyName]
                         .compactMap { $0 }
                         .joined(separator: " ")
-                    
-                    UserDefaults.standard.set(displayName, forKey: "userFullName")
-                    print("✅ Full name saved: \(displayName)")
+
+                    fullNameToSave = displayName
+                    print("✅ Full name received: \(displayName)")
                 } else {
-                    print("⚠️ Full name not provided (likely subsequent sign-in)")
+                    // Load existing full name from Keychain for subsequent sign-ins
+                    fullNameToSave = KeychainManager.shared.retrieve(forKey: .userFullName)
+                    print("⚠️ Full name not provided (loading from Keychain)")
                 }
-                
+
+                // Save to Keychain securely
+                KeychainManager.shared.saveUserAuthentication(
+                    userID: userID,
+                    email: emailToSave,
+                    fullName: fullNameToSave
+                )
+
                 // Update published properties with stored values
                 DispatchQueue.main.async {
                     self.userID = userID
-                    // Always load from UserDefaults to handle subsequent sign-ins
-                    self.userEmail = UserDefaults.standard.string(forKey: "userEmail")
-                    self.userFullName = UserDefaults.standard.string(forKey: "userFullName")
+                    self.userEmail = emailToSave
+                    self.userFullName = fullNameToSave
                     self.isAuthenticated = true
                     self.authenticationError = nil
-                    
+
                     print("📱 Updated properties:")
                     print("  Published email: \(self.userEmail ?? "nil")")
                     print("  Published name: \(self.userFullName ?? "nil")")
@@ -131,10 +145,8 @@ class AuthenticationManager: NSObject, ObservableObject {
     
     // Sign out
     func signOut() {
-        UserDefaults.standard.removeObject(forKey: "userID")
-        UserDefaults.standard.removeObject(forKey: "userEmail")
-        UserDefaults.standard.removeObject(forKey: "userFullName")
-        
+        KeychainManager.shared.deleteAllAuthenticationData()
+
         DispatchQueue.main.async {
             self.userID = nil
             self.userEmail = nil
@@ -155,11 +167,12 @@ class AuthenticationManager: NSObject, ObservableObject {
         print("  userInitials: \(userInitials)")
         print("  displayName: \(displayName)")
         print("  hasCompleteProfile: \(hasCompleteProfile)")
-        
-        print("\n🗄️ UserDefaults Storage:")
-        print("  userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
-        print("  userEmail: \(UserDefaults.standard.string(forKey: "userEmail") ?? "nil")")
-        print("  userFullName: \(UserDefaults.standard.string(forKey: "userFullName") ?? "nil")")
+
+        print("\n🔐 Keychain Storage:")
+        let auth = KeychainManager.shared.retrieveUserAuthentication()
+        print("  userID: \(auth.userID ?? "nil")")
+        print("  userEmail: \(auth.email ?? "nil")")
+        print("  userFullName: \(auth.fullName ?? "nil")")
     }
     
     /// Reset Apple ID authentication (for testing - forces fresh sign-in)
@@ -172,16 +185,17 @@ class AuthenticationManager: NSObject, ObservableObject {
         // 3. Then sign in again to get fresh data
     }
     
-    /// Force refresh from UserDefaults (useful after app updates)
+    /// Force refresh from Keychain (useful after app updates)
     func refreshFromStorage() {
-        print("🔄 Refreshing from UserDefaults...")
-        
+        print("🔄 Refreshing from Keychain...")
+
         DispatchQueue.main.async {
-            self.userID = UserDefaults.standard.string(forKey: "userID")
-            self.userEmail = UserDefaults.standard.string(forKey: "userEmail")
-            self.userFullName = UserDefaults.standard.string(forKey: "userFullName")
+            let auth = KeychainManager.shared.retrieveUserAuthentication()
+            self.userID = auth.userID
+            self.userEmail = auth.email
+            self.userFullName = auth.fullName
             self.isAuthenticated = self.userID != nil
-            
+
             print("✅ Refreshed authentication state")
             self.debugAuthState()
         }
