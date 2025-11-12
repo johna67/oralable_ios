@@ -436,34 +436,52 @@ struct HistoricalView: View {
     }
     
     // MARK: - Empty State View
-    
+
     private var emptyStateView: some View {
         VStack(spacing: designSystem.spacing.lg) {
             Image(systemName: "chart.xyaxis.line")
                 .font(.system(size: 60))
                 .foregroundColor(designSystem.colors.textTertiary)
-            
+
             Text("No Historical Data")
                 .font(designSystem.typography.headline)
                 .foregroundColor(designSystem.colors.textPrimary)
-            
-            Text("Start recording sessions to see your historical data and trends")
-                .font(designSystem.typography.body)
-                .foregroundColor(designSystem.colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Button(action: {
-                // Navigate to dashboard to start recording
-            }) {
-                HStack {
-                    Image(systemName: "record.circle")
-                    Text("Start Recording")
+
+            VStack(spacing: designSystem.spacing.sm) {
+                Text("Connect your Oralable device to start collecting data")
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                Text("Data recording starts automatically when your device connects")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textTertiary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal)
+
+            // Show connection status
+            if !bleManager.isConnected {
+                Button(action: {
+                    // Navigate to devices view to connect
+                }) {
+                    HStack {
+                        Image(systemName: "sensor.fill")
+                        Text("Go to Devices")
+                    }
+                    .padding(designSystem.spacing.md)
+                    .background(designSystem.colors.primaryBlack)
+                    .foregroundColor(designSystem.colors.primaryWhite)
+                    .cornerRadius(designSystem.cornerRadius.md)
                 }
-                .padding(designSystem.spacing.md)
-                .background(designSystem.colors.primaryBlack)
-                .foregroundColor(designSystem.colors.primaryWhite)
-                .cornerRadius(designSystem.cornerRadius.md)
+            } else {
+                HStack(spacing: designSystem.spacing.xs) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Device connected - collecting data...")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                }
             }
         }
         .padding(designSystem.spacing.xl)

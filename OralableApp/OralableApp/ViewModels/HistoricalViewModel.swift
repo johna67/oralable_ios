@@ -396,57 +396,76 @@ class HistoricalViewModel: ObservableObject {
         historicalDataManager.$dayMetrics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
+                if let metrics = metrics {
+                    Logger.shared.info("[HistoricalViewModel] ✅ Received Day metrics | Data points: \(metrics.dataPoints.count) | Total samples: \(metrics.totalSamples)")
+                } else {
+                    Logger.shared.debug("[HistoricalViewModel] Day metrics cleared (nil)")
+                }
                 self?.dayMetrics = metrics
                 self?.updateCurrentMetricsIfNeeded()
             }
             .store(in: &cancellables)
-        
+
         historicalDataManager.$weekMetrics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
+                if let metrics = metrics {
+                    Logger.shared.info("[HistoricalViewModel] ✅ Received Week metrics | Data points: \(metrics.dataPoints.count) | Total samples: \(metrics.totalSamples)")
+                } else {
+                    Logger.shared.debug("[HistoricalViewModel] Week metrics cleared (nil)")
+                }
                 self?.weekMetrics = metrics
                 self?.updateCurrentMetricsIfNeeded()
             }
             .store(in: &cancellables)
-        
+
         historicalDataManager.$monthMetrics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
+                if let metrics = metrics {
+                    Logger.shared.info("[HistoricalViewModel] ✅ Received Month metrics | Data points: \(metrics.dataPoints.count) | Total samples: \(metrics.totalSamples)")
+                } else {
+                    Logger.shared.debug("[HistoricalViewModel] Month metrics cleared (nil)")
+                }
                 self?.monthMetrics = metrics
                 self?.updateCurrentMetricsIfNeeded()
             }
             .store(in: &cancellables)
-        
+
         historicalDataManager.$isUpdating
             .receive(on: DispatchQueue.main)
             .assign(to: &$isUpdating)
-        
+
         historicalDataManager.$lastUpdateTime
             .receive(on: DispatchQueue.main)
             .assign(to: &$lastUpdateTime)
-        
+
         // Update current metrics when selected range changes
         $selectedTimeRange
-            .sink { [weak self] _ in
+            .sink { [weak self] range in
+                Logger.shared.debug("[HistoricalViewModel] Time range changed to: \(range)")
                 self?.updateCurrentMetrics()
             }
             .store(in: &cancellables)
     }
     
     // MARK: - Public Methods - Data Management
-    
+
     /// Update all metrics
     func updateAllMetrics() {
+        Logger.shared.debug("[HistoricalViewModel] Requesting metrics update from HistoricalDataManager")
         historicalDataManager.updateAllMetrics()
     }
-    
+
     /// Update metrics for current time range
     func updateCurrentRangeMetrics() {
+        Logger.shared.debug("[HistoricalViewModel] Requesting metrics update for range: \(selectedTimeRange)")
         historicalDataManager.updateMetrics(for: selectedTimeRange)
     }
-    
+
     /// Refresh current view
     func refresh() {
+        Logger.shared.info("[HistoricalViewModel] Manual refresh triggered")
         updateCurrentRangeMetrics()
     }
     
@@ -514,20 +533,36 @@ class HistoricalViewModel: ObservableObject {
     }
     
     // MARK: - Private Methods
-    
+
     private func updateCurrentMetrics() {
         switch selectedTimeRange {
         case .hour:
             currentMetrics = nil // Hour range not supported
+            Logger.shared.debug("[HistoricalViewModel] Current metrics set to nil (hour range not supported)")
         case .day:
             currentMetrics = dayMetrics
+            if let metrics = dayMetrics {
+                Logger.shared.info("[HistoricalViewModel] Current metrics updated to Day | \(metrics.dataPoints.count) data points")
+            } else {
+                Logger.shared.debug("[HistoricalViewModel] Current metrics cleared (no day metrics available)")
+            }
         case .week:
             currentMetrics = weekMetrics
+            if let metrics = weekMetrics {
+                Logger.shared.info("[HistoricalViewModel] Current metrics updated to Week | \(metrics.dataPoints.count) data points")
+            } else {
+                Logger.shared.debug("[HistoricalViewModel] Current metrics cleared (no week metrics available)")
+            }
         case .month:
             currentMetrics = monthMetrics
+            if let metrics = monthMetrics {
+                Logger.shared.info("[HistoricalViewModel] Current metrics updated to Month | \(metrics.dataPoints.count) data points")
+            } else {
+                Logger.shared.debug("[HistoricalViewModel] Current metrics cleared (no month metrics available)")
+            }
         }
     }
-    
+
     private func updateCurrentMetricsIfNeeded() {
         // Update current metrics if the selected range matches the updated range
         updateCurrentMetrics()
