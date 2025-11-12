@@ -78,18 +78,32 @@ struct DashboardView: View {
             // SHEET PRESENTATIONS
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
+                    .environmentObject(designSystem)
+                    .environmentObject(AuthenticationManager.shared)
+                    .environmentObject(SubscriptionManager.shared)
             }
             .sheet(isPresented: $showingDevices) {
                 DevicesView()
+                    .environmentObject(designSystem)
+                    .environmentObject(bleManager)
+                    .environmentObject(DeviceManager.shared)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+                    .environmentObject(designSystem)
+                    .environmentObject(AuthenticationManager.shared)
+                    .environmentObject(SubscriptionManager.shared)
+                    .environmentObject(AppStateManager.shared)
             }
             .sheet(isPresented: $showingHistorical) {
                 HistoricalView()
+                    .environmentObject(designSystem)
+                    .environmentObject(HistoricalDataManager.shared)
+                    .environmentObject(bleManager)
             }
             .sheet(isPresented: $showingShare) {
                 ShareView(ble: bleManager)
+                    .environmentObject(designSystem)
             }
         }
         .onAppear {
