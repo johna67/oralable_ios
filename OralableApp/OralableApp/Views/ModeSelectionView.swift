@@ -10,11 +10,10 @@ import SwiftUI
 
 struct ModeSelectionView: View {
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var appStateManager: AppStateManager
     @State private var selectedMode: AppMode?
     @State private var showingInfoSheet = false
     @State private var infoMode: AppMode?
-    
-    let onModeSelected: (AppMode) -> Void
     
     var body: some View {
         NavigationView {
@@ -156,7 +155,7 @@ struct ModeSelectionView: View {
     
     private func continueButton(for mode: AppMode) -> some View {
         Button(action: {
-            onModeSelected(mode)
+            appStateManager.setMode(mode)
         }) {
             HStack {
                 Text("Continue with \(mode.displayName)")

@@ -11,11 +11,175 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var authenticationManager: AuthenticationManager
+    @EnvironmentObject var subscriptionManager: SubscriptionManager
+    @EnvironmentObject var appStateManager: AppStateManager
     @State private var showingExportSheet = false
+    @State private var showingAuthenticationView = false
+    @State private var showingSubscriptionView = false
+    @State private var showingSignOutAlert = false
+    @State private var showingChangeModeAlert = false
 
     var body: some View {
         NavigationView {
             List {
+                // Account Section
+                Section {
+                    if authenticationManager.isSignedIn {
+                        // Signed In State
+                        HStack {
+                            Image(systemName: "person.circle.fill")
+                                .font(.title)
+                                .foregroundColor(designSystem.colors.primaryBlack)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(authenticationManager.displayName)
+                                    .font(designSystem.typography.body)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+
+                                if let email = authenticationManager.userEmail {
+                                    Text(email)
+                                        .font(designSystem.typography.caption)
+                                        .foregroundColor(designSystem.colors.textSecondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+
+                        Button {
+                            showingAuthenticationView = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "person.badge.key")
+                                Text("Manage Account")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(designSystem.colors.textSecondary)
+                            }
+                        }
+
+                        Button(role: .destructive) {
+                            showingSignOutAlert = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                Text("Sign Out")
+                            }
+                        }
+                    } else {
+                        // Not Signed In State
+                        Button {
+                            showingAuthenticationView = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "person.badge.key")
+                                    .foregroundColor(designSystem.colors.primaryBlack)
+                                Text("Sign In with Apple")
+                                    .foregroundColor(designSystem.colors.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(designSystem.colors.textSecondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Account")
+                } footer: {
+                    if !authenticationManager.isSignedIn {
+                        Text("Sign in to access all features and sync your data across devices")
+                    }
+                }
+
+                // Subscription Section
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Plan")
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+
+                            HStack {
+                                Text(subscriptionManager.currentTier.displayName)
+                                    .font(designSystem.typography.body)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+
+                                if subscriptionManager.isPaidSubscriber {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        if subscriptionManager.currentTier == .basic {
+                            Button("Upgrade") {
+                                showingSubscriptionView = true
+                            }
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.primaryBlack)
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    Button {
+                        showingSubscriptionView = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "star.circle")
+                            Text("Manage Subscription")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
+                    }
+                } header: {
+                    Text("Subscription")
+                } footer: {
+                    if subscriptionManager.currentTier == .basic {
+                        Text("Upgrade to Premium for unlimited data storage, advanced analytics, and more")
+                    }
+                }
+
+                // App Mode Section
+                Section {
+                    HStack {
+                        Image(systemName: appStateManager.selectedMode?.icon ?? "questionmark.circle")
+                            .foregroundColor(appStateManager.selectedMode?.color ?? .gray)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Mode")
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+
+                            Text(appStateManager.currentModeDisplayName)
+                                .font(designSystem.typography.body)
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    Button {
+                        showingChangeModeAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("Change Mode")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
+                    }
+                } header: {
+                    Text("App Mode")
+                } footer: {
+                    Text(appStateManager.selectedMode?.description ?? "")
+                }
+
                 // Device Settings Section
                 Section {
                     // PPG Channel Order
@@ -173,6 +337,30 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingExportSheet) {
             ShareView(ble: OralableBLE.shared)
+        }
+        .sheet(isPresented: $showingAuthenticationView) {
+            NavigationView {
+                AuthenticationView()
+            }
+        }
+        .sheet(isPresented: $showingSubscriptionView) {
+            SubscriptionTierSelectionView()
+        }
+        .alert("Sign Out?", isPresented: $showingSignOutAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Sign Out", role: .destructive) {
+                authenticationManager.signOut()
+            }
+        } message: {
+            Text("Are you sure you want to sign out? You'll need to sign in again to access subscription features.")
+        }
+        .alert("Change Mode?", isPresented: $showingChangeModeAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Change Mode", role: .destructive) {
+                appStateManager.clearMode()
+            }
+        } message: {
+            Text("Changing modes will restart the app and may require signing in again. Are you sure?")
         }
     }
 }
