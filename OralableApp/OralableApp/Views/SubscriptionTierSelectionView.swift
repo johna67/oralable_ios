@@ -180,7 +180,7 @@ struct SubscriptionTierSelectionView: View {
 
             VStack(alignment: .leading, spacing: designSystem.spacing.md) {
                 ForEach(SubscriptionTier.paid.features, id: \.self) { feature in
-                    FeatureRow(feature: feature)
+                    SubscriptionFeatureRow(feature: feature)
                 }
             }
         }
@@ -396,9 +396,9 @@ struct SubscriptionPlanCard: View {
     }
 }
 
-// MARK: - Feature Row
+// MARK: - Subscription Feature Row
 
-struct FeatureRow: View {
+struct SubscriptionFeatureRow: View {
     @EnvironmentObject var designSystem: DesignSystem
     let feature: String
 
