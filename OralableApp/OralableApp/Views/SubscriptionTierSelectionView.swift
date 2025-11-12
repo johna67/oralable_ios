@@ -326,8 +326,8 @@ struct SubscriptionPlanCard: View {
                 }
 
                 // Description
-                if let description = product.description, !description.isEmpty {
-                    Text(description)
+                if !product.description.isEmpty {
+                    Text(product.description)
                         .font(designSystem.typography.body)
                         .foregroundColor(designSystem.colors.textSecondary)
                 }
