@@ -201,15 +201,19 @@ struct TypographySystem {
     var button: Font {
         Font.custom(fontFamily, size: 16).weight(.semibold)
     }
-    
+
+    var buttonLarge: Font {  // Added
+        Font.custom(fontFamily, size: 18).weight(.semibold)
+    }
+
     var buttonMedium: Font {  // Added
         Font.custom(fontFamily, size: 16).weight(.medium)
     }
-    
+
     var buttonSmall: Font {  // Added
         Font.custom(fontFamily, size: 14).weight(.semibold)
     }
-    
+
     var link: Font {
         Font.custom(fontFamily, size: 16).weight(.medium)
     }
