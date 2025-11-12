@@ -42,66 +42,6 @@ struct MainTabView: View {
     }
 }
 
-// REMOVE THE DUPLICATE HistoricalView struct - you already have one in Views/HistoricalView.swift
-
-// If you don't have a real SettingsView elsewhere, keep this one:
-struct SettingsView: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section("Device Settings") {
-                    HStack {
-                        Text("Auto-connect")
-                        Spacer()
-                        Toggle("", isOn: .constant(true))
-                            .labelsHidden()
-                    }
-                    
-                    HStack {
-                        Text("Connection Timeout")
-                        Spacer()
-                        Text("30s")
-                            .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                }
-                
-                Section("Data Management") {
-                    HStack {
-                        Text("Data Retention")
-                        Spacer()
-                        Text("30 days")
-                            .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                    
-                    Button(action: {}) {
-                        Text("Clear Historical Data")
-                            .foregroundColor(.red)
-                    }
-                }
-                
-                Section("About") {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                    
-                    HStack {
-                        Text("Build")
-                        Spacer()
-                        Text("2025.11.07")
-                            .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
 
 // MARK: - Preview
 

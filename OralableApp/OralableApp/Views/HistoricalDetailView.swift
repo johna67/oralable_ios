@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftUI
 import Charts
 import Foundation
 
