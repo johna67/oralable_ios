@@ -158,32 +158,26 @@ class AuthenticationViewModel: ObservableObject {
     
     /// Subscription status
     var subscriptionStatus: String {
-        // Integrate with actual subscription manager later
-        return hasSubscription ? "Active" : "Free"
+        return SubscriptionManager.shared.isPaidSubscriber ? "Active" : "Free"
     }
-    
+
     /// Subscription plan name
     var subscriptionPlan: String {
-        // Integrate with actual subscription manager later
-        return hasSubscription ? "Premium" : "Basic"
+        return SubscriptionManager.shared.currentTier.displayName
     }
-    
+
     /// Subscription expiry text
     var subscriptionExpiryText: String {
-        // Integrate with actual subscription manager later
-        if hasSubscription {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            return formatter.string(from: Date(timeIntervalSinceNow: 30*24*60*60)) // Example: 30 days from now
+        if SubscriptionManager.shared.isPaidSubscriber {
+            // In a real implementation, this would come from StoreKit
+            return "Renews automatically"
         }
-        return "No subscription"
+        return "No active subscription"
     }
-    
+
     /// Whether user has active subscription
     var hasSubscription: Bool {
-        // Integrate with actual subscription manager later
-        // For now, return false or check some condition
-        return false
+        return SubscriptionManager.shared.isPaidSubscriber
     }
     
     // MARK: - Public Methods

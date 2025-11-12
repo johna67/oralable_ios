@@ -79,6 +79,8 @@ class SubscriptionManager: ObservableObject {
     @Published var availableProducts: [Product] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var subscriptionExpiryDate: Date?
+    @Published var showExpiryWarning = false
 
     // MARK: - Constants
 
@@ -301,6 +303,49 @@ class SubscriptionManager: ObservableObject {
 
     var lifetimeProduct: Product? {
         return product(for: ProductIdentifier.lifetimePurchase)
+    }
+
+    // MARK: - Subscription Expiry Tracking
+
+    /// Check if subscription is expiring soon (within 7 days)
+    var isExpiringSoon: Bool {
+        guard let expiryDate = subscriptionExpiryDate else { return false }
+        let daysUntilExpiry = Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0
+        return daysUntilExpiry <= 7 && daysUntilExpiry > 0
+    }
+
+    /// Days until subscription expires
+    var daysUntilExpiry: Int {
+        guard let expiryDate = subscriptionExpiryDate else { return 0 }
+        return Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0
+    }
+
+    /// Check if subscription has expired
+    var hasExpired: Bool {
+        guard let expiryDate = subscriptionExpiryDate else { return false }
+        return expiryDate < Date()
+    }
+
+    /// Get expiry warning message
+    var expiryWarningMessage: String? {
+        guard isPaidSubscriber else { return nil }
+
+        if hasExpired {
+            return "Your subscription has expired. Please renew to continue accessing premium features."
+        } else if isExpiringSoon {
+            let days = daysUntilExpiry
+            if days == 1 {
+                return "Your subscription expires tomorrow. Renew now to avoid interruption."
+            } else {
+                return "Your subscription expires in \(days) days."
+            }
+        }
+        return nil
+    }
+
+    /// Check and update expiry warning status
+    func checkExpiryStatus() {
+        showExpiryWarning = isExpiringSoon || hasExpired
     }
 
     // MARK: - Testing/Development
