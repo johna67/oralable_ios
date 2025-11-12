@@ -25,7 +25,7 @@ struct SettingsView: View {
             List {
                 // Account Section
                 Section {
-                    if authenticationManager.isSignedIn {
+                    if authenticationManager.isAuthenticated {
                         // Signed In State
                         HStack {
                             Image(systemName: "person.circle.fill")
@@ -87,7 +87,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Account")
                 } footer: {
-                    if !authenticationManager.isSignedIn {
+                    if !authenticationManager.isAuthenticated {
                         Text("Sign in to access all features and sync your data across devices")
                     }
                 }
@@ -417,5 +417,8 @@ struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
             .environmentObject(DesignSystem.shared)
+            .environmentObject(AuthenticationManager.shared)
+            .environmentObject(SubscriptionManager.shared)
+            .environmentObject(AppStateManager.shared)
     }
 }

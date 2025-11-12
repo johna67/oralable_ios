@@ -74,10 +74,10 @@ struct RootView: View {
     private func contentView(for mode: AppMode) -> some View {
         switch mode {
         case .viewer:
-            ViewerModeView()
+            ViewerModeView(selectedMode: $appStateManager.selectedMode)
         case .subscription:
             // Check authentication for subscription mode
-            if authenticationManager.isSignedIn {
+            if authenticationManager.isAuthenticated {
                 MainTabView()
             } else {
                 AuthenticationRequiredView()
