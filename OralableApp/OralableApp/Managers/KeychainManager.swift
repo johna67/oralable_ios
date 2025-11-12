@@ -18,7 +18,7 @@ class KeychainManager {
 
     // MARK: - Keychain Keys
 
-    private enum KeychainKey: String {
+    enum KeychainKey: String {
         case userID = "com.oralable.mam.userID"
         case userEmail = "com.oralable.mam.userEmail"
         case userFullName = "com.oralable.mam.userFullName"
