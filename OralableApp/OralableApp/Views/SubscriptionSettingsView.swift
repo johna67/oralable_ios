@@ -374,14 +374,33 @@ struct SubscriptionInfoView: View {
     
     private func upgradeToPremium() {
         guard subscriptionManager.currentTier != .paid else { return }
-        
+
         isUpgrading = true
-        subscriptionManager.upgradeToPaid { success in
+
+        #if DEBUG
+        // In debug mode, simulate purchase
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            subscriptionManager.simulatePurchase()
             isUpgrading = false
-            if success {
+            showSuccessAlert = true
+        }
+        #else
+        // In production, would use actual StoreKit purchase
+        Task {
+            do {
+                guard let product = subscriptionManager.monthlyProduct else {
+                    isUpgrading = false
+                    return
+                }
+                try await subscriptionManager.purchase(product)
+                isUpgrading = false
                 showSuccessAlert = true
+            } catch {
+                isUpgrading = false
+                print("Purchase failed: \(error)")
             }
         }
+        #endif
     }
 }
 
