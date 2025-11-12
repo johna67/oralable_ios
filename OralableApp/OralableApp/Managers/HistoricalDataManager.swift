@@ -63,7 +63,10 @@ class HistoricalDataManager: ObservableObject {
             Logger.shared.info("[HistoricalDataManager] Metrics calculated | Day: \(day != nil ? "✓" : "✗") | Week: \(week != nil ? "✓" : "✗") | Month: \(month != nil ? "✓" : "✗")")
 
             if let day = day {
-                Logger.shared.debug("[HistoricalDataManager] Day metrics | HR avg: \(String(format: "%.0f", day.averageHeartRate)) bpm | SpO2 avg: \(String(format: "%.1f", day.averageSpO2))% | Samples: \(day.sampleCount)")
+                let avgHR = day.dataPoints.compactMap { $0.averageHeartRate }.reduce(0, +) / Double(max(day.dataPoints.count, 1))
+                let avgSpO2 = day.dataPoints.compactMap { $0.averageSpO2 }.reduce(0, +) / Double(max(day.dataPoints.count, 1))
+                Logger.shared.debug("[HistoricalDataManager] Day metrics | Temp avg: \(String(format: "%.1f", day.avgTemperature))°C | Battery avg: \(String(format: "%.0f", day.avgBatteryLevel))% | Total samples: \(day.totalSamples) | Data points: \(day.dataPoints.count)")
+                Logger.shared.debug("[HistoricalDataManager] Day metrics | HR avg: \(String(format: "%.0f", avgHR)) bpm | SpO2 avg: \(String(format: "%.1f", avgSpO2))% (calculated from \(day.dataPoints.count) points)")
             }
 
             DispatchQueue.main.async {
@@ -92,7 +95,9 @@ class HistoricalDataManager: ObservableObject {
             let metrics = ble.getHistoricalMetrics(for: range)
 
             if let metrics = metrics {
-                Logger.shared.info("[HistoricalDataManager] ✅ Metrics calculated for \(range) | HR avg: \(String(format: "%.0f", metrics.averageHeartRate)) bpm | SpO2 avg: \(String(format: "%.1f", metrics.averageSpO2))% | Samples: \(metrics.sampleCount)")
+                let avgHR = metrics.dataPoints.compactMap { $0.averageHeartRate }.reduce(0, +) / Double(max(metrics.dataPoints.count, 1))
+                let avgSpO2 = metrics.dataPoints.compactMap { $0.averageSpO2 }.reduce(0, +) / Double(max(metrics.dataPoints.count, 1))
+                Logger.shared.info("[HistoricalDataManager] ✅ Metrics calculated for \(range) | HR avg: \(String(format: "%.0f", avgHR)) bpm | SpO2 avg: \(String(format: "%.1f", avgSpO2))% | Total samples: \(metrics.totalSamples) | Data points: \(metrics.dataPoints.count)")
             } else {
                 Logger.shared.warning("[HistoricalDataManager] ⚠️ No metrics calculated for \(range)")
             }
