@@ -520,9 +520,8 @@ extension AppMode {
 
 struct ModeSelectionView_Previews: PreviewProvider {
     static var previews: some View {
-        ModeSelectionView { mode in
-            print("Selected mode: \(mode)")
-        }
-        .environmentObject(DesignSystem.shared)
+        ModeSelectionView()
+            .environmentObject(DesignSystem.shared)
+            .environmentObject(AppStateManager.shared)
     }
 }
