@@ -201,8 +201,10 @@ class OralableBLE: ObservableObject {
     }
     
     // MARK: - History Management from Sensor Readings
-    
+
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
+        Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+
         for reading in readings {
             switch reading.sensorType {
             case .battery:
@@ -211,7 +213,8 @@ class OralableBLE: ObservableObject {
                 if batteryHistory.count > maxHistoryCount {
                     batteryHistory.removeFirst(batteryHistory.count - maxHistoryCount)
                 }
-                
+                Logger.shared.debug("[OralableBLE] Battery: \(Int(reading.value))% | History count: \(batteryHistory.count)")
+
             case .heartRate:
                 // Force connection state when we have data
                 isConnected = true
@@ -220,93 +223,102 @@ class OralableBLE: ObservableObject {
                 accelX = Double.random(in: -0.1...0.1)
                 accelY = Double.random(in: -0.1...0.1)
                 accelZ = 1.0 + Double.random(in: -0.05...0.05)
-                
+
                 let hrData = HeartRateData(bpm: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
                 heartRateHistory.append(hrData)
                 if heartRateHistory.count > maxHistoryCount {
                     heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
                 }
-                
+                Logger.shared.info("[OralableBLE] Heart Rate: \(Int(reading.value)) bpm | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(heartRateHistory.count)")
+
             case .spo2:
                 let spo2Data = SpO2Data(percentage: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
                 spo2History.append(spo2Data)
                 if spo2History.count > maxHistoryCount {
                     spo2History.removeFirst(spo2History.count - maxHistoryCount)
                 }
-                
+                Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
+
             case .temperature:
                 let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
                 temperatureHistory.append(tempData)
                 if temperatureHistory.count > maxHistoryCount {
                     temperatureHistory.removeFirst(temperatureHistory.count - maxHistoryCount)
                 }
-                
+                Logger.shared.debug("[OralableBLE] Temperature: \(String(format: "%.1f", reading.value))°C | History count: \(temperatureHistory.count)")
+
             case .ppgRed, .ppgInfrared, .ppgGreen:
                 // PPG data needs to be grouped - handled separately
                 updatePPGHistory(from: readings)
-                
+
             case .accelerometerX, .accelerometerY, .accelerometerZ:
                 // Accel data needs to be grouped - handled separately
                 updateAccelHistory(from: readings)
-                
+
             default:
                 break
             }
         }
+
+        Logger.shared.debug("[OralableBLE] Total history counts - HR: \(heartRateHistory.count), SpO2: \(spo2History.count), Temp: \(temperatureHistory.count), PPG: \(ppgHistory.count)")
     }
     
     private func updatePPGHistory(from readings: [SensorReading]) {
         var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
-        
+
         for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
             let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
             var current = grouped[roundedTime] ?? (0, 0, 0)
-            
+
             switch reading.sensorType {
             case .ppgRed: current.red = Int32(reading.value)
             case .ppgInfrared: current.ir = Int32(reading.value)
             case .ppgGreen: current.green = Int32(reading.value)
             default: break
             }
-            
+
             grouped[roundedTime] = current
         }
-        
+
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
             ppgHistory.append(ppgData)
         }
-        
+
         if ppgHistory.count > maxHistoryCount {
             ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
         }
+
+        Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
     }
     
     private func updateAccelHistory(from readings: [SensorReading]) {
         var grouped: [Date: (x: Int16, y: Int16, z: Int16)] = [:]
-        
+
         for reading in readings where [.accelerometerX, .accelerometerY, .accelerometerZ].contains(reading.sensorType) {
             let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
             var current = grouped[roundedTime] ?? (0, 0, 0)
-            
+
             switch reading.sensorType {
             case .accelerometerX: current.x = Int16(reading.value * 1000)
             case .accelerometerY: current.y = Int16(reading.value * 1000)
             case .accelerometerZ: current.z = Int16(reading.value * 1000)
             default: break
             }
-            
+
             grouped[roundedTime] = current
         }
-        
+
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
             accelerometerHistory.append(accelData)
         }
-        
+
         if accelerometerHistory.count > maxHistoryCount {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
+
+        Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
     }
     
     // MARK: - Legacy SensorData Conversion
@@ -421,6 +433,7 @@ class OralableBLE: ObservableObject {
     func startRecording() {
         guard !isRecording else {
             addLog("Recording already in progress")
+            Logger.shared.warning("[OralableBLE] Recording already in progress, ignoring start request")
             return
         }
 
@@ -431,9 +444,11 @@ class OralableBLE: ObservableObject {
             )
             isRecording = true
             addLog("Recording session started: \(session.id)")
+            Logger.shared.info("[OralableBLE] ✅ Started recording session | ID: \(session.id) | Device: \(deviceName)")
             print("📝 [OralableBLE] Started recording session: \(session.formattedDuration)")
         } catch {
             addLog("Failed to start recording: \(error.localizedDescription)")
+            Logger.shared.error("[OralableBLE] ❌ Failed to start recording: \(error.localizedDescription)")
             print("❌ [OralableBLE] Failed to start recording: \(error)")
         }
     }
@@ -441,6 +456,7 @@ class OralableBLE: ObservableObject {
     func stopRecording() {
         guard isRecording else {
             addLog("No recording in progress")
+            Logger.shared.debug("[OralableBLE] No recording in progress, ignoring stop request")
             return
         }
 
@@ -448,9 +464,11 @@ class OralableBLE: ObservableObject {
             try RecordingSessionManager.shared.stopSession()
             isRecording = false
             addLog("Recording session stopped")
+            Logger.shared.info("[OralableBLE] ✅ Stopped recording session | Duration: \(RecordingSessionManager.shared.currentSession?.formattedDuration ?? "unknown")")
             print("✅ [OralableBLE] Stopped recording session")
         } catch {
             addLog("Failed to stop recording: \(error.localizedDescription)")
+            Logger.shared.error("[OralableBLE] ❌ Failed to stop recording: \(error.localizedDescription)")
             print("❌ [OralableBLE] Failed to stop recording: \(error)")
         }
     }
@@ -482,30 +500,51 @@ class OralableBLE: ObservableObject {
     
     func connect(to peripheral: CBPeripheral) {
         addLog("Connecting to \(peripheral.name ?? "Unknown")...")
+        Logger.shared.info("[OralableBLE] 🔌 Initiating connection to device: \(peripheral.name ?? "Unknown") | ID: \(peripheral.identifier)")
         connectedDevice = peripheral
-        
+
         Task {
             if let deviceInfo = deviceManager.discoveredDevices.first(where: { $0.peripheralIdentifier == peripheral.identifier }) {
                 do {
                     try await deviceManager.connect(to: deviceInfo)
                     addLog("Connected to \(deviceInfo.name)")
+                    Logger.shared.info("[OralableBLE] ✅ Successfully connected to \(deviceInfo.name)")
+
+                    // Automatically start recording when connected
+                    await MainActor.run {
+                        Logger.shared.info("[OralableBLE] 📝 Auto-starting recording session for device: \(deviceInfo.name)")
+                        self.startRecording()
+                    }
                 } catch {
                     addLog("Connection failed: \(error.localizedDescription)")
+                    Logger.shared.error("[OralableBLE] ❌ Connection failed: \(error.localizedDescription)")
                 }
             } else {
                 addLog("Device not found in discovered devices")
+                Logger.shared.error("[OralableBLE] ❌ Device not found in discovered devices list")
             }
         }
     }
-    
+
     func disconnect() {
-        guard let primaryDevice = deviceManager.primaryDevice else { return }
+        guard let primaryDevice = deviceManager.primaryDevice else {
+            Logger.shared.warning("[OralableBLE] No primary device to disconnect from")
+            return
+        }
         addLog("Disconnecting from \(primaryDevice.name)...")
-        
+        Logger.shared.info("[OralableBLE] 🔌 Disconnecting from device: \(primaryDevice.name)")
+
+        // Automatically stop recording when disconnecting
+        if isRecording {
+            Logger.shared.info("[OralableBLE] 📝 Auto-stopping recording session before disconnect")
+            stopRecording()
+        }
+
         Task {
             await deviceManager.disconnect(from: primaryDevice)
             connectedDevice = nil
             addLog("Disconnected")
+            Logger.shared.info("[OralableBLE] ✅ Successfully disconnected")
         }
     }
     

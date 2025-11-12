@@ -40,28 +40,39 @@ class HistoricalDataManager: ObservableObject {
     /// Manually trigger an update of all metrics
     @MainActor func updateAllMetrics() {
         guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
+            Logger.shared.debug("[HistoricalDataManager] No sensor data available, clearing metrics")
             clearAllMetrics()
             return
         }
-        
+
+        Logger.shared.info("[HistoricalDataManager] Starting metrics update | Sensor data count: \(ble.sensorDataHistory.count)")
         isUpdating = true
-        
+
         // Use background queue for calculations to avoid blocking UI
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let dayRange = TimeRange.day
             let weekRange = TimeRange.week
             let monthRange = TimeRange.month
-            
+
+            Logger.shared.debug("[HistoricalDataManager] Calculating metrics for Day, Week, Month ranges...")
+
             let day = ble.getHistoricalMetrics(for: dayRange)
             let week = ble.getHistoricalMetrics(for: weekRange)
             let month = ble.getHistoricalMetrics(for: monthRange)
-            
+
+            Logger.shared.info("[HistoricalDataManager] Metrics calculated | Day: \(day != nil ? "✓" : "✗") | Week: \(week != nil ? "✓" : "✗") | Month: \(month != nil ? "✓" : "✗")")
+
+            if let day = day {
+                Logger.shared.debug("[HistoricalDataManager] Day metrics | HR avg: \(String(format: "%.0f", day.averageHeartRate)) bpm | SpO2 avg: \(String(format: "%.1f", day.averageSpO2))% | Samples: \(day.sampleCount)")
+            }
+
             DispatchQueue.main.async {
                 self?.dayMetrics = day
                 self?.weekMetrics = week
                 self?.monthMetrics = month
                 self?.lastUpdateTime = Date()
                 self?.isUpdating = false
+                Logger.shared.info("[HistoricalDataManager] ✅ Metrics update completed and published to UI")
             }
         }
     }
@@ -70,13 +81,22 @@ class HistoricalDataManager: ObservableObject {
     /// - Parameter range: The time range to update
     @MainActor func updateMetrics(for range: TimeRange) {
         guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
+            Logger.shared.debug("[HistoricalDataManager] No sensor data available for range: \(range), clearing metrics")
             clearMetrics(for: range)
             return
         }
-        
+
+        Logger.shared.debug("[HistoricalDataManager] Updating metrics for range: \(range) | Data count: \(ble.sensorDataHistory.count)")
+
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let metrics = ble.getHistoricalMetrics(for: range)
-            
+
+            if let metrics = metrics {
+                Logger.shared.info("[HistoricalDataManager] ✅ Metrics calculated for \(range) | HR avg: \(String(format: "%.0f", metrics.averageHeartRate)) bpm | SpO2 avg: \(String(format: "%.1f", metrics.averageSpO2))% | Samples: \(metrics.sampleCount)")
+            } else {
+                Logger.shared.warning("[HistoricalDataManager] ⚠️ No metrics calculated for \(range)")
+            }
+
             DispatchQueue.main.async {
                 switch range {
                 case TimeRange.hour:
@@ -90,6 +110,7 @@ class HistoricalDataManager: ObservableObject {
                     self?.monthMetrics = metrics
                 }
                 self?.lastUpdateTime = Date()
+                Logger.shared.debug("[HistoricalDataManager] Metrics for \(range) published to UI")
             }
         }
     }
