@@ -228,20 +228,39 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         print("\n📦 [OralableDevice] parseData called")
         print("📦 [OralableDevice] Characteristic: \(characteristic.uuid.uuidString)")
         print("📦 [OralableDevice] Data length: \(data.count) bytes")
-        
+
+        // Route based on known characteristic UUIDs
         if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing sensor data")
+            print("📦 [OralableDevice] Parsing PPG data (3A0FF001)")
             return parseSensorData(data)
         } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing PPG waveform data")
+            print("📦 [OralableDevice] Parsing Accelerometer data (3A0FF002)")
             return parsePPGWaveform(data)
         } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing battery data")
+            print("📦 [OralableDevice] Parsing standard battery level")
             return parseBatteryData(data)
+        } else {
+            // For unknown characteristics (003-008), use data size to identify type
+            switch data.count {
+            case 4:
+                print("📦 [OralableDevice] Parsing battery voltage (4 bytes)")
+                return parseBatteryData(data)
+            case 8:
+                print("📦 [OralableDevice] Parsing temperature (8 bytes)")
+                return parseTemperatureData(data)
+            case 154:
+                print("📦 [OralableDevice] Parsing accelerometer by size (154 bytes)")
+                return parsePPGWaveform(data)
+            case 244:
+                print("📦 [OralableDevice] Parsing PPG by size (244 bytes)")
+                return parseSensorData(data)
+            default:
+                print("⚠️ [OralableDevice] Unknown data format: \(data.count) bytes from \(characteristic.uuid.uuidString)")
+                let hexPreview = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
+                print("   First 32 bytes: \(hexPreview)")
+                return []
+            }
         }
-        
-        print("⚠️ [OralableDevice] Unknown characteristic UUID")
-        return []
     }
     
     // MARK: - Device Control
@@ -298,17 +317,24 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         var readings: [SensorReading] = []
         let timestamp = Date()
 
-        // Parse based on 244-byte firmware protocol
+        // PPG characteristic 3A0FF001: tgm_service_ppg_data_t structure
+        // Bytes 0-3: frame counter (uint32)
+        // Then CONFIG_PPG_SAMPLES_PER_FRAME (20) samples, each sample is 12 bytes:
+        //   - Bytes 0-3: Red (uint32)
+        //   - Bytes 4-7: IR (uint32)
+        //   - Bytes 8-11: Green (uint32)
+        // Total: 4 + (20 * 12) = 244 bytes
+
         guard data.count >= 244 else {
-            print("⚠️ [OralableDevice] Insufficient data: \(data.count) bytes")
+            print("⚠️ [OralableDevice] Insufficient PPG data: \(data.count) bytes (expected 244)")
             return readings
         }
 
-        // Log first 64 bytes of hex for protocol analysis (throttled)
+        // Log first packet for debugging (throttled)
         packetCount += 1
-        if packetCount % 20 == 1 {  // Log every 20th packet
-            let hexPreview = data.prefix(64).map { String(format: "%02X", $0) }.joined(separator: " ")
-            print("📦 [OralableDevice] Packet #\(packetCount) first 64 bytes: \(hexPreview)")
+        if packetCount % 20 == 1 {
+            let hexPreview = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
+            print("📦 [OralableDevice] PPG Packet #\(packetCount) first 32 bytes: \(hexPreview)")
         }
 
         // Helper to read UInt32 little-endian
@@ -320,65 +346,50 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
                    (UInt32(data[offset + 3]) << 24)
         }
 
-        // Helper to read Int16 little-endian (for accelerometer in mg)
-        func readInt16(at offset: Int) -> Int16? {
-            guard offset + 1 < data.count else { return nil }
-            let unsigned = UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
-            return Int16(bitPattern: unsigned)
-        }
+        // Read frame counter
+        let frameCounter = readUInt32(at: 0) ?? 0
 
-        // HYPOTHESIS: 244-byte structure based on CONFIG_PPG_SAMPLES_PER_FRAME=20
-        // Header: 4 bytes (timestamp/sequence)
-        // PPG Red:   20 samples × 4 bytes = 80 bytes (offset 4-83)
-        // PPG IR:    20 samples × 4 bytes = 80 bytes (offset 84-163)
-        // PPG Green: 20 samples × 4 bytes = 80 bytes (offset 164-243)
-        // Total: 4 + 80 + 80 + 80 = 244 bytes ✓
+        // Parse 20 PPG samples (interleaved R, IR, G per sample)
+        let samplesPerFrame = 20
+        let bytesPerSample = 12  // 4 bytes Red + 4 bytes IR + 4 bytes Green
 
-        let samplesPerChannel = 20
-        let bytesPerSample = 4
+        for i in 0..<samplesPerFrame {
+            let sampleOffset = 4 + (i * bytesPerSample)  // Skip 4-byte frame counter
+            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02)  // 50Hz = 0.02s
 
-        // Parse PPG Red channel (bytes 4-83)
-        for i in 0..<samplesPerChannel {
-            let offset = 4 + (i * bytesPerSample)
-            if let ppgRed = readUInt32(at: offset) {
-                // Validate: PPG values should be in range 1000-500000
-                if ppgRed > 1000 && ppgRed < 500000 {
+            // Read Red (bytes 0-3 of sample)
+            if let ppgRed = readUInt32(at: sampleOffset) {
+                if ppgRed > 1000 && ppgRed < 500000 {  // Valid range check
                     readings.append(SensorReading(
                         sensorType: .ppgRed,
                         value: Double(ppgRed),
-                        timestamp: timestamp.addingTimeInterval(Double(i) * 0.02),  // 50Hz = 0.02s
+                        timestamp: sampleTimestamp,
                         deviceId: peripheral?.identifier.uuidString,
                         quality: 0.9
                     ))
                 }
             }
-        }
 
-        // Parse PPG IR channel (bytes 84-163)
-        for i in 0..<samplesPerChannel {
-            let offset = 84 + (i * bytesPerSample)
-            if let ppgIR = readUInt32(at: offset) {
+            // Read IR (bytes 4-7 of sample)
+            if let ppgIR = readUInt32(at: sampleOffset + 4) {
                 if ppgIR > 1000 && ppgIR < 500000 {
                     readings.append(SensorReading(
                         sensorType: .ppgInfrared,
                         value: Double(ppgIR),
-                        timestamp: timestamp.addingTimeInterval(Double(i) * 0.02),
+                        timestamp: sampleTimestamp,
                         deviceId: peripheral?.identifier.uuidString,
                         quality: 0.9
                     ))
                 }
             }
-        }
 
-        // Parse PPG Green channel (bytes 164-243)
-        for i in 0..<samplesPerChannel {
-            let offset = 164 + (i * bytesPerSample)
-            if let ppgGreen = readUInt32(at: offset) {
+            // Read Green (bytes 8-11 of sample)
+            if let ppgGreen = readUInt32(at: sampleOffset + 8) {
                 if ppgGreen > 1000 && ppgGreen < 500000 {
                     readings.append(SensorReading(
                         sensorType: .ppgGreen,
                         value: Double(ppgGreen),
-                        timestamp: timestamp.addingTimeInterval(Double(i) * 0.02),
+                        timestamp: sampleTimestamp,
                         deviceId: peripheral?.identifier.uuidString,
                         quality: 0.9
                     ))
@@ -386,34 +397,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             }
         }
 
-        // ALTERNATIVE HYPOTHESIS: Maybe accelerometer is in the first bytes?
-        // Try reading accel from bytes 0-5 as Int16 values in mg
-        if let accelX = readInt16(at: 0) {
-            let accelXG = Double(accelX) / 1000.0  // Convert mg to g
-            if abs(accelXG) < 16.0 {
-                readings.append(SensorReading(
-                    sensorType: .accelerometerX,
-                    value: accelXG,
-                    timestamp: timestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: 0.95
-                ))
-            }
-        }
-
-        if let accelY = readInt16(at: 2) {
-            let accelYG = Double(accelY) / 1000.0
-            if abs(accelYG) < 16.0 {
-                readings.append(SensorReading(
-                    sensorType: .accelerometerY,
-                    value: accelYG,
-                    timestamp: timestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: 0.95
-                ))
-            }
-        }
-
+        // Send readings to subscribers
         for reading in readings {
             latestReadings[reading.sensorType] = reading
             sensorReadingsSubject.send(reading)
@@ -421,14 +405,15 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
         // Throttled summary logging
         if packetCount % 20 == 1 {
-            let ppgCount = readings.filter { [.ppgRed, .ppgInfrared, .ppgGreen].contains($0.sensorType) }.count
-            let accelCount = readings.filter { [.accelerometerX, .accelerometerY, .accelerometerZ].contains($0.sensorType) }.count
-            print("✅ [OralableDevice] Parsed \(readings.count) readings (PPG: \(ppgCount), Accel: \(accelCount))")
-            if let firstRed = readings.first(where: { $0.sensorType == .ppgRed }) {
-                print("   Sample PPG Red: \(Int(firstRed.value))")
-            }
-            if let firstIR = readings.first(where: { $0.sensorType == .ppgInfrared }) {
-                print("   Sample PPG IR: \(Int(firstIR.value))")
+            let redCount = readings.filter { $0.sensorType == .ppgRed }.count
+            let irCount = readings.filter { $0.sensorType == .ppgInfrared }.count
+            let greenCount = readings.filter { $0.sensorType == .ppgGreen }.count
+            print("✅ [OralableDevice] PPG Frame #\(frameCounter): \(readings.count) readings (R:\(redCount), IR:\(irCount), G:\(greenCount))")
+
+            if let firstRed = readings.first(where: { $0.sensorType == .ppgRed }),
+               let firstIR = readings.first(where: { $0.sensorType == .ppgInfrared }),
+               let firstGreen = readings.first(where: { $0.sensorType == .ppgGreen }) {
+                print("   Sample values - R:\(Int(firstRed.value)) IR:\(Int(firstIR.value)) G:\(Int(firstGreen.value))")
             }
         }
 
@@ -436,33 +421,200 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     }
     
     private func parsePPGWaveform(_ data: Data) -> [SensorReading] {
-        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        print("📦 [OralableDevice] Raw PPG waveform: \(hexString.prefix(100))...")
-        
-        // TODO: Implement PPG waveform parsing
-        
-        print("✅ [OralableDevice] Parsed PPG waveform")
-        return []
+        // NOTE: Despite the name, characteristic 3A0FF002 is actually ACCELEROMETER data
+        // Accelerometer characteristic: tgm_service_acc_data_t structure
+        // Bytes 0-3: frame counter (uint32)
+        // Then CONFIG_ACC_SAMPLES_PER_FRAME (25) samples, each sample is 6 bytes:
+        //   - Bytes 0-1: X (int16)
+        //   - Bytes 2-3: Y (int16)
+        //   - Bytes 4-5: Z (int16)
+        // Total: 4 + (25 * 6) = 154 bytes
+
+        var readings: [SensorReading] = []
+        let timestamp = Date()
+
+        guard data.count >= 154 else {
+            print("⚠️ [OralableDevice] Insufficient accelerometer data: \(data.count) bytes (expected 154)")
+            return readings
+        }
+
+        // Log first packet for debugging (throttled)
+        if packetCount % 20 == 1 {
+            let hexPreview = data.prefix(28).map { String(format: "%02X", $0) }.joined(separator: " ")
+            print("📦 [OralableDevice] Accel Packet first 28 bytes: \(hexPreview)")
+        }
+
+        // Helper to read Int16 little-endian
+        func readInt16(at offset: Int) -> Int16? {
+            guard offset + 1 < data.count else { return nil }
+            let unsigned = UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
+            return Int16(bitPattern: unsigned)
+        }
+
+        // Helper to read UInt32 little-endian
+        func readUInt32(at offset: Int) -> UInt32? {
+            guard offset + 3 < data.count else { return nil }
+            return UInt32(data[offset]) |
+                   (UInt32(data[offset + 1]) << 8) |
+                   (UInt32(data[offset + 2]) << 16) |
+                   (UInt32(data[offset + 3]) << 24)
+        }
+
+        // Read frame counter
+        let frameCounter = readUInt32(at: 0) ?? 0
+
+        // Parse 25 accelerometer samples
+        let samplesPerFrame = 25
+        let bytesPerSample = 6  // 2 bytes X + 2 bytes Y + 2 bytes Z
+
+        for i in 0..<samplesPerFrame {
+            let sampleOffset = 4 + (i * bytesPerSample)  // Skip 4-byte frame counter
+            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02)  // 50Hz = 0.02s
+
+            // Read X (bytes 0-1 of sample)
+            if let accelX = readInt16(at: sampleOffset) {
+                let accelXG = Double(accelX) / 1000.0  // Convert mg to g
+                if abs(accelXG) < 16.0 {  // Sanity check (±16g range)
+                    readings.append(SensorReading(
+                        sensorType: .accelerometerX,
+                        value: accelXG,
+                        timestamp: sampleTimestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+
+            // Read Y (bytes 2-3 of sample)
+            if let accelY = readInt16(at: sampleOffset + 2) {
+                let accelYG = Double(accelY) / 1000.0
+                if abs(accelYG) < 16.0 {
+                    readings.append(SensorReading(
+                        sensorType: .accelerometerY,
+                        value: accelYG,
+                        timestamp: sampleTimestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+
+            // Read Z (bytes 4-5 of sample)
+            if let accelZ = readInt16(at: sampleOffset + 4) {
+                let accelZG = Double(accelZ) / 1000.0
+                if abs(accelZG) < 16.0 {
+                    readings.append(SensorReading(
+                        sensorType: .accelerometerZ,
+                        value: accelZG,
+                        timestamp: sampleTimestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+        }
+
+        // Send readings to subscribers
+        for reading in readings {
+            latestReadings[reading.sensorType] = reading
+            sensorReadingsSubject.send(reading)
+        }
+
+        // Throttled summary logging
+        if packetCount % 20 == 1 {
+            let xCount = readings.filter { $0.sensorType == .accelerometerX }.count
+            let yCount = readings.filter { $0.sensorType == .accelerometerY }.count
+            let zCount = readings.filter { $0.sensorType == .accelerometerZ }.count
+            print("✅ [OralableDevice] Accel Frame #\(frameCounter): \(readings.count) readings (X:\(xCount), Y:\(yCount), Z:\(zCount))")
+
+            if let firstX = readings.first(where: { $0.sensorType == .accelerometerX }),
+               let firstY = readings.first(where: { $0.sensorType == .accelerometerY }),
+               let firstZ = readings.first(where: { $0.sensorType == .accelerometerZ }) {
+                print("   Sample values - X:\(String(format: "%.3f", firstX.value))g Y:\(String(format: "%.3f", firstY.value))g Z:\(String(format: "%.3f", firstZ.value))g")
+            }
+        }
+
+        return readings
     }
     
     private func parseBatteryData(_ data: Data) -> [SensorReading] {
-        guard data.count >= 1 else { return [] }
-        
-        let batteryPercent = Int(data[0])
-        self.batteryLevel = batteryPercent
-        
+        // Battery voltage data: 4 bytes as int32 in millivolts (mV)
+        guard data.count >= 4 else {
+            print("⚠️ [OralableDevice] Insufficient battery data: \(data.count) bytes (expected 4)")
+            return []
+        }
+
+        // Helper to read Int32 little-endian
+        func readInt32(at offset: Int) -> Int32? {
+            guard offset + 3 < data.count else { return nil }
+            let unsigned = UInt32(data[offset]) |
+                          (UInt32(data[offset + 1]) << 8) |
+                          (UInt32(data[offset + 2]) << 16) |
+                          (UInt32(data[offset + 3]) << 24)
+            return Int32(bitPattern: unsigned)
+        }
+
+        guard let batteryMillivolts = readInt32(at: 0) else {
+            return []
+        }
+
+        // Convert mV to percentage (assuming 3.0V = 0%, 4.2V = 100%)
+        let minVoltage = 3000.0  // 3.0V in mV
+        let maxVoltage = 4200.0  // 4.2V in mV
+        let batteryPercent = max(0, min(100, ((Double(batteryMillivolts) - minVoltage) / (maxVoltage - minVoltage)) * 100))
+
+        self.batteryLevel = Int(batteryPercent)
+
         let reading = SensorReading(
             sensorType: .battery,
-            value: Double(batteryPercent),
+            value: batteryPercent,
             timestamp: Date(),
             deviceId: peripheral?.identifier.uuidString,
             quality: 1.0
         )
-        
+
         latestReadings[.battery] = reading
         sensorReadingsSubject.send(reading)
-        
-        print("🔋 [OralableDevice] Battery: \(batteryPercent)%")
+
+        print("🔋 [OralableDevice] Battery: \(Int(batteryPercent))% (\(batteryMillivolts)mV)")
+        return [reading]
+    }
+
+    private func parseTemperatureData(_ data: Data) -> [SensorReading] {
+        // Temperature data: 8 bytes total
+        // Bytes 0-3: frame counter (uint32)
+        // Bytes 4-5: temperature as signed int16 in centidegree Celsius (1/100th degree)
+        guard data.count >= 8 else {
+            print("⚠️ [OralableDevice] Insufficient temperature data: \(data.count) bytes (expected 8)")
+            return []
+        }
+
+        // Helper to read Int16 little-endian
+        func readInt16(at offset: Int) -> Int16? {
+            guard offset + 1 < data.count else { return nil }
+            let unsigned = UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
+            return Int16(bitPattern: unsigned)
+        }
+
+        guard let tempCentiDegrees = readInt16(at: 4) else {
+            return []
+        }
+
+        // Convert centidegrees to degrees Celsius
+        let temperatureCelsius = Double(tempCentiDegrees) / 100.0
+
+        let reading = SensorReading(
+            sensorType: .temperature,
+            value: temperatureCelsius,
+            timestamp: Date(),
+            deviceId: peripheral?.identifier.uuidString,
+            quality: 1.0
+        )
+
+        latestReadings[.temperature] = reading
+        sensorReadingsSubject.send(reading)
+
+        print("🌡️ [OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
         return [reading]
     }
 }
