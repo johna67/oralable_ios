@@ -219,6 +219,8 @@ class OralableBLE: ObservableObject {
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
         // Only log summary info, not every reading to reduce logging overhead
         var hrCount = 0, spo2Count = 0, batteryCount = 0, tempCount = 0
+        var hasPPGData = false
+        var hasAccelData = false
 
         for reading in readings {
             switch reading.sensorType {
@@ -263,34 +265,37 @@ class OralableBLE: ObservableObject {
             case .ppgRed:
                 // Update live PPG red value
                 self.ppgRedValue = reading.value
-                // PPG data needs to be grouped - handled separately
-                updatePPGHistory(from: readings)
+                hasPPGData = true
 
             case .ppgInfrared, .ppgGreen:
-                // PPG data needs to be grouped - handled separately
-                updatePPGHistory(from: readings)
+                hasPPGData = true
 
             case .accelerometerX:
                 // Update live accelerometer X value
                 self.accelX = reading.value
-                // Accel data needs to be grouped - handled separately
-                updateAccelHistory(from: readings)
+                hasAccelData = true
 
             case .accelerometerY:
                 // Update live accelerometer Y value
                 self.accelY = reading.value
-                // Accel data needs to be grouped - handled separately
-                updateAccelHistory(from: readings)
+                hasAccelData = true
 
             case .accelerometerZ:
                 // Update live accelerometer Z value
                 self.accelZ = reading.value
-                // Accel data needs to be grouped - handled separately
-                updateAccelHistory(from: readings)
+                hasAccelData = true
 
             default:
                 break
             }
+        }
+
+        // Process grouped data ONCE per batch
+        if hasPPGData {
+            updatePPGHistory(from: readings)
+        }
+        if hasAccelData {
+            updateAccelHistory(from: readings)
         }
 
         // Log batch summary instead of individual readings
