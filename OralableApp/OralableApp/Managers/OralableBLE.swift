@@ -344,7 +344,10 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
+        // Reduced logging to prevent UI freeze - only log occasionally
+        if ppgHistory.count % 50 == 0 {
+            Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
+        }
     }
     
     private func updateAccelHistory(from readings: [SensorReading]) {
@@ -379,7 +382,10 @@ class OralableBLE: ObservableObject {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
 
-        Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
+        // Reduced logging to prevent UI freeze - only log occasionally
+        if accelerometerHistory.count % 50 == 0 {
+            Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
+        }
     }
     
     // MARK: - Legacy SensorData Conversion
