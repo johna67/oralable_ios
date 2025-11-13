@@ -75,13 +75,16 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     }
     
     // MARK: - Private Properties
-    
+
     private var configuration: DeviceConfiguration = .defaultOralable
     private var isStreaming = false
     private var sensorDataCharacteristic: CBCharacteristic?
     private var ppgWaveformCharacteristic: CBCharacteristic?
     private var controlCharacteristic: CBCharacteristic?
     private var cancellables = Set<AnyCancellable>()
+
+    // Continuation for waiting until service discovery completes
+    private var connectionContinuation: CheckedContinuation<Void, Error>?
     
     // MARK: - Initialization
     
@@ -109,19 +112,26 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             print("❌ [OralableDevice] No peripheral available")
             throw DeviceError.invalidPeripheral
         }
-        
+
         print("\n🔌 [OralableDevice] connect() called")
         print("🔌 [OralableDevice] Peripheral state: \(peripheral.state.rawValue)")
-        
+
         connectionState = .connecting
         deviceInfo.connectionState = .connecting
-        
-        print("🔌 [OralableDevice] Discovering services...")
-        peripheral.discoverServices([
-            BLEConstants.serviceUUID,
-            BLEConstants.batteryServiceUUID,
-            BLEConstants.deviceInfoServiceUUID
-        ])
+
+        // Wait for service discovery to complete
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.connectionContinuation = continuation
+
+            print("🔌 [OralableDevice] Discovering services...")
+            peripheral.discoverServices([
+                BLEConstants.serviceUUID,
+                BLEConstants.batteryServiceUUID,
+                BLEConstants.deviceInfoServiceUUID
+            ])
+        }
+
+        print("✅ [OralableDevice] connect() completed - services and characteristics discovered")
     }
     
     func disconnect() async {
@@ -153,27 +163,35 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
     func startDataStream() async throws {
         print("\n📊 [OralableDevice] startDataStream() called")
-        
+        print("📊 [OralableDevice] isConnected: \(isConnected)")
+        print("📊 [OralableDevice] connectionState: \(connectionState)")
+        print("📊 [OralableDevice] sensorDataCharacteristic: \(sensorDataCharacteristic != nil ? "✓" : "✗")")
+        print("📊 [OralableDevice] ppgWaveformCharacteristic: \(ppgWaveformCharacteristic != nil ? "✓" : "✗")")
+
         guard isConnected else {
-            print("❌ [OralableDevice] Not connected")
+            print("❌ [OralableDevice] Not connected - cannot start data stream")
             throw DeviceError.notConnected
         }
-        
-        if let characteristic = sensorDataCharacteristic {
-            print("📊 [OralableDevice] Enabling sensor data notifications")
-            peripheral?.setNotifyValue(true, for: characteristic)
-            isStreaming = true
-            print("✅ [OralableDevice] Sensor data notifications enabled")
-        } else {
+
+        guard let characteristic = sensorDataCharacteristic else {
             print("❌ [OralableDevice] Sensor data characteristic not found")
             throw DeviceError.characteristicNotFound("Sensor Data")
         }
-        
-        if let characteristic = ppgWaveformCharacteristic {
-            print("📊 [OralableDevice] Enabling PPG waveform notifications")
-            peripheral?.setNotifyValue(true, for: characteristic)
+
+        print("📊 [OralableDevice] Enabling sensor data notifications on characteristic \(characteristic.uuid.uuidString)")
+        peripheral?.setNotifyValue(true, for: characteristic)
+        isStreaming = true
+        print("✅ [OralableDevice] Sensor data notifications enabled")
+
+        if let ppgChar = ppgWaveformCharacteristic {
+            print("📊 [OralableDevice] Enabling PPG waveform notifications on characteristic \(ppgChar.uuid.uuidString)")
+            peripheral?.setNotifyValue(true, for: ppgChar)
             print("✅ [OralableDevice] PPG waveform notifications enabled")
+        } else {
+            print("⚠️ [OralableDevice] PPG waveform characteristic not available - skipping")
         }
+
+        print("✅ [OralableDevice] Data stream started successfully")
     }
     
     func stopDataStream() async {
@@ -348,14 +366,22 @@ extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         print("\n🔍 [OralableDevice] didDiscoverServices")
-        
+
         if let error = error {
             print("❌ [OralableDevice] Service discovery error: \(error.localizedDescription)")
+            if let continuation = connectionContinuation {
+                connectionContinuation = nil
+                continuation.resume(throwing: DeviceError.connectionFailed(error.localizedDescription))
+            }
             return
         }
-        
+
         guard let services = peripheral.services else {
             print("⚠️ [OralableDevice] No services found")
+            if let continuation = connectionContinuation {
+                connectionContinuation = nil
+                continuation.resume(throwing: DeviceError.characteristicNotFound("No services"))
+            }
             return
         }
         
@@ -378,26 +404,19 @@ extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         print("\n🔍 [OralableDevice] didDiscoverCharacteristicsFor service: \(service.uuid.uuidString)")
-        
-        // ✅ NEW CODE
-        if let sensorChar = sensorDataCharacteristic {
-            print("🔔 [OralableDevice] Auto-enabling notifications...")
-            peripheral.setNotifyValue(true, for: sensorChar)
-            isStreaming = true
-        }
 
-        if let ppgChar = ppgWaveformCharacteristic {
-            print("🔔 [OralableDevice] Auto-enabling notifications...")
-            peripheral.setNotifyValue(true, for: ppgChar)
-        }
-        
         if let error = error {
             print("❌ [OralableDevice] Characteristic discovery error: \(error.localizedDescription)")
+            if let continuation = connectionContinuation {
+                connectionContinuation = nil
+                continuation.resume(throwing: DeviceError.characteristicNotFound(error.localizedDescription))
+            }
             return
         }
-        
+
         guard let characteristics = service.characteristics else {
             print("⚠️ [OralableDevice] No characteristics found")
+            // Don't fail the connection here - other services might have characteristics
             return
         }
         
@@ -429,6 +448,13 @@ extension OralableDevice: CBPeripheralDelegate {
             connectionState = .connected
             deviceInfo.connectionState = .connected
             print("✅ [OralableDevice] Device fully connected and ready")
+
+            // Resume the connection continuation
+            if let continuation = connectionContinuation {
+                connectionContinuation = nil
+                continuation.resume()
+                print("✅ [OralableDevice] Connection continuation resumed")
+            }
         }
     }
     
