@@ -325,15 +325,11 @@ class DeviceManager: ObservableObject {
             print("🔍 [DeviceManager] ✅ Detected as: ANR MuscleSense")
             return .anr
         }
-        
-        // TEMPORARY: Accept all devices as Oralable for testing
-        print("🔍 [DeviceManager] ⚠️ Name doesn't match known patterns")
-        print("🔍 [DeviceManager] ⚠️ TEMPORARY: Accepting as Oralable for testing")
-        return .oralable
-        
-        // PRODUCTION: Return nil for unknown devices
-        // print("🔍 [DeviceManager] ❌ Unknown device type")
-        // return nil
+
+        // PRODUCTION: Only show known devices (Oralable/TGM or ANR)
+        print("🔍 [DeviceManager] ❌ Unknown device type - name doesn't match known patterns")
+        print("🔍 [DeviceManager] ❌ Device '\(name)' REJECTED - not an Oralable or ANR device")
+        return nil
     }
     
     // MARK: - Device Discovery
