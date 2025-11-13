@@ -90,27 +90,34 @@ class DashboardViewModel: ObservableObject {
     }
     
     private func setupBLESubscriptions() {
+        print("📊 [DashboardViewModel] Setting up BLE subscriptions...")
+
         // Subscribe to PPG data
         bleManager.$ppgRedValue
             .sink { [weak self] value in
+                print("📊 [DashboardViewModel] Received ppgRedValue: \(value)")
                 self?.processPPGData(value)
             }
             .store(in: &cancellables)
-        
+
         // Subscribe to accelerometer data
         bleManager.$accelX
             .combineLatest(bleManager.$accelY, bleManager.$accelZ)
             .sink { [weak self] x, y, z in
+                print("📊 [DashboardViewModel] Received accel: X=\(x), Y=\(y), Z=\(z)")
                 self?.processAccelerometerData(x: x, y: y, z: z)
             }
             .store(in: &cancellables)
-        
+
         // Subscribe to temperature
         bleManager.$temperature
             .sink { [weak self] temp in
+                print("📊 [DashboardViewModel] Received temperature: \(temp)")
                 self?.temperature = temp
             }
             .store(in: &cancellables)
+
+        print("📊 [DashboardViewModel] BLE subscriptions set up complete")
     }
     
     private func processPPGData(_ value: Double) {
