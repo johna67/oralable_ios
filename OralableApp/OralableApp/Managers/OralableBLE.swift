@@ -186,14 +186,19 @@ class OralableBLE: ObservableObject {
             }
             .store(in: &cancellables) */
         
+        // Throttle sensor reading updates to prevent UI thread saturation
+        // Process at most 5 times per second instead of 100+ times per second
         deviceManager.$allSensorReadings
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] readings in
                 self?.updateHistoriesFromReadings(readings)
                 self?.updateLegacySensorData(with: readings)
             }
             .store(in: &cancellables)
-        
+
+        // Throttle device state updates to reduce processing load
         deviceManager.$latestReadings
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] latestReadings in
                 self?.updateDeviceState(from: latestReadings)
             }
@@ -203,7 +208,8 @@ class OralableBLE: ObservableObject {
     // MARK: - History Management from Sensor Readings
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
-        Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        // Only log summary info, not every reading to reduce logging overhead
+        var hrCount = 0, spo2Count = 0, batteryCount = 0, tempCount = 0
 
         for reading in readings {
             switch reading.sensorType {
@@ -213,7 +219,7 @@ class OralableBLE: ObservableObject {
                 if batteryHistory.count > maxHistoryCount {
                     batteryHistory.removeFirst(batteryHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Battery: \(Int(reading.value))% | History count: \(batteryHistory.count)")
+                batteryCount += 1
 
             case .heartRate:
                 // Force connection state when we have data
@@ -229,7 +235,7 @@ class OralableBLE: ObservableObject {
                 if heartRateHistory.count > maxHistoryCount {
                     heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] Heart Rate: \(Int(reading.value)) bpm | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(heartRateHistory.count)")
+                hrCount += 1
 
             case .spo2:
                 let spo2Data = SpO2Data(percentage: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
@@ -237,7 +243,7 @@ class OralableBLE: ObservableObject {
                 if spo2History.count > maxHistoryCount {
                     spo2History.removeFirst(spo2History.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
+                spo2Count += 1
 
             case .temperature:
                 let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
@@ -245,7 +251,7 @@ class OralableBLE: ObservableObject {
                 if temperatureHistory.count > maxHistoryCount {
                     temperatureHistory.removeFirst(temperatureHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Temperature: \(String(format: "%.1f", reading.value))°C | History count: \(temperatureHistory.count)")
+                tempCount += 1
 
             case .ppgRed, .ppgInfrared, .ppgGreen:
                 // PPG data needs to be grouped - handled separately
@@ -260,7 +266,10 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        Logger.shared.debug("[OralableBLE] Total history counts - HR: \(heartRateHistory.count), SpO2: \(spo2History.count), Temp: \(temperatureHistory.count), PPG: \(ppgHistory.count)")
+        // Log batch summary instead of individual readings
+        if hrCount > 0 || spo2Count > 0 || batteryCount > 0 || tempCount > 0 {
+            Logger.shared.debug("[OralableBLE] Batch processed - HR: \(hrCount), SpO2: \(spo2Count), Battery: \(batteryCount), Temp: \(tempCount) | Total: \(readings.count) readings")
+        }
     }
     
     private func updatePPGHistory(from readings: [SensorReading]) {
@@ -289,7 +298,10 @@ class OralableBLE: ObservableObject {
             ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
         }
 
-        Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
+        // Reduce logging frequency - only log if significant data processed
+        if grouped.count >= 5 {
+            Logger.shared.debug("[OralableBLE] PPG batch: \(grouped.count) samples | History: \(ppgHistory.count)")
+        }
     }
     
     private func updateAccelHistory(from readings: [SensorReading]) {
@@ -318,7 +330,10 @@ class OralableBLE: ObservableObject {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
 
-        Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
+        // Reduce logging frequency - only log if significant data processed
+        if grouped.count >= 5 {
+            Logger.shared.debug("[OralableBLE] Accel batch: \(grouped.count) samples | History: \(accelerometerHistory.count)")
+        }
     }
     
     // MARK: - Legacy SensorData Conversion
