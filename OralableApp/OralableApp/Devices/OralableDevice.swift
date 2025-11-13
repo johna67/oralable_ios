@@ -352,9 +352,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
         // Create sensor readings for each sample
         // Note: We send individual readings but also log summary stats
-        let avgRed = Double(redSamples.reduce(0, +)) / Double(redSamples.count)
-        let avgIR = Double(irSamples.reduce(0, +)) / Double(irSamples.count)
-        let avgGreen = Double(greenSamples.reduce(0, +)) / Double(greenSamples.count)
+        // Use Int64 to prevent overflow when summing Int32 values
+        let avgRed = Double(redSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(redSamples.count)
+        let avgIR = Double(irSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(irSamples.count)
+        let avgGreen = Double(greenSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(greenSamples.count)
 
         print("📊 [OralableDevice] PPG Averages - Red: \(Int(avgRed)), IR: \(Int(avgIR)), Green: \(Int(avgGreen))")
 
@@ -453,9 +454,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         let scaleFactor = 1.0 / 16384.0 // Typical for ±2g range on many sensors
 
         // Log summary statistics
-        let avgX = Double(xSamples.reduce(0, +)) / Double(xSamples.count) * scaleFactor
-        let avgY = Double(ySamples.reduce(0, +)) / Double(ySamples.count) * scaleFactor
-        let avgZ = Double(zSamples.reduce(0, +)) / Double(zSamples.count) * scaleFactor
+        // Use Int64 to prevent overflow when summing Int16 values
+        let avgX = Double(xSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(xSamples.count) * scaleFactor
+        let avgY = Double(ySamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(ySamples.count) * scaleFactor
+        let avgZ = Double(zSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(zSamples.count) * scaleFactor
 
         print("📊 [OralableDevice] Accel Averages - X: \(String(format: "%.3f", avgX))g, Y: \(String(format: "%.3f", avgY))g, Z: \(String(format: "%.3f", avgZ))g")
 
