@@ -294,37 +294,140 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     private func parseSensorData(_ data: Data) -> [SensorReading] {
         var readings: [SensorReading] = []
         let timestamp = Date()
-        
+
         let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
         print("📦 [OralableDevice] Raw sensor data: \(hexString)")
-        
-        // TODO: Implement actual parsing based on firmware protocol
-        // For now, create test readings to verify connectivity
-        
-        if data.count >= 20 {
-            readings.append(SensorReading(
-                sensorType: .ppgRed,
-                value: Double(data[0]),
-                timestamp: timestamp,
-                deviceId: peripheral?.identifier.uuidString,
-                quality: 0.9
-            ))
-            
-            readings.append(SensorReading(
-                sensorType: .temperature,
-                value: 36.5,
-                timestamp: timestamp,
-                deviceId: peripheral?.identifier.uuidString,
-                quality: 0.95
-            ))
+
+        // Parse based on 244-byte firmware protocol
+        // Data is sent as 32-bit little-endian values in groups
+        guard data.count >= 244 else {
+            print("⚠️ [OralableDevice] Insufficient data: \(data.count) bytes")
+            return readings
         }
-        
+
+        // Helper to read UInt32 little-endian
+        func readUInt32(at offset: Int) -> UInt32? {
+            guard offset + 3 < data.count else { return nil }
+            return UInt32(data[offset]) |
+                   (UInt32(data[offset + 1]) << 8) |
+                   (UInt32(data[offset + 2]) << 16) |
+                   (UInt32(data[offset + 3]) << 24)
+        }
+
+        // Helper to read Int32 little-endian (for accelerometer)
+        func readInt32(at offset: Int) -> Int32? {
+            guard let unsigned = readUInt32(at: offset) else { return nil }
+            return Int32(bitPattern: unsigned)
+        }
+
+        // Parse multiple samples from the 244-byte packet
+        // Each sample group appears to be 12 bytes (3 x 4-byte values)
+        var offset = 4  // Skip timestamp/sequence number at start
+        var sampleCount = 0
+
+        while offset + 32 < data.count && sampleCount < 10 {  // Parse up to 10 samples
+            // Read PPG values (3 channels)
+            if let ppgRed = readUInt32(at: offset) {
+                // Check for invalid marker (0x0007FFFF = 524287, 19-bit ADC saturation)
+                if ppgRed != 0x0007FFFF && ppgRed != 0xFFFFFFFF && ppgRed > 0 {
+                    readings.append(SensorReading(
+                        sensorType: .ppgRed,
+                        value: Double(ppgRed),
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.9
+                    ))
+                }
+            }
+
+            if let ppgIR = readUInt32(at: offset + 4) {
+                if ppgIR != 0x0007FFFF && ppgIR != 0xFFFFFFFF && ppgIR > 0 {
+                    readings.append(SensorReading(
+                        sensorType: .ppgInfrared,
+                        value: Double(ppgIR),
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.9
+                    ))
+                }
+            }
+
+            if let ppgGreen = readUInt32(at: offset + 8) {
+                if ppgGreen != 0x0007FFFF && ppgGreen != 0xFFFFFFFF && ppgGreen > 0 {
+                    readings.append(SensorReading(
+                        sensorType: .ppgGreen,
+                        value: Double(ppgGreen),
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.9
+                    ))
+                }
+            }
+
+            // Read accelerometer (next 12 bytes, signed values in mg)
+            if let accelX = readInt32(at: offset + 12) {
+                let accelXG = Double(accelX) / 1000.0  // Convert mg to g
+                if abs(accelXG) < 16.0 {  // Sanity check (±16g range)
+                    readings.append(SensorReading(
+                        sensorType: .accelerometerX,
+                        value: accelXG,
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+
+            if let accelY = readInt32(at: offset + 16) {
+                let accelYG = Double(accelY) / 1000.0
+                if abs(accelYG) < 16.0 {
+                    readings.append(SensorReading(
+                        sensorType: .accelerometerY,
+                        value: accelYG,
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+
+            if let accelZ = readInt32(at: offset + 20) {
+                let accelZG = Double(accelZ) / 1000.0
+                if abs(accelZG) < 16.0 {
+                    readings.append(SensorReading(
+                        sensorType: .accelerometerZ,
+                        value: accelZG,
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+
+            // Temperature appears to be sent periodically
+            if sampleCount == 0, let tempRaw = readUInt32(at: offset + 24) {
+                if tempRaw > 30000 && tempRaw < 40000 {  // Sanity check for body temp range
+                    let tempC = Double(tempRaw) / 1000.0  // Assume milli-degrees C
+                    readings.append(SensorReading(
+                        sensorType: .temperature,
+                        value: tempC,
+                        timestamp: timestamp,
+                        deviceId: peripheral?.identifier.uuidString,
+                        quality: 0.95
+                    ))
+                }
+            }
+
+            offset += 24  // Move to next sample group
+            sampleCount += 1
+        }
+
         for reading in readings {
             latestReadings[reading.sensorType] = reading
             sensorReadingsSubject.send(reading)
         }
-        
-        print("✅ [OralableDevice] Parsed \(readings.count) sensor readings")
+
+        print("✅ [OralableDevice] Parsed \(readings.count) sensor readings from \(sampleCount) sample groups")
         return readings
     }
     
