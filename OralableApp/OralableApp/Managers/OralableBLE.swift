@@ -97,7 +97,7 @@ class OralableBLE: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        self.deviceManager = DeviceManager()
+        self.deviceManager = DeviceManager.shared
         self.stateDetector = DeviceStateDetector()
         setupBindings()
         setupDirectBLECallbacks()  // NEW: Direct BLE callbacks for UI
@@ -223,6 +223,9 @@ class OralableBLE: ObservableObject {
         for reading in readings {
             switch reading.sensorType {
             case .battery:
+                // Update live battery value
+                self.batteryLevel = reading.value
+
                 let batteryData = BatteryData(percentage: Int(reading.value), timestamp: reading.timestamp)
                 batteryHistory.append(batteryData)
                 if batteryHistory.count > maxHistoryCount {
@@ -231,14 +234,6 @@ class OralableBLE: ObservableObject {
                 batteryCount += 1
 
             case .heartRate:
-                // Force connection state when we have data
-                isConnected = true
-
-                // Simulate accelerometer (will show movement in dashboard)
-                accelX = Double.random(in: -0.1...0.1)
-                accelY = Double.random(in: -0.1...0.1)
-                accelZ = 1.0 + Double.random(in: -0.05...0.05)
-
                 let hrData = HeartRateData(bpm: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
                 heartRateHistory.append(hrData)
                 if heartRateHistory.count > maxHistoryCount {
@@ -255,6 +250,9 @@ class OralableBLE: ObservableObject {
                 spo2Count += 1
 
             case .temperature:
+                // Update live temperature value
+                self.temperature = reading.value
+
                 let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
                 temperatureHistory.append(tempData)
                 if temperatureHistory.count > maxHistoryCount {
@@ -262,11 +260,31 @@ class OralableBLE: ObservableObject {
                 }
                 tempCount += 1
 
-            case .ppgRed, .ppgInfrared, .ppgGreen:
+            case .ppgRed:
+                // Update live PPG red value
+                self.ppgRedValue = reading.value
                 // PPG data needs to be grouped - handled separately
                 updatePPGHistory(from: readings)
 
-            case .accelerometerX, .accelerometerY, .accelerometerZ:
+            case .ppgInfrared, .ppgGreen:
+                // PPG data needs to be grouped - handled separately
+                updatePPGHistory(from: readings)
+
+            case .accelerometerX:
+                // Update live accelerometer X value
+                self.accelX = reading.value
+                // Accel data needs to be grouped - handled separately
+                updateAccelHistory(from: readings)
+
+            case .accelerometerY:
+                // Update live accelerometer Y value
+                self.accelY = reading.value
+                // Accel data needs to be grouped - handled separately
+                updateAccelHistory(from: readings)
+
+            case .accelerometerZ:
+                // Update live accelerometer Z value
+                self.accelZ = reading.value
                 // Accel data needs to be grouped - handled separately
                 updateAccelHistory(from: readings)
 
