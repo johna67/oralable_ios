@@ -12,12 +12,12 @@ import CoreBluetooth
 @MainActor
 class DashboardViewModel: ObservableObject {
     // MARK: - Published Properties
-    
-    // Metrics
-    @Published var heartRate: Int = 72
-    @Published var spO2: Int = 98
-    @Published var temperature: Double = 36.5
-    @Published var signalQuality: Int = 95
+
+    // Metrics (initialize to 0, not mock values)
+    @Published var heartRate: Int = 0
+    @Published var spO2: Int = 0
+    @Published var temperature: Double = 0.0
+    @Published var signalQuality: Int = 0
     @Published var sessionDuration: String = "00:00"
     
     // MAM States (Movement, Adhesion, Monitoring)
@@ -37,7 +37,6 @@ class DashboardViewModel: ObservableObject {
     private let bleManager = OralableBLE.shared
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
-    private var mockDataTimer: Timer?
     
     // Thresholds for MAM detection
     private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
@@ -47,19 +46,16 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Initialization
     init() {
         setupBindings()
-        generateMockWaveforms()
     }
     
     // MARK: - Public Methods
     func startMonitoring() {
         setupBLESubscriptions()
         startSessionTimer()
-        startMockDataGeneration()
     }
     
     func stopMonitoring() {
         sessionTimer?.invalidate()
-        mockDataTimer?.invalidate()
     }
     
     func startRecording() {
@@ -212,47 +208,6 @@ class DashboardViewModel: ObservableObject {
         accelerometerData = []
         isMoving = false
         positionQuality = "Off"
-    }
-    
-    // MARK: - Mock Data Generation (Remove in production)
-    private func generateMockWaveforms() {
-        // Generate initial mock PPG waveform
-        for i in 0..<100 {
-            let value = sin(Double(i) * 0.1) * 1000 + 2000 + Double.random(in: -100...100)
-            ppgData.append(value)
-        }
-        
-        // Generate initial mock accelerometer waveform
-        for i in 0..<100 {
-            let value = sin(Double(i) * 0.05) * 0.5 + 1.0 + Double.random(in: -0.1...0.1)
-            accelerometerData.append(value)
-        }
-    }
-    
-    private func startMockDataGeneration() {
-        mockDataTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, !self.bleManager.isConnected else { return }
-            
-            // Update mock PPG data
-            self.ppgData.removeFirst()
-            let newPPGValue = sin(Double(self.ppgData.count) * 0.1) * 1000 + 2000 + Double.random(in: -100...100)
-            self.ppgData.append(newPPGValue)
-            
-            // Update mock accelerometer data
-            self.accelerometerData.removeFirst()
-            let newAccelValue = sin(Double(self.accelerometerData.count) * 0.05) * 0.5 + 1.0 + Double.random(in: -0.1...0.1)
-            self.accelerometerData.append(newAccelValue)
-            
-            // Update mock metrics
-            self.heartRate = Int.random(in: 68...76)
-            self.spO2 = Int.random(in: 96...99)
-            self.temperature = 36.5 + Double.random(in: -0.3...0.3)
-            
-            // Mock MAM states
-            self.isCharging = Bool.random()
-            self.isMoving = Bool.random()
-            self.positionQuality = ["Good", "Good", "Good", "Adjust"].randomElement()!
-        }
     }
 }
 

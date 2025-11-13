@@ -35,12 +35,10 @@ struct DashboardView: View {
                     
                     // Metrics Grid
                     metricsGrid
-                    
+
                     // Waveform Section
-                    if bleManager.isConnected {
-                        waveformSection
-                    }
-                    
+                    waveformSection
+
                     // Action Buttons
                     actionButtons
                 }
@@ -114,32 +112,19 @@ struct DashboardView: View {
                     Text(bleManager.isConnected ? "Connected" : "Disconnected")
                         .font(designSystem.typography.h3)
                         .foregroundColor(designSystem.colors.textPrimary)
-                    
+
                     if bleManager.isConnected {
                         Text(bleManager.deviceName)
                             .font(designSystem.typography.caption)
                             .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                }
-                
-                Spacer()
-                
-                // Connect Button
-                Button(action: {
-                    if bleManager.isConnected {
-                        bleManager.disconnect()
                     } else {
-                        bleManager.startScanning()
+                        Text("Use Devices tab to connect")
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.textSecondary)
                     }
-                }) {
-                    Text(bleManager.isConnected ? "Disconnect" : "Connect")
-                        .font(designSystem.typography.button)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, designSystem.spacing.md)
-                        .padding(.vertical, designSystem.spacing.sm)
-                        .background(bleManager.isConnected ? Color.red : Color.blue)
-                        .cornerRadius(designSystem.cornerRadius.medium)
                 }
+
+                Spacer()
             }
         }
         .padding(designSystem.spacing.md)
@@ -385,23 +370,36 @@ struct WaveformCard: View {
     let data: [Double]
     let color: Color
     let designSystem: DesignSystem
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             Text(title)
                 .font(designSystem.typography.caption)
                 .foregroundColor(designSystem.colors.textSecondary)
-            
-            Chart(Array(data.enumerated()), id: \.offset) { index, value in
-                LineMark(
-                    x: .value("Time", index),
-                    y: .value("Value", value)
-                )
-                .foregroundStyle(color)
+
+            if data.isEmpty {
+                // Placeholder when no data available
+                ZStack {
+                    Rectangle()
+                        .fill(designSystem.colors.backgroundPrimary.opacity(0.3))
+                        .frame(height: 100)
+
+                    Text("Waiting for data...")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+            } else {
+                Chart(Array(data.enumerated()), id: \.offset) { index, value in
+                    LineMark(
+                        x: .value("Time", index),
+                        y: .value("Value", value)
+                    )
+                    .foregroundStyle(color)
+                }
+                .frame(height: 100)
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
             }
-            .frame(height: 100)
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)
