@@ -225,36 +225,26 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     }
     
     func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
-        print("\n📦 [OralableDevice] parseData called")
-        print("📦 [OralableDevice] Characteristic: \(characteristic.uuid.uuidString)")
-        print("📦 [OralableDevice] Data length: \(data.count) bytes")
-
-        // Route based on known characteristic UUIDs
+        // Route based on known characteristic UUIDs (no logging per packet - too verbose)
         if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing PPG data (3A0FF001)")
             return parseSensorData(data)
         } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing Accelerometer data (3A0FF002)")
             return parsePPGWaveform(data)
         } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing standard battery level")
             return parseBatteryData(data)
         } else {
             // For unknown characteristics (003-008), use data size to identify type
             switch data.count {
             case 4:
-                print("📦 [OralableDevice] Parsing battery voltage (4 bytes)")
                 return parseBatteryData(data)
             case 8:
-                print("📦 [OralableDevice] Parsing temperature (8 bytes)")
                 return parseTemperatureData(data)
             case 154:
-                print("📦 [OralableDevice] Parsing accelerometer by size (154 bytes)")
                 return parsePPGWaveform(data)
             case 244:
-                print("📦 [OralableDevice] Parsing PPG by size (244 bytes)")
                 return parseSensorData(data)
             default:
+                // Only log unknown formats
                 print("⚠️ [OralableDevice] Unknown data format: \(data.count) bytes from \(characteristic.uuid.uuidString)")
                 let hexPreview = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
                 print("   First 32 bytes: \(hexPreview)")
@@ -722,16 +712,14 @@ extension OralableDevice: CBPeripheralDelegate {
             print("❌ [OralableDevice] Value update error: \(error.localizedDescription)")
             return
         }
-        
+
         guard let data = characteristic.value else {
-            print("⚠️ [OralableDevice] No data received")
-            return
+            return  // No log spam for normal operation
         }
-        
-        print("📨 [OralableDevice] Data received from \(characteristic.uuid.uuidString) (\(data.count) bytes)")
-        
+
+        // Parse data (logging happens inside parsers at throttled rate)
         let readings = parseData(data, from: characteristic)
-        
+
         for reading in readings {
             latestReadings[reading.sensorType] = reading
         }
