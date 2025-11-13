@@ -82,6 +82,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     private var ppgWaveformCharacteristic: CBCharacteristic?
     private var controlCharacteristic: CBCharacteristic?
     private var cancellables = Set<AnyCancellable>()
+
+    // Connection continuation for async/await
+    private var connectionContinuation: CheckedContinuation<Void, Error>?
     
     // MARK: - Initialization
     
@@ -109,19 +112,36 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             print("❌ [OralableDevice] No peripheral available")
             throw DeviceError.invalidPeripheral
         }
-        
+
         print("\n🔌 [OralableDevice] connect() called")
         print("🔌 [OralableDevice] Peripheral state: \(peripheral.state.rawValue)")
-        
+
         connectionState = .connecting
         deviceInfo.connectionState = .connecting
-        
+
         print("🔌 [OralableDevice] Discovering services...")
-        peripheral.discoverServices([
-            BLEConstants.serviceUUID,
-            BLEConstants.batteryServiceUUID,
-            BLEConstants.deviceInfoServiceUUID
-        ])
+
+        // Use continuation to properly wait for service/characteristic discovery
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.connectionContinuation = continuation
+
+            peripheral.discoverServices([
+                BLEConstants.serviceUUID,
+                BLEConstants.batteryServiceUUID,
+                BLEConstants.deviceInfoServiceUUID
+            ])
+
+            // Timeout after 10 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+                if let cont = self?.connectionContinuation {
+                    self?.connectionContinuation = nil
+                    cont.resume(throwing: DeviceError.timeout)
+                    print("⏱️ [OralableDevice] Connection timeout - service discovery took too long")
+                }
+            }
+        }
+
+        print("✅ [OralableDevice] Service discovery complete, device ready")
     }
     
     func disconnect() async {
@@ -429,6 +449,20 @@ extension OralableDevice: CBPeripheralDelegate {
             connectionState = .connected
             deviceInfo.connectionState = .connected
             print("✅ [OralableDevice] Device fully connected and ready")
+
+            // Resume the connection continuation now that discovery is complete
+            if let continuation = connectionContinuation {
+                connectionContinuation = nil
+                continuation.resume()
+                print("✅ [OralableDevice] Connection continuation resumed")
+            }
+        } else {
+            // If required characteristic not found, fail the connection
+            if let continuation = connectionContinuation {
+                connectionContinuation = nil
+                continuation.resume(throwing: DeviceError.characteristicNotFound("Sensor data characteristic not found"))
+                print("❌ [OralableDevice] Required characteristic not found")
+            }
         }
     }
     
