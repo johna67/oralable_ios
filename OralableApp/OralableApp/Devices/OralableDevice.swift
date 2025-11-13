@@ -227,20 +227,37 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         print("\n📦 [OralableDevice] parseData called")
         print("📦 [OralableDevice] Characteristic: \(characteristic.uuid.uuidString)")
         print("📦 [OralableDevice] Data length: \(data.count) bytes")
-        
+
+        // Route based on known characteristic UUIDs
         if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing sensor data")
+            print("📦 [OralableDevice] Parsing PPG sensor data")
             return parseSensorData(data)
         } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing PPG waveform data")
+            print("📦 [OralableDevice] Parsing accelerometer waveform data")
             return parsePPGWaveform(data)
         } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing battery data")
+            print("📦 [OralableDevice] Parsing battery level data")
             return parseBatteryData(data)
         }
-        
-        print("⚠️ [OralableDevice] Unknown characteristic UUID")
-        return []
+
+        // For unknown characteristics, try to infer based on data length
+        switch data.count {
+        case 4:
+            print("📦 [OralableDevice] Detected 4-byte packet, parsing as battery voltage")
+            return parseBatteryData(data)
+        case 8:
+            print("📦 [OralableDevice] Detected 8-byte packet, parsing as temperature")
+            return parseTemperatureData(data)
+        case 244:
+            print("📦 [OralableDevice] Detected 244-byte packet, parsing as PPG data")
+            return parseSensorData(data)
+        case 154...156:
+            print("📦 [OralableDevice] Detected 154-156 byte packet, parsing as accelerometer data")
+            return parsePPGWaveform(data)
+        default:
+            print("⚠️ [OralableDevice] Unknown characteristic UUID and unrecognized data length: \(data.count) bytes")
+            return []
+        }
     }
     
     // MARK: - Device Control
@@ -294,70 +311,264 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     // MARK: - Data Parsing
     
     private func parseSensorData(_ data: Data) -> [SensorReading] {
+        // Based on TGM firmware spec:
+        // 244 bytes = PPG data format
+        // Bytes 0-3: frame counter (uint32)
+        // Then 20 samples of 12 bytes each:
+        //   - Bytes 0-3: Red (int32)
+        //   - Bytes 4-7: IR (int32)
+        //   - Bytes 8-11: Green (int32)
+
+        guard data.count >= 244 else {
+            print("⚠️ [OralableDevice] Insufficient data for PPG parsing: \(data.count) bytes")
+            return []
+        }
+
         var readings: [SensorReading] = []
         let timestamp = Date()
-        
-        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        print("📦 [OralableDevice] Raw sensor data: \(hexString)")
-        
-        // TODO: Implement actual parsing based on firmware protocol
-        // For now, create test readings to verify connectivity
-        
-        if data.count >= 20 {
+        let deviceId = peripheral?.identifier.uuidString
+
+        // Parse frame counter
+        let frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
+        print("📦 [OralableDevice] PPG Frame #\(frameCounter)")
+
+        // Arrays to collect all samples for batch processing
+        var redSamples: [Int32] = []
+        var irSamples: [Int32] = []
+        var greenSamples: [Int32] = []
+
+        // Parse 20 PPG samples
+        for i in 0..<20 {
+            let offset = 4 + (i * 12) // Skip frame counter, then 12 bytes per sample
+
+            let red = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: Int32.self) }
+            let ir = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 4, as: Int32.self) }
+            let green = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 8, as: Int32.self) }
+
+            redSamples.append(red)
+            irSamples.append(ir)
+            greenSamples.append(green)
+        }
+
+        // Create sensor readings for each sample
+        // Note: We send individual readings but also log summary stats
+        let avgRed = Double(redSamples.reduce(0, +)) / Double(redSamples.count)
+        let avgIR = Double(irSamples.reduce(0, +)) / Double(irSamples.count)
+        let avgGreen = Double(greenSamples.reduce(0, +)) / Double(greenSamples.count)
+
+        print("📊 [OralableDevice] PPG Averages - Red: \(Int(avgRed)), IR: \(Int(avgIR)), Green: \(Int(avgGreen))")
+
+        // Send readings for each sample to maintain high temporal resolution
+        for i in 0..<20 {
+            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02) // 50Hz = 20ms between samples
+
             readings.append(SensorReading(
                 sensorType: .ppgRed,
-                value: Double(data[0]),
-                timestamp: timestamp,
-                deviceId: peripheral?.identifier.uuidString,
-                quality: 0.9
+                value: Double(redSamples[i]),
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: redSamples[i] > 0 ? 0.9 : 0.0
             ))
-            
+
             readings.append(SensorReading(
-                sensorType: .temperature,
-                value: 36.5,
-                timestamp: timestamp,
-                deviceId: peripheral?.identifier.uuidString,
-                quality: 0.95
+                sensorType: .ppgInfrared,
+                value: Double(irSamples[i]),
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: irSamples[i] > 0 ? 0.9 : 0.0
+            ))
+
+            readings.append(SensorReading(
+                sensorType: .ppgGreen,
+                value: Double(greenSamples[i]),
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: greenSamples[i] > 0 ? 0.9 : 0.0
             ))
         }
-        
+
+        // Send all readings through the publisher for downstream processing
         for reading in readings {
-            latestReadings[reading.sensorType] = reading
             sensorReadingsSubject.send(reading)
         }
-        
-        print("✅ [OralableDevice] Parsed \(readings.count) sensor readings")
+
+        // Update latest readings with most recent sample
+        if let lastRed = readings.last(where: { $0.sensorType == .ppgRed }) {
+            latestReadings[.ppgRed] = lastRed
+        }
+        if let lastIR = readings.last(where: { $0.sensorType == .ppgInfrared }) {
+            latestReadings[.ppgInfrared] = lastIR
+        }
+        if let lastGreen = readings.last(where: { $0.sensorType == .ppgGreen }) {
+            latestReadings[.ppgGreen] = lastGreen
+        }
+
+        print("✅ [OralableDevice] Parsed \(readings.count) PPG sensor readings (20 samples × 3 channels)")
         return readings
     }
     
     private func parsePPGWaveform(_ data: Data) -> [SensorReading] {
-        let hexString = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        print("📦 [OralableDevice] Raw PPG waveform: \(hexString.prefix(100))...")
-        
-        // TODO: Implement PPG waveform parsing
-        
-        print("✅ [OralableDevice] Parsed PPG waveform")
-        return []
+        // Based on TGM firmware spec:
+        // 154-156 bytes = Accelerometer data format
+        // Bytes 0-3: frame counter (uint32)
+        // Then 25 samples of 6 bytes each:
+        //   - Bytes 0-1: X (int16)
+        //   - Bytes 2-3: Y (int16)
+        //   - Bytes 4-5: Z (int16)
+
+        guard data.count >= 154 else {
+            print("⚠️ [OralableDevice] Insufficient data for accelerometer parsing: \(data.count) bytes")
+            return []
+        }
+
+        var readings: [SensorReading] = []
+        let timestamp = Date()
+        let deviceId = peripheral?.identifier.uuidString
+
+        // Parse frame counter
+        let frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
+        print("📦 [OralableDevice] Accelerometer Frame #\(frameCounter)")
+
+        // Arrays to collect all samples
+        var xSamples: [Int16] = []
+        var ySamples: [Int16] = []
+        var zSamples: [Int16] = []
+
+        // Parse 25 accelerometer samples
+        for i in 0..<25 {
+            let offset = 4 + (i * 6) // Skip frame counter, then 6 bytes per sample
+
+            let x = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: Int16.self) }
+            let y = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 2, as: Int16.self) }
+            let z = data.withUnsafeBytes { $0.load(fromByteOffset: offset + 4, as: Int16.self) }
+
+            xSamples.append(x)
+            ySamples.append(y)
+            zSamples.append(z)
+        }
+
+        // Convert raw accelerometer values to g-force (assuming typical accelerometer scale)
+        // Most accelerometers use a scale factor, typically ±2g, ±4g, etc.
+        // For now, we'll use a typical conversion factor
+        let scaleFactor = 1.0 / 16384.0 // Typical for ±2g range on many sensors
+
+        // Log summary statistics
+        let avgX = Double(xSamples.reduce(0, +)) / Double(xSamples.count) * scaleFactor
+        let avgY = Double(ySamples.reduce(0, +)) / Double(ySamples.count) * scaleFactor
+        let avgZ = Double(zSamples.reduce(0, +)) / Double(zSamples.count) * scaleFactor
+
+        print("📊 [OralableDevice] Accel Averages - X: \(String(format: "%.3f", avgX))g, Y: \(String(format: "%.3f", avgY))g, Z: \(String(format: "%.3f", avgZ))g")
+
+        // Send readings for each sample to maintain high temporal resolution
+        for i in 0..<25 {
+            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02) // 50Hz = 20ms between samples
+
+            readings.append(SensorReading(
+                sensorType: .accelerometerX,
+                value: Double(xSamples[i]) * scaleFactor,
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: 0.95
+            ))
+
+            readings.append(SensorReading(
+                sensorType: .accelerometerY,
+                value: Double(ySamples[i]) * scaleFactor,
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: 0.95
+            ))
+
+            readings.append(SensorReading(
+                sensorType: .accelerometerZ,
+                value: Double(zSamples[i]) * scaleFactor,
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: 0.95
+            ))
+        }
+
+        // Send all readings through the publisher for downstream processing
+        for reading in readings {
+            sensorReadingsSubject.send(reading)
+        }
+
+        // Update latest readings with most recent sample
+        if let lastX = readings.last(where: { $0.sensorType == .accelerometerX }) {
+            latestReadings[.accelerometerX] = lastX
+        }
+        if let lastY = readings.last(where: { $0.sensorType == .accelerometerY }) {
+            latestReadings[.accelerometerY] = lastY
+        }
+        if let lastZ = readings.last(where: { $0.sensorType == .accelerometerZ }) {
+            latestReadings[.accelerometerZ] = lastZ
+        }
+
+        print("✅ [OralableDevice] Parsed \(readings.count) accelerometer readings (25 samples × 3 axes)")
+        return readings
     }
     
     private func parseBatteryData(_ data: Data) -> [SensorReading] {
-        guard data.count >= 1 else { return [] }
-        
-        let batteryPercent = Int(data[0])
-        self.batteryLevel = batteryPercent
-        
+        // Based on TGM firmware spec:
+        // Battery voltage is sent as int32 (4 bytes) in millivolts (mV)
+
+        guard data.count >= 4 else {
+            print("⚠️ [OralableDevice] Insufficient data for battery parsing: \(data.count) bytes")
+            return []
+        }
+
+        let batteryVoltage = data.withUnsafeBytes { $0.load(as: Int32.self) }
+        let voltageInVolts = Double(batteryVoltage) / 1000.0 // Convert mV to V
+
+        // Estimate battery percentage based on typical Li-Ion voltage curve
+        // Fully charged: ~4.2V, Discharged: ~3.0V
+        let percentage = min(100, max(0, ((voltageInVolts - 3.0) / 1.2) * 100))
+        self.batteryLevel = Int(percentage)
+
         let reading = SensorReading(
             sensorType: .battery,
-            value: Double(batteryPercent),
+            value: percentage,
             timestamp: Date(),
             deviceId: peripheral?.identifier.uuidString,
-            quality: 1.0
+            quality: 1.0,
+            metadata: ["voltage_v": voltageInVolts, "voltage_mv": Double(batteryVoltage)]
         )
-        
+
         latestReadings[.battery] = reading
         sensorReadingsSubject.send(reading)
-        
-        print("🔋 [OralableDevice] Battery: \(batteryPercent)%")
+
+        print("🔋 [OralableDevice] Battery: \(String(format: "%.2f", voltageInVolts))V (\(Int(percentage))%)")
+        return [reading]
+    }
+
+    private func parseTemperatureData(_ data: Data) -> [SensorReading] {
+        // Based on TGM firmware spec:
+        // Bytes 0-3: frame counter (uint32)
+        // Bytes 4-5: temperature as int16 in centi-degrees Celsius (1/100 degree)
+        // Example: 2137 = 21.37°C
+
+        guard data.count >= 8 else {
+            print("⚠️ [OralableDevice] Insufficient data for temperature parsing: \(data.count) bytes")
+            return []
+        }
+
+        let frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
+        let tempCentiDegrees = data.withUnsafeBytes { $0.load(fromByteOffset: 4, as: Int16.self) }
+        let temperatureCelsius = Double(tempCentiDegrees) / 100.0
+
+        let reading = SensorReading(
+            sensorType: .temperature,
+            value: temperatureCelsius,
+            timestamp: Date(),
+            deviceId: peripheral?.identifier.uuidString,
+            quality: 0.95,
+            metadata: ["frame": Double(frameCounter)]
+        )
+
+        latestReadings[.temperature] = reading
+        sensorReadingsSubject.send(reading)
+
+        print("🌡️ [OralableDevice] Temperature Frame #\(frameCounter): \(String(format: "%.2f", temperatureCelsius))°C")
         return [reading]
     }
 }
