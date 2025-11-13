@@ -492,12 +492,16 @@ class DeviceManager: ObservableObject {
     }
     
     private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
+        print("📡 [DeviceManager] handleSensorReading: \(reading.sensorType) = \(reading.value)")
+
         // Add to all readings
         allSensorReadings.append(reading)
-        
+
         // Update latest readings
         latestReadings[reading.sensorType] = reading
-        
+
+        print("📡 [DeviceManager] allSensorReadings count: \(allSensorReadings.count)")
+
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
             allSensorReadings.removeFirst(100)
