@@ -85,6 +85,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
     // Continuation for waiting until service discovery completes
     private var connectionContinuation: CheckedContinuation<Void, Error>?
+
+    // Packet counter for throttled logging
+    private var packetCount = 0
     
     // MARK: - Initialization
     
@@ -302,7 +305,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         }
 
         // Log first 64 bytes of hex for protocol analysis (throttled)
-        static var packetCount = 0
         packetCount += 1
         if packetCount % 20 == 1 {  // Log every 20th packet
             let hexPreview = data.prefix(64).map { String(format: "%02X", $0) }.joined(separator: " ")
