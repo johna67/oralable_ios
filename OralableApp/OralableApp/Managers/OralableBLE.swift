@@ -79,11 +79,20 @@ class OralableBLE: ObservableObject {
     }
     
     // MARK: - Private Properties
-    
+
     private let deviceManager: DeviceManager
     private let stateDetector: DeviceStateDetector
     private var cancellables = Set<AnyCancellable>()
     private let maxHistoryCount = 100
+
+    // MARK: - Calculators and Buffers (Restored from a820411)
+    private let heartRateCalculator = HeartRateCalculator()
+    private let spo2Calculator = SpO2Calculator()
+
+    // PPG data buffers for calculations
+    private var ppgBufferRed: [Int32] = []
+    private var ppgBufferIR: [Int32] = []
+    private var ppgBufferGreen: [Int32] = []
     
     // MARK: - Initialization
     
@@ -298,6 +307,17 @@ class OralableBLE: ObservableObject {
             ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
         }
 
+        // CRITICAL: Extract PPG samples and calculate HR/SpO2
+        if !grouped.isEmpty {
+            let sortedSamples = grouped.sorted(by: { $0.key < $1.key })
+            let redSamples = sortedSamples.map { $0.value.red }
+            let irSamples = sortedSamples.map { $0.value.ir }
+            let greenSamples = sortedSamples.map { $0.value.green }
+
+            // Process PPG data for heart rate and SpO2 calculation
+            processPPGData(red: redSamples, ir: irSamples, green: greenSamples)
+        }
+
         // Reduce logging frequency - only log if significant data processed
         if grouped.count >= 5 {
             Logger.shared.debug("[OralableBLE] PPG batch: \(grouped.count) samples | History: \(ppgHistory.count)")
@@ -335,7 +355,75 @@ class OralableBLE: ObservableObject {
             Logger.shared.debug("[OralableBLE] Accel batch: \(grouped.count) samples | History: \(accelerometerHistory.count)")
         }
     }
-    
+
+    // MARK: - PPG Processing and Metric Calculation (Restored from a820411)
+
+    /// Process PPG data and calculate heart rate and SpO2
+    /// This accumulates PPG samples in buffers and runs calculations when enough data is available
+    private func processPPGData(red: [Int32], ir: [Int32], green: [Int32]) {
+        // Add new samples to buffers
+        ppgBufferRed.append(contentsOf: red)
+        ppgBufferIR.append(contentsOf: ir)
+        ppgBufferGreen.append(contentsOf: green)
+
+        // Limit buffer size to prevent memory growth
+        let maxBufferSize = 300
+        if ppgBufferRed.count > maxBufferSize {
+            ppgBufferRed.removeFirst(ppgBufferRed.count - maxBufferSize)
+            ppgBufferIR.removeFirst(ppgBufferIR.count - maxBufferSize)
+            ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxBufferSize)
+        }
+
+        // Heart Rate Calculation (requires 20+ samples)
+        if ppgBufferIR.count >= 20 {
+            let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
+            if let heartRateResult = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
+                let bpm = heartRateResult.bpm
+                let quality = heartRateResult.quality
+
+                Logger.shared.info("[OralableBLE] ❤️ Heart Rate Calculated: \(bpm) BPM (quality: \(String(format: "%.2f", quality)))")
+
+                // Add to history for graphing
+                let hrData = HeartRateData(bpm: bpm, quality: quality, timestamp: Date())
+                heartRateHistory.append(hrData)
+                if heartRateHistory.count > 1000 {
+                    heartRateHistory.removeFirst(heartRateHistory.count - 1000)
+                }
+            } else {
+                Logger.shared.debug("[OralableBLE] ⚠️ Heart Rate: Calculation failed (insufficient signal quality)")
+            }
+        }
+
+        // SpO2 Calculation (requires 150+ samples for accuracy)
+        if ppgBufferRed.count >= 150, ppgBufferIR.count >= 150 {
+            if let result = spo2Calculator.calculateSpO2WithQuality(
+                redSamples: ppgBufferRed,
+                irSamples: ppgBufferIR
+            ) {
+                let spo2Value = result.spo2
+                let quality = result.quality
+
+                Logger.shared.info("[OralableBLE] 🫁 SpO2 Calculated: \(String(format: "%.1f", spo2Value))% (quality: \(String(format: "%.2f", quality)))")
+
+                // Add to history for graphing
+                let spo2Data = SpO2Data(percentage: spo2Value, quality: quality, timestamp: Date())
+                spo2History.append(spo2Data)
+                if spo2History.count > 1000 {
+                    spo2History.removeFirst(spo2History.count - 1000)
+                }
+
+                Logger.shared.debug("[OralableBLE] 📊 SpO2 History: \(spo2History.count) readings")
+            } else {
+                Logger.shared.debug("[OralableBLE] ⚠️ SpO2: Calculation failed (poor signal quality)")
+            }
+        } else {
+            // Only log occasionally to avoid spam
+            if ppgBufferRed.count % 50 == 0 {
+                Logger.shared.debug("[OralableBLE] ⏳ SpO2: Accumulating data (\(ppgBufferRed.count)/150 samples)")
+            }
+        }
+    }
+
     // MARK: - Legacy SensorData Conversion
     
     private func updateLegacySensorData(with readings: [SensorReading]) {
