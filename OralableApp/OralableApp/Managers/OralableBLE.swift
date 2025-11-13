@@ -36,13 +36,18 @@ class OralableBLE: ObservableObject {
     @Published var logMessages: [LogMessage] = []
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
     
-    // ADD THESE PROPERTIES
+    // Real-time sensor values for UI
     @Published var accelX: Double = 0.0
     @Published var accelY: Double = 0.0
     @Published var accelZ: Double = 0.0
-    @Published var temperature: Double = 36.5
+    @Published var temperature: Double = 0.0
     @Published var ppgRedValue: Double = 0.0
-    @Published var batteryLevel: Double = 85.0
+    @Published var ppgIRValue: Double = 0.0
+    @Published var ppgGreenValue: Double = 0.0
+    @Published var heartRate: Int = 0
+    @Published var spO2: Int = 0
+    @Published var heartRateQuality: Double = 0.0
+    @Published var batteryLevel: Double = 0.0
     @Published var isRecording: Bool = false
     @Published var packetsReceived: Int = 0
     @Published var rssi: Int = -50
@@ -79,11 +84,13 @@ class OralableBLE: ObservableObject {
     }
     
     // MARK: - Private Properties
-    
+
     private let deviceManager: DeviceManager
     private let stateDetector: DeviceStateDetector
+    private let heartRateCalculator = HeartRateCalculator()
     private var cancellables = Set<AnyCancellable>()
     private let maxHistoryCount = 100
+    private var ppgIRBuffer: [UInt32] = []  // Buffer for HR calculation
     
     // MARK: - Initialization
     
@@ -240,6 +247,7 @@ class OralableBLE: ObservableObject {
                 Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
 
             case .temperature:
+                temperature = reading.value  // Update published property
                 let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
                 temperatureHistory.append(tempData)
                 if temperatureHistory.count > maxHistoryCount {
@@ -265,15 +273,25 @@ class OralableBLE: ObservableObject {
     
     private func updatePPGHistory(from readings: [SensorReading]) {
         var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
+        var irSamples: [UInt32] = []
 
         for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
             let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
             var current = grouped[roundedTime] ?? (0, 0, 0)
 
             switch reading.sensorType {
-            case .ppgRed: current.red = Int32(reading.value)
-            case .ppgInfrared: current.ir = Int32(reading.value)
-            case .ppgGreen: current.green = Int32(reading.value)
+            case .ppgRed:
+                current.red = Int32(reading.value)
+                ppgRedValue = reading.value  // Update published property
+            case .ppgInfrared:
+                current.ir = Int32(reading.value)
+                ppgIRValue = reading.value  // Update published property
+                if reading.value > 0 {
+                    irSamples.append(UInt32(reading.value))
+                }
+            case .ppgGreen:
+                current.green = Int32(reading.value)
+                ppgGreenValue = reading.value  // Update published property
             default: break
             }
 
@@ -283,10 +301,47 @@ class OralableBLE: ObservableObject {
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
             ppgHistory.append(ppgData)
+
+            // Collect IR samples for HR calculation
+            if values.ir > 0 {
+                ppgIRBuffer.append(UInt32(values.ir))
+            }
         }
 
         if ppgHistory.count > maxHistoryCount {
             ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
+        }
+
+        // Calculate Heart Rate from IR samples
+        if !ppgIRBuffer.isEmpty {
+            if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
+                heartRate = Int(hrResult.bpm)
+                heartRateQuality = hrResult.quality
+                Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
+
+                // Add to history
+                let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
+                heartRateHistory.append(hrData)
+                if heartRateHistory.count > maxHistoryCount {
+                    heartRateHistory.removeFirst()
+                }
+            }
+        }
+
+        // Calculate SpO2 from Red/IR ratio (simplified)
+        if let latest = grouped.values.first, latest.red > 1000 && latest.ir > 1000 {
+            let ratio = Double(latest.red) / Double(latest.ir)
+            // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
+            let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
+            spO2 = Int(calculatedSpO2)
+            Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
+
+            // Add to history
+            let spo2Data = SpO2Data(percentage: Double(spO2), quality: 0.8, timestamp: Date())
+            spo2History.append(spo2Data)
+            if spo2History.count > maxHistoryCount {
+                spo2History.removeFirst()
+            }
         }
 
         Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
@@ -300,9 +355,15 @@ class OralableBLE: ObservableObject {
             var current = grouped[roundedTime] ?? (0, 0, 0)
 
             switch reading.sensorType {
-            case .accelerometerX: current.x = Int16(reading.value * 1000)
-            case .accelerometerY: current.y = Int16(reading.value * 1000)
-            case .accelerometerZ: current.z = Int16(reading.value * 1000)
+            case .accelerometerX:
+                current.x = Int16(reading.value * 1000)
+                accelX = reading.value  // Update published property
+            case .accelerometerY:
+                current.y = Int16(reading.value * 1000)
+                accelY = reading.value  // Update published property
+            case .accelerometerZ:
+                current.z = Int16(reading.value * 1000)
+                accelZ = reading.value  // Update published property
             default: break
             }
 

@@ -111,13 +111,27 @@ class DashboardViewModel: ObservableObject {
     }
     
     private func setupBLESubscriptions() {
-        // Subscribe to PPG data
+        // Subscribe to Heart Rate (calculated from PPG)
+        bleManager.$heartRate
+            .sink { [weak self] hr in
+                self?.heartRate = hr
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to SpO2 (calculated from PPG)
+        bleManager.$spO2
+            .sink { [weak self] spo2 in
+                self?.spO2 = spo2
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to PPG data for waveform
         bleManager.$ppgRedValue
             .sink { [weak self] value in
                 self?.processPPGData(value)
             }
             .store(in: &cancellables)
-        
+
         // Subscribe to accelerometer data
         bleManager.$accelX
             .combineLatest(bleManager.$accelY, bleManager.$accelZ)
@@ -125,11 +139,18 @@ class DashboardViewModel: ObservableObject {
                 self?.processAccelerometerData(x: x, y: y, z: z)
             }
             .store(in: &cancellables)
-        
+
         // Subscribe to temperature
         bleManager.$temperature
             .sink { [weak self] temp in
                 self?.temperature = temp
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to HR quality for signal quality display
+        bleManager.$heartRateQuality
+            .sink { [weak self] quality in
+                self?.signalQuality = Int(quality * 100)
             }
             .store(in: &cancellables)
     }
@@ -140,14 +161,8 @@ class DashboardViewModel: ObservableObject {
         if ppgData.count > 100 {
             ppgData.removeFirst()
         }
-        
-        // Calculate heart rate from PPG
-        calculateHeartRate()
-        
-        // Update signal quality based on PPG signal
-        updateSignalQuality(from: value)
-        
-        // Check position quality from PPG amplitude
+
+        // Update position quality from PPG amplitude
         updatePositionQuality(from: value)
     }
     
@@ -165,28 +180,8 @@ class DashboardViewModel: ObservableObject {
         isMoving = magnitude > movementThreshold
     }
     
-    private func calculateHeartRate() {
-        // Simplified heart rate calculation
-        // In production, use proper peak detection algorithm
-        let randomVariation = Int.random(in: -2...2)
-        heartRate = min(max(72 + randomVariation, 60), 100)
-    }
-    
-    private func updateSignalQuality(from ppgValue: Double) {
-        // Simple signal quality estimation based on PPG amplitude
-        if ppgValue > 1000 {
-            signalQuality = 95
-        } else if ppgValue > 500 {
-            signalQuality = 80
-        } else if ppgValue > 100 {
-            signalQuality = 60
-        } else {
-            signalQuality = 40
-        }
-    }
-    
     private func updatePositionQuality(from ppgValue: Double) {
-        // MAM - Adhesion/Position detection
+        // MAM - Adhesion/Position detection based on signal quality
         if signalQuality > 80 {
             positionQuality = "Good"
         } else if signalQuality > 50 {
