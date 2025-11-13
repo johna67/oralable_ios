@@ -530,8 +530,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             value: percentage,
             timestamp: Date(),
             deviceId: peripheral?.identifier.uuidString,
-            quality: 1.0,
-            metadata: ["voltage_v": voltageInVolts, "voltage_mv": Double(batteryVoltage)]
+            quality: 1.0
         )
 
         latestReadings[.battery] = reading
@@ -561,8 +560,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             value: temperatureCelsius,
             timestamp: Date(),
             deviceId: peripheral?.identifier.uuidString,
-            quality: 0.95,
-            metadata: ["frame": Double(frameCounter)]
+            quality: 0.95
         )
 
         latestReadings[.temperature] = reading
