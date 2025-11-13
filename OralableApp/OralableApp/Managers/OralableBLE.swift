@@ -91,6 +91,10 @@ class OralableBLE: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let maxHistoryCount = 100
     private var ppgIRBuffer: [UInt32] = []  // Buffer for HR calculation
+
+    // Throttling counters to prevent log spam
+    private var ppgLogCounter = 0
+    private var accelLogCounter = 0
     
     // MARK: - Initialization
     
@@ -344,8 +348,9 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        // Reduced logging to prevent UI freeze - only log occasionally
-        if ppgHistory.count % 50 == 0 {
+        // Reduced logging to prevent UI freeze - only log every 50th packet
+        ppgLogCounter += 1
+        if ppgLogCounter % 50 == 0 {
             Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
         }
     }
@@ -382,8 +387,9 @@ class OralableBLE: ObservableObject {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
 
-        // Reduced logging to prevent UI freeze - only log occasionally
-        if accelerometerHistory.count % 50 == 0 {
+        // Reduced logging to prevent UI freeze - only log every 50th packet
+        accelLogCounter += 1
+        if accelLogCounter % 50 == 0 {
             Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
         }
     }
