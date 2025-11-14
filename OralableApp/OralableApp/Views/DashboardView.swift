@@ -202,57 +202,57 @@ struct DashboardView: View {
             MetricCard(
                 icon: "heart.fill",
                 title: "Heart Rate",
-                value: "\(viewModel.heartRate)",
+                value: bleManager.isConnected && viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "--",
                 unit: "bpm",
                 color: .red,
                 designSystem: designSystem
             )
-            
+
             // SpO2
             MetricCard(
                 icon: "lungs.fill",
                 title: "SpO2",
-                value: "\(viewModel.spO2)",
+                value: bleManager.isConnected && viewModel.spO2 > 0 ? "\(viewModel.spO2)" : "--",
                 unit: "%",
                 color: .blue,
                 designSystem: designSystem
             )
-            
+
             // Temperature
             MetricCard(
                 icon: "thermometer",
                 title: "Temperature",
-                value: String(format: "%.1f", viewModel.temperature),
+                value: bleManager.isConnected && viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "--",
                 unit: "°C",
                 color: .orange,
                 designSystem: designSystem
             )
-            
+
             // Battery
             MetricCard(
                 icon: batteryIcon,
                 title: "Battery",
-                value: "\(Int(bleManager.batteryLevel))",
+                value: bleManager.isConnected && bleManager.batteryLevel > 0 ? "\(Int(bleManager.batteryLevel))" : "--",
                 unit: "%",
                 color: batteryColor,
                 designSystem: designSystem
             )
-            
+
             // Session Time
             MetricCard(
                 icon: "clock.fill",
                 title: "Session",
-                value: viewModel.sessionDuration,
+                value: bleManager.isConnected ? viewModel.sessionDuration : "--",
                 unit: "",
                 color: .purple,
                 designSystem: designSystem
             )
-            
+
             // Signal Quality
             MetricCard(
                 icon: "wifi",
                 title: "Signal",
-                value: "\(viewModel.signalQuality)",
+                value: bleManager.isConnected && viewModel.signalQuality > 0 ? "\(viewModel.signalQuality)" : "--",
                 unit: "%",
                 color: .green,
                 designSystem: designSystem
@@ -288,14 +288,17 @@ struct DashboardView: View {
                 color: .red,
                 designSystem: designSystem
             )
-            
-            // Accelerometer
+
+            // Accelerometer with tap to navigate to historical view
             WaveformCard(
                 title: "Movement",
                 data: viewModel.accelerometerData,
                 color: .blue,
                 designSystem: designSystem
             )
+            .onTapGesture {
+                showingHistorical = true
+            }
         }
     }
     
