@@ -85,6 +85,12 @@ class OralableBLE: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let maxHistoryCount = 100
 
+    // PPG Processing Constants
+    private let maxPPGBufferSize = 300      // 6 seconds at 50Hz sampling rate
+    private let minHeartRateSamples = 20    // 0.4 seconds required for HR calculation
+    private let minSpO2Samples = 150        // 3 seconds required for accurate SpO2 calculation
+    private let maxMetricHistoryCount = 1000 // Maximum history items for HR and SpO2
+
     // MARK: - Calculators and Buffers (Restored from a820411)
     private let heartRateCalculator = HeartRateCalculator()
     private let spo2Calculator = SpO2Calculator()
@@ -217,12 +223,9 @@ class OralableBLE: ObservableObject {
     // MARK: - History Management from Sensor Readings
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
-        print("📥 [OralableBLE] updateHistoriesFromReadings called with \(readings.count) total readings")
-
         // CRITICAL FIX: Only process recent readings, not the entire accumulated array
         // Take only the last 100 readings to avoid reprocessing old data
         let recentReadings = readings.suffix(100)
-        print("📥 [OralableBLE] Processing \(recentReadings.count) recent readings")
 
         // Only log summary info, not every reading to reduce logging overhead
         var hrCount = 0, spo2Count = 0, batteryCount = 0, tempCount = 0
@@ -234,7 +237,6 @@ class OralableBLE: ObservableObject {
             case .battery:
                 // Update live battery value
                 self.batteryLevel = reading.value
-                print("🔋 [OralableBLE] Updated batteryLevel: \(reading.value)")
 
                 let batteryData = BatteryData(percentage: Int(reading.value), timestamp: reading.timestamp)
                 batteryHistory.append(batteryData)
@@ -262,7 +264,6 @@ class OralableBLE: ObservableObject {
             case .temperature:
                 // Update live temperature value
                 self.temperature = reading.value
-                print("🌡️ [OralableBLE] Updated temperature: \(reading.value)")
 
                 let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
                 temperatureHistory.append(tempData)
@@ -274,7 +275,6 @@ class OralableBLE: ObservableObject {
             case .ppgRed:
                 // Update live PPG red value
                 self.ppgRedValue = reading.value
-                print("🔴 [OralableBLE] Updated ppgRedValue: \(reading.value)")
                 hasPPGData = true
 
             case .ppgInfrared, .ppgGreen:
@@ -283,7 +283,6 @@ class OralableBLE: ObservableObject {
             case .accelerometerX:
                 // Update live accelerometer X value
                 self.accelX = reading.value
-                print("📐 [OralableBLE] Updated accelX: \(reading.value)")
                 hasAccelData = true
 
             case .accelerometerY:
@@ -401,15 +400,14 @@ class OralableBLE: ObservableObject {
         ppgBufferGreen.append(contentsOf: green)
 
         // Limit buffer size to prevent memory growth
-        let maxBufferSize = 300
-        if ppgBufferRed.count > maxBufferSize {
-            ppgBufferRed.removeFirst(ppgBufferRed.count - maxBufferSize)
-            ppgBufferIR.removeFirst(ppgBufferIR.count - maxBufferSize)
-            ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxBufferSize)
+        if ppgBufferRed.count > maxPPGBufferSize {
+            ppgBufferRed.removeFirst(ppgBufferRed.count - maxPPGBufferSize)
+            ppgBufferIR.removeFirst(ppgBufferIR.count - maxPPGBufferSize)
+            ppgBufferGreen.removeFirst(ppgBufferGreen.count - maxPPGBufferSize)
         }
 
-        // Heart Rate Calculation (requires 20+ samples)
-        if ppgBufferIR.count >= 20 {
+        // Heart Rate Calculation (requires minimum samples)
+        if ppgBufferIR.count >= minHeartRateSamples {
             let irSamplesUInt32 = ppgBufferIR.map { UInt32(bitPattern: $0) }
             if let heartRateResult = heartRateCalculator.calculateHeartRate(irSamples: irSamplesUInt32) {
                 let bpm = heartRateResult.bpm
@@ -420,16 +418,16 @@ class OralableBLE: ObservableObject {
                 // Add to history for graphing
                 let hrData = HeartRateData(bpm: bpm, quality: quality, timestamp: Date())
                 heartRateHistory.append(hrData)
-                if heartRateHistory.count > 1000 {
-                    heartRateHistory.removeFirst(heartRateHistory.count - 1000)
+                if heartRateHistory.count > maxMetricHistoryCount {
+                    heartRateHistory.removeFirst(heartRateHistory.count - maxMetricHistoryCount)
                 }
             } else {
                 Logger.shared.debug("[OralableBLE] ⚠️ Heart Rate: Calculation failed (insufficient signal quality)")
             }
         }
 
-        // SpO2 Calculation (requires 150+ samples for accuracy)
-        if ppgBufferRed.count >= 150, ppgBufferIR.count >= 150 {
+        // SpO2 Calculation (requires minimum samples for accuracy)
+        if ppgBufferRed.count >= minSpO2Samples, ppgBufferIR.count >= minSpO2Samples {
             if let result = spo2Calculator.calculateSpO2WithQuality(
                 redSamples: ppgBufferRed,
                 irSamples: ppgBufferIR
@@ -442,8 +440,8 @@ class OralableBLE: ObservableObject {
                 // Add to history for graphing
                 let spo2Data = SpO2Data(percentage: spo2Value, quality: quality, timestamp: Date())
                 spo2History.append(spo2Data)
-                if spo2History.count > 1000 {
-                    spo2History.removeFirst(spo2History.count - 1000)
+                if spo2History.count > maxMetricHistoryCount {
+                    spo2History.removeFirst(spo2History.count - maxMetricHistoryCount)
                 }
 
                 Logger.shared.debug("[OralableBLE] 📊 SpO2 History: \(spo2History.count) readings")
@@ -453,7 +451,7 @@ class OralableBLE: ObservableObject {
         } else {
             // Only log occasionally to avoid spam
             if ppgBufferRed.count % 50 == 0 {
-                Logger.shared.debug("[OralableBLE] ⏳ SpO2: Accumulating data (\(ppgBufferRed.count)/150 samples)")
+                Logger.shared.debug("[OralableBLE] ⏳ SpO2: Accumulating data (\(ppgBufferRed.count)/\(minSpO2Samples) samples)")
             }
         }
     }

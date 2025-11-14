@@ -224,38 +224,27 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     }
     
     func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
-        print("\n📦 [OralableDevice] parseData called")
-        print("📦 [OralableDevice] Characteristic: \(characteristic.uuid.uuidString)")
-        print("📦 [OralableDevice] Data length: \(data.count) bytes")
-
         // Route based on known characteristic UUIDs
         if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing PPG sensor data")
             return parseSensorData(data)
         } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing accelerometer waveform data")
             return parsePPGWaveform(data)
         } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-            print("📦 [OralableDevice] Parsing battery level data")
             return parseBatteryData(data)
         }
 
         // For unknown characteristics, try to infer based on data length
         switch data.count {
         case 4:
-            print("📦 [OralableDevice] Detected 4-byte packet, parsing as battery voltage")
             return parseBatteryData(data)
         case 8:
-            print("📦 [OralableDevice] Detected 8-byte packet, parsing as temperature")
             return parseTemperatureData(data)
         case 244:
-            print("📦 [OralableDevice] Detected 244-byte packet, parsing as PPG data")
             return parseSensorData(data)
         case 154...156:
-            print("📦 [OralableDevice] Detected 154-156 byte packet, parsing as accelerometer data")
             return parsePPGWaveform(data)
         default:
-            print("⚠️ [OralableDevice] Unknown characteristic UUID and unrecognized data length: \(data.count) bytes")
+            Logger.shared.warning("[OralableDevice] Unknown characteristic UUID and unrecognized data length: \(data.count) bytes")
             return []
         }
     }
@@ -320,7 +309,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         //   - Bytes 8-11: Green (int32)
 
         guard data.count >= 244 else {
-            print("⚠️ [OralableDevice] Insufficient data for PPG parsing: \(data.count) bytes")
+            Logger.shared.warning("[OralableDevice] Insufficient data for PPG parsing: \(data.count) bytes")
             return []
         }
 
@@ -330,7 +319,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
         // Parse frame counter
         let frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        print("📦 [OralableDevice] PPG Frame #\(frameCounter)")
 
         // Arrays to collect all samples for batch processing
         var redSamples: [Int32] = []
@@ -349,15 +337,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             irSamples.append(ir)
             greenSamples.append(green)
         }
-
-        // Create sensor readings for each sample
-        // Note: We send individual readings but also log summary stats
-        // Use Int64 to prevent overflow when summing Int32 values
-        let avgRed = Double(redSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(redSamples.count)
-        let avgIR = Double(irSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(irSamples.count)
-        let avgGreen = Double(greenSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(greenSamples.count)
-
-        print("📊 [OralableDevice] PPG Averages - Red: \(Int(avgRed)), IR: \(Int(avgIR)), Green: \(Int(avgGreen))")
 
         // Send readings for each sample to maintain high temporal resolution
         for i in 0..<20 {
@@ -404,7 +383,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             latestReadings[.ppgGreen] = lastGreen
         }
 
-        print("✅ [OralableDevice] Parsed \(readings.count) PPG sensor readings (20 samples × 3 channels)")
         return readings
     }
     
@@ -418,7 +396,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         //   - Bytes 4-5: Z (int16)
 
         guard data.count >= 154 else {
-            print("⚠️ [OralableDevice] Insufficient data for accelerometer parsing: \(data.count) bytes")
+            Logger.shared.warning("[OralableDevice] Insufficient data for accelerometer parsing: \(data.count) bytes")
             return []
         }
 
@@ -428,7 +406,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
         // Parse frame counter
         let frameCounter = data.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        print("📦 [OralableDevice] Accelerometer Frame #\(frameCounter)")
 
         // Arrays to collect all samples
         var xSamples: [Int16] = []
@@ -452,14 +429,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         // Most accelerometers use a scale factor, typically ±2g, ±4g, etc.
         // For now, we'll use a typical conversion factor
         let scaleFactor = 1.0 / 16384.0 // Typical for ±2g range on many sensors
-
-        // Log summary statistics
-        // Use Int64 to prevent overflow when summing Int16 values
-        let avgX = Double(xSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(xSamples.count) * scaleFactor
-        let avgY = Double(ySamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(ySamples.count) * scaleFactor
-        let avgZ = Double(zSamples.reduce(Int64(0), { $0 + Int64($1) })) / Double(zSamples.count) * scaleFactor
-
-        print("📊 [OralableDevice] Accel Averages - X: \(String(format: "%.3f", avgX))g, Y: \(String(format: "%.3f", avgY))g, Z: \(String(format: "%.3f", avgZ))g")
 
         // Send readings for each sample to maintain high temporal resolution
         for i in 0..<25 {
@@ -506,7 +475,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             latestReadings[.accelerometerZ] = lastZ
         }
 
-        print("✅ [OralableDevice] Parsed \(readings.count) accelerometer readings (25 samples × 3 axes)")
         return readings
     }
     
@@ -515,7 +483,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         // Battery voltage is sent as int32 (4 bytes) in millivolts (mV)
 
         guard data.count >= 4 else {
-            print("⚠️ [OralableDevice] Insufficient data for battery parsing: \(data.count) bytes")
+            Logger.shared.warning("[OralableDevice] Insufficient data for battery parsing: \(data.count) bytes")
             return []
         }
 
@@ -538,7 +506,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         latestReadings[.battery] = reading
         sensorReadingsSubject.send(reading)
 
-        print("🔋 [OralableDevice] Battery: \(String(format: "%.2f", voltageInVolts))V (\(Int(percentage))%)")
+        Logger.shared.debug("[OralableDevice] Battery: \(String(format: "%.2f", voltageInVolts))V (\(Int(percentage))%)")
         return [reading]
     }
 
@@ -549,7 +517,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         // Example: 2137 = 21.37°C
 
         guard data.count >= 8 else {
-            print("⚠️ [OralableDevice] Insufficient data for temperature parsing: \(data.count) bytes")
+            Logger.shared.warning("[OralableDevice] Insufficient data for temperature parsing: \(data.count) bytes")
             return []
         }
 
@@ -568,7 +536,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         latestReadings[.temperature] = reading
         sensorReadingsSubject.send(reading)
 
-        print("🌡️ [OralableDevice] Temperature Frame #\(frameCounter): \(String(format: "%.2f", temperatureCelsius))°C")
+        Logger.shared.debug("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
         return [reading]
     }
 }
