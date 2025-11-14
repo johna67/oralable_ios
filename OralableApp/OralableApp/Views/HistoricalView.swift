@@ -177,43 +177,13 @@ struct HistoricalView: View {
     }
     
     // MARK: - Summary Metrics Grid
-    
+
     private var summaryMetricsGrid: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            SectionHeaderView(title: "Summary", icon: "chart.bar")
-            
+            SectionHeaderView(title: "Movement Summary", icon: "figure.walk")
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
-                // Heart Rate
-                MetricCard(
-                    icon: "heart.fill",
-                    title: "Avg Heart Rate",
-                    value: viewModel.averageHeartRateText,
-                    unit: "BPM",
-                    color: .red,
-                    designSystem: designSystem
-                )
-                
-                // SpO2
-                MetricCard(
-                    icon: "lungs.fill",
-                    title: "Avg SpO2",
-                    value: viewModel.averageSpO2Text,
-                    unit: "%",
-                    color: .blue,
-                    designSystem: designSystem
-                )
-                
-                // Temperature
-                MetricCard(
-                    icon: "thermometer",
-                    title: "Avg Temperature",
-                    value: viewModel.averageTemperatureText,
-                    unit: "°C",
-                    color: .orange,
-                    designSystem: designSystem
-                )
-                
-                // Activity
+                // Activity/Movement
                 MetricCard(
                     icon: "figure.walk",
                     title: "Active Time",
@@ -222,17 +192,7 @@ struct HistoricalView: View {
                     color: .green,
                     designSystem: designSystem
                 )
-                
-                // Battery Usage
-                MetricCard(
-                    icon: "battery.75",
-                    title: "Avg Battery",
-                    value: viewModel.averageBatteryText,
-                    unit: "%",
-                    color: .yellow,
-                    designSystem: designSystem
-                )
-                
+
                 // Data Points
                 MetricCard(
                     icon: "circle.grid.3x3.fill",
@@ -247,38 +207,21 @@ struct HistoricalView: View {
     }
     
     // MARK: - Charts Section
-    
+
     private var chartsSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.lg) {
-            SectionHeaderView(title: "Trends", icon: "chart.line.uptrend.xyaxis")
-            
-            // Heart Rate Chart
-            chartCard(
-                title: "Heart Rate",
-                data: viewModel.heartRateChartData,
-                color: .red,
-                unit: "BPM"
-            )
-            
-            // SpO2 Chart
-            chartCard(
-                title: "SpO2",
-                data: viewModel.spo2ChartData,
-                color: .blue,
-                unit: "%"
-            )
-            
-            // Temperature Chart
-            chartCard(
-                title: "Temperature",
-                data: viewModel.temperatureChartData,
-                color: .orange,
-                unit: "°C"
-            )
-            
-            // Activity Chart
+            SectionHeaderView(title: "Movement Trends", icon: "chart.line.uptrend.xyaxis")
+
+            // Activity/Movement Chart
             if !viewModel.activityChartData.isEmpty {
                 activityChartCard
+            } else {
+                chartCard(
+                    title: "Movement Activity",
+                    data: [],
+                    color: .green,
+                    unit: "Activity"
+                )
             }
         }
     }
