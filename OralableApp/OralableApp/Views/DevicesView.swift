@@ -128,14 +128,20 @@ struct DevicesView: View {
             }
             
             // CRITICAL FIX: Now observes bleManager.discoveredDevicesInfo directly
-            if !bleManager.discoveredDevicesInfo.isEmpty {
+            // Filter to only show Oralable and ANR devices
+            let filteredDevices = bleManager.discoveredDevicesInfo.filter { deviceInfo in
+                deviceInfo.name.lowercased().contains("oralable") ||
+                deviceInfo.name.lowercased().contains("anr")
+            }
+
+            if !filteredDevices.isEmpty {
                 VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
                     Text("AVAILABLE DEVICES")
                         .font(designSystem.typography.caption)
                         .foregroundColor(designSystem.colors.textTertiary)
                         .padding(.top, designSystem.spacing.md)
-                    
-                    ForEach(bleManager.discoveredDevicesInfo) { deviceInfo in
+
+                    ForEach(filteredDevices) { deviceInfo in
                         HStack {
                             // Device Icon
                             Image(systemName: "sensor")
