@@ -244,7 +244,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         case 154...156:
             return parsePPGWaveform(data)
         default:
-            Logger.shared.warning("[OralableDevice] Unknown characteristic UUID and unrecognized data length: \(data.count) bytes")
+            Task { @MainActor in
+                Logger.shared.warning("[OralableDevice] Unknown characteristic UUID and unrecognized data length: \(data.count) bytes")
+            }
             return []
         }
     }
@@ -309,7 +311,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         //   - Bytes 8-11: Green (int32)
 
         guard data.count >= 244 else {
-            Logger.shared.warning("[OralableDevice] Insufficient data for PPG parsing: \(data.count) bytes")
+            Task { @MainActor in
+                Logger.shared.warning("[OralableDevice] Insufficient data for PPG parsing: \(data.count) bytes")
+            }
             return []
         }
 
@@ -396,7 +400,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         //   - Bytes 4-5: Z (int16)
 
         guard data.count >= 154 else {
-            Logger.shared.warning("[OralableDevice] Insufficient data for accelerometer parsing: \(data.count) bytes")
+            Task { @MainActor in
+                Logger.shared.warning("[OralableDevice] Insufficient data for accelerometer parsing: \(data.count) bytes")
+            }
             return []
         }
 
@@ -483,7 +489,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         // Battery voltage is sent as int32 (4 bytes) in millivolts (mV)
 
         guard data.count >= 4 else {
-            Logger.shared.warning("[OralableDevice] Insufficient data for battery parsing: \(data.count) bytes")
+            Task { @MainActor in
+                Logger.shared.warning("[OralableDevice] Insufficient data for battery parsing: \(data.count) bytes")
+            }
             return []
         }
 
@@ -506,7 +514,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         latestReadings[.battery] = reading
         sensorReadingsSubject.send(reading)
 
-        Logger.shared.debug("[OralableDevice] Battery: \(String(format: "%.2f", voltageInVolts))V (\(Int(percentage))%)")
+        Task { @MainActor in
+            Logger.shared.debug("[OralableDevice] Battery: \(String(format: "%.2f", voltageInVolts))V (\(Int(percentage))%)")
+        }
         return [reading]
     }
 
@@ -517,7 +527,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         // Example: 2137 = 21.37°C
 
         guard data.count >= 8 else {
-            Logger.shared.warning("[OralableDevice] Insufficient data for temperature parsing: \(data.count) bytes")
+            Task { @MainActor in
+                Logger.shared.warning("[OralableDevice] Insufficient data for temperature parsing: \(data.count) bytes")
+            }
             return []
         }
 
@@ -536,7 +548,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         latestReadings[.temperature] = reading
         sensorReadingsSubject.send(reading)
 
-        Logger.shared.debug("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
+        Task { @MainActor in
+            Logger.shared.debug("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
+        }
         return [reading]
     }
 }
