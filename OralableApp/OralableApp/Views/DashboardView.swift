@@ -95,12 +95,18 @@ struct DashboardView: View {
                     .environmentObject(SubscriptionManager.shared)
                     .environmentObject(AppStateManager.shared)
             }
-            .sheet(isPresented: $showingHistorical) {
-                HistoricalView()
-                    .environmentObject(designSystem)
-                    .environmentObject(HistoricalDataManager.shared)
-                    .environmentObject(bleManager)
-            }
+            .background(
+                NavigationLink(
+                    destination: HistoricalView()
+                        .environmentObject(designSystem)
+                        .environmentObject(HistoricalDataManager.shared)
+                        .environmentObject(bleManager),
+                    isActive: $showingHistorical
+                ) {
+                    EmptyView()
+                }
+                .hidden()
+            )
             .sheet(isPresented: $showingShare) {
                 ShareView(ble: bleManager)
                     .environmentObject(designSystem)
