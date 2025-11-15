@@ -322,7 +322,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
         // Log first packet for debugging (throttled)
         packetCount += 1
-        if packetCount % 20 == 1 {
+        if packetCount % 200 == 1 {  // Changed from 20 to 200 for even less logging
             let hexPreview = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
             print("📦 [OralableDevice] PPG Packet #\(packetCount) first 32 bytes: \(hexPreview)")
         }
@@ -394,7 +394,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         }
 
         // Throttled summary logging
-        if packetCount % 20 == 1 {
+        if packetCount % 200 == 1 {  // Changed from 20 to 200 for even less logging
             let redCount = readings.filter { $0.sensorType == .ppgRed }.count
             let irCount = readings.filter { $0.sensorType == .ppgInfrared }.count
             let greenCount = readings.filter { $0.sensorType == .ppgGreen }.count
@@ -429,7 +429,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         }
 
         // Log first packet for debugging (throttled)
-        if packetCount % 20 == 1 {
+        if packetCount % 200 == 1 {  // Changed from 20 to 200 for even less logging
             let hexPreview = data.prefix(28).map { String(format: "%02X", $0) }.joined(separator: " ")
             print("📦 [OralableDevice] Accel Packet first 28 bytes: \(hexPreview)")
         }
@@ -511,7 +511,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         }
 
         // Throttled summary logging
-        if packetCount % 20 == 1 {
+        if packetCount % 200 == 1 {  // Changed from 20 to 200 for even less logging
             let xCount = readings.filter { $0.sensorType == .accelerometerX }.count
             let yCount = readings.filter { $0.sensorType == .accelerometerY }.count
             let zCount = readings.filter { $0.sensorType == .accelerometerZ }.count

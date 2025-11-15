@@ -217,9 +217,9 @@ class OralableBLE: ObservableObject {
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
         // Increment counter for throttled logging
         historyLogCounter += 1
-        let shouldLog = historyLogCounter % 50 == 0
+        let shouldLog = historyLogCounter % 200 == 0  // Changed from 50 to 200 for even less logging
 
-        // THROTTLED: Only log every 50th call to prevent UI freeze
+        // THROTTLED: Only log every 200th call to prevent UI freeze
         if shouldLog {
             Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
         }
@@ -341,7 +341,7 @@ class OralableBLE: ObservableObject {
 
         // Increment counter for throttled logging
         ppgLogCounter += 1
-        let shouldLog = ppgLogCounter % 50 == 0
+        let shouldLog = ppgLogCounter % 200 == 0  // Changed from 50 to 200 for even less logging
 
         // Calculate Heart Rate from IR samples
         if !ppgIRBuffer.isEmpty {
@@ -421,9 +421,9 @@ class OralableBLE: ObservableObject {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
 
-        // Reduced logging to prevent UI freeze - only log every 50th packet
+        // Reduced logging to prevent UI freeze - only log every 200th packet
         accelLogCounter += 1
-        if accelLogCounter % 50 == 0 {
+        if accelLogCounter % 200 == 0 {  // Changed from 50 to 200 for even less logging
             Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
         }
     }
