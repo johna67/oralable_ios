@@ -95,6 +95,7 @@ class OralableBLE: ObservableObject {
     // Throttling counters to prevent log spam
     private var ppgLogCounter = 0
     private var accelLogCounter = 0
+    private var historyLogCounter = 0  // Counter for general history logging
     
     // MARK: - Initialization
     
@@ -214,7 +215,14 @@ class OralableBLE: ObservableObject {
     // MARK: - History Management from Sensor Readings
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
-        Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        // Increment counter for throttled logging
+        historyLogCounter += 1
+        let shouldLog = historyLogCounter % 50 == 0
+
+        // THROTTLED: Only log every 50th call to prevent UI freeze
+        if shouldLog {
+            Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        }
 
         for reading in readings {
             switch reading.sensorType {
@@ -224,7 +232,10 @@ class OralableBLE: ObservableObject {
                 if batteryHistory.count > maxHistoryCount {
                     batteryHistory.removeFirst(batteryHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Battery: \(Int(reading.value))% | History count: \(batteryHistory.count)")
+                // THROTTLED: Only log every 50th call to prevent UI freeze
+                if shouldLog {
+                    Logger.shared.debug("[OralableBLE] Battery: \(Int(reading.value))% | History count: \(batteryHistory.count)")
+                }
 
             case .heartRate:
                 // Force connection state when we have data
@@ -240,7 +251,10 @@ class OralableBLE: ObservableObject {
                 if heartRateHistory.count > maxHistoryCount {
                     heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] Heart Rate: \(Int(reading.value)) bpm | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(heartRateHistory.count)")
+                // THROTTLED: Only log every 50th call to prevent UI freeze
+                if shouldLog {
+                    Logger.shared.info("[OralableBLE] Heart Rate: \(Int(reading.value)) bpm | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(heartRateHistory.count)")
+                }
 
             case .spo2:
                 let spo2Data = SpO2Data(percentage: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
@@ -248,7 +262,10 @@ class OralableBLE: ObservableObject {
                 if spo2History.count > maxHistoryCount {
                     spo2History.removeFirst(spo2History.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
+                // THROTTLED: Only log every 50th call to prevent UI freeze
+                if shouldLog {
+                    Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
+                }
 
             case .temperature:
                 temperature = reading.value  // Update published property
@@ -257,7 +274,10 @@ class OralableBLE: ObservableObject {
                 if temperatureHistory.count > maxHistoryCount {
                     temperatureHistory.removeFirst(temperatureHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Temperature: \(String(format: "%.1f", reading.value))°C | History count: \(temperatureHistory.count)")
+                // THROTTLED: Only log every 50th call to prevent UI freeze
+                if shouldLog {
+                    Logger.shared.debug("[OralableBLE] Temperature: \(String(format: "%.1f", reading.value))°C | History count: \(temperatureHistory.count)")
+                }
 
             case .ppgRed, .ppgInfrared, .ppgGreen:
                 // PPG data needs to be grouped - handled separately
@@ -272,7 +292,10 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        Logger.shared.debug("[OralableBLE] Total history counts - HR: \(heartRateHistory.count), SpO2: \(spo2History.count), Temp: \(temperatureHistory.count), PPG: \(ppgHistory.count)")
+        // THROTTLED: Only log every 50th call to prevent UI freeze
+        if shouldLog {
+            Logger.shared.debug("[OralableBLE] Total history counts - HR: \(heartRateHistory.count), SpO2: \(spo2History.count), Temp: \(temperatureHistory.count), PPG: \(ppgHistory.count)")
+        }
     }
     
     private func updatePPGHistory(from readings: [SensorReading]) {
