@@ -102,53 +102,17 @@ struct AuthenticationView: View {
     // MARK: - Handle Sign In Result
 
     private func handleSignInResult(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let authorization):
-            // Handle successful sign in
-            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                // Extract user information
-                let userIdentifier = appleIDCredential.user
-                let fullName = appleIDCredential.fullName
-                let email = appleIDCredential.email
+        // Use the AuthenticationManager's handleSignIn method
+        authenticationManager.handleSignIn(result: result)
 
-                // Process authentication with the manager
-                authenticationManager.handleAppleSignIn(
-                    userIdentifier: userIdentifier,
-                    fullName: fullName,
-                    email: email
-                )
-
-                // Dismiss the view after successful sign in
-                dismiss()
-            }
-
-        case .failure(let error):
-            // Handle sign in error
-            if let authError = error as? ASAuthorizationError {
-                switch authError.code {
-                case .canceled:
-                    // User canceled - don't show error
-                    break
-                case .failed:
-                    errorMessage = "Authentication failed. Please try again."
-                    showError = true
-                case .invalidResponse:
-                    errorMessage = "Invalid response from Apple. Please try again."
-                    showError = true
-                case .notHandled:
-                    errorMessage = "Authentication not handled. Please try again."
-                    showError = true
-                case .unknown:
-                    errorMessage = "An unknown error occurred. Please try again."
-                    showError = true
-                @unknown default:
-                    errorMessage = "An unexpected error occurred. Please try again."
-                    showError = true
-                }
-            } else {
-                errorMessage = error.localizedDescription
-                showError = true
-            }
+        // Check if authentication was successful
+        if authenticationManager.isAuthenticated {
+            // Dismiss the view after successful sign in
+            dismiss()
+        } else if let error = authenticationManager.authenticationError {
+            // Show error if authentication failed
+            errorMessage = error
+            showError = true
         }
     }
 }
