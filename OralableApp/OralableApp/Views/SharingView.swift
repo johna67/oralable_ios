@@ -133,12 +133,10 @@ struct SharingView: View {
         .fileImporter(
             isPresented: $showingImportPicker,
             allowedContentTypes: [.commaSeparatedText, .text]
-        ) { (result: Result<[URL], Error>) in
-            // Handle import - expects Result<[URL], Error>
+        ) { (result: Result<URL, Error>) in
+            // Handle import - expects Result<URL, Error>
             switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-
+            case .success(let url):
                 // Request access to security-scoped resource
                 guard url.startAccessingSecurityScopedResource() else {
                     importErrorMessage = "Unable to access the selected file. Please try again."
