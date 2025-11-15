@@ -95,7 +95,12 @@ class OralableBLE: ObservableObject {
     // Throttling counters to prevent log spam
     private var ppgLogCounter = 0
     private var accelLogCounter = 0
-    
+
+    // Throttling for UI updates - only update @Published properties once per second
+    private var lastHeartRateUIUpdate: Date = .distantPast
+    private var lastSpO2UIUpdate: Date = .distantPast
+    private let uiUpdateInterval: TimeInterval = 1.0  // Update UI once per second
+
     // MARK: - Initialization
     
     init() {
@@ -319,15 +324,20 @@ class OralableBLE: ObservableObject {
         // Calculate Heart Rate from IR samples
         if !ppgIRBuffer.isEmpty {
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
-                heartRate = Int(hrResult.bpm)
-                heartRateQuality = hrResult.quality
-                Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
-
-                // Add to history
+                // Add to history (always update history)
                 let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
                 heartRateHistory.append(hrData)
                 if heartRateHistory.count > maxHistoryCount {
                     heartRateHistory.removeFirst()
+                }
+
+                // Throttle UI updates - only update @Published properties once per second
+                let now = Date()
+                if now.timeIntervalSince(lastHeartRateUIUpdate) >= uiUpdateInterval {
+                    heartRate = Int(hrResult.bpm)
+                    heartRateQuality = hrResult.quality
+                    lastHeartRateUIUpdate = now
+                    Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
                 }
             }
         }
@@ -337,14 +347,20 @@ class OralableBLE: ObservableObject {
             let ratio = Double(latest.red) / Double(latest.ir)
             // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
-            spO2 = Int(calculatedSpO2)
-            Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
 
-            // Add to history
-            let spo2Data = SpO2Data(percentage: Double(spO2), quality: 0.8, timestamp: Date())
+            // Add to history (always update history)
+            let spo2Data = SpO2Data(percentage: Double(calculatedSpO2), quality: 0.8, timestamp: Date())
             spo2History.append(spo2Data)
             if spo2History.count > maxHistoryCount {
                 spo2History.removeFirst()
+            }
+
+            // Throttle UI updates - only update @Published properties once per second
+            let now = Date()
+            if now.timeIntervalSince(lastSpO2UIUpdate) >= uiUpdateInterval {
+                spO2 = Int(calculatedSpO2)
+                lastSpO2UIUpdate = now
+                Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
             }
         }
 
