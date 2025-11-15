@@ -224,6 +224,10 @@ class OralableBLE: ObservableObject {
             Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
         }
 
+        // Track which special types we've seen to call their handlers only once
+        var hasPPGData = false
+        var hasAccelData = false
+
         for reading in readings {
             switch reading.sensorType {
             case .battery:
@@ -280,16 +284,24 @@ class OralableBLE: ObservableObject {
                 }
 
             case .ppgRed, .ppgInfrared, .ppgGreen:
-                // PPG data needs to be grouped - handled separately
-                updatePPGHistory(from: readings)
+                // Mark that we have PPG data - will process once after loop
+                hasPPGData = true
 
             case .accelerometerX, .accelerometerY, .accelerometerZ:
-                // Accel data needs to be grouped - handled separately
-                updateAccelHistory(from: readings)
+                // Mark that we have accel data - will process once after loop
+                hasAccelData = true
 
             default:
                 break
             }
+        }
+
+        // Process grouped data ONCE per batch instead of once per reading
+        if hasPPGData {
+            updatePPGHistory(from: readings)
+        }
+        if hasAccelData {
+            updateAccelHistory(from: readings)
         }
 
         // THROTTLED: Only log every 50th call to prevent UI freeze
