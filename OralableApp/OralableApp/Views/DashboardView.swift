@@ -102,8 +102,9 @@ struct DashboardView: View {
                     .environmentObject(bleManager)
             }
             .sheet(isPresented: $showingShare) {
-                ShareView(ble: bleManager)
+                SharingView()
                     .environmentObject(designSystem)
+                    .environmentObject(AppStateManager.shared)
             }
         }
         .onAppear {

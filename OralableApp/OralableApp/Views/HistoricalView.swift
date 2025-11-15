@@ -100,7 +100,9 @@ struct HistoricalView: View {
             viewModel.updateAllMetrics()
         }
         .sheet(isPresented: $showingExportSheet) {
-            ShareView(ble: bleManager)
+            SharingView()
+                .environmentObject(designSystem)
+                .environmentObject(AppStateManager.shared)
         }
         .sheet(item: $selectedDataPoint) { dataPoint in
             DataPointDetailView(dataPoint: dataPoint, viewModel: viewModel)
