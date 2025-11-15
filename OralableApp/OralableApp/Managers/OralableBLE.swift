@@ -134,6 +134,15 @@ class OralableBLE: ObservableObject {
     }
     
     private func handleDeviceDiscovered(peripheral: CBPeripheral, name: String, rssi: Int) {
+        // FILTER: Only show Oralable and ANR devices
+        let nameUpper = name.uppercased()
+        let isOralableDevice = nameUpper.contains("ORALABLE") || nameUpper.contains("ANR")
+
+        guard isOralableDevice else {
+            // Skip devices that are not Oralable or ANR
+            return
+        }
+
         // Check if we already have this device
         if let index = discoveredDevicesInfo.firstIndex(where: { $0.id == peripheral.identifier }) {
             // Update RSSI for existing device
@@ -150,10 +159,10 @@ class OralableBLE: ObservableObject {
             discoveredDevicesInfo.append(deviceInfo)
             print("[OralableBLE] Discovered new device: \(name) RSSI: \(rssi) dBm")
         }
-        
+
         // Update legacy discoveredDevices array
         discoveredDevices = discoveredDevicesInfo.map { $0.peripheral }
-        
+
         addLog("Found device: \(name) (\(rssi) dBm)")
     }
     
