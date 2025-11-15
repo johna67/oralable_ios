@@ -180,29 +180,33 @@ struct SettingsView: View {
                     Text(appStateManager.selectedMode?.description ?? "")
                 }
 
-                // Device Settings Section
-                Section {
-                    // PPG Channel Order
-                    NavigationLink {
-                        PPGChannelOrderView(selectedOrder: $viewModel.ppgChannelOrder)
-                    } label: {
-                        HStack {
-                            Text("PPG Channel Order")
-                            Spacer()
-                            Text(viewModel.ppgChannelOrder.displayName)
-                                .foregroundColor(designSystem.colors.textSecondary)
+                // Device Settings Section - Subscription Mode Only
+                if appStateManager.selectedMode == .subscription {
+                    Section {
+                        // PPG Channel Order
+                        NavigationLink {
+                            PPGChannelOrderView(selectedOrder: $viewModel.ppgChannelOrder)
+                        } label: {
+                            HStack {
+                                Text("PPG Channel Order")
+                                Spacer()
+                                Text(viewModel.ppgChannelOrder.displayName)
+                                    .foregroundColor(designSystem.colors.textSecondary)
+                            }
                         }
+
+                        // Auto-connect
+                        Toggle("Auto-connect", isOn: $viewModel.autoConnectEnabled)
+
+                        // Debug Info
+                        Toggle("Show Debug Info", isOn: $viewModel.showDebugInfo)
+                            .tint(designSystem.colors.primaryBlack)
+
+                    } header: {
+                        Text("Device Settings")
+                    } footer: {
+                        Text("Configure Bluetooth device connection and sensor settings")
                     }
-
-                    // Auto-connect
-                    Toggle("Auto-connect", isOn: $viewModel.autoConnectEnabled)
-
-                    // Debug Info
-                    Toggle("Show Debug Info", isOn: $viewModel.showDebugInfo)
-                        .tint(designSystem.colors.primaryBlack)
-
-                } header: {
-                    Text("Device Settings")
                 }
 
                 // Notification Settings Section
@@ -278,20 +282,24 @@ struct SettingsView: View {
                     Text("When enabled, all data stays on this device and is never sent to cloud services.")
                 }
 
-                // Export & Share Section
-                Section {
-                    Button {
-                        showingExportSheet = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up")
-                                .foregroundColor(designSystem.colors.primaryBlack)
-                            Text("Export Data")
-                                .foregroundColor(designSystem.colors.textPrimary)
+                // Export & Share Section - Subscription Mode Only
+                if appStateManager.selectedMode == .subscription {
+                    Section {
+                        Button {
+                            showingExportSheet = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundColor(designSystem.colors.primaryBlack)
+                                Text("Export Data")
+                                    .foregroundColor(designSystem.colors.textPrimary)
+                            }
                         }
+                    } header: {
+                        Text("Data Export")
+                    } footer: {
+                        Text("Export your sensor data as CSV files for analysis")
                     }
-                } header: {
-                    Text("Data Export")
                 }
 
                 // About Section

@@ -25,6 +25,34 @@ struct HistoricalView: View {
     @State private var selectedDataPoint: HistoricalDataPoint?
     @State private var showingExportSheet = false
     @State private var showingDatePicker = false
+    @State private var selectedFilters: Set<DataFilter> = [.heartRate, .spO2, .temperature, .activity]
+
+    enum DataFilter: String, CaseIterable, Identifiable {
+        case heartRate = "Heart Rate"
+        case spO2 = "SpO2"
+        case temperature = "Temperature"
+        case activity = "Activity"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .heartRate: return "heart.fill"
+            case .spO2: return "lungs.fill"
+            case .temperature: return "thermometer"
+            case .activity: return "figure.walk"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .heartRate: return .red
+            case .spO2: return .blue
+            case .temperature: return .orange
+            case .activity: return .green
+            }
+        }
+    }
     
     init() {
         // Initialize the view model with the required dependency
@@ -39,7 +67,10 @@ struct HistoricalView: View {
                 VStack(spacing: designSystem.spacing.lg) {
                     // Time Range Selector
                     timeRangeSelector
-                    
+
+                    // Filter Chips
+                    filterChipsView
+
                     // Date Range Display
                     dateRangeCard
                     
@@ -149,7 +180,34 @@ struct HistoricalView: View {
             .foregroundColor(designSystem.colors.textPrimary)
         }
     }
-    
+
+    // MARK: - Filter Chips
+
+    private var filterChipsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: designSystem.spacing.sm) {
+                ForEach(DataFilter.allCases) { filter in
+                    FilterChip(
+                        filter: filter,
+                        isSelected: selectedFilters.contains(filter),
+                        designSystem: designSystem
+                    ) {
+                        toggleFilter(filter)
+                    }
+                }
+            }
+            .padding(.horizontal, designSystem.spacing.md)
+        }
+    }
+
+    private func toggleFilter(_ filter: DataFilter) {
+        if selectedFilters.contains(filter) {
+            selectedFilters.remove(filter)
+        } else {
+            selectedFilters.insert(filter)
+        }
+    }
+
     // MARK: - Date Range Card
     
     private var dateRangeCard: some View {
@@ -605,6 +663,35 @@ struct DataPointDetailView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// MARK: - Filter Chip Component
+
+struct FilterChip: View {
+    let filter: HistoricalView.DataFilter
+    let isSelected: Bool
+    let designSystem: DesignSystem
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: filter.icon)
+                    .font(.system(size: 14))
+                Text(filter.rawValue)
+                    .font(designSystem.typography.caption)
+            }
+            .padding(.horizontal, designSystem.spacing.md)
+            .padding(.vertical, designSystem.spacing.sm)
+            .foregroundColor(isSelected ? designSystem.colors.primaryWhite : designSystem.colors.textPrimary)
+            .background(isSelected ? filter.color : designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.large)
+            .overlay(
+                RoundedRectangle(cornerRadius: designSystem.cornerRadius.large)
+                    .stroke(isSelected ? Color.clear : designSystem.colors.divider, lineWidth: 1)
+            )
         }
     }
 }
