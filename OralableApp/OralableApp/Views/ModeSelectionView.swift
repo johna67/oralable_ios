@@ -27,19 +27,19 @@ struct ModeSelectionView: View {
                         // Viewer Mode
                         ModeCard(
                             mode: .viewer,
-                            icon: "eye",
+                            icon: "eye.fill",
                             title: "Viewer Mode",
-                            subtitle: "View real-time data",
+                            subtitle: "Import and view CSV data",
                             features: [
-                                "Connect to Oralable device",
-                                "View real-time sensor data",
+                                "Import CSV files",
+                                "View historical data",
                                 "Basic data visualization",
-                                "Export session data"
+                                "No device connection needed"
                             ],
                             limitations: [
-                                "No data storage",
-                                "No historical tracking",
-                                "Limited features"
+                                "No Bluetooth connectivity",
+                                "No data export",
+                                "No HealthKit integration"
                             ],
                             price: "Free",
                             isSelected: selectedMode == .viewer,
@@ -51,24 +51,23 @@ struct ModeSelectionView: View {
                                 showingInfoSheet = true
                             }
                         )
-                        
+
                         // Subscription Mode
                         ModeCard(
                             mode: .subscription,
-                            icon: "crown",
-                            title: "Full Access",
-                            subtitle: "Complete feature set",
+                            icon: "crown.fill",
+                            title: "Subscription Mode",
+                            subtitle: "Full access with device connectivity",
                             features: [
-                                "All Viewer Mode features",
-                                "Unlimited data storage",
-                                "Historical analysis",
-                                "Advanced visualizations",
-                                "Health insights",
-                                "Cloud sync",
-                                "Priority support"
+                                "Bluetooth device connection",
+                                "Real-time sensor data",
+                                "Export data as CSV",
+                                "HealthKit integration",
+                                "Advanced analytics",
+                                "Cloud sync"
                             ],
                             limitations: [],
-                            price: "Sign in required",
+                            price: "Requires Apple ID",
                             isSelected: selectedMode == .subscription,
                             isRecommended: true,
                             onSelect: {
@@ -76,34 +75,6 @@ struct ModeSelectionView: View {
                             },
                             onInfo: {
                                 infoMode = .subscription
-                                showingInfoSheet = true
-                            }
-                        )
-                        
-                        // Demo Mode
-                        ModeCard(
-                            mode: .demo,
-                            icon: "play.circle",
-                            title: "Demo Mode",
-                            subtitle: "Try without device",
-                            features: [
-                                "Explore all features",
-                                "Simulated sensor data",
-                                "Test functionality",
-                                "No device needed"
-                            ],
-                            limitations: [
-                                "Mock data only",
-                                "Cannot connect to real device",
-                                "For evaluation only"
-                            ],
-                            price: "Free",
-                            isSelected: selectedMode == .demo,
-                            onSelect: {
-                                selectedMode = .demo
-                            },
-                            onInfo: {
-                                infoMode = .demo
                                 showingInfoSheet = true
                             }
                         )
@@ -458,40 +429,40 @@ extension AppMode {
     var description: String {
         switch self {
         case .viewer:
-            return "View real-time data from your Oralable device"
+            return "Import and view CSV data without device connection"
         case .subscription:
-            return "Unlock all features with your account"
+            return "Full access with Bluetooth and export features"
         case .demo:
             return "Explore the app with simulated data"
         }
     }
-    
+
     var detailedDescription: String {
         switch self {
         case .viewer:
-            return "Viewer Mode provides essential functionality for monitoring your Oralable device in real-time. Perfect for quick sessions and immediate data viewing without the need for an account."
+            return "Viewer Mode allows you to import CSV files and view historical data without connecting to a physical device. Perfect for reviewing previously exported data or analyzing data from other sources."
         case .subscription:
-            return "Full Access unlocks the complete Oralable experience. Track your health metrics over time, gain insights from historical data, and sync across all your devices. Requires Sign in with Apple for secure authentication."
+            return "Subscription Mode unlocks the complete Oralable experience. Connect to devices via Bluetooth, export data as CSV, integrate with HealthKit, and access advanced analytics. Requires Sign in with Apple for secure authentication."
         case .demo:
             return "Demo Mode lets you explore all app features using simulated data. Ideal for evaluating the app before purchasing a device or for healthcare professionals demonstrating to patients."
         }
     }
-    
+
     var useCases: [String] {
         switch self {
         case .viewer:
             return [
-                "Quick monitoring sessions",
-                "Real-time data viewing",
-                "Basic health tracking",
-                "Testing device connectivity"
+                "View imported CSV data",
+                "Analyze historical trends",
+                "No device needed",
+                "Data review and analysis"
             ]
         case .subscription:
             return [
-                "Long-term health monitoring",
-                "Tracking treatment progress",
-                "Sharing data with healthcare providers",
-                "Multiple device management"
+                "Real-time device monitoring",
+                "Export data for sharing",
+                "HealthKit integration",
+                "Advanced analytics"
             ]
         case .demo:
             return [
@@ -502,13 +473,13 @@ extension AppMode {
             ]
         }
     }
-    
+
     var requirements: [String] {
         switch self {
         case .viewer:
-            return ["Oralable device required"]
+            return ["CSV file with sensor data"]
         case .subscription:
-            return ["Apple ID required", "Oralable device required"]
+            return ["Apple ID required", "Oralable device for Bluetooth"]
         case .demo:
             return []
         }
