@@ -344,7 +344,9 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showingSubscriptionView) {
-            SubscriptionTierSelectionView()
+            UpgradePromptSheet()
+                .environmentObject(designSystem)
+                .environmentObject(appStateManager)
         }
         .alert("Sign Out?", isPresented: $showingSignOutAlert) {
             Button("Cancel", role: .cancel) {}

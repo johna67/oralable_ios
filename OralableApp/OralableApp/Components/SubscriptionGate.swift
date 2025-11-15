@@ -23,7 +23,7 @@ struct SubscriptionGate<Content: View>: View {
         } else {
             SubscriptionPromptView(feature: feature, showUpgradeSheet: $showUpgradeSheet)
                 .sheet(isPresented: $showUpgradeSheet) {
-                    SubscriptionTierSelectionView()
+                    UpgradePromptSheet()
                 }
         }
     }
@@ -137,7 +137,79 @@ struct InlineUpgradeButton: View {
             .cornerRadius(designSystem.cornerRadius.sm)
         }
         .sheet(isPresented: $showUpgradeSheet) {
-            SubscriptionTierSelectionView()
+            UpgradePromptSheet()
+        }
+    }
+}
+
+// MARK: - Upgrade Prompt Sheet
+
+struct UpgradePromptSheet: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var appStateManager: AppStateManager
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: designSystem.spacing.xl) {
+                Spacer()
+
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(designSystem.colors.accentOrange)
+
+                VStack(spacing: designSystem.spacing.md) {
+                    Text("Upgrade to Subscription Mode")
+                        .font(designSystem.typography.largeTitle)
+                        .foregroundColor(designSystem.colors.textPrimary)
+                        .multilineTextAlignment(.center)
+
+                    Text("Switch to Subscription Mode to unlock Bluetooth connectivity, data export, and HealthKit integration.")
+                        .font(designSystem.typography.body)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, designSystem.spacing.lg)
+                }
+
+                Spacer()
+
+                VStack(spacing: designSystem.spacing.sm) {
+                    Button(action: {
+                        // Navigate to mode selection in Settings
+                        dismiss()
+                    }) {
+                        Text("Go to Settings")
+                            .font(designSystem.typography.body)
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(designSystem.spacing.md)
+                            .background(designSystem.colors.primaryBlack)
+                            .foregroundColor(designSystem.colors.primaryWhite)
+                            .cornerRadius(designSystem.cornerRadius.md)
+                    }
+
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Not Now")
+                            .font(designSystem.typography.body)
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
+                .padding(.horizontal, designSystem.spacing.lg)
+                .padding(.bottom, designSystem.spacing.xl)
+            }
+            .padding(designSystem.spacing.lg)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(designSystem.colors.textTertiary)
+                    }
+                }
+            }
         }
     }
 }
