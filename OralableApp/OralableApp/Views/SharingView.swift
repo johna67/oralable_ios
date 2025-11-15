@@ -133,7 +133,7 @@ struct SharingView: View {
         .fileImporter(
             isPresented: $showingImportPicker,
             allowedContentTypes: [.commaSeparatedText, .text]
-        ) { result in
+        ) { (result: Result<[URL], Error>) in
             // Handle import - expects Result<[URL], Error>
             switch result {
             case .success(let urls):
@@ -236,7 +236,7 @@ struct SharingView: View {
             document: exportDocument,
             contentType: .commaSeparatedText,
             defaultFilename: defaultExportFilename
-        ) { result in
+        ) { (result: Result<URL, Error>) in
             // Handle export - expects Result<URL, Error>
             switch result {
             case .success(let url):
