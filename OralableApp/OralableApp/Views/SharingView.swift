@@ -29,118 +29,221 @@ struct SharingView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: designSystem.spacing.lg) {
-                    // IMPORT SECTION - VIEWER MODE ONLY
-                    VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-                        Text("Import Data")
-                            .font(designSystem.typography.headline)
-                            .foregroundColor(designSystem.colors.textPrimary)
+        Group {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: designSystem.spacing.lg) {
+                        // IMPORT SECTION - VIEWER MODE ONLY
+                        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                            Text("Import Data")
+                                .font(designSystem.typography.headline)
+                                .foregroundColor(designSystem.colors.textPrimary)
 
-                        ActionCard(
-                            icon: "arrow.down.doc.fill",
-                            title: "Import CSV File",
-                            description: isViewerMode ?
-                                "Load historical data from exported files" :
-                                "Import available in Viewer Mode only",
-                            buttonText: "Select File",
-                            isEnabled: isViewerMode,  // ← ENABLED IN VIEWER ONLY
-                            accentColor: designSystem.colors.accentGreen
-                        ) {
-                            if isViewerMode {
-                                showingImportPicker = true
+                            ActionCard(
+                                icon: "arrow.down.doc.fill",
+                                title: "Import CSV File",
+                                description: isViewerMode ?
+                                    "Load historical data from exported files" :
+                                    "Import available in Viewer Mode only",
+                                buttonText: "Select File",
+                                isEnabled: isViewerMode,  // ← ENABLED IN VIEWER ONLY
+                                accentColor: designSystem.colors.accentGreen
+                            ) {
+                                if isViewerMode {
+                                    showingImportPicker = true
+                                }
                             }
                         }
-                    }
 
-                    // EXPORT SECTION - SUBSCRIPTION MODE ONLY
-                    VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-                        Text("Export Data")
-                            .font(designSystem.typography.headline)
-                            .foregroundColor(designSystem.colors.textPrimary)
+                        // EXPORT SECTION - SUBSCRIPTION MODE ONLY
+                        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                            Text("Export Data")
+                                .font(designSystem.typography.headline)
+                                .foregroundColor(designSystem.colors.textPrimary)
 
-                        ActionCard(
-                            icon: "arrow.up.doc.fill",
-                            title: "Export as CSV",
-                            description: isViewerMode ?
-                                "Export available in Subscription Mode" :
-                                "Share your data for analysis",
-                            buttonText: "Export Data",
-                            isEnabled: !isViewerMode,  // ← ENABLED IN SUBSCRIPTION ONLY
-                            accentColor: designSystem.colors.accentBlue
-                        ) {
-                            if !isViewerMode {
-                                performExport()
+                            ActionCard(
+                                icon: "arrow.up.doc.fill",
+                                title: "Export as CSV",
+                                description: isViewerMode ?
+                                    "Export available in Subscription Mode" :
+                                    "Share your data for analysis",
+                                buttonText: "Export Data",
+                                isEnabled: !isViewerMode,  // ← ENABLED IN SUBSCRIPTION ONLY
+                                accentColor: designSystem.colors.accentBlue
+                            ) {
+                                if !isViewerMode {
+                                    performExport()
+                                }
                             }
                         }
-                    }
 
-                    // HEALTHKIT SECTION - SUBSCRIPTION MODE ONLY
-                    VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-                        Text("HealthKit")
-                            .font(designSystem.typography.headline)
-                            .foregroundColor(designSystem.colors.textPrimary)
+                        // HEALTHKIT SECTION - SUBSCRIPTION MODE ONLY
+                        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                            Text("HealthKit")
+                                .font(designSystem.typography.headline)
+                                .foregroundColor(designSystem.colors.textPrimary)
 
-                        ActionCard(
-                            icon: "heart.fill",
-                            title: "Connect HealthKit",
-                            description: isViewerMode ?
-                                "HealthKit available in Subscription Mode" :
-                                "Sync with Apple Health",
-                            buttonText: "Connect HealthKit",
-                            isEnabled: !isViewerMode,  // ← ENABLED IN SUBSCRIPTION ONLY
-                            buttonStyle: .secondary,
-                            accentColor: designSystem.colors.accentRed
-                        ) {
-                            if !isViewerMode {
-                                showHealthKitSheet = true
+                            ActionCard(
+                                icon: "heart.fill",
+                                title: "Connect HealthKit",
+                                description: isViewerMode ?
+                                    "HealthKit available in Subscription Mode" :
+                                    "Sync with Apple Health",
+                                buttonText: "Connect HealthKit",
+                                isEnabled: !isViewerMode,  // ← ENABLED IN SUBSCRIPTION ONLY
+                                buttonStyle: .secondary,
+                                accentColor: designSystem.colors.accentRed
+                            ) {
+                                if !isViewerMode {
+                                    showHealthKitSheet = true
+                                }
                             }
                         }
-                    }
 
-                    // Mode Indicator at bottom
-                    HStack {
-                        Image(systemName: isViewerMode ? "eye" : "crown")
-                            .foregroundColor(isViewerMode ? designSystem.colors.accentBlue : designSystem.colors.accentGreen)
-                        Text("Current Mode: \(isViewerMode ? "Viewer" : "Subscription")")
-                            .font(designSystem.typography.caption)
-                            .foregroundColor(designSystem.colors.textSecondary)
+                        // Mode Indicator at bottom
+                        HStack {
+                            Image(systemName: isViewerMode ? "eye" : "crown")
+                                .foregroundColor(isViewerMode ? designSystem.colors.accentBlue : designSystem.colors.accentGreen)
+                            Text("Current Mode: \(isViewerMode ? "Viewer" : "Subscription")")
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
+                        .padding(.top, designSystem.spacing.md)
                     }
-                    .padding(.top, designSystem.spacing.md)
+                    .padding(designSystem.spacing.md)
                 }
-                .padding(designSystem.spacing.md)
+                .navigationTitle("Sharing")
+                .navigationBarTitleDisplayMode(.large)
+                .background(designSystem.colors.backgroundPrimary)
             }
-            .navigationTitle("Sharing")
-            .navigationBarTitleDisplayMode(.large)
-            .background(designSystem.colors.backgroundPrimary)
+            .sheet(isPresented: $showHealthKitSheet) {
+                HealthKitConnectionView()
+            }
+            .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Imported \(importedCount) data points. View them in the Home and History tabs.")
+            }
+            .alert("Import Error", isPresented: $showImportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(importErrorMessage)
+            }
         }
         .fileImporter(
             isPresented: $showingImportPicker,
             allowedContentTypes: [.commaSeparatedText, .text]
-        ) { (result: Result<[URL], Error>) in
-            self.handleImportCompletion(result)
+        ) { result in
+            // Handle import - expects Result<[URL], Error>
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+
+                // Request access to security-scoped resource
+                guard url.startAccessingSecurityScopedResource() else {
+                    importErrorMessage = "Unable to access the selected file. Please try again."
+                    showImportError = true
+                    return
+                }
+
+                // Ensure we stop accessing the resource when done
+                defer {
+                    url.stopAccessingSecurityScopedResource()
+                }
+
+                // Copy file to temporary location
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+
+                do {
+                    // Remove existing file if present
+                    if FileManager.default.fileExists(atPath: tempURL.path) {
+                        try FileManager.default.removeItem(at: tempURL)
+                    }
+
+                    // Copy to temporary directory
+                    try FileManager.default.copyItem(at: url, to: tempURL)
+
+                    // Validate before importing
+                    let validation = CSVImportManager.shared.validateCSVFile(at: tempURL)
+
+                    if !validation.isValid {
+                        importErrorMessage = validation.errorMessage ?? "Invalid CSV format"
+                        showImportError = true
+                        try? FileManager.default.removeItem(at: tempURL)
+                        return
+                    }
+
+                    // Import the data
+                    if let imported = CSVImportManager.shared.importData(from: tempURL) {
+                        // Add imported data to BLE manager
+                        bleManager.sensorDataHistory.append(contentsOf: imported.sensorData)
+
+                        // Import individual sensor histories
+                        for sensorData in imported.sensorData {
+                            bleManager.ppgHistory.append(sensorData.ppg)
+                            bleManager.accelerometerHistory.append(sensorData.accelerometer)
+                            bleManager.temperatureHistory.append(sensorData.temperature)
+                            bleManager.batteryHistory.append(sensorData.battery)
+
+                            if let heartRate = sensorData.heartRate {
+                                bleManager.heartRateHistory.append(heartRate)
+                            }
+                            if let spo2 = sensorData.spo2 {
+                                bleManager.spo2History.append(spo2)
+                            }
+                        }
+
+                        // Convert imported string logs to LogMessage objects
+                        for logString in imported.logs {
+                            bleManager.logMessages.append(LogMessage(message: logString))
+                        }
+
+                        // Sort by timestamp
+                        bleManager.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
+                        bleManager.ppgHistory.sort { $0.timestamp < $1.timestamp }
+                        bleManager.accelerometerHistory.sort { $0.timestamp < $1.timestamp }
+                        bleManager.temperatureHistory.sort { $0.timestamp < $1.timestamp }
+                        bleManager.batteryHistory.sort { $0.timestamp < $1.timestamp }
+                        bleManager.heartRateHistory.sort { $0.timestamp < $1.timestamp }
+                        bleManager.spo2History.sort { $0.timestamp < $1.timestamp }
+
+                        importedCount = imported.sensorData.count
+                        showImportSuccess = true
+
+                        bleManager.logMessages.append(LogMessage(
+                            message: "✅ Successfully imported \(imported.sensorData.count) sensor data points"
+                        ))
+                    } else {
+                        importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
+                        showImportError = true
+                    }
+
+                    // Clean up temporary file
+                    try? FileManager.default.removeItem(at: tempURL)
+
+                } catch {
+                    importErrorMessage = "Failed to access file: \(error.localizedDescription)"
+                    showImportError = true
+                }
+
+            case .failure(let error):
+                importErrorMessage = "Failed to import file: \(error.localizedDescription)"
+                showImportError = true
+            }
         }
         .fileExporter(
             isPresented: $showingExportSheet,
             document: exportDocument,
             contentType: .commaSeparatedText,
             defaultFilename: defaultExportFilename
-        ) { (result: Result<URL, Error>) in
-            self.handleExportCompletion(result)
-        }
-        .sheet(isPresented: $showHealthKitSheet) {
-            HealthKitConnectionView()
-        }
-        .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Imported \(importedCount) data points. View them in the Home and History tabs.")
-        }
-        .alert("Import Error", isPresented: $showImportError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(importErrorMessage)
+        ) { result in
+            // Handle export - expects Result<URL, Error>
+            switch result {
+            case .success(let url):
+                print("✅ File saved successfully to: \(url)")
+            case .failure(let error):
+                print("❌ File save failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -164,114 +267,6 @@ struct SharingView: View {
         }
     }
 
-    private func handleExportCompletion(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            print("✅ File saved successfully to: \(url)")
-        case .failure(let error):
-            print("❌ File save failed: \(error.localizedDescription)")
-        }
-    }
-
-    // MARK: - Import Functionality
-
-    private func handleImportCompletion(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-
-            // Request access to security-scoped resource
-            guard url.startAccessingSecurityScopedResource() else {
-                importErrorMessage = "Unable to access the selected file. Please try again."
-                showImportError = true
-                return
-            }
-
-            // Ensure we stop accessing the resource when done
-            defer {
-                url.stopAccessingSecurityScopedResource()
-            }
-
-            // Copy file to temporary location
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
-
-            do {
-                // Remove existing file if present
-                if FileManager.default.fileExists(atPath: tempURL.path) {
-                    try FileManager.default.removeItem(at: tempURL)
-                }
-
-                // Copy to temporary directory
-                try FileManager.default.copyItem(at: url, to: tempURL)
-
-                // Validate before importing
-                let validation = CSVImportManager.shared.validateCSVFile(at: tempURL)
-
-                if !validation.isValid {
-                    importErrorMessage = validation.errorMessage ?? "Invalid CSV format"
-                    showImportError = true
-                    try? FileManager.default.removeItem(at: tempURL)
-                    return
-                }
-
-                // Import the data
-                if let imported = CSVImportManager.shared.importData(from: tempURL) {
-                    // Add imported data to BLE manager
-                    bleManager.sensorDataHistory.append(contentsOf: imported.sensorData)
-
-                    // Import individual sensor histories
-                    for sensorData in imported.sensorData {
-                        bleManager.ppgHistory.append(sensorData.ppg)
-                        bleManager.accelerometerHistory.append(sensorData.accelerometer)
-                        bleManager.temperatureHistory.append(sensorData.temperature)
-                        bleManager.batteryHistory.append(sensorData.battery)
-
-                        if let heartRate = sensorData.heartRate {
-                            bleManager.heartRateHistory.append(heartRate)
-                        }
-                        if let spo2 = sensorData.spo2 {
-                            bleManager.spo2History.append(spo2)
-                        }
-                    }
-
-                    // Convert imported string logs to LogMessage objects
-                    for logString in imported.logs {
-                        bleManager.logMessages.append(LogMessage(message: logString))
-                    }
-
-                    // Sort by timestamp
-                    bleManager.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
-                    bleManager.ppgHistory.sort { $0.timestamp < $1.timestamp }
-                    bleManager.accelerometerHistory.sort { $0.timestamp < $1.timestamp }
-                    bleManager.temperatureHistory.sort { $0.timestamp < $1.timestamp }
-                    bleManager.batteryHistory.sort { $0.timestamp < $1.timestamp }
-                    bleManager.heartRateHistory.sort { $0.timestamp < $1.timestamp }
-                    bleManager.spo2History.sort { $0.timestamp < $1.timestamp }
-
-                    importedCount = imported.sensorData.count
-                    showImportSuccess = true
-
-                    bleManager.logMessages.append(LogMessage(
-                        message: "✅ Successfully imported \(imported.sensorData.count) sensor data points"
-                    ))
-                } else {
-                    importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
-                    showImportError = true
-                }
-
-                // Clean up temporary file
-                try? FileManager.default.removeItem(at: tempURL)
-
-            } catch {
-                importErrorMessage = "Failed to access file: \(error.localizedDescription)"
-                showImportError = true
-            }
-
-        case .failure(let error):
-            importErrorMessage = "Failed to import file: \(error.localizedDescription)"
-            showImportError = true
-        }
-    }
 }
 
 // MARK: - Action Card Component
