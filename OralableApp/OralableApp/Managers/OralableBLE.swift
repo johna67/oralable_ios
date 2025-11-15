@@ -200,8 +200,18 @@ class OralableBLE: ObservableObject {
         
         deviceManager.$allSensorReadings
             .sink { [weak self] readings in
-                self?.updateHistoriesFromReadings(readings)
-                self?.updateLegacySensorData(with: readings)
+                // CRITICAL: Limit batch size BEFORE processing to prevent UI freeze
+                // For real-time data, we only care about recent readings, not old buffered ones
+                let processedReadings: [SensorReading]
+                if readings.count > 200 {
+                    processedReadings = Array(readings.suffix(200))
+                    Logger.shared.warning("[OralableBLE] ⚠️ Batch too large (\(readings.count)), limiting to 200 most recent readings")
+                } else {
+                    processedReadings = readings
+                }
+
+                self?.updateHistoriesFromReadings(processedReadings)
+                self?.updateLegacySensorData(with: processedReadings)
             }
             .store(in: &cancellables)
         
@@ -215,6 +225,8 @@ class OralableBLE: ObservableObject {
     // MARK: - History Management from Sensor Readings
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
+        // NOTE: Batch size is already limited in setupBindings to max 200 readings
+
         // Increment counter for throttled logging
         historyLogCounter += 1
         let shouldLog = historyLogCounter % 200 == 0  // Changed from 50 to 200 for even less logging
