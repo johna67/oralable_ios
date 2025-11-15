@@ -126,7 +126,7 @@ struct SharingView: View {
             document: exportDocument,
             contentType: .commaSeparatedText,
             defaultFilename: defaultExportFilename
-        ) { result in
+        ) { (result: Result<URL, Error>) in
             handleExportResult(result)
         }
         .sheet(isPresented: $showHealthKitSheet) {

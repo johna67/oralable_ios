@@ -203,11 +203,23 @@ struct TypographySystem {
         Font.custom(fontFamily, size: 24).weight(.bold)
     }
     
-    // Title variant
+    // Title variants
     var title: Font {  // Added
         Font.custom(fontFamily, size: 20).weight(.semibold)
     }
-    
+
+    var title1: Font {
+        Font.custom(fontFamily, size: 28).weight(.bold)
+    }
+
+    var title2: Font {
+        Font.custom(fontFamily, size: 22).weight(.semibold)
+    }
+
+    var title3: Font {
+        Font.custom(fontFamily, size: 20).weight(.semibold)
+    }
+
     // Interactive
     var button: Font {
         Font.custom(fontFamily, size: 16).weight(.semibold)
