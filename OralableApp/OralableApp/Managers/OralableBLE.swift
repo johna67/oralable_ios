@@ -199,16 +199,11 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] readings in
-                // CRITICAL: Limit batch size BEFORE processing to prevent UI freeze
-                // For real-time data, we only care about recent readings, not old buffered ones
-                let processedReadings: [SensorReading]
-                if readings.count > 200 {
-                    processedReadings = Array(readings.suffix(200))
-                    Logger.shared.warning("[OralableBLE] ⚠️ Batch too large (\(readings.count)), limiting to 200 most recent readings")
-                } else {
-                    processedReadings = readings
-                }
+                // CRITICAL: Throttle to max 5 updates/sec (every 200ms) to prevent UI freeze
+                // Also limit batch size - only process most recent 200 readings
+                let processedReadings = readings.count > 200 ? Array(readings.suffix(200)) : readings
 
                 self?.updateHistoriesFromReadings(processedReadings)
                 self?.updateLegacySensorData(with: processedReadings)
@@ -216,6 +211,7 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables)
         
         deviceManager.$latestReadings
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] latestReadings in
                 self?.updateDeviceState(from: latestReadings)
             }
@@ -226,15 +222,10 @@ class OralableBLE: ObservableObject {
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
         // NOTE: Batch size is already limited in setupBindings to max 200 readings
+        // NOTE: Updates are throttled to max 5/sec (every 200ms) in setupBindings
 
-        // Increment counter for throttled logging
-        historyLogCounter += 1
-        let shouldLog = historyLogCounter % 200 == 0  // Changed from 50 to 200 for even less logging
-
-        // THROTTLED: Only log every 200th call to prevent UI freeze
-        if shouldLog {
-            Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
-        }
+        // DISABLED: Logging adds too much overhead, even when throttled
+        let shouldLog = false  // Completely disable debug logging for performance
 
         // Track which special types we've seen to call their handlers only once
         var hasPPGData = false
@@ -363,9 +354,8 @@ class OralableBLE: ObservableObject {
             ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
         }
 
-        // Increment counter for throttled logging
-        ppgLogCounter += 1
-        let shouldLog = ppgLogCounter % 200 == 0  // Changed from 50 to 200 for even less logging
+        // DISABLED: Logging adds too much overhead
+        let shouldLog = false
 
         // Calculate Heart Rate from IR samples
         if !ppgIRBuffer.isEmpty {
@@ -445,11 +435,8 @@ class OralableBLE: ObservableObject {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
 
-        // Reduced logging to prevent UI freeze - only log every 200th packet
-        accelLogCounter += 1
-        if accelLogCounter % 200 == 0 {  // Changed from 50 to 200 for even less logging
-            Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
-        }
+        // DISABLED: Logging adds too much overhead
+        // No logging in this function to maximize performance
     }
     
     // MARK: - Legacy SensorData Conversion
