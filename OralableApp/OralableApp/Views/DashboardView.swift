@@ -13,13 +13,19 @@ struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @StateObject private var bleManager = OralableBLE.shared
     @EnvironmentObject var designSystem: DesignSystem
-    
+    @EnvironmentObject var appStateManager: AppStateManager
+
     // NAVIGATION STATE VARIABLES
     @State private var showingProfile = false
     @State private var showingDevices = false
     @State private var showingSettings = false
     @State private var showingHistorical = false
     @State private var showingShare = false
+    @State private var showingUpgradePrompt = false
+
+    var isViewerMode: Bool {
+        appStateManager.selectedMode == .viewer
+    }
     
     var body: some View {
         NavigationView {
@@ -105,6 +111,11 @@ struct DashboardView: View {
                 ShareView(ble: bleManager)
                     .environmentObject(designSystem)
             }
+            .sheet(isPresented: $showingUpgradePrompt) {
+                UpgradePromptSheet()
+                    .environmentObject(designSystem)
+                    .environmentObject(appStateManager)
+            }
         }
         .onAppear {
             viewModel.startMonitoring()
@@ -121,38 +132,58 @@ struct DashboardView: View {
                 // Status Icon
                 Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .font(.system(size: 24))
-                    .foregroundColor(bleManager.isConnected ? .green : .red)
-                
+                    .foregroundColor(bleManager.isConnected ? designSystem.colors.accentGreen : designSystem.colors.textTertiary)
+
                 // Status Text
                 VStack(alignment: .leading) {
                     Text(bleManager.isConnected ? "Connected" : "Disconnected")
                         .font(designSystem.typography.h3)
                         .foregroundColor(designSystem.colors.textPrimary)
-                    
+
                     if bleManager.isConnected {
                         Text(bleManager.deviceName)
                             .font(designSystem.typography.caption)
                             .foregroundColor(designSystem.colors.textSecondary)
+                    } else if isViewerMode {
+                        Text("Bluetooth disabled in Viewer Mode")
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.textSecondary)
                     }
                 }
-                
+
                 Spacer()
-                
-                // Connect Button
-                Button(action: {
-                    if bleManager.isConnected {
-                        bleManager.disconnect()
-                    } else {
-                        bleManager.startScanning()
+
+                // Connect Button - Mode Aware
+                if isViewerMode {
+                    // In Viewer Mode: Show upgrade button
+                    Button(action: {
+                        showingUpgradePrompt = true
+                    }) {
+                        Text("Upgrade")
+                            .font(designSystem.typography.button)
+                            .foregroundColor(designSystem.colors.primaryWhite)
+                            .padding(.horizontal, designSystem.spacing.md)
+                            .padding(.vertical, designSystem.spacing.sm)
+                            .background(designSystem.colors.accentOrange)
+                            .cornerRadius(designSystem.cornerRadius.medium)
                     }
-                }) {
-                    Text(bleManager.isConnected ? "Disconnect" : "Connect")
-                        .font(designSystem.typography.button)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, designSystem.spacing.md)
-                        .padding(.vertical, designSystem.spacing.sm)
-                        .background(bleManager.isConnected ? Color.red : Color.blue)
-                        .cornerRadius(designSystem.cornerRadius.medium)
+                } else {
+                    // In Subscription Mode: Normal connect/disconnect
+                    Button(action: {
+                        if bleManager.isConnected {
+                            bleManager.disconnect()
+                        } else {
+                            showingDevices = true  // Open devices view to connect
+                        }
+                    }) {
+                        Text(bleManager.isConnected ? "Disconnect" : "Connect")
+                            .font(designSystem.typography.button)
+                            .foregroundColor(designSystem.colors.primaryWhite)
+                            .padding(.horizontal, designSystem.spacing.md)
+                            .padding(.vertical, designSystem.spacing.sm)
+                            .background(bleManager.isConnected ? designSystem.colors.accentRed : designSystem.colors.accentBlue)
+                            .cornerRadius(designSystem.cornerRadius.medium)
+                    }
                 }
             }
         }

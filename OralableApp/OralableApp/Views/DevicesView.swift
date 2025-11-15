@@ -49,6 +49,27 @@ struct DevicesView: View {
             .navigationTitle("Devices")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    // Scan Button - only show when not connected
+                    if !bleManager.isConnected {
+                        Button(action: {
+                            if isScanning {
+                                stopScanning()
+                            } else {
+                                startScanning()
+                            }
+                        }) {
+                            if isScanning {
+                                Label("Stop", systemImage: "stop.circle")
+                                    .foregroundColor(designSystem.colors.accentOrange)
+                            } else {
+                                Label("Scan", systemImage: "wifi")
+                                    .foregroundColor(designSystem.colors.accentBlue)
+                            }
+                        }
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
