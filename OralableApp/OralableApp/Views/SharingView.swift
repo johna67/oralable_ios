@@ -117,23 +117,16 @@ struct SharingView: View {
         }
         .fileImporter(
             isPresented: $showingImportPicker,
-            allowedContentTypes: [.commaSeparatedText, .text]
-        ) { result in
-            handleImport(result: result)
-        }
+            allowedContentTypes: [.commaSeparatedText, .text],
+            onCompletion: handleImportCompletion
+        )
         .fileExporter(
             isPresented: $showingExportSheet,
             document: exportDocument,
             contentType: .commaSeparatedText,
-            defaultFilename: defaultExportFilename
-        ) { result in
-            switch result {
-            case .success(let url):
-                print("✅ File saved successfully to: \(url)")
-            case .failure(let error):
-                print("❌ File save failed: \(error.localizedDescription)")
-            }
-        }
+            defaultFilename: defaultExportFilename,
+            onCompletion: handleExportCompletion
+        )
         .sheet(isPresented: $showHealthKitSheet) {
             HealthKitConnectionView()
         }
@@ -169,9 +162,18 @@ struct SharingView: View {
         }
     }
 
+    private func handleExportCompletion(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            print("✅ File saved successfully to: \(url)")
+        case .failure(let error):
+            print("❌ File save failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Import Functionality
 
-    private func handleImport(result: Result<[URL], Error>) {
+    private func handleImportCompletion(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
