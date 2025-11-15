@@ -57,45 +57,56 @@ extension DesignSystem {
 // MARK: - Color System
 
 struct ColorSystem {
-    // Text Colors
-    let textPrimary = Color("TextPrimary", bundle: nil)
-    let textSecondary = Color("TextSecondary", bundle: nil)
-    let textTertiary = Color("TextTertiary", bundle: nil)
-    let textDisabled = Color("TextDisabled", bundle: nil)
-    
-    // Background Colors
-    let backgroundPrimary = Color("BackgroundPrimary", bundle: nil)
-    let backgroundSecondary = Color("BackgroundSecondary", bundle: nil)
-    let backgroundTertiary = Color("BackgroundTertiary", bundle: nil)
-    
     // Primary Colors
-    let primaryBlack = Color("PrimaryBlack", bundle: nil)
-    let primaryWhite = Color("PrimaryWhite", bundle: nil)
-    
-    // Grayscale
-    let gray50 = Color("Gray50", bundle: nil)
-    let gray100 = Color("Gray100", bundle: nil)
-    let gray200 = Color("Gray200", bundle: nil)
-    let gray300 = Color("Gray300", bundle: nil)
-    let gray400 = Color("Gray400", bundle: nil)
-    let gray500 = Color("Gray500", bundle: nil)
-    let gray600 = Color("Gray600", bundle: nil)
-    let gray700 = Color("Gray700", bundle: nil)
-    let gray800 = Color("Gray800", bundle: nil)
-    let gray900 = Color("Gray900", bundle: nil)
-    
+    let primaryBlack = Color.black
+    let primaryWhite = Color.white
+
+    // Text Colors (using hex values)
+    let textPrimary = Color.black
+    let textSecondary = Color(hex: "666666")
+    let textTertiary = Color(hex: "999999")
+    let textDisabled = Color(hex: "CCCCCC")
+
+    // Background Colors (using hex values)
+    let backgroundPrimary = Color.white
+    let backgroundSecondary = Color(hex: "F5F5F5")
+    let backgroundTertiary = Color(hex: "EEEEEE")
+
+    // Accent Colors
+    let accentGreen = Color(hex: "34C759")
+    let accentBlue = Color(hex: "007AFF")
+    let accentOrange = Color(hex: "FF9500")
+    let accentRed = Color(hex: "FF3B30")
+
+    // Border Colors
+    let borderLight = Color(hex: "E5E5E5")
+    let borderMedium = Color(hex: "CCCCCC")
+    let borderDark = Color(hex: "999999")
+
+    // Grayscale (for backward compatibility)
+    let gray50 = Color(hex: "FAFAFA")
+    let gray100 = Color(hex: "F5F5F5")
+    let gray200 = Color(hex: "EEEEEE")
+    let gray300 = Color(hex: "E0E0E0")
+    let gray400 = Color(hex: "BDBDBD")
+    let gray500 = Color(hex: "9E9E9E")
+    let gray600 = Color(hex: "757575")
+    let gray700 = Color(hex: "616161")
+    let gray800 = Color(hex: "424242")
+    let gray900 = Color(hex: "212121")
+
     // Interactive States
-    let hover = Color("Hover", bundle: nil)
-    let pressed = Color("Pressed", bundle: nil)
-    let border = Color("Border", bundle: nil)
-    let divider = Color("Divider", bundle: nil)
-    
+    let hover = Color(hex: "F5F5F5")
+    let pressed = Color(hex: "EEEEEE")
+    let border = Color(hex: "E5E5E5")
+    let divider = Color(hex: "E5E5E5")
+
     // Semantic Colors
-    let info = Color.blue
-    let warning = Color.orange
-    let error = Color.red
-    let success = Color.green
-    
+    let info = Color(hex: "007AFF")
+    let warning = Color(hex: "FF9500")
+    let error = Color(hex: "FF3B30")
+    let success = Color(hex: "34C759")
+
     // Shadow color
     let shadow = Color.black.opacity(0.1)
 }
@@ -422,11 +433,37 @@ struct AnimationSystem {
     let standard = Animation.easeInOut(duration: 0.3)
     let slow = Animation.easeInOut(duration: 0.5)
     let spring = Animation.spring(response: 0.3, dampingFraction: 0.7)
-    
+
     // Duration values (TimeInterval/Double) for use in functions that need raw durations
     let fastDuration: TimeInterval = 0.15
     let quickDuration: TimeInterval = 0.2
     let standardDuration: TimeInterval = 0.3
     let slowDuration: TimeInterval = 0.5
+}
+
+// MARK: - Color Extension for Hex Support
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 6: // RGB
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
 }
 

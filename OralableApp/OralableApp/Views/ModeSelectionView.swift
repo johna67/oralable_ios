@@ -29,16 +29,16 @@ struct ModeSelectionView: View {
                             mode: .viewer,
                             icon: "eye",
                             title: "Viewer Mode",
-                            subtitle: "View real-time data",
+                            subtitle: "Import and view historical data",
                             features: [
-                                "Connect to Oralable device",
-                                "View real-time sensor data",
+                                "Import CSV files",
+                                "View historical data",
                                 "Basic data visualization",
-                                "Export session data"
+                                "No device required"
                             ],
                             limitations: [
-                                "No data storage",
-                                "No historical tracking",
+                                "No Bluetooth connectivity",
+                                "No data export",
                                 "Limited features"
                             ],
                             price: "Free",
@@ -51,21 +51,20 @@ struct ModeSelectionView: View {
                                 showingInfoSheet = true
                             }
                         )
-                        
+
                         // Subscription Mode
                         ModeCard(
                             mode: .subscription,
                             icon: "crown",
-                            title: "Full Access",
-                            subtitle: "Complete feature set",
+                            title: "Subscription Mode",
+                            subtitle: "Full access with Apple ID",
                             features: [
-                                "All Viewer Mode features",
-                                "Unlimited data storage",
-                                "Historical analysis",
-                                "Advanced visualizations",
-                                "Health insights",
-                                "Cloud sync",
-                                "Priority support"
+                                "Bluetooth device connectivity",
+                                "Real-time sensor data",
+                                "Export data as CSV",
+                                "HealthKit integration",
+                                "Advanced analytics",
+                                "Cloud sync"
                             ],
                             limitations: [],
                             price: "Sign in required",
@@ -76,34 +75,6 @@ struct ModeSelectionView: View {
                             },
                             onInfo: {
                                 infoMode = .subscription
-                                showingInfoSheet = true
-                            }
-                        )
-                        
-                        // Demo Mode
-                        ModeCard(
-                            mode: .demo,
-                            icon: "play.circle",
-                            title: "Demo Mode",
-                            subtitle: "Try without device",
-                            features: [
-                                "Explore all features",
-                                "Simulated sensor data",
-                                "Test functionality",
-                                "No device needed"
-                            ],
-                            limitations: [
-                                "Mock data only",
-                                "Cannot connect to real device",
-                                "For evaluation only"
-                            ],
-                            price: "Free",
-                            isSelected: selectedMode == .demo,
-                            onSelect: {
-                                selectedMode = .demo
-                            },
-                            onInfo: {
-                                infoMode = .demo
                                 showingInfoSheet = true
                             }
                         )
@@ -151,14 +122,14 @@ struct ModeSelectionView: View {
     }
     
     // MARK: - Continue Button
-    
+
     private func continueButton(for mode: AppMode) -> some View {
         Button(action: {
             appStateManager.setMode(mode)
         }) {
             HStack {
-                Text("Continue with \(mode.displayName)")
-                Image(systemName: "arrow.right")
+                Text(mode == .viewer ? "Continue Free" : "Sign in with Apple ID")
+                Image(systemName: mode == .viewer ? "arrow.right" : "person.crop.circle")
             }
             .frame(maxWidth: .infinity)
             .padding(designSystem.spacing.md)
