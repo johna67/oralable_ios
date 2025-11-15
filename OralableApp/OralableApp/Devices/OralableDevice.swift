@@ -81,6 +81,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     private var sensorDataCharacteristic: CBCharacteristic?
     private var ppgWaveformCharacteristic: CBCharacteristic?
     private var controlCharacteristic: CBCharacteristic?
+    private var batteryCharacteristic: CBCharacteristic?
     private var cancellables = Set<AnyCancellable>()
 
     // Continuation for waiting until service discovery completes
@@ -88,6 +89,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
     // Packet counter for throttled logging
     private var packetCount = 0
+
+    // CRITICAL: Keep-alive timer to prevent connection timeout
+    // Reads battery level every 15 seconds to maintain connection activity
+    private var keepAliveTimer: Timer?
     
     // MARK: - Initialization
     
@@ -139,19 +144,22 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
     func disconnect() async {
         print("\n🔌 [OralableDevice] disconnect() called")
-        
+
         connectionState = .disconnecting
         deviceInfo.connectionState = .disconnecting
         isStreaming = false
-        
+
+        // Stop keep-alive timer
+        stopKeepAliveTimer()
+
         if let characteristic = sensorDataCharacteristic {
             peripheral?.setNotifyValue(false, for: characteristic)
         }
-        
+
         if let characteristic = ppgWaveformCharacteristic {
             peripheral?.setNotifyValue(false, for: characteristic)
         }
-        
+
         connectionState = .disconnected
         deviceInfo.connectionState = .disconnected
         print("🔌 [OralableDevice] Disconnected")
@@ -195,8 +203,11 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         }
 
         print("✅ [OralableDevice] Data stream started successfully")
+
+        // CRITICAL: Start keep-alive timer to prevent connection timeout
+        startKeepAliveTimer()
     }
-    
+
     func stopDataStream() async {
         print("\n📊 [OralableDevice] stopDataStream() called")
         
@@ -209,6 +220,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         }
         
         isStreaming = false
+
+        // Stop keep-alive timer
+        stopKeepAliveTimer()
+
         print("✅ [OralableDevice] Data streaming stopped")
     }
     
@@ -290,7 +305,52 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         
         self.configuration = config
     }
-    
+
+    // MARK: - Keep-Alive Timer
+
+    /// Starts a timer that periodically reads the battery characteristic to keep the BLE connection alive
+    /// This prevents iOS supervision timeout (~38 seconds) by maintaining connection activity
+    private func startKeepAliveTimer() {
+        // Stop any existing timer
+        stopKeepAliveTimer()
+
+        print("🔔 [OralableDevice] Starting keep-alive timer (reads battery every 15s)")
+
+        // Create timer on main thread
+        DispatchQueue.main.async { [weak self] in
+            self?.keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
+                self?.performKeepAlive()
+            }
+        }
+    }
+
+    /// Stops the keep-alive timer
+    private func stopKeepAliveTimer() {
+        keepAliveTimer?.invalidate()
+        keepAliveTimer = nil
+        print("🔔 [OralableDevice] Keep-alive timer stopped")
+    }
+
+    /// Performs a keep-alive action by reading the battery characteristic
+    private func performKeepAlive() {
+        guard isConnected, let peripheral = peripheral else {
+            print("⚠️ [OralableDevice] Keep-alive skipped - not connected")
+            return
+        }
+
+        // Read battery characteristic to maintain connection activity
+        if let batteryChar = batteryCharacteristic {
+            peripheral.readValue(for: batteryChar)
+            print("🔔 [OralableDevice] Keep-alive: Read battery characteristic")
+        } else {
+            // If no battery characteristic, try to read sensor data characteristic
+            if let sensorChar = sensorDataCharacteristic {
+                peripheral.readValue(for: sensorChar)
+                print("🔔 [OralableDevice] Keep-alive: Read sensor data characteristic")
+            }
+        }
+    }
+
     func updateDeviceInfo() async throws {
         guard isConnected else {
             throw DeviceError.notConnected
@@ -685,6 +745,8 @@ extension OralableDevice: CBPeripheralDelegate {
                 controlCharacteristic = characteristic
                 print("✅ [OralableDevice] Found control characteristic")
             } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
+                batteryCharacteristic = characteristic
+                print("✅ [OralableDevice] Found battery characteristic")
                 print("🔋 [OralableDevice] Reading battery level...")
                 peripheral.readValue(for: characteristic)
             } else if characteristic.uuid == BLEConstants.firmwareVersionCharacteristicUUID {

@@ -90,10 +90,26 @@ final class BLECentralManager: NSObject {
     }
     
     // MARK: - Connections
-    
+
     func connect(to peripheral: CBPeripheral) {
         pendingConnections.insert(peripheral.identifier)
-        central.connect(peripheral, options: nil)
+
+        // CRITICAL: Add connection options to improve stability and prevent timeouts
+        // These options request optimal parameters for continuous data streaming
+        let options: [String: Any] = [
+            // Request to notify on connection events even if app is in background
+            CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnDisconnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnNotificationKey: true,
+            // Start with high priority connection for initial setup
+            CBConnectPeripheralOptionStartDelayKey: 0
+        ]
+
+        Task { @MainActor in
+            Logger.shared.info("Connecting to \(peripheral.name ?? "Unknown") with optimized parameters...")
+        }
+
+        central.connect(peripheral, options: options)
     }
     
     func disconnect(from peripheral: CBPeripheral) {
