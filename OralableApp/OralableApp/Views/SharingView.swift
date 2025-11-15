@@ -126,8 +126,13 @@ struct SharingView: View {
             document: exportDocument,
             contentType: .commaSeparatedText,
             defaultFilename: defaultExportFilename
-        ) { (result: Result<URL, Error>) in
-            handleExportResult(result)
+        ) { result in
+            switch result {
+            case .success(let url):
+                print("✅ File saved successfully to: \(url)")
+            case .failure(let error):
+                print("❌ File save failed: \(error.localizedDescription)")
+            }
         }
         .sheet(isPresented: $showHealthKitSheet) {
             HealthKitConnectionView()
@@ -161,15 +166,6 @@ struct SharingView: View {
            let csvContent = try? String(contentsOf: url, encoding: .utf8) {
             exportDocument = CSVDocument(csvContent: csvContent)
             showingExportSheet = true
-        }
-    }
-
-    private func handleExportResult(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            print("✅ File saved successfully to: \(url)")
-        case .failure(let error):
-            print("❌ File save failed: \(error.localizedDescription)")
         }
     }
 

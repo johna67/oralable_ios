@@ -193,9 +193,17 @@ struct TypographySystem {
     var captionSmall: Font {  // Added
         Font.custom(fontFamily, size: 12).weight(.regular)
     }
-    
+
+    var callout: Font {
+        Font.custom(fontFamily, size: 16).weight(.regular)
+    }
+
     var footnote: Font {
         Font.custom(fontFamily, size: 12).weight(.regular)
+    }
+
+    var subheadline: Font {
+        Font.custom(fontFamily, size: 15).weight(.regular)
     }
     
     // Display variants
