@@ -118,7 +118,7 @@ struct SharingView: View {
         .fileImporter(
             isPresented: $showingImportPicker,
             allowedContentTypes: [.commaSeparatedText, .text]
-        ) { (result: Result<[URL], Error>) in
+        ) { result in
             handleImport(result: result)
         }
         .fileExporter(
@@ -126,7 +126,7 @@ struct SharingView: View {
             document: exportDocument,
             contentType: .commaSeparatedText,
             defaultFilename: defaultExportFilename
-        ) { (result: Result<URL, Error>) in
+        ) { result in
             switch result {
             case .success(let url):
                 print("✅ File saved successfully to: \(url)")
