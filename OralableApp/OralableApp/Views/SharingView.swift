@@ -101,7 +101,8 @@ struct SharingView: View {
         }
         .fileImporter(
             isPresented: $showingImportPicker,
-            allowedContentTypes: [.commaSeparatedText]
+            allowedContentTypes: [.commaSeparatedText],
+            allowsMultipleSelection: false
         ) { result in
             handleImport(result: result)
         }
@@ -197,7 +198,7 @@ struct ActionCard: View {
 
             // Description
             Text(description)
-                .font(designSystem.typography.callout)
+                .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
                 .multilineTextAlignment(.center)
 
