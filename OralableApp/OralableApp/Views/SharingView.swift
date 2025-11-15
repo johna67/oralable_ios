@@ -117,16 +117,18 @@ struct SharingView: View {
         }
         .fileImporter(
             isPresented: $showingImportPicker,
-            allowedContentTypes: [.commaSeparatedText, .text],
-            onCompletion: handleImportCompletion
-        )
+            allowedContentTypes: [.commaSeparatedText, .text]
+        ) { (result: Result<[URL], Error>) in
+            self.handleImportCompletion(result)
+        }
         .fileExporter(
             isPresented: $showingExportSheet,
             document: exportDocument,
             contentType: .commaSeparatedText,
-            defaultFilename: defaultExportFilename,
-            onCompletion: handleExportCompletion
-        )
+            defaultFilename: defaultExportFilename
+        ) { (result: Result<URL, Error>) in
+            self.handleExportCompletion(result)
+        }
         .sheet(isPresented: $showHealthKitSheet) {
             HealthKitConnectionView()
         }
