@@ -14,6 +14,7 @@ enum HealthDataType: String, Codable, CaseIterable {
     case weight
     case heartRate
     case bloodOxygen
+    case bodyTemperature
     case sleepAnalysis
     case workouts
     case respiratoryRate
@@ -26,6 +27,8 @@ enum HealthDataType: String, Codable, CaseIterable {
             return "Heart Rate"
         case .bloodOxygen:
             return "Blood Oxygen"
+        case .bodyTemperature:
+            return "Body Temperature"
         case .sleepAnalysis:
             return "Sleep"
         case .workouts:
@@ -43,6 +46,8 @@ enum HealthDataType: String, Codable, CaseIterable {
             return "bpm"
         case .bloodOxygen:
             return "%"
+        case .bodyTemperature:
+            return "°C"
         case .sleepAnalysis:
             return "hours"
         case .workouts:
@@ -60,6 +65,8 @@ enum HealthDataType: String, Codable, CaseIterable {
             return "heart.fill"
         case .bloodOxygen:
             return "lungs.fill"
+        case .bodyTemperature:
+            return "thermometer"
         case .sleepAnalysis:
             return "bed.double.fill"
         case .workouts:
@@ -78,6 +85,8 @@ enum HealthDataType: String, Codable, CaseIterable {
             return .heartRate
         case .bloodOxygen:
             return .oxygenSaturation
+        case .bodyTemperature:
+            return .bodyTemperature
         case .respiratoryRate:
             return .respiratoryRate
         case .sleepAnalysis, .workouts:
@@ -122,7 +131,7 @@ struct HealthDataReading: Identifiable, Codable {
     /// Formatted value with unit
     var formattedValue: String {
         switch type {
-        case .weight:
+        case .weight, .bodyTemperature:
             return String(format: "%.1f %@", value, type.unit)
         case .heartRate, .bloodOxygen, .respiratoryRate:
             return String(format: "%.0f %@", value, type.unit)
@@ -138,6 +147,7 @@ struct HealthDataReading: Identifiable, Codable {
             case .weight: return 75.5
             case .heartRate: return 72
             case .bloodOxygen: return 98
+            case .bodyTemperature: return 36.6
             case .sleepAnalysis: return 7.5
             case .workouts: return 45
             case .respiratoryRate: return 16
