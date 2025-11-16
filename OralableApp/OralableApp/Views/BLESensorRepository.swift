@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreBluetooth
 
 /// Repository implementation that wraps OralableBLE
 @MainActor

@@ -58,8 +58,8 @@ final class Logger {
         case auth = "Auth"
         case general = "General"
 
-        var logger: Logger {
-            Logger(subsystem: "com.oralable.app", category: rawValue)
+        var osLogger: OSLog {
+            OSLog(subsystem: "com.oralable.app", category: rawValue)
         }
     }
 
@@ -108,7 +108,7 @@ final class Logger {
         log(level: .info, message: message, category: category, file: file, function: function, line: line)
     }
 
-    func warning(_ message: String, category: Category = #general, file: String = #file, function: String = #function, line: Int = #line) {
+    func warning(_ message: String, category: Category = .general, file: String = #file, function: String = #function, line: Int = #line) {
         log(level: .warning, message: message, category: category, file: file, function: function, line: line)
     }
 
@@ -157,8 +157,8 @@ final class Logger {
     }
 
     private func logToOSLog(level: LogLevel, message: String, category: Category) {
-        let logger = category.logger
-        logger.log(level: level.osLogType, "\(message)")
+        let osLogger = category.osLogger
+        os_log("%{public}@", log: osLogger, type: level.osLogType, message)
     }
 
     private func logToConsole(level: LogLevel, message: String, file: String, function: String, line: Int) {
@@ -260,8 +260,8 @@ final class Logger {
 struct LogMessage: Identifiable {
     let id = UUID()
     let timestamp: Date
-    let level: LoggingService.LogLevel
-    let category: LoggingService.Category
+    let level: Logger.LogLevel
+    let category: Logger.Category
     let message: String
     let file: String
     let function: String

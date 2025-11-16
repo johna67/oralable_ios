@@ -17,7 +17,7 @@ struct FirmwareUpdateView: View {
     @State private var availableVersion: String = ""
     @State private var releaseNotes: String = ""
 
-    enum UpdateStatus {
+    enum UpdateStatus: Equatable {
         case checking
         case upToDate
         case updateAvailable

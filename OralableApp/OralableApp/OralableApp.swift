@@ -52,22 +52,22 @@ struct RootView: View {
     @State private var showOnboarding = false
 
     var body: some View {
-        print("🔵 [RootView] body being evaluated")
-        print("🔵 [RootView] needsModeSelection: \(appStateManager.needsModeSelection)")
-        print("🔵 [RootView] selectedMode: \(String(describing: appStateManager.selectedMode))")
+        let _ = print("🔵 [RootView] body being evaluated")
+        let _ = print("🔵 [RootView] needsModeSelection: \(appStateManager.needsModeSelection)")
+        let _ = print("🔵 [RootView] selectedMode: \(String(describing: appStateManager.selectedMode))")
 
-        return Group {
+        Group {
             if appStateManager.needsModeSelection {
                 // Show mode selection if no mode is selected
-                print("🔵 [RootView] Showing ModeSelectionView")
+                let _ = print("🔵 [RootView] Showing ModeSelectionView")
                 ModeSelectionView()
             } else if let mode = appStateManager.selectedMode {
                 // Show appropriate view based on selected mode
-                print("🔵 [RootView] Showing contentView for mode: \(mode)")
+                let _ = print("🔵 [RootView] Showing contentView for mode: \(mode)")
                 contentView(for: mode)
             } else {
                 // Fallback (shouldn't happen)
-                print("⚠️ [RootView] Fallback to ModeSelectionView")
+                let _ = print("⚠️ [RootView] Fallback to ModeSelectionView")
                 ModeSelectionView()
             }
         }

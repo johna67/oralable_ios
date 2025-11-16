@@ -34,7 +34,7 @@ struct AppleIDDebugView: View {
                                 .fontWeight(.semibold)
                             
                             Text(debugOutput)
-                                .font(.system(size: 12, family: .monospaced))
+                                .font(.system(size: 12, design: .monospaced))
                                 .foregroundColor(.secondary)
                                 .textSelection(.enabled)
                                 .padding()
@@ -64,23 +64,10 @@ struct AppleIDDebugView: View {
     
     private func updateDebugOutput() {
         // Capture debug output
-        var output = ""
-        
-        // Redirect print statements to capture debug info
-        let originalPrint = print
-        
-        // Create a custom print function that captures output
-        func customPrint(_ items: Any..., separator: String = " ", terminator: String = "\n") {
-            let message = items.map { "\($0)" }.joined(separator: separator)
-            output += message + terminator
-            originalPrint(items, separator: separator, terminator: terminator)
-        }
-        
-        // Run debug with custom print
         authManager.debugAuthState()
         
         DispatchQueue.main.async {
-            self.debugOutput = output.isEmpty ? "No debug output captured. Check console logs." : output
+            self.debugOutput = "Debug info printed to console. Check Xcode console for output."
         }
     }
 }

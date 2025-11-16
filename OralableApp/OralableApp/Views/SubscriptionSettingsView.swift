@@ -511,10 +511,10 @@ struct FeatureBullet: View {
 
 struct BLELogsView: View {
     @Environment(\.dismiss) private var dismiss
-    let logs: [LogMessage]
+    let logs: [BLELogMessage]
     @State private var searchText = ""
     
-    var filteredLogs: [LogMessage] {
+    var filteredLogs: [BLELogMessage] {
         if searchText.isEmpty {
             return logs
         }
