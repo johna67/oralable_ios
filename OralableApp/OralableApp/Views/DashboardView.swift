@@ -18,6 +18,7 @@ struct DashboardView: View {
     @State private var showingProfile = false
     @State private var showingDevices = false
     @State private var showingSettings = false
+    @State private var showingHistorical = false
     
     var body: some View {
         NavigationView {
@@ -89,6 +90,12 @@ struct DashboardView: View {
                     .environmentObject(AuthenticationManager.shared)
                     .environmentObject(SubscriptionManager.shared)
                     .environmentObject(AppStateManager.shared)
+            }
+            .sheet(isPresented: $showingHistorical) {
+                HistoricalView()
+                    .environmentObject(designSystem)
+                    .environmentObject(HistoricalDataManager.shared)
+                    .environmentObject(bleManager)
             }
         }
         .onAppear {
@@ -303,13 +310,16 @@ struct DashboardView: View {
                 designSystem: designSystem
             )
             
-            // Accelerometer
+            // Accelerometer - Tappable to view history
             WaveformCard(
                 title: "Movement",
                 data: viewModel.accelerometerData,
                 color: .blue,
                 designSystem: designSystem
             )
+            .onTapGesture {
+                showingHistorical = true
+            }
         }
     }
 }
