@@ -334,23 +334,47 @@ struct WaveformCard: View {
     let data: [Double]
     let color: Color
     let designSystem: DesignSystem
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text(title)
-                .font(designSystem.typography.caption)
-                .foregroundColor(designSystem.colors.textSecondary)
-            
-            Chart(Array(data.enumerated()), id: \.offset) { index, value in
-                LineMark(
-                    x: .value("Time", index),
-                    y: .value("Value", value)
-                )
-                .foregroundStyle(color)
+            HStack {
+                Text(title)
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+
+                Spacer()
+
+                // Show data point count for debugging
+                Text("\(data.count) pts")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textTertiary)
             }
-            .frame(height: 100)
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
+
+            if data.isEmpty {
+                // Show placeholder when no data
+                ZStack {
+                    Rectangle()
+                        .fill(designSystem.colors.backgroundPrimary.opacity(0.3))
+                        .frame(height: 100)
+
+                    Text("Waiting for data...")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+            } else {
+                Chart(Array(data.enumerated()), id: \.offset) { index, value in
+                    LineMark(
+                        x: .value("Time", index),
+                        y: .value("Value", value)
+                    )
+                    .foregroundStyle(color)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                }
+                .frame(height: 100)
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .chartYScale(domain: .automatic)
+            }
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)

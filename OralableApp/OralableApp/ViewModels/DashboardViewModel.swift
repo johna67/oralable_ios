@@ -100,6 +100,9 @@ class DashboardViewModel: ObservableObject {
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] hr in
                 self?.heartRate = hr
+                if hr > 0 {
+                    Logger.shared.debug("[DashboardViewModel] ❤️ HR updated: \(hr) bpm")
+                }
             }
             .store(in: &cancellables)
 
@@ -108,6 +111,9 @@ class DashboardViewModel: ObservableObject {
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] spo2 in
                 self?.spO2 = spo2
+                if spo2 > 0 {
+                    Logger.shared.debug("[DashboardViewModel] 🫁 SpO2 updated: \(spo2)%")
+                }
             }
             .store(in: &cancellables)
 
@@ -145,28 +151,43 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     private func processPPGData(_ value: Double) {
+        // Normalize PPG value for chart display
+        // Raw values are typically 0-524287 (19-bit ADC)
+        // Normalize to 0-100 range for better visualization
+        let normalizedValue = (value / 5242.87)  // Scale to 0-100
+
         // Update PPG waveform
-        ppgData.append(value)
+        ppgData.append(normalizedValue)
         if ppgData.count > 100 {
             ppgData.removeFirst()
         }
 
         // Update position quality from PPG amplitude
         updatePositionQuality(from: value)
+
+        // Debug logging (throttled)
+        if ppgData.count % 50 == 0 {
+            Logger.shared.debug("[DashboardViewModel] PPG: raw=\(Int(value)) normalized=\(String(format: "%.1f", normalizedValue)) buffer=\(ppgData.count)")
+        }
     }
-    
+
     private func processAccelerometerData(x: Double, y: Double, z: Double) {
         // Calculate magnitude for movement detection
         let magnitude = sqrt(x*x + y*y + z*z)
-        
+
         // Update accelerometer waveform
         accelerometerData.append(magnitude)
         if accelerometerData.count > 100 {
             accelerometerData.removeFirst()
         }
-        
+
         // Detect movement (MAM - Movement state)
         isMoving = magnitude > movementThreshold
+
+        // Debug logging (throttled)
+        if accelerometerData.count % 50 == 0 {
+            Logger.shared.debug("[DashboardViewModel] Accel: x=\(String(format: "%.2f", x))g y=\(String(format: "%.2f", y))g z=\(String(format: "%.2f", z))g mag=\(String(format: "%.2f", magnitude))g buffer=\(accelerometerData.count)")
+        }
     }
     
     private func updatePositionQuality(from ppgValue: Double) {

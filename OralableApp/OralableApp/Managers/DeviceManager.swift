@@ -605,8 +605,12 @@ class DeviceManager: ObservableObject {
         // Calculate Heart Rate from IR samples
         if ppgIRBuffer.count >= 100 {  // Need at least 2 seconds of data
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
-                heartRate = Int(hrResult.bpm)
-                heartRateQuality = hrResult.quality
+                let newHR = Int(hrResult.bpm)
+                if newHR != heartRate {  // Only log when value changes
+                    heartRate = newHR
+                    heartRateQuality = hrResult.quality
+                    print("❤️ [DeviceManager] HR calculated: \(newHR) bpm (quality: \(String(format: "%.2f", hrResult.quality)))")
+                }
             }
         }
 
@@ -625,7 +629,11 @@ class DeviceManager: ObservableObject {
                 let ratio = avgRed / avgIR
                 // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
                 let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
-                spO2 = Int(calculatedSpO2)
+                let newSpO2 = Int(calculatedSpO2)
+                if newSpO2 != spO2 {  // Only log when value changes
+                    spO2 = newSpO2
+                    print("🫁 [DeviceManager] SpO2 calculated: \(newSpO2)% (ratio: \(String(format: "%.3f", ratio)), avgRed: \(Int(avgRed)), avgIR: \(Int(avgIR)))")
+                }
             }
         }
     }
