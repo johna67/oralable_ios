@@ -258,16 +258,6 @@ struct DashboardView: View {
                 color: batteryColor,
                 designSystem: designSystem
             )
-
-            // Signal Quality
-            MetricCard(
-                icon: "wifi",
-                title: "Signal",
-                value: "\(viewModel.signalQuality)",
-                unit: "%",
-                color: .green,
-                designSystem: designSystem
-            )
         }
     }
     
