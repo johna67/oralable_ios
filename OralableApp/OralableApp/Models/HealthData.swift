@@ -189,15 +189,17 @@ struct HealthKitPermissions {
         .weight,
         .heartRate,
         .bloodOxygen,
+        .bodyTemperature,
         .sleepAnalysis,
         .workouts,
         .respiratoryRate
     ]
-    
-    // Types to write
+
+    // Types to write (Oralable can write these to HealthKit)
     static let writeTypes: Set<HealthDataType> = [
         .heartRate,
-        .bloodOxygen
+        .bloodOxygen,
+        .bodyTemperature
     ]
     
     /// Get HKObjectTypes for reading

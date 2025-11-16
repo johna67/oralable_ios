@@ -330,16 +330,16 @@ class HealthKitManager: ObservableObject {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
-        
+
         guard let spo2Type = HKObjectType.quantityType(forIdentifier: .oxygenSaturation) else {
             throw HealthKitError.invalidType
         }
-        
+
         let quantity = HKQuantity(
             unit: HKUnit.percent(),
             doubleValue: percentage / 100.0 // Convert percentage to decimal
         )
-        
+
         let sample = HKQuantitySample(
             type: spo2Type,
             quantity: quantity,
@@ -350,7 +350,40 @@ class HealthKitManager: ObservableObject {
                 "Device": "Oralable"
             ]
         )
-        
+
+        try await healthStore.save(sample)
+    }
+
+    /// Write body temperature sample to HealthKit
+    func writeBodyTemperature(
+        celsius: Double,
+        timestamp: Date = Date()
+    ) async throws {
+        guard isAuthorized else {
+            throw HealthKitError.notAuthorized
+        }
+
+        guard let temperatureType = HKObjectType.quantityType(forIdentifier: .bodyTemperature) else {
+            throw HealthKitError.invalidType
+        }
+
+        let quantity = HKQuantity(
+            unit: HKUnit.degreeCelsius(),
+            doubleValue: celsius
+        )
+
+        let sample = HKQuantitySample(
+            type: temperatureType,
+            quantity: quantity,
+            start: timestamp,
+            end: timestamp,
+            metadata: [
+                HKMetadataKeyWasUserEntered: false,
+                "Device": "Oralable",
+                "MeasurementLocation": "Oral"
+            ]
+        )
+
         try await healthStore.save(sample)
     }
     
@@ -359,21 +392,105 @@ class HealthKitManager: ObservableObject {
         switch reading.sensorType {
         case .heartRate:
             try await writeHeartRate(bpm: reading.value, timestamp: reading.timestamp)
-            
+
         case .spo2:
             try await writeBloodOxygen(percentage: reading.value, timestamp: reading.timestamp)
-            
+
+        case .temperature:
+            try await writeBodyTemperature(celsius: reading.value, timestamp: reading.timestamp)
+
         default:
-            // Other sensor types not supported for HealthKit write
+            // Other sensor types (accelerometer, PPG, battery) not supported for HealthKit
             break
         }
     }
-    
-    /// Write multiple sensor readings to HealthKit
+
+    /// Write multiple sensor readings to HealthKit (optimized batch operation)
     func writeSensorReadings(_ readings: [SensorReading]) async throws {
-        for reading in readings {
-            try await writeSensorReading(reading)
+        // Group readings by type for batch operations
+        let heartRates = readings.filter { $0.sensorType == .heartRate }
+        let spo2Readings = readings.filter { $0.sensorType == .spo2 }
+        let temperatures = readings.filter { $0.sensorType == .temperature }
+
+        // Build all samples first
+        var allSamples: [HKSample] = []
+
+        // Heart rate samples
+        if let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) {
+            let hrSamples = heartRates.map { reading in
+                let quantity = HKQuantity(unit: HKUnit(from: "count/min"), doubleValue: reading.value)
+                return HKQuantitySample(
+                    type: heartRateType,
+                    quantity: quantity,
+                    start: reading.timestamp,
+                    end: reading.timestamp,
+                    metadata: [HKMetadataKeyWasUserEntered: false, "Device": "Oralable"]
+                )
+            }
+            allSamples.append(contentsOf: hrSamples)
         }
+
+        // SpO2 samples
+        if let spo2Type = HKObjectType.quantityType(forIdentifier: .oxygenSaturation) {
+            let spo2Samples = spo2Readings.map { reading in
+                let quantity = HKQuantity(unit: HKUnit.percent(), doubleValue: reading.value / 100.0)
+                return HKQuantitySample(
+                    type: spo2Type,
+                    quantity: quantity,
+                    start: reading.timestamp,
+                    end: reading.timestamp,
+                    metadata: [HKMetadataKeyWasUserEntered: false, "Device": "Oralable"]
+                )
+            }
+            allSamples.append(contentsOf: spo2Samples)
+        }
+
+        // Temperature samples
+        if let tempType = HKObjectType.quantityType(forIdentifier: .bodyTemperature) {
+            let tempSamples = temperatures.map { reading in
+                let quantity = HKQuantity(unit: HKUnit.degreeCelsius(), doubleValue: reading.value)
+                return HKQuantitySample(
+                    type: tempType,
+                    quantity: quantity,
+                    start: reading.timestamp,
+                    end: reading.timestamp,
+                    metadata: [
+                        HKMetadataKeyWasUserEntered: false,
+                        "Device": "Oralable",
+                        "MeasurementLocation": "Oral"
+                    ]
+                )
+            }
+            allSamples.append(contentsOf: tempSamples)
+        }
+
+        // Batch save all samples at once (much more efficient than individual saves)
+        guard !allSamples.isEmpty else { return }
+
+        do {
+            try await healthStore.save(allSamples)
+            Logger.shared.info("[HealthKitManager] ✅ Saved \(allSamples.count) samples to HealthKit")
+        } catch {
+            Logger.shared.error("[HealthKitManager] ❌ Failed to save samples: \(error)")
+            throw HealthKitError.writeFailed(error.localizedDescription)
+        }
+    }
+
+    /// Sync recent sensor data to HealthKit (convenience method)
+    /// - Parameter limit: Maximum number of recent readings to sync (default: 100)
+    func syncRecentDataToHealthKit(from deviceManager: DeviceManager, limit: Int = 100) async throws {
+        guard isAuthorized else {
+            throw HealthKitError.notAuthorized
+        }
+
+        let recentReadings = Array(deviceManager.allSensorReadings.suffix(limit))
+        guard !recentReadings.isEmpty else {
+            Logger.shared.debug("[HealthKitManager] No sensor data to sync")
+            return
+        }
+
+        Logger.shared.info("[HealthKitManager] Starting sync of \(recentReadings.count) sensor readings")
+        try await writeSensorReadings(recentReadings)
     }
 }
 
