@@ -91,7 +91,7 @@ actor HistoricalDataProcessor {
     }
 
     /// Generate chart data points (runs on background thread)
-    func generateChartData(for dataPoints: [HistoricalDataPoint], metric: MetricType) async -> [ChartDataPoint] {
+    func generateChartData(for dataPoints: [HistoricalDataPoint], metric: ProcessorMetricType) async -> [ChartDataPoint] {
         return dataPoints.compactMap { point in
             guard let value = extractMetricValue(from: point, metric: metric) else {
                 return nil
@@ -101,7 +101,7 @@ actor HistoricalDataProcessor {
     }
 
     /// Calculate trend (positive = increasing, negative = decreasing)
-    func calculateTrend(for dataPoints: [HistoricalDataPoint], metric: MetricType) async -> Double {
+    func calculateTrend(for dataPoints: [HistoricalDataPoint], metric: ProcessorMetricType) async -> Double {
         guard dataPoints.count >= 2 else { return 0 }
 
         let values = dataPoints.compactMap { extractMetricValue(from: $0, metric: metric) }
@@ -177,7 +177,7 @@ actor HistoricalDataProcessor {
         )
     }
 
-    private func extractMetricValue(from point: HistoricalDataPoint, metric: MetricType) -> Double? {
+    private func extractMetricValue(from point: HistoricalDataPoint, metric: ProcessorMetricType) -> Double? {
         switch metric {
         case .heartRate:
             return point.averageHeartRate
@@ -195,7 +195,7 @@ actor HistoricalDataProcessor {
 
 // MARK: - Supporting Types
 
-enum MetricType {
+enum ProcessorMetricType {
     case heartRate
     case spO2
     case temperature
@@ -222,7 +222,7 @@ extension HistoricalViewModel {
     }
 
     /// Generate chart data using background processing
-    func generateChartDataAsync(metric: MetricType) async -> [ChartDataPoint] {
+    func generateChartDataAsync(metric: ProcessorMetricType) async -> [ChartDataPoint] {
         guard let metrics = currentMetrics else { return [] }
 
         let processor = HistoricalDataProcessor()
