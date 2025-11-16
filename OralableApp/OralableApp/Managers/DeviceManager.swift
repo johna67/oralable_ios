@@ -55,19 +55,20 @@ class DeviceManager: ObservableObject {
     @Published private(set) var heartRateQuality: Double = 0.0
     @Published private(set) var ppgChannelOrderValue: PPGChannelOrder = .standard
 
-    // Type-erased publishers - initialized once in init() and reused for all subscribers
-    private let _isConnectedPublisher: AnyPublisher<Bool, Never>
-    private let _isScanningPublisher: AnyPublisher<Bool, Never>
-    private let _batteryLevelPublisher: AnyPublisher<Double, Never>
-    private let _heartRatePublisher: AnyPublisher<Int, Never>
-    private let _spO2Publisher: AnyPublisher<Int, Never>
-    private let _ppgRedValuePublisher: AnyPublisher<Double, Never>
-    private let _accelXPublisher: AnyPublisher<Double, Never>
-    private let _accelYPublisher: AnyPublisher<Double, Never>
-    private let _accelZPublisher: AnyPublisher<Double, Never>
-    private let _temperaturePublisher: AnyPublisher<Double, Never>
-    private let _heartRateQualityPublisher: AnyPublisher<Double, Never>
-    private let _ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never>
+    // Type-erased publishers - initialized lazily on first access, then reused for all subscribers
+    // Using lazy var allows accessing self.$property after initialization is complete
+    private lazy var _isConnectedPublisher = $isConnected.eraseToAnyPublisher()
+    private lazy var _isScanningPublisher = $isScanning.eraseToAnyPublisher()
+    private lazy var _batteryLevelPublisher = $batteryLevel.eraseToAnyPublisher()
+    private lazy var _heartRatePublisher = $heartRate.eraseToAnyPublisher()
+    private lazy var _spO2Publisher = $spO2.eraseToAnyPublisher()
+    private lazy var _ppgRedValuePublisher = $ppgRedValue.eraseToAnyPublisher()
+    private lazy var _accelXPublisher = $accelX.eraseToAnyPublisher()
+    private lazy var _accelYPublisher = $accelY.eraseToAnyPublisher()
+    private lazy var _accelZPublisher = $accelZ.eraseToAnyPublisher()
+    private lazy var _temperaturePublisher = $temperature.eraseToAnyPublisher()
+    private lazy var _heartRateQualityPublisher = $heartRateQuality.eraseToAnyPublisher()
+    private lazy var _ppgChannelOrderPublisher = $ppgChannelOrderValue.eraseToAnyPublisher()
 
     // MARK: - Private Properties
 
@@ -99,21 +100,8 @@ class DeviceManager: ObservableObject {
             ppgChannelOrderValue = order
         }
 
-        // Initialize type-erased publishers ONCE - these will be reused by all subscribers
-        print("🏭 [DeviceManager] Creating type-erased publishers...")
-        _isConnectedPublisher = $isConnected.eraseToAnyPublisher()
-        _isScanningPublisher = $isScanning.eraseToAnyPublisher()
-        _batteryLevelPublisher = $batteryLevel.eraseToAnyPublisher()
-        _heartRatePublisher = $heartRate.eraseToAnyPublisher()
-        _spO2Publisher = $spO2.eraseToAnyPublisher()
-        _ppgRedValuePublisher = $ppgRedValue.eraseToAnyPublisher()
-        _accelXPublisher = $accelX.eraseToAnyPublisher()
-        _accelYPublisher = $accelY.eraseToAnyPublisher()
-        _accelZPublisher = $accelZ.eraseToAnyPublisher()
-        _temperaturePublisher = $temperature.eraseToAnyPublisher()
-        _heartRateQualityPublisher = $heartRateQuality.eraseToAnyPublisher()
-        _ppgChannelOrderPublisher = $ppgChannelOrderValue.eraseToAnyPublisher()
-        print("🏭 [DeviceManager] Type-erased publishers created successfully")
+        // Note: Type-erased publishers are lazy - they'll be created on first access
+        // This allows them to access self.$property after init() completes
 
         bleManager = BLECentralManager()
         setupBLECallbacks()
@@ -746,12 +734,12 @@ extension DeviceManager: BLEManagerProtocol {
     }
 
     var heartRatePublisher: AnyPublisher<Int, Never> {
-        print("🔍 [DeviceManager] heartRatePublisher accessed - returning STORED publisher (current HR: \(heartRate))")
+        print("🔍 [DeviceManager] heartRatePublisher accessed - returning LAZY publisher (created on first access, reused after) - current HR: \(heartRate)")
         return _heartRatePublisher
     }
 
     var spO2Publisher: AnyPublisher<Int, Never> {
-        print("🔍 [DeviceManager] spO2Publisher accessed - returning STORED publisher (current SpO2: \(spO2))")
+        print("🔍 [DeviceManager] spO2Publisher accessed - returning LAZY publisher (created on first access, reused after) - current SpO2: \(spO2)")
         return _spO2Publisher
     }
 
