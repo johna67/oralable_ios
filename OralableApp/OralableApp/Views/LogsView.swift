@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct LogsView: View {
     @StateObject private var logsManager = LogsManager.shared

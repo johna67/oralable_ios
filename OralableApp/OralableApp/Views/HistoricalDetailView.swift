@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import Foundation
+import Combine
 
 // MARK: - MetricType Definition (if not defined elsewhere)
 enum MetricType: String, CaseIterable {
