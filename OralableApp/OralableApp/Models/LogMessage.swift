@@ -3,13 +3,13 @@
 //  OralableApp
 //
 //  Created: November 7, 2025
-//  Simple log message model for system logs
+//  Simple log message model for BLE logs
 //
 
 import Foundation
 
-/// Represents a log message in the system
-struct LogMessage: Identifiable {
+/// Represents a simple BLE log message
+struct BLELogMessage: Identifiable {
     let id: UUID
     let message: String
     let timestamp: Date

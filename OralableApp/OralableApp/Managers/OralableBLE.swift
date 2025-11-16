@@ -33,7 +33,7 @@ class OralableBLE: ObservableObject {
     @Published var connectedDevice: CBPeripheral?
     @Published var sensorDataHistory: [SensorData] = []
     @Published var deviceState: DeviceStateResult?
-    @Published var logMessages: [LogMessage] = []
+    @Published var logMessages: [BLELogMessage] = []
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
     
     // Real-time sensor values for UI
@@ -861,7 +861,7 @@ class OralableBLE: ObservableObject {
     
     private func addLog(_ message: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        let logMessage = LogMessage(message: "[\(timestamp)] \(message)")
+        let logMessage = BLELogMessage(message: "[\(timestamp)] \(message)")
         logMessages.append(logMessage)
         if logMessages.count > 100 { logMessages.removeFirst(logMessages.count - 100) }
     }

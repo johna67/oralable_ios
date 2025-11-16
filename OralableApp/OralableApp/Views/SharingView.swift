@@ -191,9 +191,9 @@ struct SharingView: View {
                             }
                         }
 
-                        // Convert imported string logs to LogMessage objects
+                        // Convert imported string logs to BLELogMessage objects
                         for logString in imported.logs {
-                            bleManager.logMessages.append(LogMessage(message: logString))
+                            bleManager.logMessages.append(BLELogMessage(message: logString))
                         }
 
                         // Sort by timestamp
@@ -208,7 +208,7 @@ struct SharingView: View {
                         importedCount = imported.sensorData.count
                         showImportSuccess = true
 
-                        bleManager.logMessages.append(LogMessage(
+                        bleManager.logMessages.append(BLELogMessage(
                             message: "✅ Successfully imported \(imported.sensorData.count) sensor data points"
                         ))
                     } else {
