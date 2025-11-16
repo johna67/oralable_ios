@@ -23,7 +23,7 @@ class DevicesViewModel: BaseViewModel {
     var firmwareVersion: String { "1.0.0" }
     var lastSyncTime: String { "Just now" }
 
-    private let bleManager = OralableBLE.shared
+    private let bleManager = DeviceManager.shared
 
     override init() {
         super.init()

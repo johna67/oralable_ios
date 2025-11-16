@@ -38,7 +38,10 @@ class DeviceManager: ObservableObject {
     
     /// Errors
     @Published var lastError: DeviceError?
-    
+
+    /// PPG Channel Order configuration (for OralableBLE compatibility)
+    @Published var ppgChannelOrder: PPGChannelOrder = .standard
+
     // MARK: - Private Properties
 
     private var devices: [UUID: BLEDeviceProtocol] = [:]

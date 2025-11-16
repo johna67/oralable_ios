@@ -41,7 +41,7 @@ class SettingsViewModel: BaseViewModel {
     // MARK: - Private Properties
 
     private let userDefaults = UserDefaults.standard
-    private let bleManager: OralableBLE
+    private let bleManager: DeviceManager
     
     // UserDefaults Keys
     private enum Keys {
@@ -78,14 +78,14 @@ class SettingsViewModel: BaseViewModel {
 
     // Convenience initializer that uses shared instance
     override init() {
-        self.bleManager = OralableBLE.shared
+        self.bleManager = DeviceManager.shared
         super.init()
         loadSettings()
         setupBindings()
     }
 
     // Full initializer for testing/injection
-    init(bleManager: OralableBLE) {
+    init(bleManager: DeviceManager) {
         self.bleManager = bleManager
         super.init()
         loadSettings()
@@ -294,7 +294,7 @@ extension UserDefaults {
 
 extension SettingsViewModel {
     static func mock() -> SettingsViewModel {
-        let mockBLE = OralableBLE.mock()
-        return SettingsViewModel(bleManager: mockBLE)
+        // Use shared DeviceManager instance for mock
+        return SettingsViewModel(bleManager: DeviceManager.shared)
     }
 }

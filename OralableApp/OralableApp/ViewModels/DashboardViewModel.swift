@@ -34,7 +34,7 @@ class DashboardViewModel: BaseViewModel {
     @Published var sessionStartTime: Date?
 
     // MARK: - Private Properties
-    private let bleManager = OralableBLE.shared
+    private let bleManager = DeviceManager.shared
     private let appStateManager = AppStateManager.shared
     private var sessionTimer: Timer?
     private var mockDataTimer: Timer?
