@@ -22,25 +22,31 @@ class DevicesViewModel: ObservableObject {
     var serialNumber: String { "ORA-2025-001" }
     var firmwareVersion: String { "1.0.0" }
     var lastSyncTime: String { "Just now" }
-    
-    private let bleManager = OralableBLE.shared
+
+    private let bleManager: BLEManagerProtocol
     private var cancellables = Set<AnyCancellable>()
-    
-    init() {
+
+    init(bleManager: BLEManagerProtocol = DeviceManager.shared) {
+        self.bleManager = bleManager
         setupBindings()
     }
-    
+
     private func setupBindings() {
-        bleManager.$isConnected
+        bleManager.isConnectedPublisher
             .assign(to: &$isConnected)
-        
-        bleManager.$isScanning
+
+        bleManager.isScanningPublisher
             .assign(to: &$isScanning)
-        
-        bleManager.$deviceName
-            .assign(to: &$deviceName)
+
+        // deviceName is computed, so we observe the BLE manager's objectWillChange
+        bleManager.objectWillChange
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.deviceName = self.bleManager.deviceName
+            }
+            .store(in: &cancellables)
     }
-    
+
     func toggleScanning() {
         if isScanning {
             bleManager.stopScanning()

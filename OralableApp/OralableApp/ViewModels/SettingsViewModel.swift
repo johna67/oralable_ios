@@ -39,11 +39,11 @@ class SettingsViewModel: ObservableObject {
     @Published var showClearDataConfirmation: Bool = false
     
     // MARK: - Private Properties
-    
+
     private let userDefaults = UserDefaults.standard
-    private let bleManager: OralableBLE
+    private let bleManager: BLEManagerProtocol
     private var cancellables = Set<AnyCancellable>()
-    
+
     // UserDefaults Keys
     private enum Keys {
         static let ppgChannelOrder = "ppgChannelOrder"
@@ -77,27 +77,24 @@ class SettingsViewModel: ObservableObject {
     
     // MARK: - Initialization
 
-    // Convenience initializer that uses shared instance
-    init() {
-        self.bleManager = OralableBLE.shared
-        loadSettings()
-        setupBindings()
-    }
-
-    // Full initializer for testing/injection
-    init(bleManager: OralableBLE) {
+    // Initializer with dependency injection
+    init(bleManager: BLEManagerProtocol = DeviceManager.shared) {
         self.bleManager = bleManager
         loadSettings()
         setupBindings()
     }
-    
+
     // MARK: - Setup
-    
+
     private func setupBindings() {
         // Sync PPG channel order with BLE manager
-        bleManager.$ppgChannelOrder
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$ppgChannelOrder)
+        // Note: ppgChannelOrder is a computed property, so we observe it via objectWillChange
+        bleManager.objectWillChange
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.ppgChannelOrder = self.bleManager.ppgChannelOrder
+            }
+            .store(in: &cancellables)
         
         // Save settings when they change
         $ppgChannelOrder

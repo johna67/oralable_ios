@@ -608,8 +608,9 @@ extension DeviceManager: BLEManagerProtocol {
 
     // MARK: - Publisher Properties
 
-    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
     var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
+    var isScanningPublisher: Published<Bool>.Publisher { $isScanning }
+    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
     var heartRatePublisher: Published<Int>.Publisher { $heartRate }
     var spO2Publisher: Published<Int>.Publisher { $spO2 }
     var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }

@@ -72,8 +72,9 @@ protocol BLEManagerProtocol: AnyObject, ObservableObject {
     // MARK: - Publishers (for Combine bindings)
     // Note: These allow ViewModels to observe specific property changes
 
-    var batteryLevelPublisher: Published<Double>.Publisher { get }
     var isConnectedPublisher: Published<Bool>.Publisher { get }
+    var isScanningPublisher: Published<Bool>.Publisher { get }
+    var batteryLevelPublisher: Published<Double>.Publisher { get }
     var heartRatePublisher: Published<Int>.Publisher { get }
     var spO2Publisher: Published<Int>.Publisher { get }
     var ppgRedValuePublisher: Published<Double>.Publisher { get }
@@ -82,6 +83,8 @@ protocol BLEManagerProtocol: AnyObject, ObservableObject {
     var accelZPublisher: Published<Double>.Publisher { get }
     var temperaturePublisher: Published<Double>.Publisher { get }
     var heartRateQualityPublisher: Published<Double>.Publisher { get }
+
+    // Note: deviceName is computed from primaryDevice, so we observe primaryDevice changes via objectWillChange
 
     // MARK: - Device Discovery & Connection
 
