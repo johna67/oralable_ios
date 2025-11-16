@@ -213,22 +213,6 @@ enum AppConfiguration {
     #endif
 }
 
-// MARK: - Log Level Enum
-
-enum LogLevel: String, Codable, CaseIterable {
-    case verbose = "VERBOSE"
-    case debug = "DEBUG"
-    case info = "INFO"
-    case warning = "WARNING"
-    case error = "ERROR"
-
-    var priority: Int {
-        switch self {
-        case .verbose: return 0
-        case .debug: return 1
-        case .info: return 2
-        case .warning: return 3
-        case .error: return 4
-        }
-    }
-}
+// MARK: - Log Level
+// NOTE: LogLevel enum is defined in Models/LogModels.swift
+// Available cases: .all, .error, .warning, .info, .debug, .utf8
