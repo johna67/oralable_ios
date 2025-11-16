@@ -33,11 +33,13 @@ class BaseViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        Logger.shared.debug("[\(type(of: self))] Initialized")
+        // Note: Cannot use Logger here as init() is nonisolated
+        print("[\(type(of: self))] Initialized")
     }
 
     deinit {
-        Logger.shared.debug("[\(type(of: self))] Deinitialized")
+        // Note: Cannot use Logger here as deinit is nonisolated
+        print("[\(type(of: self))] Deinitialized")
         cancellables.removeAll()
     }
 
