@@ -18,8 +18,6 @@ struct DashboardView: View {
     @State private var showingProfile = false
     @State private var showingDevices = false
     @State private var showingSettings = false
-    @State private var showingHistorical = false
-    @State private var showingShare = false
     
     var body: some View {
         NavigationView {
@@ -40,9 +38,6 @@ struct DashboardView: View {
                     if bleManager.isConnected {
                         waveformSection
                     }
-                    
-                    // Action Buttons
-                    actionButtons
                 }
                 .padding(designSystem.spacing.md)
             }
@@ -93,17 +88,6 @@ struct DashboardView: View {
                     .environmentObject(designSystem)
                     .environmentObject(AuthenticationManager.shared)
                     .environmentObject(SubscriptionManager.shared)
-                    .environmentObject(AppStateManager.shared)
-            }
-            .sheet(isPresented: $showingHistorical) {
-                HistoricalView()
-                    .environmentObject(designSystem)
-                    .environmentObject(HistoricalDataManager.shared)
-                    .environmentObject(bleManager)
-            }
-            .sheet(isPresented: $showingShare) {
-                SharingView()
-                    .environmentObject(designSystem)
                     .environmentObject(AppStateManager.shared)
             }
         }
@@ -326,33 +310,6 @@ struct DashboardView: View {
                 color: .blue,
                 designSystem: designSystem
             )
-        }
-    }
-    
-    // MARK: - Action Buttons
-    private var actionButtons: some View {
-        HStack(spacing: designSystem.spacing.md) {
-            // Historical Data
-            Button(action: { showingHistorical = true }) {
-                Label("History", systemImage: "chart.line.uptrend.xyaxis")
-                    .font(designSystem.typography.button)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundSecondary)
-                    .cornerRadius(designSystem.cornerRadius.medium)
-            }
-            
-            // Share
-            Button(action: { showingShare = true }) {
-                Label("Export", systemImage: "square.and.arrow.up")
-                    .font(designSystem.typography.button)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundSecondary)
-                    .cornerRadius(designSystem.cornerRadius.medium)
-            }
         }
     }
 }
