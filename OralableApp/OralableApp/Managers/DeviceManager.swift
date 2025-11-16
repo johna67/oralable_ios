@@ -56,6 +56,11 @@ class DeviceManager: ObservableObject {
     private var reconnectAttempts: [UUID: Int] = [:]
     private var reconnectTasks: [UUID: Task<Void, Never>] = [:]
     private let autoReconnectEnabled = AppConfiguration.BLE.autoReconnectEnabled
+
+    // Data Throttling (Phase 2 Refactoring)
+    private let sensorDataThrottler = DataThrottler<SensorReading>(
+        minimumInterval: AppConfiguration.UI.sensorDataThrottleInterval
+    )
     
     // MARK: - Initialization
     
@@ -501,15 +506,22 @@ class DeviceManager: ObservableObject {
     }
     
     private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
-        // Add to all readings
-        allSensorReadings.append(reading)
-        
-        // Update latest readings
-        latestReadings[reading.sensorType] = reading
-        
-        // Trim history if needed (keep last 1000)
-        if allSensorReadings.count > 1000 {
-            allSensorReadings.removeFirst(100)
+        // Phase 2: Use DataThrottler to prevent UI freezes from high-frequency data
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+
+            // Throttle sensor data to configured interval (default: 100ms)
+            if let throttledReading = await self.sensorDataThrottler.throttle(reading) {
+                // Only process readings that pass through the throttle
+                self.allSensorReadings.append(throttledReading)
+                self.latestReadings[throttledReading.sensorType] = throttledReading
+
+                // Trim history if needed (keep last 1000)
+                if self.allSensorReadings.count > AppConfiguration.Sensors.historyBufferSize {
+                    self.allSensorReadings.removeFirst(100)
+                }
+            }
+            // Note: Dropped readings are tracked by throttler statistics
         }
     }
     
@@ -538,6 +550,19 @@ class DeviceManager: ObservableObject {
             print("📌 [DeviceManager] Clearing primary device")
         }
         primaryDevice = deviceInfo
+    }
+
+    // MARK: - Data Throttling (Phase 2 Refactoring)
+
+    /// Get sensor data throttling statistics
+    /// - Returns: Tuple of (received count, emitted count, drop rate percentage)
+    func getThrottlingStatistics() async -> (received: Int, emitted: Int, dropRate: Double) {
+        await sensorDataThrottler.statistics()
+    }
+
+    /// Reset data throttling statistics
+    func resetThrottlingStatistics() async {
+        await sensorDataThrottler.reset()
     }
 
     // MARK: - Auto-Reconnect (Phase 1 Refactoring)
