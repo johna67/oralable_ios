@@ -289,7 +289,7 @@ extension UserDefaults {
 
 extension SettingsViewModel {
     static func mock() -> SettingsViewModel {
-        let mockBLE = OralableBLE.mock()
-        return SettingsViewModel(bleManager: mockBLE)
+        // Use DeviceManager.shared as it conforms to BLEManagerProtocol
+        return SettingsViewModel(bleManager: DeviceManager.shared)
     }
 }
