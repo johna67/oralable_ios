@@ -258,17 +258,7 @@ struct DashboardView: View {
                 color: batteryColor,
                 designSystem: designSystem
             )
-            
-            // Session Time
-            MetricCard(
-                icon: "clock.fill",
-                title: "Session",
-                value: viewModel.sessionDuration,
-                unit: "",
-                color: .purple,
-                designSystem: designSystem
-            )
-            
+
             // Signal Quality
             MetricCard(
                 icon: "wifi",
