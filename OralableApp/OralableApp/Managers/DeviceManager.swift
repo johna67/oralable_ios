@@ -56,17 +56,23 @@ class DeviceManager: ObservableObject {
     @Published private(set) var ppgChannelOrderValue: PPGChannelOrder = .standard
     
     // MARK: - Private Properties
-    
+
     private var devices: [UUID: BLEDeviceProtocol] = [:]
     private var cancellables = Set<AnyCancellable>()
     private let maxDevices: Int = 5
-    
+
     // BLE Integration
     private(set) var bleManager: BLECentralManager?
-    
+
     // Discovery tracking
     private var discoveryCount: Int = 0
     private var scanStartTime: Date?
+
+    // Heart Rate & SpO2 Calculation
+    private let heartRateCalculator = HeartRateCalculator()
+    private var ppgIRBuffer: [UInt32] = []
+    private var ppgRedBuffer: [UInt32] = []
+    private let maxPPGBufferSize: Int = 300  // 6 seconds at 50Hz
     
     // MARK: - Initialization
     
@@ -569,8 +575,20 @@ class DeviceManager: ObservableObject {
             accelZ = reading.value
         case .ppgRed:
             ppgRedValue = reading.value
+            // Collect red samples for SpO2 calculation
+            ppgRedBuffer.append(UInt32(reading.value))
+            if ppgRedBuffer.count > maxPPGBufferSize {
+                ppgRedBuffer.removeFirst(ppgRedBuffer.count - maxPPGBufferSize)
+            }
         case .ppgInfrared:
             ppgIRValue = reading.value
+            // Collect IR samples for HR calculation
+            ppgIRBuffer.append(UInt32(reading.value))
+            if ppgIRBuffer.count > maxPPGBufferSize {
+                ppgIRBuffer.removeFirst(ppgIRBuffer.count - maxPPGBufferSize)
+            }
+            // Calculate heart rate when we have enough samples
+            calculateHeartRateAndSpO2()
         case .ppgGreen:
             ppgGreenValue = reading.value
         default:
@@ -580,6 +598,35 @@ class DeviceManager: ObservableObject {
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
             allSensorReadings.removeFirst(100)
+        }
+    }
+
+    private func calculateHeartRateAndSpO2() {
+        // Calculate Heart Rate from IR samples
+        if ppgIRBuffer.count >= 100 {  // Need at least 2 seconds of data
+            if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
+                heartRate = Int(hrResult.bpm)
+                heartRateQuality = hrResult.quality
+            }
+        }
+
+        // Calculate SpO2 from Red/IR ratio
+        if ppgRedBuffer.count >= 10 && ppgIRBuffer.count >= 10 {
+            // Use recent samples for ratio calculation
+            let recentRed = ppgRedBuffer.suffix(10)
+            let recentIR = ppgIRBuffer.suffix(10)
+
+            // Calculate average values
+            let avgRed = Double(recentRed.reduce(0, +)) / Double(recentRed.count)
+            let avgIR = Double(recentIR.reduce(0, +)) / Double(recentIR.count)
+
+            // Only calculate if both values are valid (not saturated, not zero)
+            if avgRed > 1000 && avgRed < 500000 && avgIR > 1000 && avgIR < 500000 {
+                let ratio = avgRed / avgIR
+                // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
+                let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
+                spO2 = Int(calculatedSpO2)
+            }
         }
     }
     
