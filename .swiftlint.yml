@@ -1,0 +1,182 @@
+# SwiftLint Configuration
+# Phase 1 Refactoring - Code Quality Standards
+
+# Disabled Rules
+disabled_rules:
+  - trailing_whitespace # Allow trailing whitespace
+  - todo # Allow TODO comments
+  - line_length # Handled by warning threshold below
+
+# Opt-In Rules (Best Practices)
+opt_in_rules:
+  - empty_count # Prefer isEmpty over count == 0
+  - explicit_init # Discourage explicit init calls
+  - force_unwrapping # Flag force unwraps (!)
+  - closure_spacing # Enforce closure spacing
+  - contains_over_first_not_nil # Use contains instead of first { } != nil
+  - discouraged_optional_boolean # Avoid optional booleans
+  - empty_string # Use isEmpty instead of == ""
+  - fatal_error_message # Require message in fatalError
+  - first_where # Use first(where:) instead of filter().first
+  - modifier_order # Consistent modifier ordering
+  - redundant_nil_coalescing # Remove redundant ?? nil
+  - sorted_first_last # Use min/max instead of sorted().first
+  - toggle_bool # Use toggle() instead of = !
+  - unneeded_parentheses_in_closure_argument # Remove unnecessary parens
+  - vertical_whitespace_closing_braces # Enforce spacing before closing braces
+  - yoda_condition # Disallow yoda conditions (if true == value)
+
+# Included/Excluded Paths
+included:
+  - OralableApp/OralableApp
+
+excluded:
+  - Pods
+  - OralableApp/OralableApp.xcodeproj
+  - OralableApp/OralableApp.xcworkspace
+  - OralableAppTests
+  - OralableAppUITests
+  - OralableApp/build
+  - OralableApp/DerivedData
+
+# Line Length
+line_length:
+  warning: 120
+  error: 150
+  ignores_function_declarations: true
+  ignores_comments: true
+  ignores_urls: true
+
+# Type Body Length
+type_body_length:
+  warning: 400
+  error: 600
+
+# File Length
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+# Function Body Length
+function_body_length:
+  warning: 50
+  error: 100
+
+# Function Parameter Count
+function_parameter_count:
+  warning: 5
+  error: 8
+
+# Cyclomatic Complexity
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+  ignores_case_statements: true
+
+# Nesting Depth
+nesting:
+  type_level:
+    warning: 2
+  statement_level:
+    warning: 5
+
+# Type Name
+type_name:
+  min_length: 3
+  max_length: 50
+  excluded:
+    - ID
+    - URL
+    - BLE
+    - MAM
+    - PPG
+    - EMG
+    - UI
+    - VM
+
+# Identifier Name
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
+  excluded:
+    - id
+    - ID
+    - x
+    - y
+    - z
+    - i
+    - db
+    - hr
+    - vm
+    - vc
+    - to
+    - bpm
+
+# Large Tuple
+large_tuple:
+  warning: 3
+  error: 4
+
+# Trailing Comma
+trailing_comma:
+  mandatory_comma: true
+
+# Vertical Whitespace
+vertical_whitespace:
+  max_empty_lines: 2
+
+# Number Separator
+number_separator:
+  minimum_length: 5
+
+# Force Cast
+force_cast:
+  severity: error
+
+# Force Try
+force_try:
+  severity: error
+
+# Implicitly Unwrapped Optional
+implicitly_unwrapped_optional:
+  mode: all_except_iboutlets
+  severity: warning
+
+# Custom Rules
+custom_rules:
+  # Enforce Logger usage
+  print_usage:
+    name: "Print Usage"
+    regex: '\bprint\s*\('
+    message: "Use Logger.shared instead of print()"
+    severity: warning
+
+  # Discourage force unwrapping
+  force_unwrap_usage:
+    name: "Force Unwrap"
+    regex: '!\s*(?!nil|is|as)'
+    message: "Avoid force unwrapping with !"
+    severity: warning
+
+  # Encourage guard statements
+  if_let_pattern:
+    name: "If-Let Pattern"
+    regex: 'if\s+let\s+\w+\s*=\s*\w+\s*\{[^}]*return'
+    message: "Consider using guard instead of if-let with early return"
+    severity: warning
+
+# Reporter
+reporter: "xcode"
+
+# Strict Mode (fail on warnings)
+strict: false
+
+# Analyzer Rules (requires full build)
+analyzer_rules:
+  - unused_declaration
+  - unused_import

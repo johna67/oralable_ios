@@ -40,17 +40,22 @@ class DeviceManager: ObservableObject {
     @Published var lastError: DeviceError?
     
     // MARK: - Private Properties
-    
+
     private var devices: [UUID: BLEDeviceProtocol] = [:]
     private var cancellables = Set<AnyCancellable>()
-    private let maxDevices: Int = 5
-    
+    private let maxDevices: Int = AppConfiguration.BLE.maxConcurrentConnections
+
     // BLE Integration
     private(set) var bleManager: BLECentralManager?
-    
+
     // Discovery tracking
     private var discoveryCount: Int = 0
     private var scanStartTime: Date?
+
+    // Auto-Reconnect Management (Phase 1 Refactoring)
+    private var reconnectAttempts: [UUID: Int] = [:]
+    private var reconnectTasks: [UUID: Task<Void, Never>] = [:]
+    private let autoReconnectEnabled = AppConfiguration.BLE.autoReconnectEnabled
     
     // MARK: - Initialization
     
@@ -277,26 +282,34 @@ class DeviceManager: ObservableObject {
         print("\n🔌 [DeviceManager] handleDeviceDisconnected")
         print("🔌 [DeviceManager] Peripheral: \(peripheral.identifier)")
         print("🔌 [DeviceManager] Name: \(peripheral.name ?? "Unknown")")
-        
+
+        let peripheralId = peripheral.identifier
+
         if let error = error {
             print("🔌 [DeviceManager] Error: \(error.localizedDescription)")
             lastError = .connectionLost
         }
-        
+
         isConnecting = false
-        
+
         // Update device states
-        if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+        if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheralId }) {
             print("🔌 [DeviceManager] Updating discoveredDevices[\(index)] to disconnected")
             discoveredDevices[index].connectionState = .disconnected
         }
-        
-        connectedDevices.removeAll { $0.peripheralIdentifier == peripheral.identifier }
+
+        connectedDevices.removeAll { $0.peripheralIdentifier == peripheralId }
         print("🔌 [DeviceManager] Removed from connectedDevices, count: \(connectedDevices.count)")
-        
-        if primaryDevice?.peripheralIdentifier == peripheral.identifier {
+
+        if primaryDevice?.peripheralIdentifier == peripheralId {
             print("🔌 [DeviceManager] Primary device disconnected, setting to nil")
             primaryDevice = connectedDevices.first
+        }
+
+        // Auto-Reconnect Logic (Phase 1 Refactoring)
+        if autoReconnectEnabled, let deviceInfo = discoveredDevices.first(where: { $0.peripheralIdentifier == peripheralId }) {
+            print("🔄 [DeviceManager] Auto-reconnect enabled for device: \(deviceInfo.name)")
+            attemptReconnection(to: deviceInfo)
         }
     }
     
@@ -526,4 +539,95 @@ class DeviceManager: ObservableObject {
         }
         primaryDevice = deviceInfo
     }
+
+    // MARK: - Auto-Reconnect (Phase 1 Refactoring)
+
+    /// Attempt to reconnect to a disconnected device with exponential backoff
+    /// - Parameter deviceInfo: The device to reconnect to
+    private func attemptReconnection(to deviceInfo: DeviceInfo) {
+        guard let peripheralId = deviceInfo.peripheralIdentifier else {
+            print("🔄 [DeviceManager] Cannot reconnect - no peripheral identifier")
+            return
+        }
+
+        // Cancel any existing reconnect task for this device
+        reconnectTasks[peripheralId]?.cancel()
+        reconnectTasks[peripheralId] = nil
+
+        // Get current attempt count (default to 0 if not found)
+        let currentAttempt = (reconnectAttempts[peripheralId] ?? 0) + 1
+        reconnectAttempts[peripheralId] = currentAttempt
+
+        print("🔄 [DeviceManager] Reconnect attempt #\(currentAttempt) for device: \(deviceInfo.name)")
+
+        // Check if we've exceeded max attempts
+        if currentAttempt > AppConfiguration.BLE.maxReconnectAttempts {
+            print("🔄 [DeviceManager] Max reconnect attempts (\(AppConfiguration.BLE.maxReconnectAttempts)) reached for device: \(deviceInfo.name)")
+            reconnectAttempts[peripheralId] = nil
+            lastError = .connectionLost
+            return
+        }
+
+        // Calculate delay using exponential backoff
+        let delay = AppConfiguration.BLE.reconnectInitialDelay * pow(
+            AppConfiguration.BLE.reconnectBackoffMultiplier,
+            Double(currentAttempt - 1)
+        )
+
+        print("🔄 [DeviceManager] Waiting \(String(format: "%.1f", delay))s before reconnect attempt...")
+
+        // Create reconnect task
+        let task = Task { @MainActor [weak self] in
+            do {
+                // Wait for delay
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                // Check if task was cancelled
+                if Task.isCancelled {
+                    print("🔄 [DeviceManager] Reconnect task cancelled for device: \(deviceInfo.name)")
+                    return
+                }
+
+                print("🔄 [DeviceManager] Executing reconnect attempt for device: \(deviceInfo.name)")
+
+                // Attempt reconnection
+                try await self?.connect(to: deviceInfo)
+
+                // If successful, reset attempt counter
+                print("🔄 [DeviceManager] ✅ Reconnection successful for device: \(deviceInfo.name)")
+                self?.reconnectAttempts[peripheralId] = nil
+                self?.reconnectTasks[peripheralId] = nil
+
+            } catch {
+                print("🔄 [DeviceManager] ❌ Reconnection failed: \(error.localizedDescription)")
+                // Don't recurse here - let handleDeviceDisconnected call us again if needed
+            }
+        }
+
+        reconnectTasks[peripheralId] = task
+    }
+
+    /// Cancel all pending reconnection attempts
+    func cancelAllReconnectionAttempts() {
+        print("\n🔄 [DeviceManager] Cancelling all reconnection attempts...")
+        for (_, task) in reconnectTasks {
+            task.cancel()
+        }
+        reconnectTasks.removeAll()
+        reconnectAttempts.removeAll()
+        print("🔄 [DeviceManager] All reconnection attempts cancelled")
+    }
+
+    /// Cancel reconnection attempts for a specific device
+    /// - Parameter deviceInfo: The device to cancel reconnection for
+    func cancelReconnection(for deviceInfo: DeviceInfo) {
+        guard let peripheralId = deviceInfo.peripheralIdentifier else { return }
+
+        print("\n🔄 [DeviceManager] Cancelling reconnection for device: \(deviceInfo.name)")
+        reconnectTasks[peripheralId]?.cancel()
+        reconnectTasks[peripheralId] = nil
+        reconnectAttempts[peripheralId] = nil
+        print("🔄 [DeviceManager] Reconnection cancelled")
+    }
 }
+

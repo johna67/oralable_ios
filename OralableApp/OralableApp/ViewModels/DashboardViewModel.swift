@@ -10,7 +10,7 @@ import Combine
 import CoreBluetooth
 
 @MainActor
-class DashboardViewModel: ObservableObject {
+class DashboardViewModel: BaseViewModel {
     // MARK: - Published Properties
 
     // Metrics
@@ -19,34 +19,34 @@ class DashboardViewModel: ObservableObject {
     @Published var temperature: Double = 0.0
     @Published var signalQuality: Int = 0
     @Published var sessionDuration: String = "00:00"
-    
+
     // MAM States (Movement, Adhesion, Monitoring)
     @Published var isCharging: Bool = false
     @Published var isMoving: Bool = false
     @Published var positionQuality: String = "Good" // "Good", "Adjust", "Off"
-    
+
     // Waveform Data
     @Published var ppgData: [Double] = []
     @Published var accelerometerData: [Double] = []
-    
+
     // Session Management
     @Published var isRecording: Bool = false
     @Published var sessionStartTime: Date?
-    
+
     // MARK: - Private Properties
     private let bleManager = OralableBLE.shared
     private let appStateManager = AppStateManager.shared
-    private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
     private var mockDataTimer: Timer?
-    
-    // Thresholds for MAM detection
-    private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
-    private let movementThreshold: Double = 0.1         // Accelerometer magnitude
-    private let signalQualityThreshold: Double = 80.0   // Signal quality percentage
+
+    // Thresholds for MAM detection (using AppConfiguration)
+    private let chargingVoltageThreshold = AppConfiguration.Sensors.chargingVoltageThreshold
+    private let movementThreshold = AppConfiguration.Sensors.movementThreshold
+    private let signalQualityThreshold = AppConfiguration.Sensors.signalQualityThreshold
     
     // MARK: - Initialization
-    init() {
+    override init() {
+        super.init()
         setupBindings()
 
         // Only use mock data in Demo mode

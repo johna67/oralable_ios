@@ -10,39 +10,38 @@ import Foundation
 import Combine
 
 @MainActor
-class SettingsViewModel: ObservableObject {
-    
+class SettingsViewModel: BaseViewModel {
+
     // MARK: - Published Properties (Observable by View)
-    
+
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
     @Published var notificationsEnabled: Bool = true
     @Published var dataRetentionDays: Int = 30
     @Published var autoConnectEnabled: Bool = true
     @Published var showDebugInfo: Bool = false
-    
+
     // Notification settings
     @Published var connectionAlerts: Bool = true
     @Published var batteryAlerts: Bool = true
     @Published var lowBatteryThreshold: Int = 20
-    
+
     // Display settings
     @Published var useMetricUnits: Bool = true
     @Published var show24HourTime: Bool = true
     @Published var chartRefreshRate: ChartRefreshRate = .realTime
-    
+
     // Privacy settings
     @Published var shareAnalytics: Bool = false
     @Published var localStorageOnly: Bool = true
-    
+
     // UI State
     @Published var showResetConfirmation: Bool = false
     @Published var showClearDataConfirmation: Bool = false
-    
+
     // MARK: - Private Properties
-    
+
     private let userDefaults = UserDefaults.standard
     private let bleManager: OralableBLE
-    private var cancellables = Set<AnyCancellable>()
     
     // UserDefaults Keys
     private enum Keys {
@@ -78,8 +77,9 @@ class SettingsViewModel: ObservableObject {
     // MARK: - Initialization
 
     // Convenience initializer that uses shared instance
-    init() {
+    override init() {
         self.bleManager = OralableBLE.shared
+        super.init()
         loadSettings()
         setupBindings()
     }
@@ -87,6 +87,7 @@ class SettingsViewModel: ObservableObject {
     // Full initializer for testing/injection
     init(bleManager: OralableBLE) {
         self.bleManager = bleManager
+        super.init()
         loadSettings()
         setupBindings()
     }

@@ -13,28 +13,26 @@ import Combine
 /// Oralable device implementation
 class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
-    // MARK: - BLE Service & Characteristic UUIDs
-    
+    // MARK: - BLE Service & Characteristic UUIDs (using AppConfiguration)
+
     private struct BLEConstants {
-        // ✅ CORRECTED: TGM Service UUIDs (verified from nRF Connect 11/11/2025)
-        static let serviceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-        
-        // TGM Characteristics (from nRF Connect discovery)
-        static let sensorDataCharacteristicUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let ppgWaveformCharacteristicUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic003UUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic004UUID = CBUUID(string: "3A0FF004-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic005UUID = CBUUID(string: "3A0FF005-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic006UUID = CBUUID(string: "3A0FF006-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic007UUID = CBUUID(string: "3A0FF007-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic008UUID = CBUUID(string: "3A0FF008-98C4-46B2-94AF-1AEE0FD4C48E")
-        
+        // TGM Service UUIDs (from AppConfiguration)
+        static let serviceUUID = AppConfiguration.BLE.tgmServiceUUID
+        static let sensorDataCharacteristicUUID = AppConfiguration.BLE.sensorDataCharacteristicUUID
+        static let ppgWaveformCharacteristicUUID = AppConfiguration.BLE.ppgWaveformCharacteristicUUID
+        static let characteristic003UUID = AppConfiguration.BLE.characteristic003UUID
+        static let characteristic004UUID = AppConfiguration.BLE.characteristic004UUID
+        static let characteristic005UUID = AppConfiguration.BLE.characteristic005UUID
+        static let characteristic006UUID = AppConfiguration.BLE.characteristic006UUID
+        static let characteristic007UUID = AppConfiguration.BLE.characteristic007UUID
+        static let characteristic008UUID = AppConfiguration.BLE.characteristic008UUID
+
         // Standard BLE Services
-        static let batteryServiceUUID = CBUUID(string: "180F")
-        static let batteryLevelCharacteristicUUID = CBUUID(string: "2A19")
-        static let deviceInfoServiceUUID = CBUUID(string: "180A")
-        static let firmwareVersionCharacteristicUUID = CBUUID(string: "2A26")
-        static let hardwareVersionCharacteristicUUID = CBUUID(string: "2A27")
+        static let batteryServiceUUID = AppConfiguration.BLE.batteryServiceUUID
+        static let batteryLevelCharacteristicUUID = AppConfiguration.BLE.batteryLevelCharacteristicUUID
+        static let deviceInfoServiceUUID = AppConfiguration.BLE.deviceInfoServiceUUID
+        static let firmwareVersionCharacteristicUUID = AppConfiguration.BLE.firmwareVersionCharacteristicUUID
+        static let hardwareVersionCharacteristicUUID = AppConfiguration.BLE.hardwareVersionCharacteristicUUID
     }
     
     // MARK: - Published Properties

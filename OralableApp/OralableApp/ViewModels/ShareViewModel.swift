@@ -11,22 +11,20 @@ import Combine
 
 /// View model for the Share screen using modern architecture
 @MainActor
-class ShareViewModel: ObservableObject {
+class ShareViewModel: BaseViewModel {
     enum ExportFormat: String, CaseIterable {
         case csv = "CSV"
         case pdf = "PDF"
         case json = "JSON"
     }
-    
+
     // MARK: - Published Properties
-    
+
     @Published var connectionStatus: String = "Disconnected"
     @Published var isConnected: Bool = false
     @Published var dataSummary: DataSummary?
     @Published var recentLogs: [LogEntry] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
-    @Published var successMessage: String?
+    // Note: isLoading, errorMessage, successMessage inherited from BaseViewModel
     
     // Export/Import states
     @Published var isExporting: Bool = false
@@ -68,16 +66,14 @@ class ShareViewModel: ObservableObject {
     }
     
     // MARK: - Dependencies
-    
+
     private let deviceManager: DeviceManager
     private let repository: SensorRepository
     private let csvService: CSVService
     private let loggingService: LoggingService
-    
-    private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Initialization
-    
+
     init(
         deviceManager: DeviceManager,
         repository: SensorRepository,
@@ -88,7 +84,9 @@ class ShareViewModel: ObservableObject {
         self.repository = repository
         self.csvService = csvService
         self.loggingService = loggingService
-        
+
+        super.init()
+
         setupSubscriptions()
         loadInitialData()
     }

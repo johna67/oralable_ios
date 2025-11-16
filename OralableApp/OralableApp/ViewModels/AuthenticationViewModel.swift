@@ -11,39 +11,39 @@ import AuthenticationServices
 import Combine
 
 @MainActor
-class AuthenticationViewModel: ObservableObject {
-    
+class AuthenticationViewModel: BaseViewModel {
+
     // MARK: - Published Properties (Observable by View)
-    
+
     /// Whether user is authenticated
     @Published var isAuthenticated: Bool = false
-    
+
     /// User ID from Apple
     @Published var userID: String?
-    
+
     /// User email
     @Published var userEmail: String?
-    
+
     /// User full name
     @Published var userFullName: String?
-    
+
     /// Authentication error message
     @Published var authenticationError: String?
-    
+
     /// Whether to show error alert
     @Published var showError: Bool = false
-    
+
     /// Whether authentication is in progress
     @Published var isAuthenticating: Bool = false
-    
+
     // MARK: - Private Properties
-    
+
     private let authenticationManager = AuthenticationManager.shared
-    private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Initialization
-    
-    init() {
+
+    override init() {
+        super.init()
         setupBindings()
     }
     

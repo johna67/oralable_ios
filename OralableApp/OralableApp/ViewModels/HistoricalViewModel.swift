@@ -18,40 +18,39 @@ import Foundation
 import Combine
 
 @MainActor
-class HistoricalViewModel: ObservableObject {
-    
+class HistoricalViewModel: BaseViewModel {
+
     // MARK: - Published Properties (Observable by View)
-    
+
     /// Selected time range for viewing data
     @Published var selectedTimeRange: TimeRange = .day
-    
+
     /// Metrics for each time range
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
     @Published var monthMetrics: HistoricalMetrics?
-    
+
     /// Current metrics for selected range
     @Published var currentMetrics: HistoricalMetrics?
-    
+
     /// Whether metrics are being updated
     @Published var isUpdating: Bool = false
-    
+
     /// Last update time
     @Published var lastUpdateTime: Date?
-    
+
     /// Whether to show detailed statistics
     @Published var showDetailedStats: Bool = false
-    
+
     /// Selected data point for detail view
     @Published var selectedDataPoint: HistoricalDataPoint?
-    
+
     /// Current offset from present time (0 = current period, -1 = previous period, etc.)
     @Published var timeRangeOffset: Int = 0
-    
+
     // MARK: - Private Properties
-    
+
     private let historicalDataManager: HistoricalDataManager
-    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
     
@@ -385,6 +384,7 @@ class HistoricalViewModel: ObservableObject {
     
     init(historicalDataManager: HistoricalDataManager) {
         self.historicalDataManager = historicalDataManager
+        super.init()
         setupBindings()
         updateCurrentMetrics()
     }

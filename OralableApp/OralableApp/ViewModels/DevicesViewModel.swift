@@ -4,7 +4,7 @@ import Combine
 import CoreBluetooth
 
 @MainActor
-class DevicesViewModel: ObservableObject {
+class DevicesViewModel: BaseViewModel {
     @Published var isConnected: Bool = false
     @Published var isScanning: Bool = false
     @Published var deviceName: String = "Oralable-001"
@@ -12,21 +12,21 @@ class DevicesViewModel: ObservableObject {
     @Published var signalStrength: Int = -45
     @Published var discoveredDevices: [DiscoveredDevice] = []
     @Published var connectedDevice: ConnectedDeviceInfo?
-    
+
     // Settings
     @Published var autoConnect: Bool = true
     @Published var ledBrightness: Double = 0.5
     @Published var sampleRate: Int = 50
-    
+
     // Device info
     var serialNumber: String { "ORA-2025-001" }
     var firmwareVersion: String { "1.0.0" }
     var lastSyncTime: String { "Just now" }
-    
+
     private let bleManager = OralableBLE.shared
-    private var cancellables = Set<AnyCancellable>()
-    
-    init() {
+
+    override init() {
+        super.init()
         setupBindings()
     }
     
