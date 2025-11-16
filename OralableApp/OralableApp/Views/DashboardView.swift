@@ -232,28 +232,28 @@ struct DashboardView: View {
             MetricCard(
                 icon: "heart.fill",
                 title: "Heart Rate",
-                value: "\(viewModel.heartRate)",
-                unit: "bpm",
+                value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "Not available",
+                unit: viewModel.heartRate > 0 ? "bpm" : "",
                 color: .red,
                 designSystem: designSystem
             )
-            
+
             // SpO2
             MetricCard(
                 icon: "lungs.fill",
                 title: "SpO2",
-                value: "\(viewModel.spO2)",
-                unit: "%",
+                value: viewModel.spO2 > 0 ? "\(viewModel.spO2)" : "Not available",
+                unit: viewModel.spO2 > 0 ? "%" : "",
                 color: .blue,
                 designSystem: designSystem
             )
-            
+
             // Temperature
             MetricCard(
                 icon: "thermometer",
                 title: "Temperature",
-                value: String(format: "%.1f", viewModel.temperature),
-                unit: "°C",
+                value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "Not available",
+                unit: viewModel.temperature > 0 ? "°C" : "",
                 color: .orange,
                 designSystem: designSystem
             )
@@ -381,8 +381,8 @@ struct MetricCard: View {
             
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(designSystem.typography.h2)
-                    .foregroundColor(designSystem.colors.textPrimary)
+                    .font(value == "Not available" ? designSystem.typography.body : designSystem.typography.h2)
+                    .foregroundColor(value == "Not available" ? designSystem.colors.textTertiary : designSystem.colors.textPrimary)
                 Text(unit)
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textSecondary)
