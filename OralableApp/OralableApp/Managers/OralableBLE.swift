@@ -137,46 +137,75 @@ class OralableBLE: ObservableObject {
     }
 
     private func flushPendingBuffers() {
-        // Flush all pending data to @Published arrays
-        if !pendingHeartRateData.isEmpty {
-            heartRateHistory.append(contentsOf: pendingHeartRateData)
-            if let latest = pendingHeartRateData.last {
-                heartRate = Int(latest.bpm)
-                heartRateQuality = latest.quality
+        // Thread-safe flush: Copy data from background queue to main thread
+        processingQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Copy pending data (on background queue)
+            let hrData = self.pendingHeartRateData
+            let spo2Data = self.pendingSpo2Data
+            let ppgData = self.pendingPPGData
+            let accelData = self.pendingAccelData
+
+            // Clear pending buffers (on background queue)
+            self.pendingHeartRateData.removeAll()
+            self.pendingSpo2Data.removeAll()
+            self.pendingPPGData.removeAll()
+            self.pendingAccelData.removeAll()
+
+            // Update @Published arrays on main thread
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                if !hrData.isEmpty {
+                    self.heartRateHistory.append(contentsOf: hrData)
+                    if let latest = hrData.last {
+                        self.heartRate = Int(latest.bpm)
+                        self.heartRateQuality = latest.quality
+                    }
+                }
+
+                if !spo2Data.isEmpty {
+                    self.spo2History.append(contentsOf: spo2Data)
+                    if let latest = spo2Data.last {
+                        self.spO2 = Int(latest.percentage)
+                    }
+                }
+
+                if !ppgData.isEmpty {
+                    self.ppgHistory.append(contentsOf: ppgData)
+                    // Update real-time PPG values for dashboard
+                    if let latest = ppgData.last {
+                        self.ppgRedValue = Double(latest.red)
+                        self.ppgIRValue = Double(latest.ir)
+                        self.ppgGreenValue = Double(latest.green)
+                    }
+                }
+
+                if !accelData.isEmpty {
+                    self.accelerometerHistory.append(contentsOf: accelData)
+                    // Update real-time accel values for dashboard
+                    if let latest = accelData.last {
+                        self.accelX = Double(latest.x) / 1000.0
+                        self.accelY = Double(latest.y) / 1000.0
+                        self.accelZ = Double(latest.z) / 1000.0
+                    }
+                }
+
+                // Trim all histories
+                if self.heartRateHistory.count > self.maxHistoryCount {
+                    self.heartRateHistory.removeFirst(self.heartRateHistory.count - self.maxHistoryCount)
+                }
+                if self.spo2History.count > self.maxHistoryCount {
+                    self.spo2History.removeFirst(self.spo2History.count - self.maxHistoryCount)
+                }
+                if self.ppgHistory.count > self.maxHistoryCount {
+                    self.ppgHistory.removeFirst(self.ppgHistory.count - self.maxHistoryCount)
+                }
+                if self.accelerometerHistory.count > self.maxHistoryCount {
+                    self.accelerometerHistory.removeFirst(self.accelerometerHistory.count - self.maxHistoryCount)
+                }
             }
-            pendingHeartRateData.removeAll()
-        }
-
-        if !pendingSpo2Data.isEmpty {
-            spo2History.append(contentsOf: pendingSpo2Data)
-            if let latest = pendingSpo2Data.last {
-                spO2 = Int(latest.percentage)
-            }
-            pendingSpo2Data.removeAll()
-        }
-
-        if !pendingPPGData.isEmpty {
-            ppgHistory.append(contentsOf: pendingPPGData)
-            pendingPPGData.removeAll()
-        }
-
-        if !pendingAccelData.isEmpty {
-            accelerometerHistory.append(contentsOf: pendingAccelData)
-            pendingAccelData.removeAll()
-        }
-
-        // Trim all histories
-        if heartRateHistory.count > maxHistoryCount {
-            heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
-        }
-        if spo2History.count > maxHistoryCount {
-            spo2History.removeFirst(spo2History.count - maxHistoryCount)
-        }
-        if ppgHistory.count > maxHistoryCount {
-            ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
-        }
-        if accelerometerHistory.count > maxHistoryCount {
-            accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
     }
     
@@ -272,11 +301,12 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
-            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: processingQueue)
+            .receive(on: processingQueue)
             .sink { [weak self] readings in
-                // Process all data - timer will handle throttled flushing
-                self?.updateHistoriesFromReadings(readings)
-                self?.updateLegacySensorData(with: readings)
+                // Process on background queue
+                self?.updateHistoriesFromReadingsBackground(readings)
+                self?.updateLegacySensorDataBackground(with: readings)
             }
             .store(in: &cancellables)
         
@@ -288,7 +318,97 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - History Management from Sensor Readings
+    // MARK: - Background Processing (runs off main thread)
+
+    private func updateHistoriesFromReadingsBackground(_ readings: [SensorReading]) {
+        // Process PPG and accelerometer data - these are the heavy operations
+        updatePPGHistoryBackground(from: readings)
+        updateAccelHistoryBackground(from: readings)
+    }
+
+    private func updateLegacySensorDataBackground(with readings: [SensorReading]) {
+        // Skip legacy conversion in background - not critical for performance
+    }
+
+    private func updatePPGHistoryBackground(from readings: [SensorReading]) {
+        // Heavy processing OFF main thread
+        var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
+
+        for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
+            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
+            var current = grouped[roundedTime] ?? (0, 0, 0)
+
+            switch reading.sensorType {
+            case .ppgRed:
+                current.red = Int32(reading.value)
+            case .ppgInfrared:
+                current.ir = Int32(reading.value)
+                if reading.value > 0 {
+                    ppgIRBuffer.append(UInt32(reading.value))
+                }
+            case .ppgGreen:
+                current.green = Int32(reading.value)
+            default: break
+            }
+
+            grouped[roundedTime] = current
+        }
+
+        // Add to pending buffer (thread-safe since not @Published)
+        for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
+            let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
+            pendingPPGData.append(ppgData)
+
+            if values.ir > 0 {
+                ppgIRBuffer.append(UInt32(values.ir))
+            }
+        }
+
+        // Calculate HR and SpO2 (heavy computation) OFF main thread
+        if !ppgIRBuffer.isEmpty {
+            if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
+                let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
+                pendingHeartRateData.append(hrData)
+            }
+        }
+
+        if let latest = grouped.values.first, latest.red > 1000 && latest.ir > 1000 {
+            let ratio = Double(latest.red) / Double(latest.ir)
+            let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
+            let spo2Data = SpO2Data(percentage: Double(calculatedSpO2), quality: 0.8, timestamp: Date())
+            pendingSpo2Data.append(spo2Data)
+        }
+    }
+
+    private func updateAccelHistoryBackground(from readings: [SensorReading]) {
+        // Heavy processing OFF main thread
+        var grouped: [Date: (x: Int16, y: Int16, z: Int16)] = [:]
+
+        for reading in readings where [.accelerometerX, .accelerometerY, .accelerometerZ].contains(reading.sensorType) {
+            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
+            var current = grouped[roundedTime] ?? (0, 0, 0)
+
+            switch reading.sensorType {
+            case .accelerometerX:
+                current.x = Int16(reading.value * 1000)
+            case .accelerometerY:
+                current.y = Int16(reading.value * 1000)
+            case .accelerometerZ:
+                current.z = Int16(reading.value * 1000)
+            default: break
+            }
+
+            grouped[roundedTime] = current
+        }
+
+        // Add to pending buffer
+        for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
+            let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
+            pendingAccelData.append(accelData)
+        }
+    }
+
+    // MARK: - History Management from Sensor Readings (Main Thread - DEPRECATED, use background versions)
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
         // Reduced logging - only every 10th call
