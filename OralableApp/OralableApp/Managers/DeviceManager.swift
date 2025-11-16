@@ -55,20 +55,6 @@ class DeviceManager: ObservableObject {
     @Published private(set) var heartRateQuality: Double = 0.0
     @Published private(set) var ppgChannelOrderValue: PPGChannelOrder = .standard
 
-    // Type-erased publishers (created once and reused)
-    private lazy var _isConnectedPublisher = $isConnected.eraseToAnyPublisher()
-    private lazy var _isScanningPublisher = $isScanning.eraseToAnyPublisher()
-    private lazy var _batteryLevelPublisher = $batteryLevel.eraseToAnyPublisher()
-    private lazy var _heartRatePublisher = $heartRate.eraseToAnyPublisher()
-    private lazy var _spO2Publisher = $spO2.eraseToAnyPublisher()
-    private lazy var _ppgRedValuePublisher = $ppgRedValue.eraseToAnyPublisher()
-    private lazy var _accelXPublisher = $accelX.eraseToAnyPublisher()
-    private lazy var _accelYPublisher = $accelY.eraseToAnyPublisher()
-    private lazy var _accelZPublisher = $accelZ.eraseToAnyPublisher()
-    private lazy var _temperaturePublisher = $temperature.eraseToAnyPublisher()
-    private lazy var _heartRateQualityPublisher = $heartRateQuality.eraseToAnyPublisher()
-    private lazy var _ppgChannelOrderPublisher = $ppgChannelOrderValue.eraseToAnyPublisher()
-
     // MARK: - Private Properties
 
     private var devices: [UUID: BLEDeviceProtocol] = [:]
@@ -715,26 +701,58 @@ extension DeviceManager: BLEManagerProtocol {
     }
 
     // MARK: - Publisher Properties
-    // Return the stored type-erased publishers (created once, reused for all subscribers)
+    // Computed properties that type-erase the @Published publishers
+    // Using AnyPublisher to properly expose publishers through protocol boundaries
 
-    var isConnectedPublisher: AnyPublisher<Bool, Never> { _isConnectedPublisher }
-    var isScanningPublisher: AnyPublisher<Bool, Never> { _isScanningPublisher }
-    var batteryLevelPublisher: AnyPublisher<Double, Never> { _batteryLevelPublisher }
+    var isConnectedPublisher: AnyPublisher<Bool, Never> {
+        $isConnected.eraseToAnyPublisher()
+    }
+
+    var isScanningPublisher: AnyPublisher<Bool, Never> {
+        $isScanning.eraseToAnyPublisher()
+    }
+
+    var batteryLevelPublisher: AnyPublisher<Double, Never> {
+        $batteryLevel.eraseToAnyPublisher()
+    }
+
     var heartRatePublisher: AnyPublisher<Int, Never> {
-        print("🔍 [DeviceManager] heartRatePublisher accessed - returning stored publisher")
-        return _heartRatePublisher
+        print("🔍 [DeviceManager] heartRatePublisher accessed - current value: \(heartRate)")
+        return $heartRate.eraseToAnyPublisher()
     }
+
     var spO2Publisher: AnyPublisher<Int, Never> {
-        print("🔍 [DeviceManager] spO2Publisher accessed - returning stored publisher")
-        return _spO2Publisher
+        print("🔍 [DeviceManager] spO2Publisher accessed - current value: \(spO2)")
+        return $spO2.eraseToAnyPublisher()
     }
-    var ppgRedValuePublisher: AnyPublisher<Double, Never> { _ppgRedValuePublisher }
-    var accelXPublisher: AnyPublisher<Double, Never> { _accelXPublisher }
-    var accelYPublisher: AnyPublisher<Double, Never> { _accelYPublisher }
-    var accelZPublisher: AnyPublisher<Double, Never> { _accelZPublisher }
-    var temperaturePublisher: AnyPublisher<Double, Never> { _temperaturePublisher }
-    var heartRateQualityPublisher: AnyPublisher<Double, Never> { _heartRateQualityPublisher }
-    var ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never> { _ppgChannelOrderPublisher }
+
+    var ppgRedValuePublisher: AnyPublisher<Double, Never> {
+        $ppgRedValue.eraseToAnyPublisher()
+    }
+
+    var accelXPublisher: AnyPublisher<Double, Never> {
+        $accelX.eraseToAnyPublisher()
+    }
+
+    var accelYPublisher: AnyPublisher<Double, Never> {
+        $accelY.eraseToAnyPublisher()
+    }
+
+    var accelZPublisher: AnyPublisher<Double, Never> {
+        $accelZ.eraseToAnyPublisher()
+    }
+
+    var temperaturePublisher: AnyPublisher<Double, Never> {
+        $temperature.eraseToAnyPublisher()
+    }
+
+    var heartRateQualityPublisher: AnyPublisher<Double, Never> {
+        $heartRateQuality.eraseToAnyPublisher()
+    }
+
+    var ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never> {
+        $ppgChannelOrderValue.eraseToAnyPublisher()
+    }
 
     // MARK: - BLEManagerProtocol Methods
 
