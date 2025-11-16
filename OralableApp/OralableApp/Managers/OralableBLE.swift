@@ -99,7 +99,14 @@ class OralableBLE: ObservableObject {
     // Throttling for UI updates - only update @Published properties once per second
     private var lastHeartRateUIUpdate: Date = .distantPast
     private var lastSpO2UIUpdate: Date = .distantPast
+    private var lastHistoryUpdate: Date = .distantPast
     private let uiUpdateInterval: TimeInterval = 1.0  // Update UI once per second
+
+    // Pending updates buffer (not @Published, so doesn't trigger UI)
+    private var pendingHeartRateData: [HeartRateData] = []
+    private var pendingSpo2Data: [SpO2Data] = []
+    private var pendingPPGData: [PPGData] = []
+    private var pendingAccelData: [AccelerometerData] = []
 
     // MARK: - Initialization
     
@@ -203,6 +210,7 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
             .sink { [weak self] readings in
                 self?.updateHistoriesFromReadings(readings)
                 self?.updateLegacySensorData(with: readings)
@@ -324,16 +332,22 @@ class OralableBLE: ObservableObject {
         // Calculate Heart Rate from IR samples
         if !ppgIRBuffer.isEmpty {
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
-                // Add to history (always update history)
+                // Add to PENDING buffer (does NOT trigger UI update)
                 let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
-                heartRateHistory.append(hrData)
-                if heartRateHistory.count > maxHistoryCount {
-                    heartRateHistory.removeFirst()
-                }
+                pendingHeartRateData.append(hrData)
 
                 // Throttle UI updates - only update @Published properties once per second
                 let now = Date()
                 if now.timeIntervalSince(lastHeartRateUIUpdate) >= uiUpdateInterval {
+                    // Flush pending data to @Published array
+                    heartRateHistory.append(contentsOf: pendingHeartRateData)
+                    pendingHeartRateData.removeAll()
+
+                    // Trim history
+                    if heartRateHistory.count > maxHistoryCount {
+                        heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
+                    }
+
                     heartRate = Int(hrResult.bpm)
                     heartRateQuality = hrResult.quality
                     lastHeartRateUIUpdate = now
@@ -348,16 +362,22 @@ class OralableBLE: ObservableObject {
             // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
 
-            // Add to history (always update history)
+            // Add to PENDING buffer (does NOT trigger UI update)
             let spo2Data = SpO2Data(percentage: Double(calculatedSpO2), quality: 0.8, timestamp: Date())
-            spo2History.append(spo2Data)
-            if spo2History.count > maxHistoryCount {
-                spo2History.removeFirst()
-            }
+            pendingSpo2Data.append(spo2Data)
 
             // Throttle UI updates - only update @Published properties once per second
             let now = Date()
             if now.timeIntervalSince(lastSpO2UIUpdate) >= uiUpdateInterval {
+                // Flush pending data to @Published array
+                spo2History.append(contentsOf: pendingSpo2Data)
+                pendingSpo2Data.removeAll()
+
+                // Trim history
+                if spo2History.count > maxHistoryCount {
+                    spo2History.removeFirst(spo2History.count - maxHistoryCount)
+                }
+
                 spO2 = Int(calculatedSpO2)
                 lastSpO2UIUpdate = now
                 Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")

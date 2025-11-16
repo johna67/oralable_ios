@@ -178,7 +178,15 @@ extension BLECentralManager: CBCentralManagerDelegate {
             Logger.shared.debug(details)
         }
 
-        // Fire callback
+        // DEVICE NAME FILTERING: Only report Oralable and ARN devices
+        // This prevents the UI from showing incompatible devices
+        let upperName = name.uppercased()
+        guard upperName.hasPrefix("ORALABLE") || upperName.hasPrefix("ARN") else {
+            // Silently ignore other devices
+            return
+        }
+
+        // Fire callback only for compatible devices
         onDeviceDiscovered?(peripheral, name, RSSI.intValue)
     }
     
