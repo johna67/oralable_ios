@@ -172,7 +172,10 @@ struct SharingView: View {
                     }
 
                     // Import the data
-                    if let imported = CSVImportManager.shared.importData(from: tempURL) {
+                    let imported = CSVImportManager.shared.importData(from: tempURL)
+
+                    // Check if import was successful
+                    if imported.successfulLines > 0 {
                         // Add imported data to BLE manager
                         bleManager.sensorDataHistory.append(contentsOf: imported.sensorData)
 
@@ -212,7 +215,10 @@ struct SharingView: View {
                             message: "✅ Successfully imported \(imported.sensorData.count) sensor data points"
                         ))
                     } else {
-                        importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
+                        // Import failed or no valid data
+                        importErrorMessage = imported.errors.isEmpty ?
+                            "Failed to parse CSV file. Please ensure it's in the correct format." :
+                            imported.errors.joined(separator: "\n")
                         showImportError = true
                     }
 
