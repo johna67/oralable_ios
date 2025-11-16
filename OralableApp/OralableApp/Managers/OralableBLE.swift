@@ -331,12 +331,20 @@ class OralableBLE: ObservableObject {
             ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
         }
 
+        // Increment counter for throttled logging (prevents UI freeze from 50Hz logging)
+        ppgLogCounter += 1
+        let shouldLog = ppgLogCounter % 50 == 0
+
         // Calculate Heart Rate from IR samples
         if !ppgIRBuffer.isEmpty {
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
                 heartRate = Int(hrResult.bpm)
                 heartRateQuality = hrResult.quality
-                Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
+
+                // Throttled logging - only log every 50th packet to prevent UI freeze
+                if shouldLog {
+                    Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
+                }
 
                 // Add to history
                 let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
@@ -353,7 +361,11 @@ class OralableBLE: ObservableObject {
             // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
             spO2 = Int(calculatedSpO2)
-            Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
+
+            // Throttled logging - only log every 50th packet to prevent UI freeze
+            if shouldLog {
+                Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
+            }
 
             // Add to history
             let spo2Data = SpO2Data(percentage: Double(spO2), quality: 0.8, timestamp: Date())
@@ -364,8 +376,7 @@ class OralableBLE: ObservableObject {
         }
 
         // Reduced logging to prevent UI freeze - only log every 50th packet
-        ppgLogCounter += 1
-        if ppgLogCounter % 50 == 0 {
+        if shouldLog {
             Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
         }
     }
