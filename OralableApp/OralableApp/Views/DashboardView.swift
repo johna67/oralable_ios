@@ -19,7 +19,6 @@ struct DashboardView: View {
     @State private var showingDevices = false
     @State private var showingSettings = false
     @State private var showingHistorical = false
-    @State private var showingShare = false
     
     var body: some View {
         NavigationView {
@@ -40,9 +39,6 @@ struct DashboardView: View {
                     if bleManager.isConnected {
                         waveformSection
                     }
-                    
-                    // Action Buttons
-                    actionButtons
                 }
                 .padding(designSystem.spacing.md)
             }
@@ -100,10 +96,6 @@ struct DashboardView: View {
                     .environmentObject(designSystem)
                     .environmentObject(HistoricalDataManager.shared)
                     .environmentObject(bleManager)
-            }
-            .sheet(isPresented: $showingShare) {
-                ShareView(ble: bleManager)
-                    .environmentObject(designSystem)
             }
         }
         .onAppear {
@@ -231,28 +223,28 @@ struct DashboardView: View {
             MetricCard(
                 icon: "heart.fill",
                 title: "Heart Rate",
-                value: "\(viewModel.heartRate)",
-                unit: "bpm",
+                value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "Not available",
+                unit: viewModel.heartRate > 0 ? "bpm" : "",
                 color: .red,
                 designSystem: designSystem
             )
-            
+
             // SpO2
             MetricCard(
                 icon: "lungs.fill",
                 title: "SpO2",
-                value: "\(viewModel.spO2)",
-                unit: "%",
+                value: viewModel.spO2 > 0 ? "\(viewModel.spO2)" : "Not available",
+                unit: viewModel.spO2 > 0 ? "%" : "",
                 color: .blue,
                 designSystem: designSystem
             )
-            
+
             // Temperature
             MetricCard(
                 icon: "thermometer",
                 title: "Temperature",
-                value: String(format: "%.1f", viewModel.temperature),
-                unit: "°C",
+                value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "Not available",
+                unit: viewModel.temperature > 0 ? "°C" : "",
                 color: .orange,
                 designSystem: designSystem
             )
@@ -264,26 +256,6 @@ struct DashboardView: View {
                 value: "\(Int(bleManager.batteryLevel))",
                 unit: "%",
                 color: batteryColor,
-                designSystem: designSystem
-            )
-            
-            // Session Time
-            MetricCard(
-                icon: "clock.fill",
-                title: "Session",
-                value: viewModel.sessionDuration,
-                unit: "",
-                color: .purple,
-                designSystem: designSystem
-            )
-            
-            // Signal Quality
-            MetricCard(
-                icon: "wifi",
-                title: "Signal",
-                value: "\(viewModel.signalQuality)",
-                unit: "%",
-                color: .green,
                 designSystem: designSystem
             )
         }
@@ -312,45 +284,21 @@ struct DashboardView: View {
         VStack(spacing: designSystem.spacing.md) {
             // PPG Waveform
             WaveformCard(
-                title: "PPG Signal",
+                title: "PPG IR",
                 data: viewModel.ppgData,
                 color: .red,
                 designSystem: designSystem
             )
             
-            // Accelerometer
+            // Accelerometer - Tappable to view history
             WaveformCard(
                 title: "Movement",
                 data: viewModel.accelerometerData,
                 color: .blue,
                 designSystem: designSystem
             )
-        }
-    }
-    
-    // MARK: - Action Buttons
-    private var actionButtons: some View {
-        HStack(spacing: designSystem.spacing.md) {
-            // Historical Data
-            Button(action: { showingHistorical = true }) {
-                Label("History", systemImage: "chart.line.uptrend.xyaxis")
-                    .font(designSystem.typography.button)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundSecondary)
-                    .cornerRadius(designSystem.cornerRadius.medium)
-            }
-            
-            // Share
-            Button(action: { showingShare = true }) {
-                Label("Export", systemImage: "square.and.arrow.up")
-                    .font(designSystem.typography.button)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundSecondary)
-                    .cornerRadius(designSystem.cornerRadius.medium)
+            .onTapGesture {
+                showingHistorical = true
             }
         }
     }
@@ -380,8 +328,8 @@ struct MetricCard: View {
             
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(designSystem.typography.h2)
-                    .foregroundColor(designSystem.colors.textPrimary)
+                    .font(value == "Not available" ? designSystem.typography.body : designSystem.typography.h2)
+                    .foregroundColor(value == "Not available" ? designSystem.colors.textTertiary : designSystem.colors.textPrimary)
                 Text(unit)
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textSecondary)

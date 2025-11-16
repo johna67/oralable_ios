@@ -3,22 +3,7 @@
 //  OralableApp
 //
 //  Created: November 7, 2025
-//
-//  ⚠️ DEPRECATED - This file is being phased out
-//
-//  STATUS: Compatibility wrapper around DeviceManager
-//
-//  Migration Progress:
-//  ✅ ViewModels migrated to BLEManagerProtocol (DashboardViewModel, DevicesViewModel, SettingsViewModel)
-//  ⏳ HistoricalDataManager still uses OralableBLE for historical data aggregation
-//  ⏳ Some Views still reference OralableBLE (ViewerModeView, HistoricalView)
-//
-//  Next Steps:
-//  1. Migrate HistoricalDataManager to use DeviceManager.allSensorReadings
-//  2. Update remaining Views to use DeviceManager
-//  3. Delete this file entirely
-//
-//  DO NOT ADD NEW DEPENDENCIES ON THIS CLASS
+//  Compatibility wrapper around DeviceManager to maintain existing view interfaces
 //
 
 import Foundation
@@ -48,7 +33,7 @@ class OralableBLE: ObservableObject {
     @Published var connectedDevice: CBPeripheral?
     @Published var sensorDataHistory: [SensorData] = []
     @Published var deviceState: DeviceStateResult?
-    @Published var logMessages: [LogMessage] = []
+    @Published var logMessages: [BLELogMessage] = []
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
     
     // Real-time sensor values for UI
@@ -110,15 +95,118 @@ class OralableBLE: ObservableObject {
     // Throttling counters to prevent log spam
     private var ppgLogCounter = 0
     private var accelLogCounter = 0
-    
+
+    // Throttling for UI updates - only update @Published properties once per second
+    private var lastHeartRateUIUpdate: Date = .distantPast
+    private var lastSpO2UIUpdate: Date = .distantPast
+    private var lastHistoryUpdate: Date = .distantPast
+    private let uiUpdateInterval: TimeInterval = 1.0  // Update UI once per second
+
+    // Pending updates buffer (not @Published, so doesn't trigger UI)
+    private var pendingHeartRateData: [HeartRateData] = []
+    private var pendingSpo2Data: [SpO2Data] = []
+    private var pendingPPGData: [PPGData] = []
+    private var pendingAccelData: [AccelerometerData] = []
+
+    // Background processing queue to prevent main thread blocking
+    private let processingQueue = DispatchQueue(label: "com.oralable.dataProcessing", qos: .userInitiated)
+
+    // Timer to ensure pending buffers flush regularly
+    private var flushTimer: Timer?
+
     // MARK: - Initialization
-    
+
     init() {
         self.deviceManager = DeviceManager()
         self.stateDetector = DeviceStateDetector()
         setupBindings()
         setupDirectBLECallbacks()  // NEW: Direct BLE callbacks for UI
+        setupFlushTimer()  // NEW: Regular buffer flushing
         addLog("OralableBLE initialized")
+    }
+
+    // MARK: - Buffer Flushing Timer
+
+    private func setupFlushTimer() {
+        // Flush pending buffers every second to ensure UI updates
+        flushTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.flushPendingBuffers()
+            }
+        }
+    }
+
+    private func flushPendingBuffers() {
+        // Thread-safe flush: Copy data from background queue to main thread
+        processingQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Copy pending data (on background queue)
+            let hrData = self.pendingHeartRateData
+            let spo2Data = self.pendingSpo2Data
+            let ppgData = self.pendingPPGData
+            let accelData = self.pendingAccelData
+
+            // Clear pending buffers (on background queue)
+            self.pendingHeartRateData.removeAll()
+            self.pendingSpo2Data.removeAll()
+            self.pendingPPGData.removeAll()
+            self.pendingAccelData.removeAll()
+
+            // Update @Published arrays on main thread
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                if !hrData.isEmpty {
+                    self.heartRateHistory.append(contentsOf: hrData)
+                    if let latest = hrData.last {
+                        self.heartRate = Int(latest.bpm)
+                        self.heartRateQuality = latest.quality
+                    }
+                }
+
+                if !spo2Data.isEmpty {
+                    self.spo2History.append(contentsOf: spo2Data)
+                    if let latest = spo2Data.last {
+                        self.spO2 = Int(latest.percentage)
+                    }
+                }
+
+                if !ppgData.isEmpty {
+                    self.ppgHistory.append(contentsOf: ppgData)
+                    // Update real-time PPG values for dashboard
+                    if let latest = ppgData.last {
+                        self.ppgRedValue = Double(latest.red)
+                        self.ppgIRValue = Double(latest.ir)
+                        self.ppgGreenValue = Double(latest.green)
+                    }
+                }
+
+                if !accelData.isEmpty {
+                    self.accelerometerHistory.append(contentsOf: accelData)
+                    // Update real-time accel values for dashboard
+                    if let latest = accelData.last {
+                        self.accelX = Double(latest.x) / 1000.0
+                        self.accelY = Double(latest.y) / 1000.0
+                        self.accelZ = Double(latest.z) / 1000.0
+                    }
+                }
+
+                // Trim all histories
+                if self.heartRateHistory.count > self.maxHistoryCount {
+                    self.heartRateHistory.removeFirst(self.heartRateHistory.count - self.maxHistoryCount)
+                }
+                if self.spo2History.count > self.maxHistoryCount {
+                    self.spo2History.removeFirst(self.spo2History.count - self.maxHistoryCount)
+                }
+                if self.ppgHistory.count > self.maxHistoryCount {
+                    self.ppgHistory.removeFirst(self.ppgHistory.count - self.maxHistoryCount)
+                }
+                if self.accelerometerHistory.count > self.maxHistoryCount {
+                    self.accelerometerHistory.removeFirst(self.accelerometerHistory.count - self.maxHistoryCount)
+                }
+            }
+        }
     }
     
     // MARK: - Direct BLE Callbacks (for UI integration)
@@ -213,23 +301,121 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
+            .debounce(for: .milliseconds(200), scheduler: processingQueue)
+            .receive(on: processingQueue)
             .sink { [weak self] readings in
-                self?.updateHistoriesFromReadings(readings)
-                self?.updateLegacySensorData(with: readings)
+                // Process on background queue
+                self?.updateHistoriesFromReadingsBackground(readings)
+                self?.updateLegacySensorDataBackground(with: readings)
             }
             .store(in: &cancellables)
         
         deviceManager.$latestReadings
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] latestReadings in
                 self?.updateDeviceState(from: latestReadings)
             }
             .store(in: &cancellables)
     }
     
-    // MARK: - History Management from Sensor Readings
+    // MARK: - Background Processing (runs off main thread)
+
+    private func updateHistoriesFromReadingsBackground(_ readings: [SensorReading]) {
+        // Process PPG and accelerometer data - these are the heavy operations
+        updatePPGHistoryBackground(from: readings)
+        updateAccelHistoryBackground(from: readings)
+    }
+
+    private func updateLegacySensorDataBackground(with readings: [SensorReading]) {
+        // Skip legacy conversion in background - not critical for performance
+    }
+
+    private func updatePPGHistoryBackground(from readings: [SensorReading]) {
+        // Heavy processing OFF main thread
+        var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
+
+        for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
+            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
+            var current = grouped[roundedTime] ?? (0, 0, 0)
+
+            switch reading.sensorType {
+            case .ppgRed:
+                current.red = Int32(reading.value)
+            case .ppgInfrared:
+                current.ir = Int32(reading.value)
+                if reading.value > 0 {
+                    ppgIRBuffer.append(UInt32(reading.value))
+                }
+            case .ppgGreen:
+                current.green = Int32(reading.value)
+            default: break
+            }
+
+            grouped[roundedTime] = current
+        }
+
+        // Add to pending buffer (thread-safe since not @Published)
+        for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
+            let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
+            pendingPPGData.append(ppgData)
+
+            if values.ir > 0 {
+                ppgIRBuffer.append(UInt32(values.ir))
+            }
+        }
+
+        // Calculate HR and SpO2 (heavy computation) OFF main thread
+        if !ppgIRBuffer.isEmpty {
+            if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
+                let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
+                pendingHeartRateData.append(hrData)
+            }
+        }
+
+        if let latest = grouped.values.first, latest.red > 1000 && latest.ir > 1000 {
+            let ratio = Double(latest.red) / Double(latest.ir)
+            let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
+            let spo2Data = SpO2Data(percentage: Double(calculatedSpO2), quality: 0.8, timestamp: Date())
+            pendingSpo2Data.append(spo2Data)
+        }
+    }
+
+    private func updateAccelHistoryBackground(from readings: [SensorReading]) {
+        // Heavy processing OFF main thread
+        var grouped: [Date: (x: Int16, y: Int16, z: Int16)] = [:]
+
+        for reading in readings where [.accelerometerX, .accelerometerY, .accelerometerZ].contains(reading.sensorType) {
+            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
+            var current = grouped[roundedTime] ?? (0, 0, 0)
+
+            switch reading.sensorType {
+            case .accelerometerX:
+                current.x = Int16(reading.value * 1000)
+            case .accelerometerY:
+                current.y = Int16(reading.value * 1000)
+            case .accelerometerZ:
+                current.z = Int16(reading.value * 1000)
+            default: break
+            }
+
+            grouped[roundedTime] = current
+        }
+
+        // Add to pending buffer
+        for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
+            let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
+            pendingAccelData.append(accelData)
+        }
+    }
+
+    // MARK: - History Management from Sensor Readings (Main Thread - DEPRECATED, use background versions)
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
-        Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        // Reduced logging - only every 10th call
+        ppgLogCounter += 1
+        if ppgLogCounter % 10 == 0 {
+            Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        }
 
         for reading in readings {
             switch reading.sensorType {
@@ -239,7 +425,7 @@ class OralableBLE: ObservableObject {
                 if batteryHistory.count > maxHistoryCount {
                     batteryHistory.removeFirst(batteryHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Battery: \(Int(reading.value))% | History count: \(batteryHistory.count)")
+                // Removed per-reading logging
 
             case .heartRate:
                 // Force connection state when we have data
@@ -255,7 +441,7 @@ class OralableBLE: ObservableObject {
                 if heartRateHistory.count > maxHistoryCount {
                     heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] Heart Rate: \(Int(reading.value)) bpm | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(heartRateHistory.count)")
+                // Removed per-reading logging
 
             case .spo2:
                 let spo2Data = SpO2Data(percentage: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
@@ -263,7 +449,7 @@ class OralableBLE: ObservableObject {
                 if spo2History.count > maxHistoryCount {
                     spo2History.removeFirst(spo2History.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
+                // Removed per-reading logging
 
             case .temperature:
                 temperature = reading.value  // Update published property
@@ -272,7 +458,7 @@ class OralableBLE: ObservableObject {
                 if temperatureHistory.count > maxHistoryCount {
                     temperatureHistory.removeFirst(temperatureHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Temperature: \(String(format: "%.1f", reading.value))°C | History count: \(temperatureHistory.count)")
+                // Removed per-reading logging
 
             case .ppgRed, .ppgInfrared, .ppgGreen:
                 // PPG data needs to be grouped - handled separately
@@ -287,7 +473,7 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        Logger.shared.debug("[OralableBLE] Total history counts - HR: \(heartRateHistory.count), SpO2: \(spo2History.count), Temp: \(temperatureHistory.count), PPG: \(ppgHistory.count)")
+        // Removed verbose logging - only log on throttled interval
     }
     
     private func updatePPGHistory(from readings: [SensorReading]) {
@@ -319,7 +505,8 @@ class OralableBLE: ObservableObject {
 
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
-            ppgHistory.append(ppgData)
+            // Add to PENDING buffer instead of @Published array
+            pendingPPGData.append(ppgData)
 
             // Collect IR samples for HR calculation
             if values.ir > 0 {
@@ -327,30 +514,39 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        if ppgHistory.count > maxHistoryCount {
-            ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
-        }
-
-        // Increment counter for throttled logging (prevents UI freeze from 50Hz logging)
-        ppgLogCounter += 1
-        let shouldLog = ppgLogCounter % 50 == 0
-
         // Calculate Heart Rate from IR samples
         if !ppgIRBuffer.isEmpty {
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
-                heartRate = Int(hrResult.bpm)
-                heartRateQuality = hrResult.quality
-
-                // Throttled logging - only log every 50th packet to prevent UI freeze
-                if shouldLog {
-                    Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
-                }
-
-                // Add to history
+                // Add to PENDING buffer (does NOT trigger UI update)
                 let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
-                heartRateHistory.append(hrData)
-                if heartRateHistory.count > maxHistoryCount {
-                    heartRateHistory.removeFirst()
+                pendingHeartRateData.append(hrData)
+
+                // Throttle UI updates - only update @Published properties once per second
+                let now = Date()
+                if now.timeIntervalSince(lastHeartRateUIUpdate) >= uiUpdateInterval {
+                    // Flush ALL pending data to @Published arrays in ONE batch
+                    heartRateHistory.append(contentsOf: pendingHeartRateData)
+                    ppgHistory.append(contentsOf: pendingPPGData)
+                    accelerometerHistory.append(contentsOf: pendingAccelData)
+                    pendingHeartRateData.removeAll()
+                    pendingPPGData.removeAll()
+                    pendingAccelData.removeAll()
+
+                    // Trim histories
+                    if heartRateHistory.count > maxHistoryCount {
+                        heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
+                    }
+                    if ppgHistory.count > maxHistoryCount {
+                        ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
+                    }
+                    if accelerometerHistory.count > maxHistoryCount {
+                        accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
+                    }
+
+                    heartRate = Int(hrResult.bpm)
+                    heartRateQuality = hrResult.quality
+                    lastHeartRateUIUpdate = now
+                    Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
                 }
             }
         }
@@ -360,23 +556,31 @@ class OralableBLE: ObservableObject {
             let ratio = Double(latest.red) / Double(latest.ir)
             // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
-            spO2 = Int(calculatedSpO2)
 
-            // Throttled logging - only log every 50th packet to prevent UI freeze
-            if shouldLog {
+            // Add to PENDING buffer (does NOT trigger UI update)
+            let spo2Data = SpO2Data(percentage: Double(calculatedSpO2), quality: 0.8, timestamp: Date())
+            pendingSpo2Data.append(spo2Data)
+
+            // Update SpO2 value on throttled interval (uses same timestamp as HR)
+            let now = Date()
+            if now.timeIntervalSince(lastSpO2UIUpdate) >= uiUpdateInterval {
+                // Flush ALL pending buffers together (avoid separate updates)
+                spo2History.append(contentsOf: pendingSpo2Data)
+                pendingSpo2Data.removeAll()
+
+                // Trim history
+                if spo2History.count > maxHistoryCount {
+                    spo2History.removeFirst(spo2History.count - maxHistoryCount)
+                }
+
+                spO2 = Int(calculatedSpO2)
+                lastSpO2UIUpdate = now
                 Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
-            }
-
-            // Add to history
-            let spo2Data = SpO2Data(percentage: Double(spO2), quality: 0.8, timestamp: Date())
-            spo2History.append(spo2Data)
-            if spo2History.count > maxHistoryCount {
-                spo2History.removeFirst()
             }
         }
 
-        // Reduced logging to prevent UI freeze - only log every 50th packet
-        if shouldLog {
+        // Reduced logging to prevent UI freeze - only log every 200th packet
+        if ppgLogCounter % 200 == 0 {
             Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
         }
     }
@@ -406,16 +610,13 @@ class OralableBLE: ObservableObject {
 
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
-            accelerometerHistory.append(accelData)
+            // Add to PENDING buffer instead of @Published array
+            pendingAccelData.append(accelData)
         }
 
-        if accelerometerHistory.count > maxHistoryCount {
-            accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
-        }
-
-        // Reduced logging to prevent UI freeze - only log every 50th packet
+        // Reduced logging to prevent UI freeze - only log every 200th packet
         accelLogCounter += 1
-        if accelLogCounter % 50 == 0 {
+        if accelLogCounter % 200 == 0 {
             Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
         }
     }
@@ -660,7 +861,7 @@ class OralableBLE: ObservableObject {
     
     private func addLog(_ message: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        let logMessage = LogMessage(message: "[\(timestamp)] \(message)")
+        let logMessage = BLELogMessage(message: "[\(timestamp)] \(message)")
         logMessages.append(logMessage)
         if logMessages.count > 100 { logMessages.removeFirst(logMessages.count - 100) }
     }
@@ -684,21 +885,4 @@ extension OralableBLE {
     }
 
     
-}
-
-// MARK: - BLEManagerProtocol Conformance
-
-extension OralableBLE: BLEManagerProtocol {
-    var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
-    var isScanningPublisher: Published<Bool>.Publisher { $isScanning }
-    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
-    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
-    var spO2Publisher: Published<Int>.Publisher { $spO2 }
-    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
-    var accelXPublisher: Published<Double>.Publisher { $accelX }
-    var accelYPublisher: Published<Double>.Publisher { $accelY }
-    var accelZPublisher: Published<Double>.Publisher { $accelZ }
-    var temperaturePublisher: Published<Double>.Publisher { $temperature }
-    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
-    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrder }
 }

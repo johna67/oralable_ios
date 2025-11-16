@@ -9,34 +9,39 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var designSystem: DesignSystem
-    
+    @EnvironmentObject var appStateManager: AppStateManager
+
     var body: some View {
         TabView {
             DashboardView()
                 .tabItem {
-                    Label("Dashboard", systemImage: "house.fill")
+                    Label("Home", systemImage: "house.fill")
                 }
                 .tag(0)
-            
+
             DevicesView()
                 .tabItem {
                     Label("Devices", systemImage: "sensor.fill")
                 }
                 .tag(1)
-            
-            // Use the real HistoricalView from your Views folder
+
             HistoricalView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
                 .tag(2)
-            
-            // Use SettingsView, not ShareView
+
+            SharingView()
+                .tabItem {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .tag(3)
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
-                .tag(3)
+                .tag(4)
         }
         .accentColor(designSystem.colors.primaryBlack)
     }

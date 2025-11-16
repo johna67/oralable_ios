@@ -21,6 +21,12 @@ struct DevicesView: View {
     @State private var isScanning = false
     @State private var showingForgetDevice = false
     @State private var lastActionTime: Date = .distantPast
+
+    // Device management state
+    @State private var showingRenameAlert = false
+    @State private var newDeviceName = ""
+    @State private var showingFirmwareUpdate = false
+    @State private var showingCalibration = false
     
     var body: some View {
         NavigationView {
@@ -64,6 +70,26 @@ struct DevicesView: View {
             }
         } message: {
             Text("Are you sure you want to forget this device? You'll need to reconnect it later.")
+        }
+        .alert("Rename Device", isPresented: $showingRenameAlert) {
+            TextField("Device Name", text: $newDeviceName)
+                .textInputAutocapitalization(.words)
+            Button("Cancel", role: .cancel) {
+                newDeviceName = ""
+            }
+            Button("Rename") {
+                saveDeviceName()
+            }
+        } message: {
+            Text("Enter a new name for your device")
+        }
+        .sheet(isPresented: $showingFirmwareUpdate) {
+            FirmwareUpdateView()
+                .environmentObject(designSystem)
+        }
+        .sheet(isPresented: $showingCalibration) {
+            CalibrationWizardView(bleManager: bleManager)
+                .environmentObject(designSystem)
         }
         .onAppear {
             synchronizeScanningState()
@@ -525,18 +551,30 @@ struct DevicesView: View {
     }
     
     private func renameDevice() {
-        // Placeholder for device renaming
-        print("Renaming device...")
+        newDeviceName = bleManager.deviceName
+        showingRenameAlert = true
     }
-    
+
+    private func saveDeviceName() {
+        guard !newDeviceName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+
+        // Save to UserDefaults
+        if let deviceUUID = bleManager.deviceUUID {
+            let key = "deviceName_\(deviceUUID.uuidString)"
+            UserDefaults.standard.set(newDeviceName, forKey: key)
+        }
+
+        // Update bleManager (this will update the UI)
+        bleManager.deviceName = newDeviceName
+        newDeviceName = ""
+    }
+
     private func updateFirmware() {
-        // Placeholder for firmware update
-        print("Checking for firmware updates...")
+        showingFirmwareUpdate = true
     }
-    
+
     private func calibrateDevice() {
-        // Placeholder for calibration
-        print("Starting calibration...")
+        showingCalibration = true
     }
     
     private func formatConnectionTime() -> String {

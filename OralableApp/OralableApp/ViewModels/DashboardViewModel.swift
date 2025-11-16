@@ -29,74 +29,55 @@ class DashboardViewModel: ObservableObject {
     @Published var ppgData: [Double] = []
     @Published var accelerometerData: [Double] = []
     
-    // Session Management
-    @Published var isRecording: Bool = false
-    @Published var sessionStartTime: Date?
+    // Connection State
+    @Published var isConnected: Bool = false
+    @Published var deviceName: String = "Not Connected"
+    @Published var batteryLevel: Int = 0
+    
+    // Mock Mode (for testing without hardware)
+    @Published var isMockMode: Bool = false
     
     // MARK: - Private Properties
+    
     private let bleManager: BLEManagerProtocol
     private let appStateManager = AppStateManager.shared
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
     private var mockDataTimer: Timer?
-
-    // Thresholds for MAM detection
-    private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
-    private let movementThreshold: Double = 0.1         // Accelerometer magnitude
-    private let signalQualityThreshold: Double = 80.0   // Signal quality percentage
-
+    
+    // Session tracking
+    private var sessionStartTime: Date?
+    
+    // MAM Thresholds
+    private let movementThreshold: Double = 0.5 // g-force
+    
     // MARK: - Initialization
+    
     init(bleManager: BLEManagerProtocol = DeviceManager.shared) {
         self.bleManager = bleManager
         setupBindings()
-
-        // Only use mock data in Demo mode
-        let isDemoMode = appStateManager.selectedMode == .demo
-        if isDemoMode {
-            Logger.shared.info("[DashboardViewModel] 🎭 Initializing in DEMO MODE with MOCK DATA")
-            generateMockWaveforms()
-        } else {
-            Logger.shared.info("[DashboardViewModel] ✅ Initializing in PRODUCTION MODE - REAL DATA only")
-        }
-    }
-
-    // MARK: - Public Methods
-    func startMonitoring() {
-        setupBLESubscriptions()
+        
+        // Start session timer
         startSessionTimer()
-
-        // Only use mock data in Demo mode
-        let isDemoMode = appStateManager.selectedMode == .demo
-        if isDemoMode {
-            Logger.shared.info("[DashboardViewModel] 🎭 Starting mock data generation for DEMO MODE")
-            startMockDataGeneration()
-        } else {
-            Logger.shared.info("[DashboardViewModel] ✅ Mock data DISABLED - waiting for real device data")
-        }
     }
     
-    func stopMonitoring() {
+    deinit {
         sessionTimer?.invalidate()
         mockDataTimer?.invalidate()
     }
     
-    func startRecording() {
-        isRecording = true
-        sessionStartTime = Date()
-        bleManager.startRecording()
-    }
+    // MARK: - Setup
     
-    func stopRecording() {
-        isRecording = false
-        sessionStartTime = nil
-        bleManager.stopRecording()
-    }
-    
-    // MARK: - Private Methods
     private func setupBindings() {
-        // Battery level changes
+        setupBLESubscriptions()
+        setupStateSubscriptions()
+    }
+    
+    private func setupStateSubscriptions() {
+        // Battery monitoring
         bleManager.batteryLevelPublisher
             .sink { [weak self] level in
+                self?.batteryLevel = Int(level)
                 self?.updateChargingState(batteryLevel: level)
             }
             .store(in: &cancellables)
@@ -112,8 +93,9 @@ class DashboardViewModel: ObservableObject {
     }
 
     private func setupBLESubscriptions() {
-        // Subscribe to Heart Rate (calculated from PPG)
+        // Subscribe to Heart Rate (calculated from PPG) - reduced throttle for responsiveness
         bleManager.heartRatePublisher
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] hr in
                 self?.heartRate = hr
             }
@@ -121,6 +103,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to SpO2 (calculated from PPG)
         bleManager.spO2Publisher
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] spo2 in
                 self?.spO2 = spo2
             }
@@ -128,6 +111,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to PPG data for waveform
         bleManager.ppgRedValuePublisher
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] value in
                 self?.processPPGData(value)
             }
@@ -136,6 +120,7 @@ class DashboardViewModel: ObservableObject {
         // Subscribe to accelerometer data
         bleManager.accelXPublisher
             .combineLatest(bleManager.accelYPublisher, bleManager.accelZPublisher)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] x, y, z in
                 self?.processAccelerometerData(x: x, y: y, z: z)
             }
@@ -143,6 +128,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to temperature
         bleManager.temperaturePublisher
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] temp in
                 self?.temperature = temp
             }
@@ -150,12 +136,12 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to HR quality for signal quality display
         bleManager.heartRateQualityPublisher
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] quality in
                 self?.signalQuality = Int(quality * 100)
             }
             .store(in: &cancellables)
     }
-    
     private func processPPGData(_ value: Double) {
         // Update PPG waveform
         ppgData.append(value)

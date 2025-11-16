@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct OralableApp: App {
+    init() {
+        print("🚀 [APP] OralableApp init started")
+    }
+
     // Initialize design system
     @StateObject private var designSystem = DesignSystem.shared
 
@@ -21,7 +25,8 @@ struct OralableApp: App {
     @StateObject private var appStateManager = AppStateManager.shared
 
     var body: some Scene {
-        WindowGroup {
+        print("🚀 [APP] body being evaluated")
+        return WindowGroup {
             RootView()
                 .environmentObject(designSystem)
                 .environmentObject(bleManager)
@@ -30,6 +35,9 @@ struct OralableApp: App {
                 .environmentObject(authenticationManager)
                 .environmentObject(subscriptionManager)
                 .environmentObject(appStateManager)
+                .onAppear {
+                    print("✅ [APP] RootView appeared - app launched successfully!")
+                }
         }
     }
 }
@@ -44,21 +52,30 @@ struct RootView: View {
     @State private var showOnboarding = false
 
     var body: some View {
+        let _ = print("🔵 [RootView] body being evaluated")
+        let _ = print("🔵 [RootView] needsModeSelection: \(appStateManager.needsModeSelection)")
+        let _ = print("🔵 [RootView] selectedMode: \(String(describing: appStateManager.selectedMode))")
+
         Group {
             if appStateManager.needsModeSelection {
                 // Show mode selection if no mode is selected
+                let _ = print("🔵 [RootView] Showing ModeSelectionView")
                 ModeSelectionView()
             } else if let mode = appStateManager.selectedMode {
                 // Show appropriate view based on selected mode
+                let _ = print("🔵 [RootView] Showing contentView for mode: \(mode)")
                 contentView(for: mode)
             } else {
                 // Fallback (shouldn't happen)
+                let _ = print("⚠️ [RootView] Fallback to ModeSelectionView")
                 ModeSelectionView()
             }
         }
         .onAppear {
+            print("✅ [RootView] onAppear called")
             // Show onboarding on first launch
             if appStateManager.isFirstLaunch && !appStateManager.hasCompletedOnboarding {
+                print("🔵 [RootView] Showing onboarding")
                 showOnboarding = true
             }
         }

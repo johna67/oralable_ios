@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 
 /// Possible states the device can be in
 enum DeviceState: String, CaseIterable {

@@ -243,7 +243,7 @@ struct WithingsStyleChartView: View {
             endDate = monthInterval?.end ?? Date()
         }
         
-        return ble.historicalData.filter { data in
+        return ble.sensorDataHistory.filter { data in
             data.timestamp >= startDate && data.timestamp < endDate
         }.sorted { $0.timestamp < $1.timestamp }
     }
@@ -259,9 +259,15 @@ struct WithingsStyleChartView: View {
                 // Show magnitude as requested
                 value = data.accelerometer.magnitude
             case .temperature:
-                value = data.temperature
+                value = data.temperature.celsius
             case .battery:
-                value = Double(data.batteryLevel)
+                value = Double(data.battery.percentage)
+            case .heartRate:
+                guard let hr = data.heartRate else { return nil }
+                value = hr.bpm
+            case .spo2:
+                guard let spo2 = data.spo2 else { return nil }
+                value = spo2.percentage
             }
             return (data.timestamp, value)
         }
@@ -369,6 +375,10 @@ struct CurrentValueIndicator: View {
         case .temperature:
             return String(format: "%.1f°C", value)
         case .battery:
+            return String(format: "%.0f%%", value)
+        case .heartRate:
+            return String(format: "%.0f bpm", value)
+        case .spo2:
             return String(format: "%.0f%%", value)
         }
     }
@@ -603,10 +613,10 @@ struct DataInfoSheet: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("Total data points: \(ble.historicalData.count)")
+                    Text("Total data points: \(ble.sensorDataHistory.count)")
                     
-                    if let earliest = ble.historicalData.first?.timestamp,
-                       let latest = ble.historicalData.last?.timestamp {
+                    if let earliest = ble.sensorDataHistory.first?.timestamp,
+                       let latest = ble.sensorDataHistory.last?.timestamp {
                         Text("Data range: \(earliest, style: .date) - \(latest, style: .date)")
                     }
                     

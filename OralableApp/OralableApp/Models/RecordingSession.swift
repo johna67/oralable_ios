@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 
 /// Represents a single data recording session
 struct RecordingSession: Identifiable, Codable {

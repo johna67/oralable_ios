@@ -98,14 +98,14 @@ struct ViewerModeView: View {
             .tag(0)
 
             NavigationStack {
-                ShareView(ble: ble, isViewerMode: true)
+                SharingView()
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(action: { selectedMode = nil }) {
                                 Label("Modes", systemImage: "chevron.left")
                             }
                         }
-                        
+
                         ToolbarItem(placement: .topBarTrailing) {
                             Button(action: { showDevices = true }) {
                                 Image(systemName: "wave.3.right.circle.fill")
@@ -129,7 +129,7 @@ struct ViewerModeView: View {
         case 0:
             DashboardView()
         case 1:
-            ShareView(ble: ble, isViewerMode: true)
+            SharingView()
         default:
             DashboardView()
         }
