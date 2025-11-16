@@ -111,14 +111,73 @@ class OralableBLE: ObservableObject {
     // Background processing queue to prevent main thread blocking
     private let processingQueue = DispatchQueue(label: "com.oralable.dataProcessing", qos: .userInitiated)
 
+    // Timer to ensure pending buffers flush regularly
+    private var flushTimer: Timer?
+
     // MARK: - Initialization
-    
+
     init() {
         self.deviceManager = DeviceManager()
         self.stateDetector = DeviceStateDetector()
         setupBindings()
         setupDirectBLECallbacks()  // NEW: Direct BLE callbacks for UI
+        setupFlushTimer()  // NEW: Regular buffer flushing
         addLog("OralableBLE initialized")
+    }
+
+    // MARK: - Buffer Flushing Timer
+
+    private func setupFlushTimer() {
+        // Flush pending buffers every second to ensure UI updates
+        flushTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.flushPendingBuffers()
+            }
+        }
+    }
+
+    private func flushPendingBuffers() {
+        // Flush all pending data to @Published arrays
+        if !pendingHeartRateData.isEmpty {
+            heartRateHistory.append(contentsOf: pendingHeartRateData)
+            if let latest = pendingHeartRateData.last {
+                heartRate = Int(latest.bpm)
+                heartRateQuality = latest.quality
+            }
+            pendingHeartRateData.removeAll()
+        }
+
+        if !pendingSpo2Data.isEmpty {
+            spo2History.append(contentsOf: pendingSpo2Data)
+            if let latest = pendingSpo2Data.last {
+                spO2 = Int(latest.percentage)
+            }
+            pendingSpo2Data.removeAll()
+        }
+
+        if !pendingPPGData.isEmpty {
+            ppgHistory.append(contentsOf: pendingPPGData)
+            pendingPPGData.removeAll()
+        }
+
+        if !pendingAccelData.isEmpty {
+            accelerometerHistory.append(contentsOf: pendingAccelData)
+            pendingAccelData.removeAll()
+        }
+
+        // Trim all histories
+        if heartRateHistory.count > maxHistoryCount {
+            heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
+        }
+        if spo2History.count > maxHistoryCount {
+            spo2History.removeFirst(spo2History.count - maxHistoryCount)
+        }
+        if ppgHistory.count > maxHistoryCount {
+            ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
+        }
+        if accelerometerHistory.count > maxHistoryCount {
+            accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
+        }
     }
     
     // MARK: - Direct BLE Callbacks (for UI integration)
@@ -213,20 +272,11 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] readings in
-                guard let self = self else { return }
-
-                // CRITICAL: Skip most updates to prevent grinding
-                let now = Date()
-                guard now.timeIntervalSince(self.lastHistoryUpdate) >= self.uiUpdateInterval else {
-                    return  // Skip this update
-                }
-                self.lastHistoryUpdate = now
-
-                // Only process on throttled interval
-                self.updateHistoriesFromReadings(readings)
-                self.updateLegacySensorData(with: readings)
+                // Process all data - timer will handle throttled flushing
+                self?.updateHistoriesFromReadings(readings)
+                self?.updateLegacySensorData(with: readings)
             }
             .store(in: &cancellables)
         

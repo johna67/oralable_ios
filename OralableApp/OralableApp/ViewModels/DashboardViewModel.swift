@@ -111,9 +111,9 @@ class DashboardViewModel: ObservableObject {
     }
     
     private func setupBLESubscriptions() {
-        // Subscribe to Heart Rate (calculated from PPG)
+        // Subscribe to Heart Rate (calculated from PPG) - reduced throttle for responsiveness
         bleManager.$heartRate
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] hr in
                 self?.heartRate = hr
             }
@@ -121,24 +121,24 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to SpO2 (calculated from PPG)
         bleManager.$spO2
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] spo2 in
                 self?.spO2 = spo2
             }
             .store(in: &cancellables)
 
-        // Subscribe to PPG data for waveform - THROTTLED
+        // Subscribe to PPG data for waveform
         bleManager.$ppgRedValue
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] value in
                 self?.processPPGData(value)
             }
             .store(in: &cancellables)
 
-        // Subscribe to accelerometer data - THROTTLED
+        // Subscribe to accelerometer data
         bleManager.$accelX
             .combineLatest(bleManager.$accelY, bleManager.$accelZ)
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] x, y, z in
                 self?.processAccelerometerData(x: x, y: y, z: z)
             }
@@ -146,7 +146,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to temperature
         bleManager.$temperature
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] temp in
                 self?.temperature = temp
             }
@@ -154,7 +154,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to HR quality for signal quality display
         bleManager.$heartRateQuality
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] quality in
                 self?.signalQuality = Int(quality * 100)
             }
