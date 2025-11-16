@@ -1,6 +1,7 @@
 import Foundation
 import AuthenticationServices
 import SwiftUI
+import Combine
 
 class AuthenticationManager: NSObject, ObservableObject {
     @Published var isAuthenticated = false
