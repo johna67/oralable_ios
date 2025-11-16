@@ -1,5 +1,5 @@
 //
-//  LoggingService.swift
+//  Logger.swift
 //  OralableApp
 //
 //  Centralized logging system with proper levels and performance optimization
@@ -8,10 +8,10 @@
 import Foundation
 import OSLog
 
-/// Logging service with support for different log levels and conditional compilation
+/// Centralized logger with support for different log levels and conditional compilation
 @MainActor
-final class LoggingService {
-    static let shared = LoggingService()
+final class Logger {
+    static let shared = Logger()
 
     // MARK: - Log Levels
 
@@ -281,24 +281,24 @@ struct LogMessage: Identifiable {
 // MARK: - Global Convenience Functions
 
 /// Global logging functions for convenience
-func logDebug(_ message: String, category: LoggingService.Category = .general) {
-    LoggingService.shared.debug(message, category: category)
+func logDebug(_ message: String, category: Logger.Category = .general) {
+    Logger.shared.debug(message, category: category)
 }
 
-func logInfo(_ message: String, category: LoggingService.Category = .general) {
-    LoggingService.shared.info(message, category: category)
+func logInfo(_ message: String, category: Logger.Category = .general) {
+    Logger.shared.info(message, category: category)
 }
 
-func logWarning(_ message: String, category: LoggingService.Category = .general) {
-    LoggingService.shared.warning(message, category: category)
+func logWarning(_ message: String, category: Logger.Category = .general) {
+    Logger.shared.warning(message, category: category)
 }
 
-func logError(_ message: String, error: Error? = nil, category: LoggingService.Category = .general) {
-    LoggingService.shared.error(message, category: category, error: error)
+func logError(_ message: String, error: Error? = nil, category: Logger.Category = .general) {
+    Logger.shared.error(message, category: category, error: error)
 }
 
-func logCritical(_ message: String, error: Error? = nil, category: LoggingService.Category = .general) {
-    LoggingService.shared.critical(message, category: category, error: error)
+func logCritical(_ message: String, error: Error? = nil, category: Logger.Category = .general) {
+    Logger.shared.critical(message, category: category, error: error)
 }
 
 // MARK: - Example Usage
@@ -310,15 +310,15 @@ func logCritical(_ message: String, error: Error? = nil, category: LoggingServic
  logError("Failed to connect to device", error: someError, category: .ble)
 
  // Throttled logging (for tight loops)
- LoggingService.shared.logThrottled("PPG packet received", category: .sensor, key: "ppg_packets", interval: 20)
+ Logger.shared.logThrottled("PPG packet received", category: .sensor, key: "ppg_packets", interval: 20)
 
  // Performance measurement
- LoggingService.shared.measure("Heart rate calculation", category: .sensor) {
+ Logger.shared.measure("Heart rate calculation", category: .sensor) {
      calculateHeartRate()
  }
 
  // Async measurement
- await LoggingService.shared.measureAsync("Fetch historical data", category: .data) {
+ await Logger.shared.measureAsync("Fetch historical data", category: .data) {
      await fetchHistoricalData()
  }
  */

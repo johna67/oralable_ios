@@ -354,7 +354,7 @@ class ErrorHandler: ObservableObject {
     }
 
     private func logError(_ error: AppError) {
-        let logger = LoggingService.shared
+        let logger = Logger.shared
 
         switch error.severity {
         case .info:
@@ -368,7 +368,7 @@ class ErrorHandler: ObservableObject {
         }
     }
 
-    private func logCategory(for errorCategory: ErrorCategory) -> LoggingService.Category {
+    private func logCategory(for errorCategory: ErrorCategory) -> Logger.Category {
         switch errorCategory {
         case .ble: return .ble
         case .sensor: return .sensor
