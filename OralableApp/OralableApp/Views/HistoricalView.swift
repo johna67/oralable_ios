@@ -25,6 +25,11 @@ struct HistoricalView: View {
     @State private var selectedDataPoint: HistoricalDataPoint?
     @State private var showingExportSheet = false
     @State private var showingDatePicker = false
+
+    // Navigation state variables (matching DashboardView)
+    @State private var showingProfile = false
+    @State private var showingDevices = false
+    @State private var showingSettings = false
     
     init() {
         // Initialize the view model with the required dependency
@@ -64,31 +69,45 @@ struct HistoricalView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if viewModel.isUpdating {
-                        ProgressView()
-                            .scaleEffect(0.8)
+                    Button(action: { showingProfile = true }) {
+                        Image(systemName: "person.circle")
+                            .font(.system(size: 22))
+                            .foregroundColor(designSystem.colors.textPrimary)
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: { viewModel.refresh() }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
+                    HStack(spacing: designSystem.spacing.sm) {
+                        Button(action: { showingDevices = true }) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 20))
+                                .foregroundColor(designSystem.colors.textPrimary)
                         }
-                        
-                        Button(action: { showingExportSheet = true }) {
-                            Label("Export Data", systemImage: "square.and.arrow.up")
+
+                        Menu {
+                            Button(action: { viewModel.refresh() }) {
+                                Label("Refresh", systemImage: "arrow.clockwise")
+                            }
+
+                            Button(action: { showingExportSheet = true }) {
+                                Label("Export Data", systemImage: "square.and.arrow.up")
+                            }
+
+                            Button(action: { viewModel.toggleDetailedStats() }) {
+                                Label(
+                                    viewModel.showDetailedStats ? "Hide Details" : "Show Details",
+                                    systemImage: "chart.bar.doc.horizontal"
+                                )
+                            }
+
+                            Button(action: { showingSettings = true }) {
+                                Label("Settings", systemImage: "gearshape")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 20))
+                                .foregroundColor(designSystem.colors.textPrimary)
                         }
-                        
-                        Button(action: { viewModel.toggleDetailedStats() }) {
-                            Label(
-                                viewModel.showDetailedStats ? "Hide Details" : "Show Details",
-                                systemImage: "chart.bar.doc.horizontal"
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundColor(designSystem.colors.textPrimary)
                     }
                 }
             }
@@ -98,6 +117,25 @@ struct HistoricalView: View {
         }
         .onAppear {
             viewModel.updateAllMetrics()
+        }
+        .sheet(isPresented: $showingProfile) {
+            ProfileView()
+                .environmentObject(designSystem)
+                .environmentObject(AuthenticationManager.shared)
+                .environmentObject(SubscriptionManager.shared)
+        }
+        .sheet(isPresented: $showingDevices) {
+            DevicesView()
+                .environmentObject(designSystem)
+                .environmentObject(bleManager)
+                .environmentObject(DeviceManager.shared)
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+                .environmentObject(designSystem)
+                .environmentObject(AuthenticationManager.shared)
+                .environmentObject(SubscriptionManager.shared)
+                .environmentObject(AppStateManager.shared)
         }
         .sheet(isPresented: $showingExportSheet) {
             SharingView()
