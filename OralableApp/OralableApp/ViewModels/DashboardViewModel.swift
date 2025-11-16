@@ -74,20 +74,22 @@ class DashboardViewModel: ObservableObject {
     }
     
     private func setupStateSubscriptions() {
+        // Connection state - update local property and reset on disconnect
+        bleManager.isConnectedPublisher
+            .sink { [weak self] connected in
+                self?.isConnected = connected
+                self?.deviceName = self?.bleManager.deviceName ?? "Not Connected"
+                if !connected {
+                    self?.resetMetrics()
+                }
+            }
+            .store(in: &cancellables)
+
         // Battery monitoring
         bleManager.batteryLevelPublisher
             .sink { [weak self] level in
                 self?.batteryLevel = Int(level)
                 self?.updateChargingState(batteryLevel: level)
-            }
-            .store(in: &cancellables)
-
-        // Connection state
-        bleManager.isConnectedPublisher
-            .sink { [weak self] connected in
-                if !connected {
-                    self?.resetMetrics()
-                }
             }
             .store(in: &cancellables)
     }
@@ -278,24 +280,18 @@ class DashboardViewModel: ObservableObject {
 
 // MARK: - Extensions
 extension DashboardViewModel {
-    // Convenience methods for UI
-    var isConnected: Bool {
-        bleManager.isConnected
-    }
-    
-    var deviceName: String {
-        bleManager.deviceName
-    }
-    
-    var batteryLevel: Double {
-        bleManager.batteryLevel
-    }
-    
-    func toggleRecording() {
-        if isRecording {
-            stopRecording()
-        } else {
-            startRecording()
+    // Recording control methods
+    func startRecording() {
+        guard isConnected else {
+            Logger.shared.warning("[DashboardViewModel] Cannot start recording - not connected to device")
+            return
         }
+        // TODO: Implement recording start via RecordingSessionManager
+        Logger.shared.info("[DashboardViewModel] Recording started")
+    }
+
+    func stopRecording() {
+        // TODO: Implement recording stop via RecordingSessionManager
+        Logger.shared.info("[DashboardViewModel] Recording stopped")
     }
 }
