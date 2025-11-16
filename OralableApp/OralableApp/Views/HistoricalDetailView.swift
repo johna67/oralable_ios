@@ -276,7 +276,7 @@ struct HistoricalSample: Codable {
 
 // MARK: - Centralized Data Processing Manager
 @MainActor
-class HistoricalDataProcessor: ObservableObject {
+class HistoricalDetailDataProcessor: ObservableObject {
     @Published var processedData: ProcessedHistoricalData?
     @Published var isProcessing = false
     @Published var selectedDataPoint: SensorData?
@@ -903,9 +903,9 @@ struct HistoricalDetailView: View {
     
     // Inject or derive app mode; default to subscription for now
     @State private var appMode: HistoricalAppMode = .subscription
-    
-    @StateObject private var processor = HistoricalDataProcessor()
-    
+
+    @StateObject private var processor = HistoricalDetailDataProcessor()
+
     private var chartHeight: CGFloat {
         DesignSystem.Layout.isIPad ? 400 : 300
     }
@@ -1153,8 +1153,8 @@ struct EnhancedHistoricalChartCardUnified: View {
     let metricType: MetricType
     let timeRange: TimeRange
     @Binding var selectedDataPoint: SensorData?
-    let processed: HistoricalDataProcessor.ProcessedHistoricalData?
-    
+    let processed: HistoricalDetailDataProcessor.ProcessedHistoricalData?
+
     // X-axis domain - the full time range regardless of data points
     private var xAxisDomain: ClosedRange<Date> {
         guard let processed = processed, !processed.rawData.isEmpty else {
@@ -1360,8 +1360,8 @@ struct EnhancedHistoricalChartCardUnified: View {
 struct TooltipOverlayUnified: View {
     let metricType: MetricType
     let selected: SensorData
-    let processed: HistoricalDataProcessor.ProcessedHistoricalData
-    
+    let processed: HistoricalDetailDataProcessor.ProcessedHistoricalData
+
     private var timeFormatter: DateFormatter {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
@@ -1430,8 +1430,8 @@ struct TooltipOverlayUnified: View {
 // MARK: - Enhanced Statistics Card (Unified with processor)
 struct EnhancedStatisticsCardUnified: View {
     let metricType: MetricType
-    let processed: HistoricalDataProcessor.ProcessedHistoricalData?
-    
+    let processed: HistoricalDetailDataProcessor.ProcessedHistoricalData?
+
     private func formatValue(_ value: Double) -> String {
         switch metricType {
         case .ppg:
