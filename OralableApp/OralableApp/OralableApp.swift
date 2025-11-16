@@ -196,10 +196,5 @@ enum AppMode: String, Codable {
 }
 
 // MARK: - App Configuration
-
-struct AppConfiguration {
-    static let appVersion = "1.0.0"
-    static let buildNumber = "2025.11.07"
-    static let minimumOSVersion = "15.0"
-}
+// NOTE: AppConfiguration moved to Configuration/AppConfiguration.swift (Phase 1 Refactoring)
 
