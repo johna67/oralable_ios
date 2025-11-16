@@ -71,19 +71,20 @@ protocol BLEManagerProtocol: AnyObject, ObservableObject {
 
     // MARK: - Publishers (for Combine bindings)
     // Note: These allow ViewModels to observe specific property changes
+    // Using AnyPublisher to properly expose publishers through protocol boundaries
 
-    var isConnectedPublisher: Published<Bool>.Publisher { get }
-    var isScanningPublisher: Published<Bool>.Publisher { get }
-    var batteryLevelPublisher: Published<Double>.Publisher { get }
-    var heartRatePublisher: Published<Int>.Publisher { get }
-    var spO2Publisher: Published<Int>.Publisher { get }
-    var ppgRedValuePublisher: Published<Double>.Publisher { get }
-    var accelXPublisher: Published<Double>.Publisher { get }
-    var accelYPublisher: Published<Double>.Publisher { get }
-    var accelZPublisher: Published<Double>.Publisher { get }
-    var temperaturePublisher: Published<Double>.Publisher { get }
-    var heartRateQualityPublisher: Published<Double>.Publisher { get }
-    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { get }
+    var isConnectedPublisher: AnyPublisher<Bool, Never> { get }
+    var isScanningPublisher: AnyPublisher<Bool, Never> { get }
+    var batteryLevelPublisher: AnyPublisher<Double, Never> { get }
+    var heartRatePublisher: AnyPublisher<Int, Never> { get }
+    var spO2Publisher: AnyPublisher<Int, Never> { get }
+    var ppgRedValuePublisher: AnyPublisher<Double, Never> { get }
+    var accelXPublisher: AnyPublisher<Double, Never> { get }
+    var accelYPublisher: AnyPublisher<Double, Never> { get }
+    var accelZPublisher: AnyPublisher<Double, Never> { get }
+    var temperaturePublisher: AnyPublisher<Double, Never> { get }
+    var heartRateQualityPublisher: AnyPublisher<Double, Never> { get }
+    var ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never> { get }
 
     // Note: deviceName is computed from primaryDevice, so we observe primaryDevice changes via objectWillChange
 

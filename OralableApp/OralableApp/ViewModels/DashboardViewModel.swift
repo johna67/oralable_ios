@@ -95,27 +95,33 @@ class DashboardViewModel: ObservableObject {
     }
 
     private func setupBLESubscriptions() {
+        Logger.shared.debug("[DashboardViewModel] 🔗 Setting up BLE subscriptions...")
+
         // Subscribe to Heart Rate (calculated from PPG) - reduced throttle for responsiveness
         bleManager.heartRatePublisher
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] hr in
+                Logger.shared.debug("[DashboardViewModel] ❤️ HR RAW received from publisher: \(hr) bpm")
                 self?.heartRate = hr
                 if hr > 0 {
                     Logger.shared.debug("[DashboardViewModel] ❤️ HR updated: \(hr) bpm")
                 }
             }
             .store(in: &cancellables)
+        Logger.shared.debug("[DashboardViewModel] ✅ HR publisher subscription created")
 
         // Subscribe to SpO2 (calculated from PPG)
         bleManager.spO2Publisher
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] spo2 in
+                Logger.shared.debug("[DashboardViewModel] 🫁 SpO2 RAW received from publisher: \(spo2)%")
                 self?.spO2 = spo2
                 if spo2 > 0 {
                     Logger.shared.debug("[DashboardViewModel] 🫁 SpO2 updated: \(spo2)%")
                 }
             }
             .store(in: &cancellables)
+        Logger.shared.debug("[DashboardViewModel] ✅ SpO2 publisher subscription created")
 
         // Subscribe to PPG data for waveform
         bleManager.ppgRedValuePublisher
@@ -149,6 +155,8 @@ class DashboardViewModel: ObservableObject {
                 self?.signalQuality = Int(quality * 100)
             }
             .store(in: &cancellables)
+
+        Logger.shared.info("[DashboardViewModel] ✅ All BLE subscriptions setup complete. Total cancellables: \(cancellables.count)")
     }
     private func processPPGData(_ value: Double) {
         // Normalize PPG value for chart display

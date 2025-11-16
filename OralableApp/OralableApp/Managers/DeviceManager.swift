@@ -54,7 +54,21 @@ class DeviceManager: ObservableObject {
     @Published private(set) var ppgGreenValue: Double = 0.0
     @Published private(set) var heartRateQuality: Double = 0.0
     @Published private(set) var ppgChannelOrderValue: PPGChannelOrder = .standard
-    
+
+    // Type-erased publishers (created once and reused)
+    private lazy var _isConnectedPublisher = $isConnected.eraseToAnyPublisher()
+    private lazy var _isScanningPublisher = $isScanning.eraseToAnyPublisher()
+    private lazy var _batteryLevelPublisher = $batteryLevel.eraseToAnyPublisher()
+    private lazy var _heartRatePublisher = $heartRate.eraseToAnyPublisher()
+    private lazy var _spO2Publisher = $spO2.eraseToAnyPublisher()
+    private lazy var _ppgRedValuePublisher = $ppgRedValue.eraseToAnyPublisher()
+    private lazy var _accelXPublisher = $accelX.eraseToAnyPublisher()
+    private lazy var _accelYPublisher = $accelY.eraseToAnyPublisher()
+    private lazy var _accelZPublisher = $accelZ.eraseToAnyPublisher()
+    private lazy var _temperaturePublisher = $temperature.eraseToAnyPublisher()
+    private lazy var _heartRateQualityPublisher = $heartRateQuality.eraseToAnyPublisher()
+    private lazy var _ppgChannelOrderPublisher = $ppgChannelOrderValue.eraseToAnyPublisher()
+
     // MARK: - Private Properties
 
     private var devices: [UUID: BLEDeviceProtocol] = [:]
@@ -602,6 +616,9 @@ class DeviceManager: ObservableObject {
     }
 
     private func calculateHeartRateAndSpO2() {
+        // Verify we're on MainActor
+        dispatchPrecondition(condition: .onQueue(.main))
+
         // Calculate Heart Rate from IR samples
         if ppgIRBuffer.count >= 100 {  // Need at least 2 seconds of data
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
@@ -609,7 +626,7 @@ class DeviceManager: ObservableObject {
                 if newHR != heartRate {  // Only log when value changes
                     heartRate = newHR
                     heartRateQuality = hrResult.quality
-                    print("❤️ [DeviceManager] HR calculated: \(newHR) bpm (quality: \(String(format: "%.2f", hrResult.quality)))")
+                    print("❤️ [DeviceManager] HR calculated: \(newHR) bpm (quality: \(String(format: "%.2f", hrResult.quality))) - Setting @Published property")
                 }
             }
         }
@@ -632,7 +649,7 @@ class DeviceManager: ObservableObject {
                 let newSpO2 = Int(calculatedSpO2)
                 if newSpO2 != spO2 {  // Only log when value changes
                     spO2 = newSpO2
-                    print("🫁 [DeviceManager] SpO2 calculated: \(newSpO2)% (ratio: \(String(format: "%.3f", ratio)), avgRed: \(Int(avgRed)), avgIR: \(Int(avgIR)))")
+                    print("🫁 [DeviceManager] SpO2 calculated: \(newSpO2)% (ratio: \(String(format: "%.3f", ratio)), avgRed: \(Int(avgRed)), avgIR: \(Int(avgIR))) - Setting @Published property")
                 }
             }
         }
@@ -698,19 +715,26 @@ extension DeviceManager: BLEManagerProtocol {
     }
 
     // MARK: - Publisher Properties
+    // Return the stored type-erased publishers (created once, reused for all subscribers)
 
-    var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
-    var isScanningPublisher: Published<Bool>.Publisher { $isScanning }
-    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
-    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
-    var spO2Publisher: Published<Int>.Publisher { $spO2 }
-    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
-    var accelXPublisher: Published<Double>.Publisher { $accelX }
-    var accelYPublisher: Published<Double>.Publisher { $accelY }
-    var accelZPublisher: Published<Double>.Publisher { $accelZ }
-    var temperaturePublisher: Published<Double>.Publisher { $temperature }
-    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
-    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrderValue }
+    var isConnectedPublisher: AnyPublisher<Bool, Never> { _isConnectedPublisher }
+    var isScanningPublisher: AnyPublisher<Bool, Never> { _isScanningPublisher }
+    var batteryLevelPublisher: AnyPublisher<Double, Never> { _batteryLevelPublisher }
+    var heartRatePublisher: AnyPublisher<Int, Never> {
+        print("🔍 [DeviceManager] heartRatePublisher accessed - returning stored publisher")
+        return _heartRatePublisher
+    }
+    var spO2Publisher: AnyPublisher<Int, Never> {
+        print("🔍 [DeviceManager] spO2Publisher accessed - returning stored publisher")
+        return _spO2Publisher
+    }
+    var ppgRedValuePublisher: AnyPublisher<Double, Never> { _ppgRedValuePublisher }
+    var accelXPublisher: AnyPublisher<Double, Never> { _accelXPublisher }
+    var accelYPublisher: AnyPublisher<Double, Never> { _accelYPublisher }
+    var accelZPublisher: AnyPublisher<Double, Never> { _accelZPublisher }
+    var temperaturePublisher: AnyPublisher<Double, Never> { _temperaturePublisher }
+    var heartRateQualityPublisher: AnyPublisher<Double, Never> { _heartRateQualityPublisher }
+    var ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never> { _ppgChannelOrderPublisher }
 
     // MARK: - BLEManagerProtocol Methods
 
