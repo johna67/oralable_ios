@@ -34,19 +34,20 @@ class DashboardViewModel: ObservableObject {
     @Published var sessionStartTime: Date?
     
     // MARK: - Private Properties
-    private let bleManager = OralableBLE.shared
+    private let bleManager: BLEManagerProtocol
     private let appStateManager = AppStateManager.shared
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
     private var mockDataTimer: Timer?
-    
+
     // Thresholds for MAM detection
     private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
     private let movementThreshold: Double = 0.1         // Accelerometer magnitude
     private let signalQualityThreshold: Double = 80.0   // Signal quality percentage
-    
+
     // MARK: - Initialization
-    init() {
+    init(bleManager: BLEManagerProtocol = DeviceManager.shared) {
+        self.bleManager = bleManager
         setupBindings()
 
         // Only use mock data in Demo mode
@@ -94,14 +95,14 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Private Methods
     private func setupBindings() {
         // Battery level changes
-        bleManager.$batteryLevel
+        bleManager.batteryLevelPublisher
             .sink { [weak self] level in
                 self?.updateChargingState(batteryLevel: level)
             }
             .store(in: &cancellables)
-        
+
         // Connection state
-        bleManager.$isConnected
+        bleManager.isConnectedPublisher
             .sink { [weak self] connected in
                 if !connected {
                     self?.resetMetrics()
@@ -109,46 +110,46 @@ class DashboardViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     private func setupBLESubscriptions() {
         // Subscribe to Heart Rate (calculated from PPG)
-        bleManager.$heartRate
+        bleManager.heartRatePublisher
             .sink { [weak self] hr in
                 self?.heartRate = hr
             }
             .store(in: &cancellables)
 
         // Subscribe to SpO2 (calculated from PPG)
-        bleManager.$spO2
+        bleManager.spO2Publisher
             .sink { [weak self] spo2 in
                 self?.spO2 = spo2
             }
             .store(in: &cancellables)
 
         // Subscribe to PPG data for waveform
-        bleManager.$ppgRedValue
+        bleManager.ppgRedValuePublisher
             .sink { [weak self] value in
                 self?.processPPGData(value)
             }
             .store(in: &cancellables)
 
         // Subscribe to accelerometer data
-        bleManager.$accelX
-            .combineLatest(bleManager.$accelY, bleManager.$accelZ)
+        bleManager.accelXPublisher
+            .combineLatest(bleManager.accelYPublisher, bleManager.accelZPublisher)
             .sink { [weak self] x, y, z in
                 self?.processAccelerometerData(x: x, y: y, z: z)
             }
             .store(in: &cancellables)
 
         // Subscribe to temperature
-        bleManager.$temperature
+        bleManager.temperaturePublisher
             .sink { [weak self] temp in
                 self?.temperature = temp
             }
             .store(in: &cancellables)
 
         // Subscribe to HR quality for signal quality display
-        bleManager.$heartRateQuality
+        bleManager.heartRateQualityPublisher
             .sink { [weak self] quality in
                 self?.signalQuality = Int(quality * 100)
             }

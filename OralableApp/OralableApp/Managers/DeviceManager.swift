@@ -16,28 +16,43 @@ class DeviceManager: ObservableObject {
     static let shared = DeviceManager()
     
     // MARK: - Published Properties
-    
+
     /// All discovered devices
     @Published var discoveredDevices: [DeviceInfo] = []
-    
+
     /// Currently connected devices
     @Published var connectedDevices: [DeviceInfo] = []
-    
+
     /// Primary active device
     @Published var primaryDevice: DeviceInfo?
-    
+
     /// All sensor readings from all devices
     @Published var allSensorReadings: [SensorReading] = []
-    
+
     /// Latest readings by sensor type (aggregated from all devices)
     @Published var latestReadings: [SensorType: SensorReading] = [:]
-    
+
     /// Connection state
     @Published var isScanning: Bool = false
     @Published var isConnecting: Bool = false
-    
+
     /// Errors
     @Published var lastError: DeviceError?
+
+    // MARK: - Individual Sensor Value Published Properties (for ViewModel bindings)
+
+    @Published private(set) var isConnected: Bool = false
+    @Published private(set) var heartRate: Int = 0
+    @Published private(set) var spO2: Int = 0
+    @Published private(set) var temperature: Double = 0.0
+    @Published private(set) var batteryLevel: Double = 0.0
+    @Published private(set) var accelX: Double = 0.0
+    @Published private(set) var accelY: Double = 0.0
+    @Published private(set) var accelZ: Double = 0.0
+    @Published private(set) var ppgRedValue: Double = 0.0
+    @Published private(set) var ppgIRValue: Double = 0.0
+    @Published private(set) var ppgGreenValue: Double = 0.0
+    @Published private(set) var heartRateQuality: Double = 0.0
     
     // MARK: - Private Properties
     
@@ -228,21 +243,24 @@ class DeviceManager: ObservableObject {
         print("\n✅ [DeviceManager] handleDeviceConnected")
         print("✅ [DeviceManager] Peripheral: \(peripheral.identifier)")
         print("✅ [DeviceManager] Name: \(peripheral.name ?? "Unknown")")
-        
+
         isConnecting = false
-        
+
         // Update device info
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
             print("✅ [DeviceManager] Found device in discoveredDevices at index \(index)")
             discoveredDevices[index].connectionState = .connected
-            
+
             // Add to connected devices if not already there
             if !connectedDevices.contains(where: { $0.id == discoveredDevices[index].id }) {
                 print("✅ [DeviceManager] Adding to connectedDevices array")
                 connectedDevices.append(discoveredDevices[index])
                 print("✅ [DeviceManager] connectedDevices count: \(connectedDevices.count)")
+
+                // Update isConnected published property
+                isConnected = !connectedDevices.isEmpty
             }
-            
+
             // Set as primary if none set
             if primaryDevice == nil {
                 print("✅ [DeviceManager] Setting as primary device (first connection)")
@@ -277,23 +295,26 @@ class DeviceManager: ObservableObject {
         print("\n🔌 [DeviceManager] handleDeviceDisconnected")
         print("🔌 [DeviceManager] Peripheral: \(peripheral.identifier)")
         print("🔌 [DeviceManager] Name: \(peripheral.name ?? "Unknown")")
-        
+
         if let error = error {
             print("🔌 [DeviceManager] Error: \(error.localizedDescription)")
             lastError = .connectionLost
         }
-        
+
         isConnecting = false
-        
+
         // Update device states
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
             print("🔌 [DeviceManager] Updating discoveredDevices[\(index)] to disconnected")
             discoveredDevices[index].connectionState = .disconnected
         }
-        
+
         connectedDevices.removeAll { $0.peripheralIdentifier == peripheral.identifier }
         print("🔌 [DeviceManager] Removed from connectedDevices, count: \(connectedDevices.count)")
-        
+
+        // Update isConnected published property
+        isConnected = !connectedDevices.isEmpty
+
         if primaryDevice?.peripheralIdentifier == peripheral.identifier {
             print("🔌 [DeviceManager] Primary device disconnected, setting to nil")
             primaryDevice = connectedDevices.first
@@ -490,10 +511,37 @@ class DeviceManager: ObservableObject {
     private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
         // Add to all readings
         allSensorReadings.append(reading)
-        
+
         // Update latest readings
         latestReadings[reading.sensorType] = reading
-        
+
+        // Update individual @Published properties for ViewModel bindings
+        switch reading.sensorType {
+        case .heartRate:
+            heartRate = Int(reading.value)
+            heartRateQuality = reading.quality ?? 0.0
+        case .spo2:
+            spO2 = Int(reading.value)
+        case .temperature:
+            temperature = reading.value
+        case .battery:
+            batteryLevel = reading.value
+        case .accelerometerX:
+            accelX = reading.value
+        case .accelerometerY:
+            accelY = reading.value
+        case .accelerometerZ:
+            accelZ = reading.value
+        case .ppgRed:
+            ppgRedValue = reading.value
+        case .ppgInfrared:
+            ppgIRValue = reading.value
+        case .ppgGreen:
+            ppgGreenValue = reading.value
+        default:
+            break
+        }
+
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
             allSensorReadings.removeFirst(100)
@@ -525,5 +573,129 @@ class DeviceManager: ObservableObject {
             print("📌 [DeviceManager] Clearing primary device")
         }
         primaryDevice = deviceInfo
+    }
+}
+
+// MARK: - BLEManagerProtocol Conformance
+
+extension DeviceManager: BLEManagerProtocol {
+
+    // MARK: - Connection State Properties
+    // Note: isConnected is now a @Published property, not computed
+
+    var deviceName: String {
+        primaryDevice?.name ?? "No Device"
+    }
+
+    // Note: Recording functionality delegated to RecordingSessionManager
+    var isRecording: Bool {
+        RecordingSessionManager.shared.isRecording
+    }
+
+    // Note: PPG channel order stored in UserDefaults
+    var ppgChannelOrder: PPGChannelOrder {
+        get {
+            if let rawValue = UserDefaults.standard.string(forKey: "ppgChannelOrder"),
+               let order = PPGChannelOrder(rawValue: rawValue) {
+                return order
+            }
+            return .standard
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "ppgChannelOrder")
+        }
+    }
+
+    // MARK: - Publisher Properties
+
+    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
+    var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
+    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
+    var spO2Publisher: Published<Int>.Publisher { $spO2 }
+    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
+    var accelXPublisher: Published<Double>.Publisher { $accelX }
+    var accelYPublisher: Published<Double>.Publisher { $accelY }
+    var accelZPublisher: Published<Double>.Publisher { $accelZ }
+    var temperaturePublisher: Published<Double>.Publisher { $temperature }
+    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
+
+    // MARK: - BLEManagerProtocol Methods
+
+    // Note: The class already has stopScanning() and async startScanning()
+    // We provide sync wrappers where needed for protocol conformance
+
+    /// Synchronous wrapper for async startScanning() - required by protocol
+    func startScanning() {
+        Task {
+            // Call the async version defined in the main class (line 338)
+            await (self as DeviceManager).startScanning()
+        }
+    }
+
+    func connect(to peripheral: CBPeripheral) {
+        Task {
+            if let deviceInfo = discoveredDevices.first(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+                do {
+                    try await connect(to: deviceInfo)
+                    Logger.shared.info("[DeviceManager] ✅ Connected to \(deviceInfo.name)")
+
+                    // Auto-start recording when connected (matching OralableBLE behavior)
+                    await MainActor.run {
+                        startRecording()
+                    }
+                } catch {
+                    Logger.shared.error("[DeviceManager] ❌ Connection failed: \(error)")
+                }
+            }
+        }
+    }
+
+    func disconnect() {
+        guard let primary = primaryDevice else { return }
+
+        // Auto-stop recording when disconnecting (matching OralableBLE behavior)
+        if isRecording {
+            stopRecording()
+        }
+
+        disconnect(from: primary)
+    }
+
+    func startRecording() {
+        guard !isRecording else {
+            Logger.shared.warning("[DeviceManager] Recording already in progress")
+            return
+        }
+
+        do {
+            let deviceID = primaryDevice?.peripheralIdentifier?.uuidString
+            let deviceName = primaryDevice?.name ?? "Unknown"
+            _ = try RecordingSessionManager.shared.startSession(
+                deviceID: deviceID,
+                deviceName: deviceName
+            )
+            Logger.shared.info("[DeviceManager] ✅ Started recording session")
+        } catch {
+            Logger.shared.error("[DeviceManager] ❌ Failed to start recording: \(error)")
+        }
+    }
+
+    func stopRecording() {
+        guard isRecording else {
+            Logger.shared.debug("[DeviceManager] No recording in progress")
+            return
+        }
+
+        do {
+            try RecordingSessionManager.shared.stopSession()
+            Logger.shared.info("[DeviceManager] ✅ Stopped recording session")
+        } catch {
+            Logger.shared.error("[DeviceManager] ❌ Failed to stop recording: \(error)")
+        }
+    }
+
+    func clearHistory() {
+        clearReadings()
+        Logger.shared.info("[DeviceManager] ✅ Cleared all history")
     }
 }
