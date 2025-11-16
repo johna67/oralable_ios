@@ -277,26 +277,53 @@ class DeviceManager: ObservableObject {
         print("\n🔌 [DeviceManager] handleDeviceDisconnected")
         print("🔌 [DeviceManager] Peripheral: \(peripheral.identifier)")
         print("🔌 [DeviceManager] Name: \(peripheral.name ?? "Unknown")")
-        
+
+        var shouldReconnect = false
+
         if let error = error {
             print("🔌 [DeviceManager] Error: \(error.localizedDescription)")
             lastError = .connectionLost
+
+            // Automatic reconnection for unexpected disconnections
+            shouldReconnect = true
+            print("🔌 [DeviceManager] Unexpected disconnection detected - will attempt reconnection")
+        } else {
+            print("🔌 [DeviceManager] Clean disconnection (user-initiated)")
         }
-        
+
         isConnecting = false
-        
+
+        // Store device info before updating state (needed for reconnection)
+        let deviceInfoForReconnect = discoveredDevices.first(where: { $0.peripheralIdentifier == peripheral.identifier })
+
         // Update device states
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
             print("🔌 [DeviceManager] Updating discoveredDevices[\(index)] to disconnected")
             discoveredDevices[index].connectionState = .disconnected
         }
-        
+
         connectedDevices.removeAll { $0.peripheralIdentifier == peripheral.identifier }
         print("🔌 [DeviceManager] Removed from connectedDevices, count: \(connectedDevices.count)")
-        
+
         if primaryDevice?.peripheralIdentifier == peripheral.identifier {
             print("🔌 [DeviceManager] Primary device disconnected, setting to nil")
             primaryDevice = connectedDevices.first
+        }
+
+        // Attempt automatic reconnection for unexpected disconnections
+        if shouldReconnect, let deviceInfo = deviceInfoForReconnect {
+            print("🔌 [DeviceManager] Scheduling automatic reconnection in 2 seconds...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                print("🔌 [DeviceManager] Attempting automatic reconnection to \(deviceInfo.name)...")
+                Task { @MainActor in
+                    do {
+                        try await self?.connect(to: deviceInfo)
+                        print("✅ [DeviceManager] Automatic reconnection successful")
+                    } catch {
+                        print("❌ [DeviceManager] Automatic reconnection failed: \(error.localizedDescription)")
+                    }
+                }
+            }
         }
     }
     

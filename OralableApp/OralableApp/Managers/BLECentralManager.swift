@@ -93,7 +93,16 @@ final class BLECentralManager: NSObject {
     
     func connect(to peripheral: CBPeripheral) {
         pendingConnections.insert(peripheral.identifier)
-        central.connect(peripheral, options: nil)
+
+        // Connection options to prevent 3-minute timeout
+        let options: [String: Any] = [
+            CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnDisconnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnNotificationKey: true,
+            CBConnectPeripheralOptionStartDelayKey: 1  // Delay of 1 second before connecting
+        ]
+
+        central.connect(peripheral, options: options)
     }
     
     func disconnect(from peripheral: CBPeripheral) {
