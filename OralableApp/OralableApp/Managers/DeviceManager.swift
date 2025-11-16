@@ -55,6 +55,20 @@ class DeviceManager: ObservableObject {
     @Published private(set) var heartRateQuality: Double = 0.0
     @Published private(set) var ppgChannelOrderValue: PPGChannelOrder = .standard
 
+    // Type-erased publishers - initialized once in init() and reused for all subscribers
+    private let _isConnectedPublisher: AnyPublisher<Bool, Never>
+    private let _isScanningPublisher: AnyPublisher<Bool, Never>
+    private let _batteryLevelPublisher: AnyPublisher<Double, Never>
+    private let _heartRatePublisher: AnyPublisher<Int, Never>
+    private let _spO2Publisher: AnyPublisher<Int, Never>
+    private let _ppgRedValuePublisher: AnyPublisher<Double, Never>
+    private let _accelXPublisher: AnyPublisher<Double, Never>
+    private let _accelYPublisher: AnyPublisher<Double, Never>
+    private let _accelZPublisher: AnyPublisher<Double, Never>
+    private let _temperaturePublisher: AnyPublisher<Double, Never>
+    private let _heartRateQualityPublisher: AnyPublisher<Double, Never>
+    private let _ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never>
+
     // MARK: - Private Properties
 
     private var devices: [UUID: BLEDeviceProtocol] = [:]
@@ -78,13 +92,29 @@ class DeviceManager: ObservableObject {
     
     init() {
         print("\n🏭 [DeviceManager] Initializing...")
-        
+
         // Load PPG channel order from UserDefaults
         if let rawValue = UserDefaults.standard.string(forKey: "ppgChannelOrder"),
            let order = PPGChannelOrder(rawValue: rawValue) {
             ppgChannelOrderValue = order
         }
-        
+
+        // Initialize type-erased publishers ONCE - these will be reused by all subscribers
+        print("🏭 [DeviceManager] Creating type-erased publishers...")
+        _isConnectedPublisher = $isConnected.eraseToAnyPublisher()
+        _isScanningPublisher = $isScanning.eraseToAnyPublisher()
+        _batteryLevelPublisher = $batteryLevel.eraseToAnyPublisher()
+        _heartRatePublisher = $heartRate.eraseToAnyPublisher()
+        _spO2Publisher = $spO2.eraseToAnyPublisher()
+        _ppgRedValuePublisher = $ppgRedValue.eraseToAnyPublisher()
+        _accelXPublisher = $accelX.eraseToAnyPublisher()
+        _accelYPublisher = $accelY.eraseToAnyPublisher()
+        _accelZPublisher = $accelZ.eraseToAnyPublisher()
+        _temperaturePublisher = $temperature.eraseToAnyPublisher()
+        _heartRateQualityPublisher = $heartRateQuality.eraseToAnyPublisher()
+        _ppgChannelOrderPublisher = $ppgChannelOrderValue.eraseToAnyPublisher()
+        print("🏭 [DeviceManager] Type-erased publishers created successfully")
+
         bleManager = BLECentralManager()
         setupBLECallbacks()
         print("🏭 [DeviceManager] Initialization complete")
@@ -701,57 +731,56 @@ extension DeviceManager: BLEManagerProtocol {
     }
 
     // MARK: - Publisher Properties
-    // Computed properties that type-erase the @Published publishers
-    // Using AnyPublisher to properly expose publishers through protocol boundaries
+    // Return the stored publishers (initialized once in init, shared by all subscribers)
 
     var isConnectedPublisher: AnyPublisher<Bool, Never> {
-        $isConnected.eraseToAnyPublisher()
+        _isConnectedPublisher
     }
 
     var isScanningPublisher: AnyPublisher<Bool, Never> {
-        $isScanning.eraseToAnyPublisher()
+        _isScanningPublisher
     }
 
     var batteryLevelPublisher: AnyPublisher<Double, Never> {
-        $batteryLevel.eraseToAnyPublisher()
+        _batteryLevelPublisher
     }
 
     var heartRatePublisher: AnyPublisher<Int, Never> {
-        print("🔍 [DeviceManager] heartRatePublisher accessed - current value: \(heartRate)")
-        return $heartRate.eraseToAnyPublisher()
+        print("🔍 [DeviceManager] heartRatePublisher accessed - returning STORED publisher (current HR: \(heartRate))")
+        return _heartRatePublisher
     }
 
     var spO2Publisher: AnyPublisher<Int, Never> {
-        print("🔍 [DeviceManager] spO2Publisher accessed - current value: \(spO2)")
-        return $spO2.eraseToAnyPublisher()
+        print("🔍 [DeviceManager] spO2Publisher accessed - returning STORED publisher (current SpO2: \(spO2))")
+        return _spO2Publisher
     }
 
     var ppgRedValuePublisher: AnyPublisher<Double, Never> {
-        $ppgRedValue.eraseToAnyPublisher()
+        _ppgRedValuePublisher
     }
 
     var accelXPublisher: AnyPublisher<Double, Never> {
-        $accelX.eraseToAnyPublisher()
+        _accelXPublisher
     }
 
     var accelYPublisher: AnyPublisher<Double, Never> {
-        $accelY.eraseToAnyPublisher()
+        _accelYPublisher
     }
 
     var accelZPublisher: AnyPublisher<Double, Never> {
-        $accelZ.eraseToAnyPublisher()
+        _accelZPublisher
     }
 
     var temperaturePublisher: AnyPublisher<Double, Never> {
-        $temperature.eraseToAnyPublisher()
+        _temperaturePublisher
     }
 
     var heartRateQualityPublisher: AnyPublisher<Double, Never> {
-        $heartRateQuality.eraseToAnyPublisher()
+        _heartRateQualityPublisher
     }
 
     var ppgChannelOrderPublisher: AnyPublisher<PPGChannelOrder, Never> {
-        $ppgChannelOrderValue.eraseToAnyPublisher()
+        _ppgChannelOrderPublisher
     }
 
     // MARK: - BLEManagerProtocol Methods
