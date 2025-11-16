@@ -54,11 +54,20 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Initialization
     
     init(bleManager: BLEManagerProtocol = DeviceManager.shared) {
+        print("🎯 [DashboardViewModel] INIT called - Creating instance")
+        print("🎯 [DashboardViewModel] bleManager type: \(type(of: bleManager))")
+        print("🎯 [DashboardViewModel] bleManager is DeviceManager.shared: \(bleManager as AnyObject === DeviceManager.shared as AnyObject)")
+
         self.bleManager = bleManager
+
+        print("🎯 [DashboardViewModel] Calling setupBindings()...")
         setupBindings()
-        
+        print("🎯 [DashboardViewModel] setupBindings() completed")
+
         // Start session timer
         startSessionTimer()
+
+        print("🎯 [DashboardViewModel] INIT completed")
     }
     
     deinit {
@@ -69,8 +78,12 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Setup
     
     private func setupBindings() {
+        print("🎯 [DashboardViewModel] setupBindings() - Starting...")
+        print("🎯 [DashboardViewModel] Calling setupBLESubscriptions()...")
         setupBLESubscriptions()
+        print("🎯 [DashboardViewModel] Calling setupStateSubscriptions()...")
         setupStateSubscriptions()
+        print("🎯 [DashboardViewModel] setupBindings() - Completed")
     }
     
     private func setupStateSubscriptions() {

@@ -20,7 +20,8 @@ struct DashboardView: View {
     @State private var showingHistorical = false
     
     var body: some View {
-        NavigationView {
+        print("📱 [DashboardView] body being evaluated - viewModel initialized: \(viewModel.self)")
+        return NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
                     // Connection Status Card
