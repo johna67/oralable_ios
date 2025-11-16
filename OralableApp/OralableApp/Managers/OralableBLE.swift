@@ -3,7 +3,22 @@
 //  OralableApp
 //
 //  Created: November 7, 2025
-//  Compatibility wrapper around DeviceManager to maintain existing view interfaces
+//
+//  ⚠️ DEPRECATED - This file is being phased out
+//
+//  STATUS: Compatibility wrapper around DeviceManager
+//
+//  Migration Progress:
+//  ✅ ViewModels migrated to BLEManagerProtocol (DashboardViewModel, DevicesViewModel, SettingsViewModel)
+//  ⏳ HistoricalDataManager still uses OralableBLE for historical data aggregation
+//  ⏳ Some Views still reference OralableBLE (ViewerModeView, HistoricalView)
+//
+//  Next Steps:
+//  1. Migrate HistoricalDataManager to use DeviceManager.allSensorReadings
+//  2. Update remaining Views to use DeviceManager
+//  3. Delete this file entirely
+//
+//  DO NOT ADD NEW DEPENDENCIES ON THIS CLASS
 //
 
 import Foundation
