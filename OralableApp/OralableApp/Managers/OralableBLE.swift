@@ -108,6 +108,9 @@ class OralableBLE: ObservableObject {
     private var pendingPPGData: [PPGData] = []
     private var pendingAccelData: [AccelerometerData] = []
 
+    // Background processing queue to prevent main thread blocking
+    private let processingQueue = DispatchQueue(label: "com.oralable.dataProcessing", qos: .userInitiated)
+
     // MARK: - Initialization
     
     init() {
@@ -210,14 +213,25 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         deviceManager.$allSensorReadings
-            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] readings in
-                self?.updateHistoriesFromReadings(readings)
-                self?.updateLegacySensorData(with: readings)
+                guard let self = self else { return }
+
+                // CRITICAL: Skip most updates to prevent grinding
+                let now = Date()
+                guard now.timeIntervalSince(self.lastHistoryUpdate) >= self.uiUpdateInterval else {
+                    return  // Skip this update
+                }
+                self.lastHistoryUpdate = now
+
+                // Only process on throttled interval
+                self.updateHistoriesFromReadings(readings)
+                self.updateLegacySensorData(with: readings)
             }
             .store(in: &cancellables)
         
         deviceManager.$latestReadings
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] latestReadings in
                 self?.updateDeviceState(from: latestReadings)
             }
@@ -227,7 +241,11 @@ class OralableBLE: ObservableObject {
     // MARK: - History Management from Sensor Readings
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
-        Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        // Reduced logging - only every 10th call
+        ppgLogCounter += 1
+        if ppgLogCounter % 10 == 0 {
+            Logger.shared.debug("[OralableBLE] Processing \(readings.count) sensor readings")
+        }
 
         for reading in readings {
             switch reading.sensorType {
@@ -237,7 +255,7 @@ class OralableBLE: ObservableObject {
                 if batteryHistory.count > maxHistoryCount {
                     batteryHistory.removeFirst(batteryHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Battery: \(Int(reading.value))% | History count: \(batteryHistory.count)")
+                // Removed per-reading logging
 
             case .heartRate:
                 // Force connection state when we have data
@@ -253,7 +271,7 @@ class OralableBLE: ObservableObject {
                 if heartRateHistory.count > maxHistoryCount {
                     heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] Heart Rate: \(Int(reading.value)) bpm | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(heartRateHistory.count)")
+                // Removed per-reading logging
 
             case .spo2:
                 let spo2Data = SpO2Data(percentage: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
@@ -261,7 +279,7 @@ class OralableBLE: ObservableObject {
                 if spo2History.count > maxHistoryCount {
                     spo2History.removeFirst(spo2History.count - maxHistoryCount)
                 }
-                Logger.shared.info("[OralableBLE] SpO2: \(Int(reading.value))% | Quality: \(String(format: "%.2f", reading.quality ?? 0.8)) | History count: \(spo2History.count)")
+                // Removed per-reading logging
 
             case .temperature:
                 temperature = reading.value  // Update published property
@@ -270,7 +288,7 @@ class OralableBLE: ObservableObject {
                 if temperatureHistory.count > maxHistoryCount {
                     temperatureHistory.removeFirst(temperatureHistory.count - maxHistoryCount)
                 }
-                Logger.shared.debug("[OralableBLE] Temperature: \(String(format: "%.1f", reading.value))°C | History count: \(temperatureHistory.count)")
+                // Removed per-reading logging
 
             case .ppgRed, .ppgInfrared, .ppgGreen:
                 // PPG data needs to be grouped - handled separately
@@ -285,7 +303,7 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        Logger.shared.debug("[OralableBLE] Total history counts - HR: \(heartRateHistory.count), SpO2: \(spo2History.count), Temp: \(temperatureHistory.count), PPG: \(ppgHistory.count)")
+        // Removed verbose logging - only log on throttled interval
     }
     
     private func updatePPGHistory(from readings: [SensorReading]) {
@@ -384,9 +402,8 @@ class OralableBLE: ObservableObject {
             }
         }
 
-        // Reduced logging to prevent UI freeze - only log every 50th packet
-        ppgLogCounter += 1
-        if ppgLogCounter % 50 == 0 {
+        // Reduced logging to prevent UI freeze - only log every 200th packet
+        if ppgLogCounter % 200 == 0 {
             Logger.shared.debug("[OralableBLE] PPG data processed: \(grouped.count) samples | R: \(grouped.values.first?.red ?? 0), IR: \(grouped.values.first?.ir ?? 0), G: \(grouped.values.first?.green ?? 0) | History count: \(ppgHistory.count)")
         }
     }
@@ -423,9 +440,9 @@ class OralableBLE: ObservableObject {
             accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
         }
 
-        // Reduced logging to prevent UI freeze - only log every 50th packet
+        // Reduced logging to prevent UI freeze - only log every 200th packet
         accelLogCounter += 1
-        if accelLogCounter % 50 == 0 {
+        if accelLogCounter % 200 == 0 {
             Logger.shared.debug("[OralableBLE] Accelerometer data processed: \(grouped.count) samples | X: \(grouped.values.first?.x ?? 0), Y: \(grouped.values.first?.y ?? 0), Z: \(grouped.values.first?.z ?? 0) | History count: \(accelerometerHistory.count)")
         }
     }
