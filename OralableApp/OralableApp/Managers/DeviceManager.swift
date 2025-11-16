@@ -53,6 +53,7 @@ class DeviceManager: ObservableObject {
     @Published private(set) var ppgIRValue: Double = 0.0
     @Published private(set) var ppgGreenValue: Double = 0.0
     @Published private(set) var heartRateQuality: Double = 0.0
+    @Published private(set) var ppgChannelOrderValue: PPGChannelOrder = .standard
     
     // MARK: - Private Properties
     
@@ -71,6 +72,13 @@ class DeviceManager: ObservableObject {
     
     init() {
         print("\n🏭 [DeviceManager] Initializing...")
+        
+        // Load PPG channel order from UserDefaults
+        if let rawValue = UserDefaults.standard.string(forKey: "ppgChannelOrder"),
+           let order = PPGChannelOrder(rawValue: rawValue) {
+            ppgChannelOrderValue = order
+        }
+        
         bleManager = BLECentralManager()
         setupBLECallbacks()
         print("🏭 [DeviceManager] Initialization complete")
@@ -589,7 +597,7 @@ extension DeviceManager: BLEManagerProtocol {
 
     // Note: Recording functionality delegated to RecordingSessionManager
     var isRecording: Bool {
-        RecordingSessionManager.shared.isRecording
+        RecordingSessionManager.shared.currentSession != nil
     }
 
     // Note: PPG channel order stored in UserDefaults
@@ -603,6 +611,7 @@ extension DeviceManager: BLEManagerProtocol {
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "ppgChannelOrder")
+            ppgChannelOrderValue = newValue
         }
     }
 
@@ -619,6 +628,7 @@ extension DeviceManager: BLEManagerProtocol {
     var accelZPublisher: Published<Double>.Publisher { $accelZ }
     var temperaturePublisher: Published<Double>.Publisher { $temperature }
     var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
+    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrderValue }
 
     // MARK: - BLEManagerProtocol Methods
 

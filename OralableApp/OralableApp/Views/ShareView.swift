@@ -200,16 +200,29 @@ struct ShareView: View {
                 }
                 
                 // Now import from the copied file
-                if let imported = CSVImportManager.shared.importData(from: tempURL) {
-                    // Calculate time offset to make imported data "recent" for 3-minute window
-                    // Find the most recent timestamp in imported data
-                    guard let oldestTimestamp = imported.sensorData.first?.timestamp,
-                          let newestTimestamp = imported.sensorData.last?.timestamp else {
+                let imported = CSVImportManager.shared.importData(from: tempURL)
+                
+                // Check if import was successful
+                guard !imported.sensorData.isEmpty else {
+                    if imported.hasErrors {
+                        importErrorMessage = imported.errors.first ?? "No valid sensor data in CSV file."
+                    } else {
                         importErrorMessage = "No valid sensor data in CSV file."
-                        showImportError = true
-                        try? FileManager.default.removeItem(at: tempURL)
-                        return
                     }
+                    showImportError = true
+                    try? FileManager.default.removeItem(at: tempURL)
+                    return
+                }
+                
+                // Calculate time offset to make imported data "recent" for 3-minute window
+                // Find the most recent timestamp in imported data
+                guard let oldestTimestamp = imported.sensorData.first?.timestamp,
+                      let newestTimestamp = imported.sensorData.last?.timestamp else {
+                    importErrorMessage = "No valid sensor data in CSV file."
+                    showImportError = true
+                    try? FileManager.default.removeItem(at: tempURL)
+                    return
+                }
                     
                     // Calculate offset to bring the newest data point to "now"
                     let timeOffset = Date().timeIntervalSince(newestTimestamp)
@@ -304,10 +317,6 @@ struct ShareView: View {
                     ))
                     
                     showImportSuccess = true
-                } else {
-                    importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
-                    showImportError = true
-                }
                 
                 // Clean up temporary file
                 try? FileManager.default.removeItem(at: tempURL)

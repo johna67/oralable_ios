@@ -674,3 +674,20 @@ extension OralableBLE {
 
     
 }
+
+// MARK: - BLEManagerProtocol Conformance
+
+extension OralableBLE: BLEManagerProtocol {
+    var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
+    var isScanningPublisher: Published<Bool>.Publisher { $isScanning }
+    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
+    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
+    var spO2Publisher: Published<Int>.Publisher { $spO2 }
+    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
+    var accelXPublisher: Published<Double>.Publisher { $accelX }
+    var accelYPublisher: Published<Double>.Publisher { $accelY }
+    var accelZPublisher: Published<Double>.Publisher { $accelZ }
+    var temperaturePublisher: Published<Double>.Publisher { $temperature }
+    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
+    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrder }
+}

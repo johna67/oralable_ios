@@ -16,7 +16,7 @@ class CSVImportManager {
             let csvContent = try String(contentsOf: url, encoding: .utf8)
             return parseCSVContent(csvContent, progressHandler: progressHandler)
         } catch {
-            Logger.shared.error("[CSVImportManager] Failed to read CSV file: \(error)")
+            logError("[CSVImportManager] Failed to read CSV file: \(error)")
             return ImportResult(
                 sensorData: [],
                 logs: [],
@@ -33,7 +33,7 @@ class CSVImportManager {
         let lines = csvContent.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
 
         guard !lines.isEmpty else {
-            Logger.shared.warning("[CSVImportManager] CSV file is empty")
+            logWarning("[CSVImportManager] CSV file is empty")
             return ImportResult(
                 sensorData: [],
                 logs: [],
@@ -112,11 +112,11 @@ class CSVImportManager {
 
         let successfulLines = totalLines - failedLineCount
 
-        Logger.shared.info("[CSVImportManager] ✅ Import complete | Total: \(totalLines) | Success: \(successfulLines) | Failed: \(failedLineCount)")
+        logInfo("[CSVImportManager] ✅ Import complete | Total: \(totalLines) | Success: \(successfulLines) | Failed: \(failedLineCount)")
 
         if !errors.isEmpty && errors.count <= 10 {
             // Log first 10 errors for debugging
-            Logger.shared.warning("[CSVImportManager] Import errors:\n" + errors.prefix(10).joined(separator: "\n"))
+            logWarning("[CSVImportManager] Import errors:\n" + errors.prefix(10).joined(separator: "\n"))
         }
 
         return ImportResult(
@@ -467,7 +467,7 @@ extension CSVImportManager {
             )
 
         } catch {
-            Logger.shared.error("[CSVImportManager] Failed to preview file: \(error)")
+            logError("[CSVImportManager] Failed to preview file: \(error)")
             return PreviewResult(headers: [], sampleRows: [], totalRowCount: 0, fileSize: 0)
         }
     }

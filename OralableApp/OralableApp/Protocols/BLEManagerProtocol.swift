@@ -83,6 +83,7 @@ protocol BLEManagerProtocol: AnyObject, ObservableObject {
     var accelZPublisher: Published<Double>.Publisher { get }
     var temperaturePublisher: Published<Double>.Publisher { get }
     var heartRateQualityPublisher: Published<Double>.Publisher { get }
+    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { get }
 
     // Note: deviceName is computed from primaryDevice, so we observe primaryDevice changes via objectWillChange
 

@@ -38,10 +38,9 @@ class DevicesViewModel: ObservableObject {
         bleManager.isScanningPublisher
             .assign(to: &$isScanning)
 
-        // deviceName is computed, so we observe the BLE manager's objectWillChange
-        // Type-erase the publisher to work with protocol types
-        bleManager.objectWillChange
-            .eraseToAnyPublisher()
+        // deviceName is computed from primaryDevice, so we observe connection state changes
+        // When connection state changes, we update the device name
+        bleManager.isConnectedPublisher
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 self.deviceName = self.bleManager.deviceName

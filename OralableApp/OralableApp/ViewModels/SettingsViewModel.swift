@@ -88,11 +88,10 @@ class SettingsViewModel: ObservableObject {
 
     private func setupBindings() {
         // Sync PPG channel order with BLE manager
-        // Note: ppgChannelOrder is a computed property, so we observe it via objectWillChange
-        bleManager.objectWillChange
-            .sink { [weak self] _ in
+        bleManager.ppgChannelOrderPublisher
+            .sink { [weak self] value in
                 guard let self = self else { return }
-                self.ppgChannelOrder = self.bleManager.ppgChannelOrder
+                self.ppgChannelOrder = value
             }
             .store(in: &cancellables)
         
