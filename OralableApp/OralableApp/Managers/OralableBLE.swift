@@ -335,16 +335,13 @@ class OralableBLE: ObservableObject {
 
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
-            ppgHistory.append(ppgData)
+            // Add to PENDING buffer instead of @Published array
+            pendingPPGData.append(ppgData)
 
             // Collect IR samples for HR calculation
             if values.ir > 0 {
                 ppgIRBuffer.append(UInt32(values.ir))
             }
-        }
-
-        if ppgHistory.count > maxHistoryCount {
-            ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
         }
 
         // Calculate Heart Rate from IR samples
@@ -357,13 +354,23 @@ class OralableBLE: ObservableObject {
                 // Throttle UI updates - only update @Published properties once per second
                 let now = Date()
                 if now.timeIntervalSince(lastHeartRateUIUpdate) >= uiUpdateInterval {
-                    // Flush pending data to @Published array
+                    // Flush ALL pending data to @Published arrays in ONE batch
                     heartRateHistory.append(contentsOf: pendingHeartRateData)
+                    ppgHistory.append(contentsOf: pendingPPGData)
+                    accelerometerHistory.append(contentsOf: pendingAccelData)
                     pendingHeartRateData.removeAll()
+                    pendingPPGData.removeAll()
+                    pendingAccelData.removeAll()
 
-                    // Trim history
+                    // Trim histories
                     if heartRateHistory.count > maxHistoryCount {
                         heartRateHistory.removeFirst(heartRateHistory.count - maxHistoryCount)
+                    }
+                    if ppgHistory.count > maxHistoryCount {
+                        ppgHistory.removeFirst(ppgHistory.count - maxHistoryCount)
+                    }
+                    if accelerometerHistory.count > maxHistoryCount {
+                        accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
                     }
 
                     heartRate = Int(hrResult.bpm)
@@ -384,10 +391,10 @@ class OralableBLE: ObservableObject {
             let spo2Data = SpO2Data(percentage: Double(calculatedSpO2), quality: 0.8, timestamp: Date())
             pendingSpo2Data.append(spo2Data)
 
-            // Throttle UI updates - only update @Published properties once per second
+            // Update SpO2 value on throttled interval (uses same timestamp as HR)
             let now = Date()
             if now.timeIntervalSince(lastSpO2UIUpdate) >= uiUpdateInterval {
-                // Flush pending data to @Published array
+                // Flush ALL pending buffers together (avoid separate updates)
                 spo2History.append(contentsOf: pendingSpo2Data)
                 pendingSpo2Data.removeAll()
 
@@ -433,11 +440,8 @@ class OralableBLE: ObservableObject {
 
         for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
             let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
-            accelerometerHistory.append(accelData)
-        }
-
-        if accelerometerHistory.count > maxHistoryCount {
-            accelerometerHistory.removeFirst(accelerometerHistory.count - maxHistoryCount)
+            // Add to PENDING buffer instead of @Published array
+            pendingAccelData.append(accelData)
         }
 
         // Reduced logging to prevent UI freeze - only log every 200th packet
