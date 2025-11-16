@@ -313,7 +313,7 @@ struct DashboardView: View {
         VStack(spacing: designSystem.spacing.md) {
             // PPG Waveform
             WaveformCard(
-                title: "PPG Signal",
+                title: "PPG IR",
                 data: viewModel.ppgData,
                 color: .red,
                 designSystem: designSystem
