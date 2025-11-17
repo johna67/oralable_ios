@@ -81,7 +81,7 @@ class AppDependencies: ObservableObject {
 
     /// Creates a HistoricalViewModel with injected dependencies
     func makeHistoricalViewModel() -> HistoricalViewModel {
-        return HistoricalViewModel()
+        return HistoricalViewModel(historicalDataManager: historicalDataManager)
     }
 
     /// Creates a SettingsViewModel with injected dependencies
