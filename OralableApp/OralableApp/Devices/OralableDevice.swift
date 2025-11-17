@@ -56,7 +56,12 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     var sensorReadings: AnyPublisher<SensorReading, Never> {
         sensorReadingsSubject.eraseToAnyPublisher()
     }
-    
+
+    // Legacy compatibility - same as sensorReadings
+    var sensorReadingsPublisher: AnyPublisher<SensorReading, Never> {
+        sensorReadingsSubject.eraseToAnyPublisher()
+    }
+
     let supportedSensors: [SensorType] = [
         .ppgRed,
         .ppgInfrared,
