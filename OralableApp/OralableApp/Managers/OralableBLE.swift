@@ -94,6 +94,8 @@ class OralableBLE: ObservableObject {
 
     #if DEBUG
     private var readingsCounter = 0  // Counter for debug logging
+    private var hrLogCounter = 0  // Counter for heart rate logging
+    private var spo2LogCounter = 0  // Counter for SpO2 logging
     #endif
     
     // MARK: - Initialization
@@ -319,7 +321,18 @@ class OralableBLE: ObservableObject {
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
                 heartRate = Int(hrResult.bpm)
                 heartRateQuality = hrResult.quality
-                Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
+
+                // PERFORMANCE: Only log abnormal values or every 50th calculation
+                #if DEBUG
+                hrLogCounter += 1
+                let shouldLog = hrLogCounter >= 50 || hrResult.quality < 0.5 || hrResult.bpm < 40 || hrResult.bpm > 200
+                if shouldLog {
+                    Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
+                    if hrLogCounter >= 50 {
+                        hrLogCounter = 0
+                    }
+                }
+                #endif
 
                 // Add to history
                 let hrData = HeartRateData(bpm: hrResult.bpm, quality: hrResult.quality, timestamp: Date())
@@ -333,7 +346,18 @@ class OralableBLE: ObservableObject {
             // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
             spO2 = Int(calculatedSpO2)
-            Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
+
+            // PERFORMANCE: Only log abnormal values or every 50th calculation
+            #if DEBUG
+            spo2LogCounter += 1
+            let shouldLog = spo2LogCounter >= 50 || spO2 < 85 || spO2 > 100
+            if shouldLog {
+                Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
+                if spo2LogCounter >= 50 {
+                    spo2LogCounter = 0
+                }
+            }
+            #endif
 
             // Add to history
             let spo2Data = SpO2Data(percentage: Double(spO2), quality: 0.8, timestamp: Date())
