@@ -17,7 +17,7 @@ class CircularBuffer<T> {
     private var buffer: [T]
     private var writeIndex: Int = 0
     private let capacity: Int
-    private var count: Int = 0
+    private(set) var count: Int = 0  // Collection protocol requires public read access
 
     // MARK: - Initialization
 
@@ -69,11 +69,6 @@ class CircularBuffer<T> {
     var first: T? {
         guard count > 0 else { return nil }
         return count < capacity ? buffer.first : buffer[writeIndex]
-    }
-
-    /// Number of elements currently in the buffer
-    var currentCount: Int {
-        count
     }
 
     /// Whether the buffer is empty
