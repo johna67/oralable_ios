@@ -89,6 +89,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     // Continuation for waiting until service discovery completes
     private var connectionContinuation: CheckedContinuation<Void, Error>?
 
+    // Heart rate calculator for converting raw PPG IR to BPM
+    private let heartRateCalculator = HeartRateCalculator()
+
     // Packet counter for throttled logging
     private var packetCount = 0
     
@@ -390,6 +393,25 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             }
         }
 
+        // Calculate heart rate from IR samples
+        let irSamples = readings
+            .filter { $0.sensorType == .ppgInfrared }
+            .compactMap { UInt32($0.value) }
+
+        if !irSamples.isEmpty {
+            if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: irSamples) {
+                let heartRateReading = SensorReading(
+                    sensorType: .heartRate,
+                    value: hrResult.bpm,
+                    timestamp: hrResult.timestamp,
+                    deviceId: peripheral?.identifier.uuidString,
+                    quality: hrResult.quality
+                )
+                readings.append(heartRateReading)
+                print("💓 [OralableDevice] Heart Rate: \(Int(hrResult.bpm)) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
+            }
+        }
+
         // Send readings to subscribers
         for reading in readings {
             latestReadings[reading.sensorType] = reading
@@ -401,7 +423,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             let redCount = readings.filter { $0.sensorType == .ppgRed }.count
             let irCount = readings.filter { $0.sensorType == .ppgInfrared }.count
             let greenCount = readings.filter { $0.sensorType == .ppgGreen }.count
-            print("✅ [OralableDevice] PPG Frame #\(frameCounter): \(readings.count) readings (R:\(redCount), IR:\(irCount), G:\(greenCount))")
+            let hrCount = readings.filter { $0.sensorType == .heartRate }.count
+            print("✅ [OralableDevice] PPG Frame #\(frameCounter): \(readings.count) readings (R:\(redCount), IR:\(irCount), G:\(greenCount), HR:\(hrCount))")
 
             if let firstRed = readings.first(where: { $0.sensorType == .ppgRed }),
                let firstIR = readings.first(where: { $0.sensorType == .ppgInfrared }),
