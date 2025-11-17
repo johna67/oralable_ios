@@ -40,17 +40,22 @@ class DeviceManager: ObservableObject {
     @Published var lastError: DeviceError?
     
     // MARK: - Private Properties
-    
+
     private var devices: [UUID: BLEDeviceProtocol] = [:]
     private var cancellables = Set<AnyCancellable>()
     private let maxDevices: Int = 5
-    
+
     // BLE Integration
     private(set) var bleManager: BLECentralManager?
-    
+
     // Discovery tracking
     private var discoveryCount: Int = 0
     private var scanStartTime: Date?
+
+    // Reconnection management
+    private var reconnectionAttempts: [UUID: Int] = [:]
+    private let maxReconnectionAttempts = 3
+    private var reconnectionTasks: [UUID: Task<Void, Never>] = [:]
     
     // MARK: - Initialization
     
@@ -120,55 +125,29 @@ class DeviceManager: ObservableObject {
     
     private func handleDeviceDiscovered(peripheral: CBPeripheral, name: String, rssi: Int) {
         discoveryCount += 1
-        
-        print("\n" + String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] handleDeviceDiscovered - DEVICE #\(discoveryCount)")
-        print(String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] Peripheral UUID: \(peripheral.identifier)")
-        print("🔍 [DeviceManager] Name: \(name)")
-        print("🔍 [DeviceManager] RSSI: \(rssi) dBm")
-        
-        if let scanStart = scanStartTime {
-            let elapsed = Date().timeIntervalSince(scanStart)
-            print("🔍 [DeviceManager] Time since scan start: \(String(format: "%.1f", elapsed))s")
-        }
-        
+
+        #if DEBUG
+        Logger.shared.debug("[DeviceManager] Discovered device #\(discoveryCount): \(name) | RSSI: \(rssi) dBm")
+        #endif
+
         // Check if already discovered
-        print("🔍 [DeviceManager] Checking if already discovered...")
-        print("🔍 [DeviceManager] Current discovered devices count: \(discoveredDevices.count)")
-        
         if discoveredDevices.contains(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-            print("🔍 [DeviceManager] ⚠️ Device ALREADY in list - updating RSSI")
-            
+            // Update RSSI for existing device
             if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-                print("🔍 [DeviceManager] Found at index \(index), updating...")
                 discoveredDevices[index].signalStrength = rssi
-                print("🔍 [DeviceManager] ✅ RSSI updated to \(rssi)")
             }
-            
-            print(String(repeating: "=", count: 80))
-            print("🔍 [DeviceManager] END handleDeviceDiscovered (duplicate)")
-            print(String(repeating: "=", count: 80) + "\n")
             return
         }
-        
-        print("🔍 [DeviceManager] ✅ New device - creating DeviceInfo...")
-        
+
         // Detect device type
-        print("🔍 [DeviceManager] Detecting device type...")
         guard let deviceType = detectDeviceType(from: name, peripheral: peripheral) else {
-            print("🔍 [DeviceManager] ❌ Could not detect device type for '\(name)'")
-            print("🔍 [DeviceManager] ❌ Device REJECTED - unknown type")
-            print(String(repeating: "=", count: 80))
-            print("🔍 [DeviceManager] END handleDeviceDiscovered (rejected)")
-            print(String(repeating: "=", count: 80) + "\n")
+            Logger.shared.debug("[DeviceManager] Unknown device type '\(name)' - rejected")
             return
         }
-        
-        print("🔍 [DeviceManager] ✅ Device type detected: \(deviceType)")
-        
+
+        Logger.shared.info("[DeviceManager] New device discovered: \(name) (\(deviceType))")
+
         // Create device info
-        print("🔍 [DeviceManager] Creating DeviceInfo object...")
         let deviceInfo = DeviceInfo(
             type: deviceType,
             name: name,
@@ -176,159 +155,177 @@ class DeviceManager: ObservableObject {
             connectionState: .disconnected,
             signalStrength: rssi
         )
-        print("🔍 [DeviceManager] ✅ DeviceInfo created")
-        
+
         // Add to discovered list
-        print("🔍 [DeviceManager] Adding to discoveredDevices array...")
         discoveredDevices.append(deviceInfo)
-        print("🔍 [DeviceManager] ✅ Added to discovered devices")
-        print("🔍 [DeviceManager] New discoveredDevices count: \(discoveredDevices.count)")
-        
+
         // Create device instance
-        print("🔍 [DeviceManager] Creating device instance...")
         let device: BLEDeviceProtocol
-        
+
         switch deviceType {
         case .oralable:
-            print("🔍 [DeviceManager] Creating OralableDevice instance...")
             device = OralableDevice(peripheral: peripheral)
         case .anr:
-            print("🔍 [DeviceManager] Creating ANRMuscleSenseDevice instance...")
             device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
         case .demo:
-            print("🔍 [DeviceManager] Creating Demo device (using MockBLEDevice)...")
             #if DEBUG
             device = MockBLEDevice(type: .demo)
             #else
             device = OralableDevice(peripheral: peripheral)
             #endif
         }
-        
-        print("🔍 [DeviceManager] ✅ Device instance created")
-        
+
         // Store device - KEY POINT: Using peripheral.identifier as the key
-        print("🔍 [DeviceManager] Storing device in devices dictionary...")
-        print("🔍 [DeviceManager] Dictionary key: \(peripheral.identifier)")
         devices[peripheral.identifier] = device
-        print("🔍 [DeviceManager] ✅ Device stored")
-        print("🔍 [DeviceManager] Total devices in dictionary: \(devices.count)")
-        
+
         // Subscribe to device sensor readings
-        print("🔍 [DeviceManager] Subscribing to device sensor readings...")
         subscribeToDevice(device)
-        print("🔍 [DeviceManager] ✅ Subscribed to device")
-        
-        print(String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] END handleDeviceDiscovered (SUCCESS)")
-        print("🔍 [DeviceManager] Summary: \(discoveredDevices.count) device(s) discovered so far")
-        print(String(repeating: "=", count: 80) + "\n")
+
+        #if DEBUG
+        Logger.shared.debug("[DeviceManager] Total devices discovered: \(discoveredDevices.count)")
+        #endif
     }
     
     private func handleDeviceConnected(peripheral: CBPeripheral) {
-        print("\n✅ [DeviceManager] handleDeviceConnected")
-        print("✅ [DeviceManager] Peripheral: \(peripheral.identifier)")
-        print("✅ [DeviceManager] Name: \(peripheral.name ?? "Unknown")")
-        
+        Logger.shared.info("[DeviceManager] Device connected: \(peripheral.name ?? "Unknown")")
+
         isConnecting = false
-        
+
         // Update device info
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-            print("✅ [DeviceManager] Found device in discoveredDevices at index \(index)")
             discoveredDevices[index].connectionState = .connected
-            
+
             // Add to connected devices if not already there
             if !connectedDevices.contains(where: { $0.id == discoveredDevices[index].id }) {
-                print("✅ [DeviceManager] Adding to connectedDevices array")
                 connectedDevices.append(discoveredDevices[index])
-                print("✅ [DeviceManager] connectedDevices count: \(connectedDevices.count)")
             }
-            
+
             // Set as primary if none set
             if primaryDevice == nil {
-                print("✅ [DeviceManager] Setting as primary device (first connection)")
                 primaryDevice = discoveredDevices[index]
             }
-        } else {
-            print("⚠️ [DeviceManager] Device not found in discoveredDevices!")
         }
-        
+
         // Start device operations
         if let device = devices[peripheral.identifier] {
-            print("✅ [DeviceManager] Calling device.connect() to discover services...")
             Task {
                 do {
                     // First, let the device discover its services
                     try await device.connect()
-                    print("✅ [DeviceManager] Device services discovered")
-                    
+
                     // Then start data collection
                     try await device.startDataCollection()
-                    print("✅ [DeviceManager] Data collection started")
+                    Logger.shared.info("[DeviceManager] Data collection started for \(device.name)")
                 } catch {
-                    print("❌ [DeviceManager] Error during device setup: \(error)")
+                    Logger.shared.error("[DeviceManager] Error during device setup: \(error.localizedDescription)")
                 }
             }
-        } else {
-            print("⚠️ [DeviceManager] Device not found in devices dictionary!")
         }
     }
     
     private func handleDeviceDisconnected(peripheral: CBPeripheral, error: Error?) {
-        print("\n🔌 [DeviceManager] handleDeviceDisconnected")
-        print("🔌 [DeviceManager] Peripheral: \(peripheral.identifier)")
-        print("🔌 [DeviceManager] Name: \(peripheral.name ?? "Unknown")")
-        
+        let wasUnexpectedDisconnection = error != nil
+
         if let error = error {
-            print("🔌 [DeviceManager] Error: \(error.localizedDescription)")
+            Logger.shared.warning("[DeviceManager] Device disconnected with error: \(error.localizedDescription)")
             lastError = .connectionLost
+        } else {
+            Logger.shared.info("[DeviceManager] Device disconnected: \(peripheral.name ?? "Unknown")")
         }
-        
+
         isConnecting = false
-        
+
         // Update device states
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-            print("🔌 [DeviceManager] Updating discoveredDevices[\(index)] to disconnected")
             discoveredDevices[index].connectionState = .disconnected
         }
-        
+
         connectedDevices.removeAll { $0.peripheralIdentifier == peripheral.identifier }
-        print("🔌 [DeviceManager] Removed from connectedDevices, count: \(connectedDevices.count)")
-        
+
         if primaryDevice?.peripheralIdentifier == peripheral.identifier {
-            print("🔌 [DeviceManager] Primary device disconnected, setting to nil")
             primaryDevice = connectedDevices.first
         }
+
+        // Attempt automatic reconnection if this was an unexpected disconnection
+        if wasUnexpectedDisconnection {
+            attemptReconnection(to: peripheral)
+        } else {
+            // Manual disconnection - reset reconnection attempts
+            reconnectionAttempts[peripheral.identifier] = nil
+            reconnectionTasks[peripheral.identifier]?.cancel()
+            reconnectionTasks[peripheral.identifier] = nil
+        }
+    }
+
+    // MARK: - Automatic Reconnection
+
+    private func attemptReconnection(to peripheral: CBPeripheral) {
+        let peripheralId = peripheral.identifier
+        let attempts = reconnectionAttempts[peripheralId] ?? 0
+
+        guard attempts < maxReconnectionAttempts else {
+            Logger.shared.warning("[DeviceManager] Max reconnection attempts reached for \(peripheral.name ?? "device")")
+            reconnectionAttempts[peripheralId] = nil
+            return
+        }
+
+        reconnectionAttempts[peripheralId] = attempts + 1
+
+        // Exponential backoff: 2^attempts seconds
+        let delay = pow(2.0, Double(attempts))
+        Logger.shared.info("[DeviceManager] Will attempt reconnection #\(attempts + 1) in \(Int(delay))s")
+
+        // Cancel any existing reconnection task for this device
+        reconnectionTasks[peripheralId]?.cancel()
+
+        // Create new reconnection task
+        let task = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                // Check if task was cancelled
+                guard !Task.isCancelled else {
+                    Logger.shared.debug("[DeviceManager] Reconnection cancelled for \(peripheral.name ?? "device")")
+                    return
+                }
+
+                // Attempt reconnection
+                if let deviceInfo = discoveredDevices.first(where: { $0.peripheralIdentifier == peripheralId }) {
+                    Logger.shared.info("[DeviceManager] Attempting reconnection #\(attempts + 1) to \(deviceInfo.name)")
+                    try await connect(to: deviceInfo)
+                }
+            } catch {
+                Logger.shared.error("[DeviceManager] Reconnection attempt failed: \(error.localizedDescription)")
+            }
+        }
+
+        reconnectionTasks[peripheralId] = task
+    }
+
+    /// Cancel all ongoing reconnection attempts
+    func cancelAllReconnections() {
+        for (peripheralId, task) in reconnectionTasks {
+            task.cancel()
+            Logger.shared.debug("[DeviceManager] Cancelled reconnection for device: \(peripheralId)")
+        }
+        reconnectionTasks.removeAll()
+        reconnectionAttempts.removeAll()
     }
     
     private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType? {
-        print("🔍 [DeviceManager] detectDeviceType")
-        print("🔍 [DeviceManager] Input name: '\(name)'")
-        print("🔍 [DeviceManager] Peripheral.name: '\(peripheral.name ?? "nil")'")
-        
         let lowercaseName = name.lowercased()
-        print("🔍 [DeviceManager] Lowercase name: '\(lowercaseName)'")
-        
+
         // Check for Oralable
-        if lowercaseName.contains("oralable") {
-            print("🔍 [DeviceManager] ✅ Detected as: Oralable (name contains 'oralable')")
+        if lowercaseName.contains("oralable") || lowercaseName.contains("tgm") {
             return .oralable
         }
-        
-        // Check for TGM
-        if lowercaseName.contains("tgm") {
-            print("🔍 [DeviceManager] ✅ Detected as: Oralable (name contains 'tgm')")
-            return .oralable
-        }
-        
+
         // Check for ANR
         if lowercaseName.contains("anr") || lowercaseName.contains("muscle") {
-            print("🔍 [DeviceManager] ✅ Detected as: ANR MuscleSense")
             return .anr
         }
 
-        // PRODUCTION: Only show known devices (Oralable/TGM or ANR)
-        print("🔍 [DeviceManager] ❌ Unknown device type - name doesn't match known patterns")
-        print("🔍 [DeviceManager] ❌ Device '\(name)' REJECTED - not an Oralable or ANR device")
+        // Unknown device type
         return nil
     }
     
@@ -336,139 +333,101 @@ class DeviceManager: ObservableObject {
     
     /// Start scanning for devices
     func startScanning() async {
-        print("\n" + String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] startScanning() called")
-        print(String(repeating: "=", count: 80))
-        
+        Logger.shared.info("[DeviceManager] Starting device scan")
+
         scanStartTime = Date()
         discoveryCount = 0
-        
-        print("🔍 [DeviceManager] Clearing previous discovered devices...")
         discoveredDevices.removeAll()
-        print("🔍 [DeviceManager] discoveredDevices cleared")
-        
-        print("🔍 [DeviceManager] Setting isScanning = true...")
         isScanning = true
-        print("🔍 [DeviceManager] isScanning = \(isScanning)")
-        
-        // OPTION 1: Scan for ALL BLE devices (for debugging)
-        print("🔍 [DeviceManager] Starting scan for ALL BLE devices...")
-        print("🔍 [DeviceManager] (No service filter applied)")
+
+        // Scan for ALL BLE devices (filters applied in handleDeviceDiscovered)
         bleManager?.startScanning()
-        
-        // OPTION 2: Scan ONLY for TGM Service devices (production)
-        // print("🔍 [DeviceManager] Starting scan for TGM Service devices...")
+
+        // For production, optionally filter by TGM service UUID:
         // let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-        // print("🔍 [DeviceManager] Service filter: \(tgmServiceUUID.uuidString)")
         // bleManager?.startScanning(services: [tgmServiceUUID])
-        
-        print(String(repeating: "=", count: 80))
-        print("🔍 [DeviceManager] Scan started - waiting for discoveries...")
-        print(String(repeating: "=", count: 80) + "\n")
     }
-    
+
     /// Stop scanning for devices
     func stopScanning() {
-        print("\n⏹️ [DeviceManager] stopScanning() called")
-        
+        #if DEBUG
         if let scanStart = scanStartTime {
             let elapsed = Date().timeIntervalSince(scanStart)
-            print("⏹️ [DeviceManager] Total scan duration: \(String(format: "%.1f", elapsed))s")
+            Logger.shared.debug("[DeviceManager] Scan stopped | Duration: \(String(format: "%.1f", elapsed))s | Devices found: \(discoveredDevices.count)")
         }
-        
-        print("⏹️ [DeviceManager] Total devices discovered: \(discoveryCount)")
-        print("⏹️ [DeviceManager] Devices in list: \(discoveredDevices.count)")
-        
-        print("⏹️ [DeviceManager] Setting isScanning = false...")
+        #endif
+
         isScanning = false
-        
-        print("⏹️ [DeviceManager] Calling bleManager.stopScanning()...")
         bleManager?.stopScanning()
-        
         scanStartTime = nil
-        print("⏹️ [DeviceManager] Scan stopped\n")
     }
     
     // MARK: - Connection Management
     
     // ✅ CORRECTED METHOD - Using peripheralIdentifier as dictionary key
     func connect(to deviceInfo: DeviceInfo) async throws {
-        print("\n🔌 [DeviceManager] connect() called")
-        print("🔌 [DeviceManager] Device: \(deviceInfo.name)")
-        print("🔌 [DeviceManager] DeviceInfo.id: \(deviceInfo.id)")
-        print("🔌 [DeviceManager] DeviceInfo.peripheralIdentifier: \(deviceInfo.peripheralIdentifier?.uuidString ?? "nil")")
-        
+        Logger.shared.info("[DeviceManager] Connecting to device: \(deviceInfo.name)")
+
         // ✅ CRITICAL FIX: Use peripheralIdentifier, not deviceInfo.id
         guard let peripheralId = deviceInfo.peripheralIdentifier else {
-            print("❌ [DeviceManager] No peripheral identifier!")
             throw DeviceError.invalidPeripheral
         }
-        
-        print("🔌 [DeviceManager] Looking up device in dictionary with key: \(peripheralId)")
-        print("🔌 [DeviceManager] Available dictionary keys: \(devices.keys.map { $0.uuidString })")
-        
+
         guard let device = devices[peripheralId] else {
-            print("❌ [DeviceManager] Device not found in devices dictionary!")
-            print("❌ [DeviceManager] Searched for: \(peripheralId)")
+            Logger.shared.error("[DeviceManager] Device not found in registry")
             throw DeviceError.invalidPeripheral
         }
-        
-        print("🔌 [DeviceManager] ✅ Device found in dictionary")
-        
+
         guard let peripheral = device.peripheral else {
-            print("❌ [DeviceManager] Device has no peripheral!")
             throw DeviceError.invalidPeripheral
         }
-        
-        print("🔌 [DeviceManager] ✅ Peripheral available: \(peripheral.identifier)")
-        
+
         isConnecting = true
-        print("🔌 [DeviceManager] isConnecting = true")
-        
+
         // Update state
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheralId }) {
-            print("🔌 [DeviceManager] Updating state to .connecting")
             discoveredDevices[index].connectionState = .connecting
         }
-        
+
+        // Reset reconnection attempts on manual connect
+        reconnectionAttempts[peripheralId] = 0
+
         // Connect via BLE manager
-        print("🔌 [DeviceManager] Calling bleManager.connect()...")
         bleManager?.connect(to: peripheral)
-        print("🔌 [DeviceManager] Connection request sent")
     }
     
     func disconnect(from deviceInfo: DeviceInfo) {
-        print("\n🔌 [DeviceManager] disconnect() called")
-        print("🔌 [DeviceManager] Device: \(deviceInfo.name)")
-        
+        Logger.shared.info("[DeviceManager] Disconnecting from device: \(deviceInfo.name)")
+
         guard let peripheralId = deviceInfo.peripheralIdentifier,
               let device = devices[peripheralId],
               let peripheral = device.peripheral else {
-            print("❌ [DeviceManager] Device or peripheral not found!")
+            Logger.shared.error("[DeviceManager] Device or peripheral not found")
             return
         }
-        
-        print("🔌 [DeviceManager] Calling bleManager.disconnect()...")
+
+        // Cancel any pending reconnection attempts for this device
+        reconnectionTasks[peripheralId]?.cancel()
+        reconnectionTasks[peripheralId] = nil
+        reconnectionAttempts[peripheralId] = nil
+
         bleManager?.disconnect(from: peripheral)
-        
+
         // Stop data collection
-        print("🔌 [DeviceManager] Stopping data collection...")
         Task {
             try? await device.stopDataCollection()
-            print("🔌 [DeviceManager] Data collection stopped")
         }
     }
-    
+
     func disconnectAll() {
-        print("\n🔌 [DeviceManager] disconnectAll() called")
-        print("🔌 [DeviceManager] Connected devices count: \(connectedDevices.count)")
-        
+        Logger.shared.info("[DeviceManager] Disconnecting all devices")
+
         for deviceInfo in connectedDevices {
-            print("🔌 [DeviceManager] Disconnecting: \(deviceInfo.name)")
             disconnect(from: deviceInfo)
         }
-        
-        print("🔌 [DeviceManager] All disconnections requested")
+
+        // Cancel all reconnection attempts
+        cancelAllReconnections()
     }
     
     // MARK: - Sensor Data Management
