@@ -322,15 +322,12 @@ class OralableBLE: ObservableObject {
                 heartRate = Int(hrResult.bpm)
                 heartRateQuality = hrResult.quality
 
-                // PERFORMANCE: Only log abnormal values or every 50th calculation
+                // PERFORMANCE: Only log every 50th calculation to avoid UI freeze
                 #if DEBUG
                 hrLogCounter += 1
-                let shouldLog = hrLogCounter >= 50 || hrResult.quality < 0.5 || hrResult.bpm < 40 || hrResult.bpm > 200
-                if shouldLog {
+                if hrLogCounter >= 50 {
                     Logger.shared.info("[OralableBLE] ❤️ Heart Rate: \(heartRate) bpm | Quality: \(String(format: "%.2f", hrResult.quality)) | \(hrResult.qualityLevel.description)")
-                    if hrLogCounter >= 50 {
-                        hrLogCounter = 0
-                    }
+                    hrLogCounter = 0
                 }
                 #endif
 
@@ -347,15 +344,12 @@ class OralableBLE: ObservableObject {
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
             spO2 = Int(calculatedSpO2)
 
-            // PERFORMANCE: Only log abnormal values or every 50th calculation
+            // PERFORMANCE: Only log every 50th calculation to avoid UI freeze
             #if DEBUG
             spo2LogCounter += 1
-            let shouldLog = spo2LogCounter >= 50 || spO2 < 85 || spO2 > 100
-            if shouldLog {
+            if spo2LogCounter >= 50 {
                 Logger.shared.info("[OralableBLE] 🫁 SpO2: \(spO2)% | Ratio: \(String(format: "%.3f", ratio))")
-                if spo2LogCounter >= 50 {
-                    spo2LogCounter = 0
-                }
+                spo2LogCounter = 0
             }
             #endif
 
