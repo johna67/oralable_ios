@@ -581,12 +581,16 @@ class DeviceManager: ObservableObject {
     }
     
     private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
+        print("📊 [DeviceManager] handleSensorReading - Type: \(reading.sensorType), Value: \(reading.value)")
+
         // Phase 2: Use DataThrottler to prevent UI freezes from high-frequency data
         Task { @MainActor [weak self] in
             guard let self = self else { return }
 
             // Throttle sensor data to configured interval (default: 100ms)
             if let throttledReading = await self.sensorDataThrottler.throttle(reading) {
+                print("📊 [DeviceManager] Throttled reading passed: \(throttledReading.sensorType) = \(throttledReading.value)")
+
                 // Only process readings that pass through the throttle
                 self.allSensorReadings.append(throttledReading)
                 self.latestReadings[throttledReading.sensorType] = throttledReading
