@@ -47,6 +47,9 @@ struct DashboardView: View {
             .background(designSystem.colors.backgroundPrimary)
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                viewModel.startMonitoring()
+            }
             // NAVIGATION TOOLBAR - CRITICAL FIX
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
