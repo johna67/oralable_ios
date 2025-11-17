@@ -48,8 +48,9 @@ class HistoricalDataManager: ObservableObject {
         Logger.shared.info("[HistoricalDataManager] Starting metrics update | Sensor data count: \(ble.sensorDataHistory.count)")
         isUpdating = true
 
-        // Use background queue for calculations to avoid blocking UI
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // Use Task for proper async handling with main actor isolation
+        Task { @MainActor [weak self] in
+            // Access main-actor isolated BLE methods on main actor
             let dayRange = TimeRange.day
             let weekRange = TimeRange.week
             let monthRange = TimeRange.month
@@ -69,14 +70,13 @@ class HistoricalDataManager: ObservableObject {
                 Logger.shared.debug("[HistoricalDataManager] Day metrics | HR avg: \(String(format: "%.0f", avgHR)) bpm | SpO2 avg: \(String(format: "%.1f", avgSpO2))% (calculated from \(day.dataPoints.count) points)")
             }
 
-            DispatchQueue.main.async {
-                self?.dayMetrics = day
-                self?.weekMetrics = week
-                self?.monthMetrics = month
-                self?.lastUpdateTime = Date()
-                self?.isUpdating = false
-                Logger.shared.info("[HistoricalDataManager] ✅ Metrics update completed and published to UI")
-            }
+            // Update published properties on main actor
+            self?.dayMetrics = day
+            self?.weekMetrics = week
+            self?.monthMetrics = month
+            self?.lastUpdateTime = Date()
+            self?.isUpdating = false
+            Logger.shared.info("[HistoricalDataManager] ✅ Metrics update completed and published to UI")
         }
     }
     
@@ -91,7 +91,9 @@ class HistoricalDataManager: ObservableObject {
 
         Logger.shared.debug("[HistoricalDataManager] Updating metrics for range: \(range) | Data count: \(ble.sensorDataHistory.count)")
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // Use Task for proper async handling with main actor isolation
+        Task { @MainActor [weak self] in
+            // Access main-actor isolated BLE methods on main actor
             let metrics = ble.getHistoricalMetrics(for: range)
 
             if let metrics = metrics {
@@ -102,21 +104,20 @@ class HistoricalDataManager: ObservableObject {
                 Logger.shared.warning("[HistoricalDataManager] ⚠️ No metrics calculated for \(range)")
             }
 
-            DispatchQueue.main.async {
-                switch range {
-                case TimeRange.hour:
-                    // Hour metrics are no longer supported
-                    break
-                case TimeRange.day:
-                    self?.dayMetrics = metrics
-                case TimeRange.week:
-                    self?.weekMetrics = metrics
-                case TimeRange.month:
-                    self?.monthMetrics = metrics
-                }
-                self?.lastUpdateTime = Date()
-                Logger.shared.debug("[HistoricalDataManager] Metrics for \(range) published to UI")
+            // Update published properties on main actor
+            switch range {
+            case TimeRange.hour:
+                // Hour metrics are no longer supported
+                break
+            case TimeRange.day:
+                self?.dayMetrics = metrics
+            case TimeRange.week:
+                self?.weekMetrics = metrics
+            case TimeRange.month:
+                self?.monthMetrics = metrics
             }
+            self?.lastUpdateTime = Date()
+            Logger.shared.debug("[HistoricalDataManager] Metrics for \(range) published to UI")
         }
     }
     
