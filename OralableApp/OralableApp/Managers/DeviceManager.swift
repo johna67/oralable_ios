@@ -593,24 +593,34 @@ class DeviceManager: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
 
-            // Throttle sensor data to configured interval (default: 100ms)
-            if let throttledReading = await self.sensorDataThrottler.throttle(reading) {
-                print("📊 [DeviceManager] Throttled reading passed: \(throttledReading.sensorType) = \(throttledReading.value)")
+            // Don't throttle calculated metrics (low-frequency, important for UI)
+            // Only throttle raw high-frequency sensor data (PPG, accelerometer)
+            let calculatedMetrics: Set<SensorType> = [.heartRate, .spo2, .temperature, .battery]
+            let shouldBypassThrottle = calculatedMetrics.contains(reading.sensorType)
 
-                // Only process readings that pass through the throttle
-                self.allSensorReadings.append(throttledReading)
-                self.latestReadings[throttledReading.sensorType] = throttledReading
+            if shouldBypassThrottle {
+                // Bypass throttler for calculated metrics - these are already low-frequency
+                print("📊 [DeviceManager] Calculated metric - bypassing throttler: \(reading.sensorType) = \(reading.value)")
+                self.allSensorReadings.append(reading)
+                self.latestReadings[reading.sensorType] = reading
 
-                if throttledReading.sensorType == .heartRate {
-                    print("💓 [DeviceManager] latestReadings[.heartRate] = \(throttledReading.value) (should trigger binding)")
+                if reading.sensorType == .heartRate {
+                    print("💓 [DeviceManager] latestReadings[.heartRate] = \(reading.value) (should trigger binding)")
                 }
-
-                // Trim history if needed (keep last 1000)
-                if self.allSensorReadings.count > AppConfiguration.Sensors.historyBufferSize {
-                    self.allSensorReadings.removeFirst(100)
+            } else {
+                // Throttle raw high-frequency data (PPG, accelerometer)
+                if let throttledReading = await self.sensorDataThrottler.throttle(reading) {
+                    print("📊 [DeviceManager] Throttled reading passed: \(throttledReading.sensorType) = \(throttledReading.value)")
+                    self.allSensorReadings.append(throttledReading)
+                    self.latestReadings[throttledReading.sensorType] = throttledReading
                 }
+                // Note: Dropped readings are tracked by throttler statistics
             }
-            // Note: Dropped readings are tracked by throttler statistics
+
+            // Trim history if needed (keep last 1000)
+            if self.allSensorReadings.count > AppConfiguration.Sensors.historyBufferSize {
+                self.allSensorReadings.removeFirst(100)
+            }
         }
     }
     
