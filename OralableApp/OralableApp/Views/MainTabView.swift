@@ -9,7 +9,8 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var designSystem: DesignSystem
-    
+    @StateObject private var oralableBLE = OralableBLE.shared
+
     var body: some View {
         TabView {
             DashboardView()
@@ -17,14 +18,14 @@ struct MainTabView: View {
                     Label("Dashboard", systemImage: "house.fill")
                 }
                 .tag(0)
-            
+
             DevicesView()
                 .tabItem {
                     Label("Devices", systemImage: "sensor.fill")
                 }
                 .tag(1)
 
-            ShareView()
+            ShareView(ble: oralableBLE)
                 .tabItem {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
