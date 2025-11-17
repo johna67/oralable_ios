@@ -87,6 +87,19 @@ class CircularBuffer<T> {
         writeIndex = 0
         count = 0
     }
+
+    /// Creates a new CircularBuffer containing only elements that satisfy the predicate
+    /// - Parameter isIncluded: A closure that takes an element and returns true if it should be included
+    /// - Returns: A new CircularBuffer with the same capacity containing only matching elements
+    func filtered(_ isIncluded: (T) throws -> Bool) rethrows -> CircularBuffer<T> {
+        let newBuffer = CircularBuffer<T>(capacity: capacity)
+        for element in self {
+            if try isIncluded(element) {
+                newBuffer.append(element)
+            }
+        }
+        return newBuffer
+    }
 }
 
 // MARK: - Collection Conformance

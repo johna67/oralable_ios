@@ -372,13 +372,14 @@ class BLESensorRepository: SensorRepository {
     }
     
     func clearData(olderThan date: Date) async throws {
-        // Filter out old data from each history array
-        ble.heartRateHistory = ble.heartRateHistory.filter { $0.timestamp >= date }
-        ble.spo2History = ble.spo2History.filter { $0.timestamp >= date }
-        ble.temperatureHistory = ble.temperatureHistory.filter { $0.timestamp >= date }
-        ble.accelerometerHistory = ble.accelerometerHistory.filter { $0.timestamp >= date }
-        ble.batteryHistory = ble.batteryHistory.filter { $0.timestamp >= date }
-        ble.ppgHistory = ble.ppgHistory.filter { $0.timestamp >= date }
+        // Filter out old data from each history buffer using CircularBuffer's filtered method
+        ble.heartRateHistory = ble.heartRateHistory.filtered { $0.timestamp >= date }
+        ble.spo2History = ble.spo2History.filtered { $0.timestamp >= date }
+        ble.temperatureHistory = ble.temperatureHistory.filtered { $0.timestamp >= date }
+        ble.accelerometerHistory = ble.accelerometerHistory.filtered { $0.timestamp >= date }
+        ble.batteryHistory = ble.batteryHistory.filtered { $0.timestamp >= date }
+        ble.ppgHistory = ble.ppgHistory.filtered { $0.timestamp >= date }
+        // sensorDataHistory is still an array, so use regular filter
         ble.sensorDataHistory = ble.sensorDataHistory.filter { $0.timestamp >= date }
     }
     
