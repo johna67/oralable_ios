@@ -20,16 +20,9 @@ import CoreBluetooth
 extension DeviceManager {
 
     // MARK: - Convenience Properties (Single-Device Access)
-
-    /// Convenience: True if any device is connected
-    var isConnected: Bool {
-        !connectedDevices.isEmpty
-    }
-
-    /// Convenience: Name of primary device or "No Device"
-    var deviceName: String {
-        primaryDevice?.name ?? "No Device"
-    }
+    // NOTE: isConnected, deviceName, batteryLevel, heartRate, spO2, temperature,
+    // ppgRedValue, ppgIRValue, ppgGreenValue, accelX/Y/Z, heartRateQuality
+    // are now @Published properties in DeviceManager.swift
 
     /// Convenience: UUID of primary device
     var deviceUUID: UUID? {
@@ -50,63 +43,6 @@ extension DeviceManager {
     /// Convenience: Connection state as descriptive string
     var connectionState: String {
         connectionStatus.lowercased()
-    }
-
-    // MARK: - Real-Time Sensor Values (from latestReadings)
-
-    /// Latest battery level (0-100)
-    var batteryLevel: Double {
-        latestReadings[.battery]?.value ?? 0.0
-    }
-
-    /// Latest accelerometer X value (g)
-    var accelX: Double {
-        latestReadings[.accelerometerX]?.value ?? 0.0
-    }
-
-    /// Latest accelerometer Y value (g)
-    var accelY: Double {
-        latestReadings[.accelerometerY]?.value ?? 0.0
-    }
-
-    /// Latest accelerometer Z value (g)
-    var accelZ: Double {
-        latestReadings[.accelerometerZ]?.value ?? 1.0
-    }
-
-    /// Latest temperature in Celsius
-    var temperature: Double {
-        latestReadings[.temperature]?.value ?? 0.0
-    }
-
-    /// Latest PPG Red channel value
-    var ppgRedValue: Double {
-        latestReadings[.ppgRed]?.value ?? 0.0
-    }
-
-    /// Latest PPG Infrared channel value
-    var ppgIRValue: Double {
-        latestReadings[.ppgInfrared]?.value ?? 0.0
-    }
-
-    /// Latest PPG Green channel value
-    var ppgGreenValue: Double {
-        latestReadings[.ppgGreen]?.value ?? 0.0
-    }
-
-    /// Latest heart rate (bpm)
-    var heartRate: Int {
-        Int(latestReadings[.heartRate]?.value ?? 0)
-    }
-
-    /// Latest SpO2 percentage
-    var spO2: Int {
-        Int(latestReadings[.spo2]?.value ?? 0)
-    }
-
-    /// Latest heart rate quality (0.0-1.0)
-    var heartRateQuality: Double {
-        latestReadings[.heartRate]?.quality ?? 0.0
     }
 
     /// Latest RSSI signal strength

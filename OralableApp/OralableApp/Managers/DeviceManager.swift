@@ -42,6 +42,48 @@ class DeviceManager: ObservableObject {
     /// PPG Channel Order configuration (for OralableBLE compatibility)
     @Published var ppgChannelOrder: PPGChannelOrder = .standard
 
+    // MARK: - Convenience Published Properties (for OralableBLE compatibility)
+    // These mirror the computed properties in the extension but as @Published for Combine bindings
+
+    /// Connection state as Boolean
+    @Published var isConnected: Bool = false
+
+    /// Device name of primary device
+    @Published var deviceName: String = "No Device"
+
+    /// Battery level (0-100)
+    @Published var batteryLevel: Double = 0.0
+
+    /// Heart rate (bpm)
+    @Published var heartRate: Int = 0
+
+    /// SpO2 percentage
+    @Published var spO2: Int = 0
+
+    /// Temperature in Celsius
+    @Published var temperature: Double = 0.0
+
+    /// PPG Red channel value
+    @Published var ppgRedValue: Double = 0.0
+
+    /// PPG Infrared channel value
+    @Published var ppgIRValue: Double = 0.0
+
+    /// PPG Green channel value
+    @Published var ppgGreenValue: Double = 0.0
+
+    /// Accelerometer X (g)
+    @Published var accelX: Double = 0.0
+
+    /// Accelerometer Y (g)
+    @Published var accelY: Double = 0.0
+
+    /// Accelerometer Z (g)
+    @Published var accelZ: Double = 1.0
+
+    /// Heart rate quality (0.0-1.0)
+    @Published var heartRateQuality: Double = 0.0
+
     // MARK: - Private Properties
 
     private var devices: [UUID: BLEDeviceProtocol] = [:]
@@ -71,6 +113,7 @@ class DeviceManager: ObservableObject {
         print("\n🏭 [DeviceManager] Initializing...")
         bleManager = BLECentralManager()
         setupBLECallbacks()
+        setupConveniencePropertyBindings()
         print("🏭 [DeviceManager] Initialization complete")
     }
     
@@ -128,7 +171,41 @@ class DeviceManager: ObservableObject {
         
         print("🔗 [DeviceManager] BLE callbacks configured successfully")
     }
-    
+
+    // MARK: - Convenience Property Bindings Setup
+
+    private func setupConveniencePropertyBindings() {
+        // Update isConnected when connectedDevices changes
+        $connectedDevices
+            .map { !$0.isEmpty }
+            .assign(to: &$isConnected)
+
+        // Update deviceName when primaryDevice changes
+        $primaryDevice
+            .map { $0?.name ?? "No Device" }
+            .assign(to: &$deviceName)
+
+        // Update sensor values when latestReadings changes
+        $latestReadings
+            .sink { [weak self] readings in
+                guard let self = self else { return }
+
+                // Update all sensor value properties
+                self.batteryLevel = readings[.battery]?.value ?? 0.0
+                self.heartRate = Int(readings[.heartRate]?.value ?? 0)
+                self.spO2 = Int(readings[.spo2]?.value ?? 0)
+                self.temperature = readings[.temperature]?.value ?? 0.0
+                self.ppgRedValue = readings[.ppgRed]?.value ?? 0.0
+                self.ppgIRValue = readings[.ppgInfrared]?.value ?? 0.0
+                self.ppgGreenValue = readings[.ppgGreen]?.value ?? 0.0
+                self.accelX = readings[.accelerometerX]?.value ?? 0.0
+                self.accelY = readings[.accelerometerY]?.value ?? 0.0
+                self.accelZ = readings[.accelerometerZ]?.value ?? 1.0
+                self.heartRateQuality = readings[.heartRate]?.quality ?? 0.0
+            }
+            .store(in: &cancellables)
+    }
+
     // MARK: - Device Discovery Handlers
     
     private func handleDeviceDiscovered(peripheral: CBPeripheral, name: String, rssi: Int) {
