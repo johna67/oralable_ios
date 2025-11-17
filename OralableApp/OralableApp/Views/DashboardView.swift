@@ -41,9 +41,6 @@ struct DashboardView: View {
                     if bleManager.isConnected {
                         waveformSection
                     }
-                    
-                    // Action Buttons
-                    actionButtons
                 }
                 .padding(designSystem.spacing.md)
             }
@@ -107,12 +104,6 @@ struct DashboardView: View {
                     .environmentObject(designSystem)
             }
         }
-        .onAppear {
-            viewModel.startMonitoring()
-        }
-        .onDisappear {
-            viewModel.stopMonitoring()
-        }
     }
     
     // MARK: - Connection Status Card
@@ -138,21 +129,17 @@ struct DashboardView: View {
                 }
                 
                 Spacer()
-                
-                // Connect Button
+
+                // Connect Button - Opens Devices view for connection management
                 Button(action: {
-                    if bleManager.isConnected {
-                        bleManager.disconnect()
-                    } else {
-                        Task { await bleManager.startScanning() }
-                    }
+                    showingDevices = true
                 }) {
-                    Text(bleManager.isConnected ? "Disconnect" : "Connect")
+                    Text(bleManager.isConnected ? "Manage" : "Connect")
                         .font(designSystem.typography.button)
                         .foregroundColor(.white)
                         .padding(.horizontal, designSystem.spacing.md)
                         .padding(.vertical, designSystem.spacing.sm)
-                        .background(bleManager.isConnected ? Color.red : Color.blue)
+                        .background(bleManager.isConnected ? Color.blue : Color.green)
                         .cornerRadius(designSystem.cornerRadius.medium)
                 }
             }
@@ -232,32 +219,32 @@ struct DashboardView: View {
             MetricCard(
                 icon: "heart.fill",
                 title: "Heart Rate",
-                value: "\(viewModel.heartRate)",
-                unit: "bpm",
+                value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "Not available",
+                unit: viewModel.heartRate > 0 ? "bpm" : "",
                 color: .red,
                 designSystem: designSystem
             )
-            
+
             // SpO2
             MetricCard(
                 icon: "lungs.fill",
                 title: "SpO2",
-                value: "\(viewModel.spO2)",
-                unit: "%",
+                value: viewModel.spO2 > 0 ? "\(viewModel.spO2)" : "Not available",
+                unit: viewModel.spO2 > 0 ? "%" : "",
                 color: .blue,
                 designSystem: designSystem
             )
-            
+
             // Temperature
             MetricCard(
                 icon: "thermometer",
                 title: "Temperature",
-                value: String(format: "%.1f", viewModel.temperature),
-                unit: "°C",
+                value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "Not available",
+                unit: viewModel.temperature > 0 ? "°C" : "",
                 color: .orange,
                 designSystem: designSystem
             )
-            
+
             // Battery
             MetricCard(
                 icon: batteryIcon,
@@ -265,26 +252,6 @@ struct DashboardView: View {
                 value: "\(Int(bleManager.batteryLevel))",
                 unit: "%",
                 color: batteryColor,
-                designSystem: designSystem
-            )
-            
-            // Session Time
-            MetricCard(
-                icon: "clock.fill",
-                title: "Session",
-                value: viewModel.sessionDuration,
-                unit: "",
-                color: .purple,
-                designSystem: designSystem
-            )
-            
-            // Signal Quality
-            MetricCard(
-                icon: "wifi",
-                title: "Signal",
-                value: "\(viewModel.signalQuality)",
-                unit: "%",
-                color: .green,
                 designSystem: designSystem
             )
         }
