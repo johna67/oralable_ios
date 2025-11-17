@@ -45,8 +45,8 @@ class AppDependencies: ObservableObject {
         self.authenticationManager = AuthenticationManager.shared // Keep for now
         self.subscriptionManager = SubscriptionManager.shared // Keep for now
 
-        // Health integration
-        self.healthKitManager = HealthKitManager.shared // Keep for now
+        // Health integration - create new instance
+        self.healthKitManager = HealthKitManager()
 
         // BLE Manager (wraps DeviceManager - to be refactored)
         self.bleManager = OralableBLE.shared // Keep for now
@@ -118,7 +118,7 @@ extension AppDependencies {
 
 /// Environment key for accessing dependencies throughout the app
 struct AppDependenciesKey: EnvironmentKey {
-    static let defaultValue: AppDependencies = AppDependencies()
+    @MainActor static let defaultValue: AppDependencies = AppDependencies()
 }
 
 extension EnvironmentValues {
