@@ -12,6 +12,7 @@ import Charts
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @StateObject private var bleManager = DeviceManager.shared
+    @StateObject private var oralableBLE = OralableBLE.shared  // For ShareView compatibility
     @EnvironmentObject var designSystem: DesignSystem
     
     // NAVIGATION STATE VARIABLES
@@ -85,7 +86,7 @@ struct DashboardView: View {
             .sheet(isPresented: $showingDevices) {
                 DevicesView()
                     .environmentObject(designSystem)
-                    .environmentObject(bleManager)
+                    .environmentObject(oralableBLE)
                     .environmentObject(DeviceManager.shared)
             }
             .sheet(isPresented: $showingSettings) {
@@ -99,10 +100,10 @@ struct DashboardView: View {
                 HistoricalView()
                     .environmentObject(designSystem)
                     .environmentObject(HistoricalDataManager.shared)
-                    .environmentObject(bleManager)
+                    .environmentObject(oralableBLE)
             }
             .sheet(isPresented: $showingShare) {
-                ShareView(ble: bleManager)
+                ShareView(ble: oralableBLE)
                     .environmentObject(designSystem)
             }
         }
