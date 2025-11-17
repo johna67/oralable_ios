@@ -449,17 +449,11 @@ class DeviceManager: ObservableObject {
         isScanning = true
         print("🔍 [DeviceManager] isScanning = \(isScanning)")
 
-        // OPTION 1: Scan for ALL BLE devices (for debugging)
-        // print("🔍 [DeviceManager] Starting scan for ALL BLE devices...")
-        // print("🔍 [DeviceManager] (No service filter applied)")
-        // bleManager?.startScanning()
-
-        // OPTION 2: Scan ONLY for Oralable and ANR devices (production)
-        print("🔍 [DeviceManager] Starting scan for Oralable and ANR devices...")
-        let oralableServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-        let anrServiceUUID = CBUUID(string: "19B10000-E8F2-537E-4F6C-D104768A1214")
-        print("🔍 [DeviceManager] Service filters: Oralable (\(oralableServiceUUID.uuidString)), ANR (\(anrServiceUUID.uuidString))")
-        bleManager?.startScanning(services: [oralableServiceUUID, anrServiceUUID])
+        // Scan for ALL BLE devices, then filter by name (more reliable)
+        // Name filtering happens in detectDeviceType() which checks for "oralable", "tgm", "anr", "muscle"
+        print("🔍 [DeviceManager] Starting scan for ALL BLE devices...")
+        print("🔍 [DeviceManager] (Will filter by name: Oralable, TGM, ANR)")
+        bleManager?.startScanning()
 
         print(String(repeating: "=", count: 80))
         print("🔍 [DeviceManager] Scan started - waiting for discoveries...")
