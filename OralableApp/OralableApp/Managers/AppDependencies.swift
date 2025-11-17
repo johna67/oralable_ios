@@ -118,7 +118,12 @@ extension AppDependencies {
 
 /// Environment key for accessing dependencies throughout the app
 struct AppDependenciesKey: EnvironmentKey {
-    @MainActor static let defaultValue: AppDependencies = AppDependencies()
+    @MainActor static var defaultValue: AppDependencies {
+        // Use lazy initialization to avoid circular dependency issues
+        // This creates a new instance each time, but defaultValue should rarely be used
+        // The app should inject dependencies explicitly via .withDependencies()
+        return AppDependencies()
+    }
 }
 
 extension EnvironmentValues {
