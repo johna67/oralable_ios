@@ -11,7 +11,7 @@ import Charts
 
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
-    @StateObject private var bleManager = OralableBLE.shared
+    @StateObject private var bleManager = DeviceManager.shared
     @EnvironmentObject var designSystem: DesignSystem
     
     // NAVIGATION STATE VARIABLES

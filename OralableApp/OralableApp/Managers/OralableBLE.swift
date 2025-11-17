@@ -5,11 +5,17 @@
 //  Created: November 7, 2025
 //  Compatibility wrapper around DeviceManager to maintain existing view interfaces
 //
+//  DEPRECATED: Phase 2 Refactoring (November 2025)
+//  This class is deprecated and will be removed in Phase 3.
+//  Use DeviceManager.shared instead for all new code.
+//  All ViewModels have been migrated to DeviceManager.
+//
 
 import Foundation
 import Combine
 import CoreBluetooth
 
+@available(*, deprecated, message: "Use DeviceManager.shared instead. This will be removed in Phase 3. All ViewModels now use DeviceManager.")
 @MainActor
 class OralableBLE: ObservableObject {
     static let shared = OralableBLE()
