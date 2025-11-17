@@ -91,6 +91,10 @@ class OralableBLE: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let maxHistoryCount = 100
     private var ppgIRBuffer: [UInt32] = []  // Buffer for HR calculation
+
+    #if DEBUG
+    private var readingsCounter = 0  // Counter for debug logging
+    #endif
     
     // MARK: - Initialization
     
@@ -213,7 +217,6 @@ class OralableBLE: ObservableObject {
         // PERFORMANCE: Removed excessive debug logging from hot path
         // Only log summary every 100 readings in DEBUG builds
         #if DEBUG
-        static var readingsCounter = 0
         readingsCounter += readings.count
         if readingsCounter >= 100 {
             Logger.shared.debug("[OralableBLE] Processed \(readingsCounter) readings total")
