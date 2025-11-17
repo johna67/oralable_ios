@@ -600,27 +600,12 @@ class OralableBLE: ObservableObject {
     }
     
     func clearHistory() {
-        var batteryHist = batteryHistory
-        var hrHist = heartRateHistory
-        var spo2Hist = spo2History
-        var tempHist = temperatureHistory
-        var accelHist = accelerometerHistory
-        var ppgHist = ppgHistory
-
-        batteryHist.removeAll()
-        hrHist.removeAll()
-        spo2Hist.removeAll()
-        tempHist.removeAll()
-        accelHist.removeAll()
-        ppgHist.removeAll()
-
-        batteryHistory = batteryHist
-        heartRateHistory = hrHist
-        spo2History = spo2Hist
-        temperatureHistory = tempHist
-        accelerometerHistory = accelHist
-        ppgHistory = ppgHist
-
+        batteryHistory.removeAll()
+        heartRateHistory.removeAll()
+        spo2History.removeAll()
+        temperatureHistory.removeAll()
+        accelerometerHistory.removeAll()
+        ppgHistory.removeAll()
         sensorDataHistory.removeAll()
         addLog("Cleared all history data")
     }
@@ -640,20 +625,10 @@ extension OralableBLE {
         let ble = OralableBLE()
         for i in 0..<50 {
             let timestamp = Date().addingTimeInterval(TimeInterval(-i * 10))
-            var batteryHist = ble.batteryHistory
-            var hrHist = ble.heartRateHistory
-            var spo2Hist = ble.spo2History
-            var tempHist = ble.temperatureHistory
-
-            batteryHist.append(BatteryData(percentage: 85 + i % 15, timestamp: timestamp))
-            hrHist.append(HeartRateData(bpm: Double(60 + i % 40), quality: 0.9, timestamp: timestamp))
-            spo2Hist.append(SpO2Data(percentage: Double(95 + i % 5), quality: 0.9, timestamp: timestamp))
-            tempHist.append(TemperatureData(celsius: 36.0 + Double(i % 10) * 0.1, timestamp: timestamp))
-
-            ble.batteryHistory = batteryHist
-            ble.heartRateHistory = hrHist
-            ble.spo2History = spo2Hist
-            ble.temperatureHistory = tempHist
+            ble.batteryHistory.append(BatteryData(percentage: 85 + i % 15, timestamp: timestamp))
+            ble.heartRateHistory.append(HeartRateData(bpm: Double(60 + i % 40), quality: 0.9, timestamp: timestamp))
+            ble.spo2History.append(SpO2Data(percentage: Double(95 + i % 5), quality: 0.9, timestamp: timestamp))
+            ble.temperatureHistory.append(TemperatureData(celsius: 36.0 + Double(i % 10) * 0.1, timestamp: timestamp))
         }
         ble.isConnected = true
         ble.deviceName = "Oralable-Mock"

@@ -10,7 +10,8 @@ import Foundation
 
 /// A high-performance circular buffer for storing fixed-size collections
 /// Replaces inefficient array.removeFirst() operations with O(1) append
-struct CircularBuffer<T> {
+/// Note: Changed to class to work properly with @Published properties
+class CircularBuffer<T> {
     // MARK: - Private Properties
 
     private var buffer: [T]
@@ -34,7 +35,7 @@ struct CircularBuffer<T> {
     /// Appends an element to the buffer in O(1) time
     /// If buffer is full, overwrites the oldest element
     /// - Parameter element: Element to append
-    mutating func append(_ element: T) {
+    func append(_ element: T) {
         if count < capacity {
             buffer.append(element)
             count += 1
@@ -86,7 +87,7 @@ struct CircularBuffer<T> {
     }
 
     /// Removes all elements from the buffer
-    mutating func removeAll() {
+    func removeAll() {
         buffer.removeAll(keepingCapacity: true)
         writeIndex = 0
         count = 0
