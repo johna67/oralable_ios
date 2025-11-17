@@ -286,14 +286,11 @@ struct ShareView: View {
                         ble.logMessages.append(LogMessage(message: logString))
                     }
                     
-                    // Sort by timestamp
+                    // Sort sensor data history array by timestamp
                     ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
-                    ble.ppgHistory.sort { $0.timestamp < $1.timestamp }
-                    ble.accelerometerHistory.sort { $0.timestamp < $1.timestamp }
-                    ble.temperatureHistory.sort { $0.timestamp < $1.timestamp }
-                    ble.batteryHistory.sort { $0.timestamp < $1.timestamp }
-                    ble.heartRateHistory.sort { $0.timestamp < $1.timestamp }
-                    ble.spo2History.sort { $0.timestamp < $1.timestamp }
+
+                    // Note: CircularBuffer history arrays maintain chronological order through append()
+                    // No sorting needed since data is already added in timestamp order
                     
                     importedCount = imported.sensorData.count
                     
