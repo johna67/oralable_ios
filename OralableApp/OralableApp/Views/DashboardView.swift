@@ -144,7 +144,7 @@ struct DashboardView: View {
                     if bleManager.isConnected {
                         bleManager.disconnect()
                     } else {
-                        bleManager.startScanning()
+                        Task { await bleManager.startScanning() }
                     }
                 }) {
                     Text(bleManager.isConnected ? "Disconnect" : "Connect")
