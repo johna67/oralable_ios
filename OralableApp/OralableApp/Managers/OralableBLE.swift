@@ -97,6 +97,11 @@ class OralableBLE: ObservableObject {
     private var hrLogCounter = 0  // Counter for heart rate logging
     private var spo2LogCounter = 0  // Counter for SpO2 logging
     #endif
+
+    // PERFORMANCE: Throttle expensive calculations
+    private var lastHRCalculation: Date = Date.distantPast
+    private var lastSpO2Calculation: Date = Date.distantPast
+    private let calculationInterval: TimeInterval = 0.5  // Only calculate every 500ms
     
     // MARK: - Initialization
     
@@ -317,10 +322,14 @@ class OralableBLE: ObservableObject {
         }
 
         // Calculate Heart Rate from IR samples
-        if !ppgIRBuffer.isEmpty {
+        // CRITICAL PERFORMANCE FIX: Throttle expensive HR calculation to prevent UI freeze
+        // FFT-based heart rate calculation is CPU intensive - only run every 500ms
+        let now = Date()
+        if !ppgIRBuffer.isEmpty && now.timeIntervalSince(lastHRCalculation) >= calculationInterval {
             if let hrResult = heartRateCalculator.calculateHeartRate(irSamples: ppgIRBuffer) {
                 heartRate = Int(hrResult.bpm)
                 heartRateQuality = hrResult.quality
+                lastHRCalculation = now
 
                 // PERFORMANCE: Only log every 50th calculation to avoid UI freeze
                 #if DEBUG
@@ -338,11 +347,15 @@ class OralableBLE: ObservableObject {
         }
 
         // Calculate SpO2 from Red/IR ratio (simplified)
-        if let latest = grouped.values.first, latest.red > 1000 && latest.ir > 1000 {
+        // CRITICAL PERFORMANCE FIX: Throttle SpO2 calculation to prevent UI freeze
+        // Only calculate every 500ms to reduce CPU load during high-frequency data streaming
+        if let latest = grouped.values.first, latest.red > 1000 && latest.ir > 1000,
+           now.timeIntervalSince(lastSpO2Calculation) >= calculationInterval {
             let ratio = Double(latest.red) / Double(latest.ir)
             // Simplified SpO2 calculation: SpO2 = 110 - 25 * ratio
             let calculatedSpO2 = max(70, min(100, 110 - 25 * ratio))
             spO2 = Int(calculatedSpO2)
+            lastSpO2Calculation = now
 
             // PERFORMANCE: Only log every 50th calculation to avoid UI freeze
             #if DEBUG
