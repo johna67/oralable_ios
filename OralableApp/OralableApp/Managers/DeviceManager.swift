@@ -192,7 +192,13 @@ class DeviceManager: ObservableObject {
 
                 // Update all sensor value properties
                 self.batteryLevel = readings[.battery]?.value ?? 0.0
-                self.heartRate = Int(readings[.heartRate]?.value ?? 0)
+
+                let newHeartRate = Int(readings[.heartRate]?.value ?? 0)
+                if newHeartRate != self.heartRate && newHeartRate > 0 {
+                    print("💓 [DeviceManager] Updating @Published heartRate: \(self.heartRate) → \(newHeartRate)")
+                }
+                self.heartRate = newHeartRate
+
                 self.spO2 = Int(readings[.spo2]?.value ?? 0)
                 self.temperature = readings[.temperature]?.value ?? 0.0
                 self.ppgRedValue = readings[.ppgRed]?.value ?? 0.0
@@ -594,6 +600,10 @@ class DeviceManager: ObservableObject {
                 // Only process readings that pass through the throttle
                 self.allSensorReadings.append(throttledReading)
                 self.latestReadings[throttledReading.sensorType] = throttledReading
+
+                if throttledReading.sensorType == .heartRate {
+                    print("💓 [DeviceManager] latestReadings[.heartRate] = \(throttledReading.value) (should trigger binding)")
+                }
 
                 // Trim history if needed (keep last 1000)
                 if self.allSensorReadings.count > AppConfiguration.Sensors.historyBufferSize {
