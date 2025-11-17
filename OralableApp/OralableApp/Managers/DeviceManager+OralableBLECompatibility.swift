@@ -212,6 +212,27 @@ extension DeviceManager {
         }
     }
 
+    /// Disconnect from primary device (convenience method)
+    func disconnect() {
+        guard let primaryDevice = primaryDevice else {
+            Logger.shared.warning("[DeviceManager] No primary device to disconnect from")
+            return
+        }
+
+        Logger.shared.info("[DeviceManager] 🔌 Disconnecting from device: \(primaryDevice.name)")
+
+        // Automatically stop recording when disconnecting
+        if isRecording {
+            Logger.shared.info("[DeviceManager] 📝 Auto-stopping recording session before disconnect")
+            stopRecording()
+        }
+
+        Task {
+            await disconnect(from: primaryDevice)
+            Logger.shared.info("[DeviceManager] ✅ Successfully disconnected")
+        }
+    }
+
     /// Computed sensor data tuple (legacy compatibility)
     var sensorData: (batteryLevel: Int, firmwareVersion: String, deviceUUID: UInt64) {
         let battery = Int(batteryLevel)

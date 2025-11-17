@@ -45,7 +45,7 @@ class DevicesViewModel: BaseViewModel {
         if isScanning {
             bleManager.stopScanning()
         } else {
-            bleManager.startScanning()
+            Task { await bleManager.startScanning() }
         }
     }
     
