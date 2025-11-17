@@ -111,7 +111,7 @@ extension DeviceManager {
 
     /// Latest RSSI signal strength
     var rssi: Int {
-        latestReadings[.rssi]?.value.map { Int($0) } ?? -50
+        primaryDevice?.signalStrength ?? -50
     }
 
     // MARK: - History Arrays (Derived from allSensorReadings)
