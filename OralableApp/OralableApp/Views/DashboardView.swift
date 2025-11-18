@@ -320,14 +320,17 @@ struct DashboardView: View {
                 color: .red,
                 designSystem: designSystem
             )
-            
-            // Accelerometer
-            WaveformCard(
-                title: "Movement",
-                data: viewModel.accelerometerData,
-                color: .blue,
-                designSystem: designSystem
-            )
+
+            // Accelerometer - Tappable to view history
+            Button(action: { showingHistorical = true }) {
+                WaveformCard(
+                    title: "Movement",
+                    data: viewModel.accelerometerData,
+                    color: .blue,
+                    designSystem: designSystem
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
         }
     }
     
