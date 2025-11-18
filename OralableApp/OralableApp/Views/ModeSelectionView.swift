@@ -79,34 +79,6 @@ struct ModeSelectionView: View {
                                 showingInfoSheet = true
                             }
                         )
-                        
-                        // Demo Mode
-                        ModeCard(
-                            mode: .demo,
-                            icon: "play.circle",
-                            title: "Demo Mode",
-                            subtitle: "Try without device",
-                            features: [
-                                "Explore all features",
-                                "Simulated sensor data",
-                                "Test functionality",
-                                "No device needed"
-                            ],
-                            limitations: [
-                                "Mock data only",
-                                "Cannot connect to real device",
-                                "For evaluation only"
-                            ],
-                            price: "Free",
-                            isSelected: selectedMode == .demo,
-                            onSelect: {
-                                selectedMode = .demo
-                            },
-                            onInfo: {
-                                infoMode = .demo
-                                showingInfoSheet = true
-                            }
-                        )
                     }
                     
                     // Continue Button
@@ -435,48 +407,41 @@ extension AppMode {
         switch self {
         case .viewer: return "Viewer Mode"
         case .subscription: return "Full Access"
-        case .demo: return "Demo Mode"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .viewer: return "eye"
         case .subscription: return "crown"
-        case .demo: return "play.circle"
         }
     }
-    
+
     var color: Color {
         switch self {
         case .viewer: return .blue
         case .subscription: return .green
-        case .demo: return .purple
         }
     }
-    
+
     var description: String {
         switch self {
         case .viewer:
             return "View real-time data from your Oralable device"
         case .subscription:
             return "Unlock all features with your account"
-        case .demo:
-            return "Explore the app with simulated data"
         }
     }
-    
+
     var detailedDescription: String {
         switch self {
         case .viewer:
             return "Viewer Mode provides essential functionality for monitoring your Oralable device in real-time. Perfect for quick sessions and immediate data viewing without the need for an account."
         case .subscription:
             return "Full Access unlocks the complete Oralable experience. Track your health metrics over time, gain insights from historical data, and sync across all your devices. Requires Sign in with Apple for secure authentication."
-        case .demo:
-            return "Demo Mode lets you explore all app features using simulated data. Ideal for evaluating the app before purchasing a device or for healthcare professionals demonstrating to patients."
         }
     }
-    
+
     var useCases: [String] {
         switch self {
         case .viewer:
@@ -493,24 +458,15 @@ extension AppMode {
                 "Sharing data with healthcare providers",
                 "Multiple device management"
             ]
-        case .demo:
-            return [
-                "App evaluation",
-                "Feature exploration",
-                "Training and demos",
-                "No device available"
-            ]
         }
     }
-    
+
     var requirements: [String] {
         switch self {
         case .viewer:
             return ["Oralable device required"]
         case .subscription:
             return ["Apple ID required", "Oralable device required"]
-        case .demo:
-            return []
         }
     }
 }

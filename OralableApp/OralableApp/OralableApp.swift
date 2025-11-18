@@ -192,7 +192,6 @@ struct DemoModeView: View {
 enum AppMode: String, Codable {
     case viewer
     case subscription
-    case demo
 }
 
 // MARK: - App Configuration

@@ -82,7 +82,7 @@ class AppStateManager: ObservableObject {
         switch mode {
         case .subscription:
             return true
-        case .viewer, .demo:
+        case .viewer:
             return false
         }
     }
@@ -92,7 +92,7 @@ class AppStateManager: ObservableObject {
         switch mode {
         case .subscription:
             return true
-        case .viewer, .demo:
+        case .viewer:
             return false
         }
     }
@@ -137,11 +137,6 @@ class AppStateManager: ObservableObject {
     /// Check if the app is in subscription mode
     var isSubscriptionMode: Bool {
         selectedMode == .subscription
-    }
-
-    /// Check if the app is in demo mode
-    var isDemoMode: Bool {
-        selectedMode == .demo
     }
 
     /// Check if mode selection is needed
