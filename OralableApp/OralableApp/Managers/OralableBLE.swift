@@ -231,6 +231,10 @@ class OralableBLE: ObservableObject {
         }
         #endif
 
+        // Track which types of data we have to avoid redundant processing
+        var hasPPGData = false
+        var hasAccelData = false
+
         for reading in readings {
             switch reading.sensorType {
             case .battery:
@@ -271,16 +275,26 @@ class OralableBLE: ObservableObject {
                 temperatureHistory.append(tempData)
 
             case .ppgRed, .ppgInfrared, .ppgGreen:
-                // PPG data needs to be grouped - handled separately
-                updatePPGHistory(from: readings)
+                // PPG data needs to be grouped - mark for processing after loop
+                hasPPGData = true
 
             case .accelerometerX, .accelerometerY, .accelerometerZ:
-                // Accel data needs to be grouped - handled separately
-                updateAccelHistory(from: readings)
+                // Accel data needs to be grouped - mark for processing after loop
+                hasAccelData = true
 
             default:
                 break
             }
+        }
+
+        // CRITICAL PERFORMANCE FIX: Process PPG and accel data ONCE after the loop
+        // Previously these were called INSIDE the loop for every reading, causing O(n²) complexity
+        // Example: 100 readings with 30 PPG = 30 calls × 100 iterations = 3,000 redundant iterations!
+        if hasPPGData {
+            updatePPGHistory(from: readings)
+        }
+        if hasAccelData {
+            updateAccelHistory(from: readings)
         }
     }
     
