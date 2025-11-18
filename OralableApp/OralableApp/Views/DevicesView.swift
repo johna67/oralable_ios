@@ -128,14 +128,15 @@ struct DevicesView: View {
             }
             
             // CRITICAL FIX: Now observes bleManager.discoveredDevicesInfo directly
-            if !bleManager.discoveredDevicesInfo.isEmpty {
+            // Filter to only show Oralable and ANR Muscle Sense devices
+            if !filteredDevices.isEmpty {
                 VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
                     Text("AVAILABLE DEVICES")
                         .font(designSystem.typography.caption)
                         .foregroundColor(designSystem.colors.textTertiary)
                         .padding(.top, designSystem.spacing.md)
-                    
-                    ForEach(bleManager.discoveredDevicesInfo) { deviceInfo in
+
+                    ForEach(filteredDevices) { deviceInfo in
                         HStack {
                             // Device Icon
                             Image(systemName: "sensor")
@@ -407,7 +408,7 @@ struct DevicesView: View {
                     .font(.system(.caption, design: .monospaced))
                 Text("Manager Scanning: \(bleManager.isScanning ? "Yes" : "No")")
                     .font(.system(.caption, design: .monospaced))
-                Text("Discovered: \(bleManager.discoveredDevicesInfo.count) device(s)")
+                Text("Discovered: \(bleManager.discoveredDevicesInfo.count) device(s) (\(filteredDevices.count) compatible)")
                     .font(.system(.caption, design: .monospaced))
             }
             .foregroundColor(designSystem.colors.textSecondary)
@@ -421,6 +422,15 @@ struct DevicesView: View {
     }
     
     // MARK: - Computed Properties
+
+    // Filter to only show Oralable and ANR Muscle Sense devices
+    private var filteredDevices: [DeviceInfo] {
+        bleManager.discoveredDevicesInfo.filter { deviceInfo in
+            let name = deviceInfo.name.lowercased()
+            return name.contains("oralable") || name.contains("anr")
+        }
+    }
+
     private var actionButtonIcon: String {
         if bleManager.isConnected {
             return "xmark.circle"
@@ -498,7 +508,7 @@ struct DevicesView: View {
         // Report findings
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if !self.isScanning && !self.bleManager.isScanning {
-                print("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s)")
+                print("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s) (\(self.filteredDevices.count) compatible)")
             }
         }
     }
