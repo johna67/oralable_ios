@@ -427,7 +427,7 @@ struct DevicesView: View {
     private var filteredDevices: [OralableBLE.DiscoveredDeviceInfo] {
         bleManager.discoveredDevicesInfo.filter { deviceInfo in
             let name = deviceInfo.name.lowercased()
-            return name.contains("oralable") || name.contains("anr")
+            return name.contains("oralable") || name.contains("anr") || name.contains("n02cl")
         }
     }
 

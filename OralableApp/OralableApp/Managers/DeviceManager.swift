@@ -315,8 +315,10 @@ class DeviceManager: ObservableObject {
     private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType? {
         let lowercaseName = name.lowercased()
 
-        // Check for Oralable
-        if lowercaseName.contains("oralable") || lowercaseName.contains("tgm") {
+        // Check for Oralable (including N02CL model)
+        if lowercaseName.contains("oralable") ||
+           lowercaseName.contains("tgm") ||
+           lowercaseName.contains("n02cl") {
             return .oralable
         }
 
