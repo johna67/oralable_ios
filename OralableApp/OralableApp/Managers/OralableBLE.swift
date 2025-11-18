@@ -814,24 +814,54 @@ class OralableBLE: ObservableObject {
         connectedDevice = peripheral
 
         Task {
-            if let deviceInfo = deviceManager.discoveredDevices.first(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-                do {
-                    try await deviceManager.connect(to: deviceInfo)
-                    addLog("Connected to \(deviceInfo.name)")
-                    Logger.shared.info("[OralableBLE] ✅ Successfully connected to \(deviceInfo.name)")
+            // First try to find in discovered devices list
+            var deviceInfo = deviceManager.discoveredDevices.first(where: { $0.peripheralIdentifier == peripheral.identifier })
 
-                    // Automatically start recording when connected
-                    await MainActor.run {
-                        Logger.shared.info("[OralableBLE] 📝 Auto-starting recording session for device: \(deviceInfo.name)")
-                        self.startRecording()
+            // If not found, create a temporary DeviceInfo for connection
+            if deviceInfo == nil {
+                Logger.shared.info("[OralableBLE] Device not in discovered list, creating temporary DeviceInfo")
+
+                // Detect device type from name
+                let deviceType: DeviceType
+                if let name = peripheral.name {
+                    if name.lowercased().contains("oralable") {
+                        deviceType = .oralable
+                    } else if name.lowercased().contains("anr") || name.lowercased().contains("muscle") {
+                        deviceType = .anrMuscleSense
+                    } else {
+                        deviceType = .unknown
                     }
-                } catch {
-                    addLog("Connection failed: \(error.localizedDescription)")
-                    Logger.shared.error("[OralableBLE] ❌ Connection failed: \(error.localizedDescription)")
+                } else {
+                    deviceType = .unknown
                 }
-            } else {
-                addLog("Device not found in discovered devices")
-                Logger.shared.error("[OralableBLE] ❌ Device not found in discovered devices list")
+
+                deviceInfo = DeviceInfo(
+                    name: peripheral.name ?? "Unknown Device",
+                    type: deviceType,
+                    signalStrength: 0,
+                    peripheralIdentifier: peripheral.identifier
+                )
+            }
+
+            guard let finalDeviceInfo = deviceInfo else {
+                addLog("Failed to create device info")
+                Logger.shared.error("[OralableBLE] ❌ Failed to create DeviceInfo")
+                return
+            }
+
+            do {
+                try await deviceManager.connect(to: finalDeviceInfo)
+                addLog("Connected to \(finalDeviceInfo.name)")
+                Logger.shared.info("[OralableBLE] ✅ Successfully connected to \(finalDeviceInfo.name)")
+
+                // Automatically start recording when connected
+                await MainActor.run {
+                    Logger.shared.info("[OralableBLE] 📝 Auto-starting recording session for device: \(finalDeviceInfo.name)")
+                    self.startRecording()
+                }
+            } catch {
+                addLog("Connection failed: \(error.localizedDescription)")
+                Logger.shared.error("[OralableBLE] ❌ Connection failed: \(error.localizedDescription)")
             }
         }
     }
