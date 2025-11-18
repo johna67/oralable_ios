@@ -36,8 +36,6 @@ struct RootView: View {
     @EnvironmentObject var authenticationManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
 
-    @State private var showOnboarding = false
-
     var body: some View {
         Group {
             if appStateManager.needsModeSelection {
@@ -50,18 +48,6 @@ struct RootView: View {
                 // Fallback (shouldn't happen)
                 ModeSelectionView()
             }
-        }
-        .onAppear {
-            // Show onboarding on first launch
-            if appStateManager.isFirstLaunch && !appStateManager.hasCompletedOnboarding {
-                showOnboarding = true
-            }
-        }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingView(onComplete: {
-                appStateManager.completeOnboarding()
-                showOnboarding = false
-            })
         }
     }
 
