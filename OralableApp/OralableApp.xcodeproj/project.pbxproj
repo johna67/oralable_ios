@@ -27,6 +27,20 @@
 			remoteGlobalIDString = 26CAF25D2E781EFB003FE378;
 			remoteInfo = OralableApp;
 		};
+		26D6C3FD2ECD181B00C60C3D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 26CAF2562E781EFB003FE378 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 26D6C3EB2ECD181900C60C3D;
+			remoteInfo = OralableForDentists;
+		};
+		26D6C4072ECD181B00C60C3D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 26CAF2562E781EFB003FE378 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 26D6C3EB2ECD181900C60C3D;
+			remoteInfo = OralableForDentists;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +59,9 @@
 		26CAF25E2E781EFB003FE378 /* OralableApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OralableApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		26D6C3EC2ECD181900C60C3D /* OralableForDentists.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OralableForDentists.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		26D6C3FC2ECD181B00C60C3D /* OralableForDentistsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableForDentistsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		26D6C4062ECD181B00C60C3D /* OralableForDentistsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableForDentistsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -54,6 +71,26 @@
 				Info.plist,
 			);
 			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
+		};
+		26D6C4452ECD1CC700C60C3D /* Exceptions for "OralableForDentists" folder in "OralableForDentists" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				Managers/DentistAppDependencies.swift,
+				Managers/DentistAuthenticationManager.swift,
+				Managers/DentistDataManager.swift,
+				Managers/DentistSubscriptionManager.swift,
+				OralableForDentists.swift,
+				ViewModels/AddPatientViewModel.swift,
+				ViewModels/DentistSettingsViewModel.swift,
+				ViewModels/PatientListViewModel.swift,
+				Views/AddPatientView.swift,
+				Views/DentistSettingsView.swift,
+				Views/PatientDetailView.swift,
+				Views/PatientListView.swift,
+				Views/UpgradePromptView.swift,
+			);
+			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -74,6 +111,29 @@
 		26CAF27C2E781EFE003FE378 /* OralableAppUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = OralableAppUITests;
+			sourceTree = "<group>";
+		};
+		26D6C3ED2ECD181900C60C3D /* OralableForDentists */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				26D6C4452ECD1CC700C60C3D /* Exceptions for "OralableForDentists" folder in "OralableForDentists" target */,
+			);
+			path = OralableForDentists;
+			sourceTree = "<group>";
+		};
+		26D6C3FF2ECD181B00C60C3D /* OralableForDentistsTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OralableForDentistsTests;
+			sourceTree = "<group>";
+		};
+		26D6C4092ECD181B00C60C3D /* OralableForDentistsUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OralableForDentistsUITests;
+			sourceTree = "<group>";
+		};
+		26E2CB2B2ECD10B100B9E42C /* OralableForDentistsUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OralableForDentistsUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -100,6 +160,27 @@
 			buildActionMask = 2147483647;
 			files = (
 				26A0F4802EBAE8EE0054C5FC /* AsyncAlgorithms in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C3E92ECD181900C60C3D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C3F92ECD181B00C60C3D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C4032ECD181B00C60C3D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +214,10 @@
 				26B2FED92EB999C100E0F7B1 /* OralableApp */,
 				26CAF2722E781EFE003FE378 /* OralableAppTests */,
 				26CAF27C2E781EFE003FE378 /* OralableAppUITests */,
+				26E2CB2B2ECD10B100B9E42C /* OralableForDentistsUITests */,
+				26D6C3ED2ECD181900C60C3D /* OralableForDentists */,
+				26D6C3FF2ECD181B00C60C3D /* OralableForDentistsTests */,
+				26D6C4092ECD181B00C60C3D /* OralableForDentistsUITests */,
 				26CAF25F2E781EFB003FE378 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -143,6 +228,9 @@
 				26CAF25E2E781EFB003FE378 /* OralableApp.app */,
 				26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */,
 				26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */,
+				26D6C3EC2ECD181900C60C3D /* OralableForDentists.app */,
+				26D6C3FC2ECD181B00C60C3D /* OralableForDentistsTests.xctest */,
+				26D6C4062ECD181B00C60C3D /* OralableForDentistsUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -221,6 +309,74 @@
 			productReference = 26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		26D6C3EB2ECD181900C60C3D /* OralableForDentists */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26D6C40F2ECD181B00C60C3D /* Build configuration list for PBXNativeTarget "OralableForDentists" */;
+			buildPhases = (
+				26D6C3E82ECD181900C60C3D /* Sources */,
+				26D6C3E92ECD181900C60C3D /* Frameworks */,
+				26D6C3EA2ECD181900C60C3D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				26D6C3ED2ECD181900C60C3D /* OralableForDentists */,
+			);
+			name = OralableForDentists;
+			packageProductDependencies = (
+			);
+			productName = OralableForDentists;
+			productReference = 26D6C3EC2ECD181900C60C3D /* OralableForDentists.app */;
+			productType = "com.apple.product-type.application";
+		};
+		26D6C3FB2ECD181B00C60C3D /* OralableForDentistsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26D6C4122ECD181B00C60C3D /* Build configuration list for PBXNativeTarget "OralableForDentistsTests" */;
+			buildPhases = (
+				26D6C3F82ECD181B00C60C3D /* Sources */,
+				26D6C3F92ECD181B00C60C3D /* Frameworks */,
+				26D6C3FA2ECD181B00C60C3D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				26D6C3FE2ECD181B00C60C3D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				26D6C3FF2ECD181B00C60C3D /* OralableForDentistsTests */,
+			);
+			name = OralableForDentistsTests;
+			packageProductDependencies = (
+			);
+			productName = OralableForDentistsTests;
+			productReference = 26D6C3FC2ECD181B00C60C3D /* OralableForDentistsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		26D6C4052ECD181B00C60C3D /* OralableForDentistsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26D6C4152ECD181B00C60C3D /* Build configuration list for PBXNativeTarget "OralableForDentistsUITests" */;
+			buildPhases = (
+				26D6C4022ECD181B00C60C3D /* Sources */,
+				26D6C4032ECD181B00C60C3D /* Frameworks */,
+				26D6C4042ECD181B00C60C3D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				26D6C4082ECD181B00C60C3D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				26D6C4092ECD181B00C60C3D /* OralableForDentistsUITests */,
+			);
+			name = OralableForDentistsUITests;
+			packageProductDependencies = (
+			);
+			productName = OralableForDentistsUITests;
+			productReference = 26D6C4062ECD181B00C60C3D /* OralableForDentistsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -228,7 +384,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					26CAF25D2E781EFB003FE378 = {
@@ -241,6 +397,17 @@
 					26CAF2782E781EFE003FE378 = {
 						CreatedOnToolsVersion = 16.4;
 						TestTargetID = 26CAF25D2E781EFB003FE378;
+					};
+					26D6C3EB2ECD181900C60C3D = {
+						CreatedOnToolsVersion = 26.1;
+					};
+					26D6C3FB2ECD181B00C60C3D = {
+						CreatedOnToolsVersion = 26.1;
+						TestTargetID = 26D6C3EB2ECD181900C60C3D;
+					};
+					26D6C4052ECD181B00C60C3D = {
+						CreatedOnToolsVersion = 26.1;
+						TestTargetID = 26D6C3EB2ECD181900C60C3D;
 					};
 				};
 			};
@@ -264,6 +431,9 @@
 				26CAF25D2E781EFB003FE378 /* OralableApp */,
 				26CAF26E2E781EFE003FE378 /* OralableAppTests */,
 				26CAF2782E781EFE003FE378 /* OralableAppUITests */,
+				26D6C3EB2ECD181900C60C3D /* OralableForDentists */,
+				26D6C3FB2ECD181B00C60C3D /* OralableForDentistsTests */,
+				26D6C4052ECD181B00C60C3D /* OralableForDentistsUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -284,6 +454,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		26CAF2772E781EFE003FE378 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C3EA2ECD181900C60C3D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C3FA2ECD181B00C60C3D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C4042ECD181B00C60C3D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -314,6 +505,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		26D6C3E82ECD181900C60C3D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C3F82ECD181B00C60C3D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26D6C4022ECD181B00C60C3D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -326,6 +538,16 @@
 			isa = PBXTargetDependency;
 			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
 			targetProxy = 26CAF27A2E781EFE003FE378 /* PBXContainerItemProxy */;
+		};
+		26D6C3FE2ECD181B00C60C3D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
+			targetProxy = 26D6C3FD2ECD181B00C60C3D /* PBXContainerItemProxy */;
+		};
+		26D6C4082ECD181B00C60C3D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
+			targetProxy = 26D6C4072ECD181B00C60C3D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -597,6 +819,168 @@
 			};
 			name = Release;
 		};
+		26D6C4102ECD181B00C60C3D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = OralableForDentists/OralableForDentists.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OralableForDentists/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.OralableForDentists;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		26D6C4112ECD181B00C60C3D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = OralableForDentists/OralableForDentists.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OralableForDentists/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.OralableForDentists;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		26D6C4132ECD181B00C60C3D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.OralableForDentistsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OralableForDentists.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OralableForDentists";
+			};
+			name = Debug;
+		};
+		26D6C4142ECD181B00C60C3D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.OralableForDentistsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OralableForDentists.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OralableForDentists";
+			};
+			name = Release;
+		};
+		26D6C4162ECD181B00C60C3D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.OralableForDentistsUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OralableForDentists;
+			};
+			name = Debug;
+		};
+		26D6C4172ECD181B00C60C3D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = THKF822TTP;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.OralableForDentistsUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OralableForDentists;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -632,6 +1016,33 @@
 			buildConfigurations = (
 				26CAF28B2E781EFE003FE378 /* Debug */,
 				26CAF28C2E781EFE003FE378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26D6C40F2ECD181B00C60C3D /* Build configuration list for PBXNativeTarget "OralableForDentists" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26D6C4102ECD181B00C60C3D /* Debug */,
+				26D6C4112ECD181B00C60C3D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26D6C4122ECD181B00C60C3D /* Build configuration list for PBXNativeTarget "OralableForDentistsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26D6C4132ECD181B00C60C3D /* Debug */,
+				26D6C4142ECD181B00C60C3D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26D6C4152ECD181B00C60C3D /* Build configuration list for PBXNativeTarget "OralableForDentistsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26D6C4162ECD181B00C60C3D /* Debug */,
+				26D6C4172ECD181B00C60C3D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
