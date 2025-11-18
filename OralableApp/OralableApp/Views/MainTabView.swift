@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var bleManager: OralableBLE
 
     var body: some View {
         TabView {
@@ -25,14 +26,12 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-            // Use the real HistoricalView from your Views folder
-            HistoricalView(viewModel: dependencies.makeHistoricalViewModel())
+            ShareView(ble: bleManager)
                 .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
+                    Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .tag(2)
 
-            // Use SettingsView, not ShareView
             SettingsView(viewModel: dependencies.makeSettingsViewModel())
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
