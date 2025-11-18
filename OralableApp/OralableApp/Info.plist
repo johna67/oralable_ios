@@ -33,7 +33,7 @@
 	<string></string>
 	<key>NSUbiquitousContainer</key>
 	<dict>
-		<key>iCloud.jacdentalsolutions.OralableApp</key>
+		<key>iCloud.jacdentalsolutions.Oralable</key>
 		<dict>
 			<key>NSUbiquitousContainerName</key>
 			<string>Oralable Data</string>
