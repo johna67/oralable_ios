@@ -341,6 +341,7 @@ class OralableBLE: ObservableObject {
         Task { @MainActor in
             // Battery updates
             for (data, value) in batteryUpdates {
+                self.batteryLevel = Double(value)  // Update published property
                 self.batteryHistory.append(data)
                 if value % 10 == 0 {
                     Logger.shared.info("[OralableBLE] Battery: \(value)%")
@@ -421,6 +422,7 @@ class OralableBLE: ObservableObject {
         for reading in readings {
             switch reading.sensorType {
             case .battery:
+                batteryLevel = reading.value  // Update published property
                 let batteryData = BatteryData(percentage: Int(reading.value), timestamp: reading.timestamp)
                 batteryHistory.append(batteryData)
                 // Only log significant battery changes
