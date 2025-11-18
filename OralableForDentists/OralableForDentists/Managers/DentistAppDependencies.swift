@@ -95,20 +95,3 @@ extension View {
     }
 }
 
-// MARK: - Placeholder Logger (will use shared Logger from patient app)
-
-class Logger {
-    static let shared = Logger()
-
-    func info(_ message: String) {
-        print("[INFO] \(message)")
-    }
-
-    func error(_ message: String) {
-        print("[ERROR] \(message)")
-    }
-
-    func warning(_ message: String) {
-        print("[WARNING] \(message)")
-    }
-}

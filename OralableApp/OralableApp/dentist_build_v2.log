@@ -1,0 +1,495 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ../OralableApp.xcodeproj -scheme OralableForDentists -configuration Debug -destination "platform=iOS Simulator,name=iPhone 17 Pro" clean build
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  swift-collections: https://github.com/apple/swift-collections.git @ 1.3.0
+  swift-async-algorithms: https://github.com/apple/swift-async-algorithms.git @ 1.0.4
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+** CLEAN SUCCEEDED **
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'OralableForDentists' in project 'OralableApp' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+Build description signature: a1a9afc629b0b0dbf75478daf7ed9595
+Build description path: /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/XCBuildData/a1a9afc629b0b0dbf75478daf7ed9595.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache
+
+CreateBuildDirectory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    builtin-create-build-directory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products
+
+CreateBuildDirectory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    builtin-create-build-directory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex
+
+CreateBuildDirectory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/ExplicitPrecompiledModules
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    builtin-create-build-directory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/ExplicitPrecompiledModules
+
+CreateBuildDirectory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    builtin-create-build-directory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+CreateBuildDirectory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    builtin-create-build-directory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator
+
+CreateBuildDirectory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    builtin-create-build-directory /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp-278a5c60fc3a80913799e1fb6e20741b-VFS-iphonesimulator/all-product-headers.yaml
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp-278a5c60fc3a80913799e1fb6e20741b-VFS-iphonesimulator/all-product-headers.yaml
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.DependencyMetadataFileList (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.DependencyMetadataFileList
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.hmap (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.hmap
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-project-headers.hmap (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-project-headers.hmap
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-own-target-headers.hmap (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-own-target-headers.hmap
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-generated-files.hmap (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-generated-files.hmap
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.DependencyStaticMetadataFileList (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.DependencyStaticMetadataFileList
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-all-target-headers.hmap (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-all-target-headers.hmap
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-all-non-framework-target-headers.hmap (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-all-non-framework-target-headers.hmap
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-DebugDylibPath-normal-arm64.txt (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-DebugDylibPath-normal-arm64.txt
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-DebugDylibInstallName-normal-arm64.txt (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-DebugDylibInstallName-normal-arm64.txt
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.SwiftConstValuesFileList (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.SwiftConstValuesFileList
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.LinkFileList (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.LinkFileList
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists_const_extract_protocols.json (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists_const_extract_protocols.json
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.SwiftFileList (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.SwiftFileList
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-OutputFileMap.json (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-OutputFileMap.json
+
+WriteAuxiliaryFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources/Entitlements-Simulated.plist (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    write-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources/Entitlements-Simulated.plist
+
+MkDir /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /bin/mkdir -p /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app
+
+ProcessProductPackaging /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.entitlements /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app.xcent (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+    Entitlements:
+    
+    {
+}
+    
+    builtin-productPackagingUtility /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.entitlements -entitlements -format xml -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app.xcent
+
+ProcessProductPackaging /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.entitlements /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+    Entitlements:
+    
+    {
+    "application-identifier" = "THKF822TTP.com.jacdental.oralable.dentist";
+    "aps-environment" = development;
+    "com.apple.developer.applesignin" =     (
+        Default
+    );
+    "com.apple.developer.associated-domains" =     (
+        "applinks:oralable.com",
+        "webcredentials:oralable.com"
+    );
+    "com.apple.developer.icloud-container-identifiers" =     (
+        "iCloud.com.jacdental.oralable.shared"
+    );
+    "com.apple.developer.icloud-services" =     (
+        CloudKit
+    );
+    "com.apple.developer.ubiquity-container-identifiers" =     (
+        "iCloud.com.jacdental.oralable.shared"
+    );
+    "com.apple.security.application-groups" =     (
+        "group.com.jacdental.oralable"
+    );
+}
+    
+    builtin-productPackagingUtility /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.entitlements -entitlements -format xml -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent
+
+ProcessProductPackagingDER /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent.der (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /usr/bin/derq query -f xml -i /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent.der --raw
+
+ProcessProductPackagingDER /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app.xcent /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app.xcent.der (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /usr/bin/derq query -f xml -i /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app.xcent -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app.xcent.der --raw
+
+Ld /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app/__preview.dylib normal (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios26.1-simulator -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -O0 -L/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -F/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -install_name @rpath/OralableForDentists.debug.dylib -dead_strip -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists_dependency_info.dat -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __ents_der -Xlinker /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists.app-Simulated.xcent.der -Xlinker -no_adhoc_codesign -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app/__preview.dylib
+
+ProcessInfoPlistFile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app/Info.plist /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Info.plist (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    builtin-infoPlistUtility /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app/PkgInfo -expandbuildsettings -format binary -platform iphonesimulator -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableForDentists.app/Info.plist
+
+SwiftDriver OralableForDentists normal arm64 com.apple.xcode.tools.swift.compiler (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name OralableForDentists -Onone -enforce-exclusivity\=checked @/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.SwiftFileList -DDEBUG -default-isolation\=MainActor -enable-bare-slash-regex -enable-upcoming-feature DisableOutwardActorInference -enable-upcoming-feature InferSendableFromCaptures -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature MemberImportVisibility -enable-upcoming-feature InferIsolatedConformances -enable-upcoming-feature NonisolatedNonsendingByDefault -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -target arm64-apple-ios26.1-simulator -g -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/OralableApp-bbqtqzgjthkkwbbxnapmqywzpgkr/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -emit-localized-strings -emit-localized-strings-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64 -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache -output-file-map /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists_const_extract_protocols.json -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-generated-files.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-own-target-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-all-target-headers.hmap -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-project-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources-normal/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-Swift.h -working-directory /Users/johnacogan67/Projects/oralable_ios/OralableApp -experimental-emit-module-separately -disable-cmo
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ptrcheck-DSXTZSD4V2ZLLIAF5X75GQJEL.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/SwiftShims-1UZ66VH25U46KW7QIUNNJPXZC.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdbool-74TAUSFLI15WCTVMMWSV6HYXQ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ptrauth-83YCZ2CNUI4PNJAMIO8ANPFGJ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stddef-7KLGK3LD4UE54DNJMRZRLGV1W.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_AvailabilityInternal-3SYU0QWE3I3PWZ9L2881SXGUZ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_StoreKit_SwiftUI-6F0VSROAKW9INGT8NFWAVFMZY.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/DeveloperToolsSupport-EYX7O3R9Y4CZB1WR3RLQ7J1VS.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_SwiftConcurrencyShims-39T881OG5GDGFHPUGIUQHD9PG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdarg-CDWLQJ2QSH6HTXFE5ANNBZDE4.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_float-E8S6PB8H7NWW63MPBA2LAR593.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_DarwinFoundation1-A33YAP73LGZH8ZQNDS40JRXU1.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ExtensionFoundation-92U4YF8SBMUTMDK763A7TI5W4.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_DarwinFoundation2-219NZ5D5ZKG26TV3IG0IOH87U.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_limits-XBPXI1Z5F6WF3WCTPDQW79ZX.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_tgmath-6AX24T4OJQ5A94NHNZBJQA9H.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdint-4L7LU5HGCY9UT8OXDOUK6GDU0.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/sys_types-15J0SCEDP6G2A625BGVL6PQSU.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_intrinsics-4NCXJ5N5A7V6POPMENPL2FFP9.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdatomic-3L3QLX9U0MUVSFAYB827I8TDO.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_DarwinFoundation3-7PPPKCUQ8Y0BU6PED3QQWOXEY.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_inttypes-EW8YOL5NC7SC17VIBDNN6MT5L.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Darwin-9F8C35UUU38DS2N5URYPVGMD4.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/simd-91VUJW3V9NL7B38GWBCMAYKTU.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ObjectiveC-7UFTTHMI3EQF7Q1KPJFM3ETPG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/MachO-CNA3TVS7B2Y9Q3A0SAML1A1N1.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/os_object-4MXC9RLWU2SPSBWOENK8328WP.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/os_workgroup-3DMLFYVYTL2OYFZO9M540ATGU.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Spatial-BZWGO3N578I8IAKK1EDIR8EAP.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Dispatch-AYAPGEFIJNLK9EWEG2OYMZ1SM.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreFoundation-A2DUXGZRTJJWIKGTD33X3VTFG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/XPC-39A118A1SAM5FLVQVZBEONG08.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/dnssd-5O6Q8FKHZ9UQIQWSN1G7J04GT.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/os-7QTFLJU1T14D3I8INR9QN1WUQ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreGraphics-A1M53K1YUNPDS9PC7BL9LP7P7.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Security-EWI7PLBX4WZYYFVNNZI0TJOBJ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CFNetwork-7F7Y494AVSCGYFDBCP0UHZ8XC.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Foundation-D8PR8PEMMVZQ6HVJV8ENXN36L.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreText-AIIPI41CFFW109LS0KZCT0LUK.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ImageIO-8NWG954RTLBJLJLJWWNDJH2L3.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Network-7V3OY3DMSCEEAXYKL5EYZPPNF.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreTransferable-22R0MIVAC65N0TSEGO2SNFLQW.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_LocationEssentials-4EJZGYOC2SQMO57VF3C0OK1LL.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/UserNotifications-7OKDBMWDHR0UQV7TT1A9RFXXE.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/LocalAuthentication-34JKCLWNGD1SMHIG2I72K4QZA.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/BackgroundAssets-5MUVXCZSS9XJ53QHK8MCPAIM6.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/OpenGLES-4A2VWFLR9WD6RI1UUF394OKLC.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/OSLog-4TDD03ZYEWQHUF2LD8H4JU9CG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/IOSurface-CRF7RKZQGWW6G6VJAFHLA5AAG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Symbols-61QDP703F03LX92P4QLOBAB1Q.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreLocation-5B1ZC7JGTL1UQTTCCBRQHQNSF.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/UniformTypeIdentifiers-CIWFT4KO2ZCQOTMQFKC3FK8ZJ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreData-X0B73R6UGRF8AZ9YZH11UHYK.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/DataDetection-67SKK6K09FAK917492UW5HCXL.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/FileProvider-DYLCCGC709GTXQ7FDX88W825A.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/UIUtilities-L4CHD5IRFXCBV4HA6VWUE9YS.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Accessibility-3USD97GP47U3A0O7U2R7GXKBR.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Metal-3IROV067VWW3LY50M8YI4LPLU.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CloudKit-8NZWATRGVMUSSZWWVWCFX9BUG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreVideo-CPE1020CIUYOW29Q1WPHIZS5W.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreImage-6EUUMQ9I11NPOZPH9T2IVVLXH.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/QuartzCore-2KL0NOZBITTLGBDXNTZQ9EFT3.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/SwiftUICore-481OUYQMPBVBTKVF6Q4R6UY90.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/UIKit-C45RHV9CIMBR66O4ZDPRS1VFV.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/SwiftUI-39E9C8MI7Z016SZSETT1E581E.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/StoreKit-99EXXPJTXNJK5QAV70VMYISTJ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/AuthenticationServices-72DA25XTAF8QZAF76ZC2Z6MF0.pcm
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ OralableForDentists (in target 'OralableForDentists' from project 'OralableApp')
+
+EmitSwiftModule normal arm64 (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAppDependencies.swift:7:7: error: type 'DentistAppDependencies' does not conform to protocol 'ObservableObject'
+class DentistAppDependencies: ObservableObject {
+      ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAppDependencies.swift:7:7: note: add stubs for conformance
+class DentistAppDependencies: ObservableObject {
+      ^
+Combine.ObservableObject.objectWillChange:2:5: note: protocol requires property 'objectWillChange' with type 'Self.ObjectWillChangePublisher'
+var objectWillChange: Self.ObjectWillChangePublisher { get }}
+    ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:7:7: error: type 'DentistAuthenticationManager' does not conform to protocol 'ObservableObject'
+class DentistAuthenticationManager: NSObject, ObservableObject {
+      ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:7:7: note: add stubs for conformance
+class DentistAuthenticationManager: NSObject, ObservableObject {
+      ^
+Combine.ObservableObject.objectWillChange:2:5: note: protocol requires property 'objectWillChange' with type 'Self.ObjectWillChangePublisher'
+var objectWillChange: Self.ObjectWillChangePublisher { get }}
+    ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:12:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var isAuthenticated: Bool = false
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:4:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:13:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var dentistID: String?
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:4:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:14:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var dentistName: String?
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:4:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:15:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var dentistEmail: String?
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:4:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:16:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var authenticationError: String?
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift:4:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:46:7: error: type 'DentistDataManager' does not conform to protocol 'ObservableObject'
+class DentistDataManager: ObservableObject {
+      ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:46:7: note: add stubs for conformance
+class DentistDataManager: ObservableObject {
+      ^
+Combine.ObservableObject.objectWillChange:2:5: note: protocol requires property 'objectWillChange' with type 'Self.ObjectWillChangePublisher'
+var objectWillChange: Self.ObjectWillChangePublisher { get }}
+    ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:51:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var patients: [DentistPatient] = []
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:3:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:52:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var isLoading = false
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:3:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:53:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var errorMessage: String?
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:3:1: note: add import of module 'Combine'
+
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:54:6: error: initializer 'init(wrappedValue:)' is not available due to missing import of defining module 'Combine'
+    @Published var successMessage: String?
+     ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift:3:1: note: add import of module 'Combine'
+
+^
+
+Failed frontend command:
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -emit-module -experimental-skip-non-inlinable-function-bodies-without-types /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAppDependencies.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistSubscriptionManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/AddPatientViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/DentistSettingsViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/PatientListViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/AddPatientView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/DentistSettingsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/PatientDetailView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/PatientListView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/UpgradePromptView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.swift -target arm64-apple-ios26.1-simulator -disable-cross-import-overlay-search -swift-module-cross-import AuthenticationServices /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Modules/AuthenticationServices.swiftcrossimport/SwiftUI.swiftoverlay -swift-module-cross-import AuthenticationServices /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk/System/Library/Frameworks/AuthenticationServices.framework/Modules/AuthenticationServices.swiftcrossimport/SwiftUI.swiftoverlay -swift-module-cross-import StoreKit /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/StoreKit.framework/Modules/StoreKit.swiftcrossimport/SwiftUI.swiftoverlay -swift-module-cross-import StoreKit /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk/System/Library/Frameworks/StoreKit.framework/Modules/StoreKit.swiftcrossimport/SwiftUI.swiftoverlay -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#FoundationMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libObservationMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#ObservationMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libPreviewsMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#PreviewsMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftUIMacros -disable-implicit-swift-modules -Xcc -fno-implicit-modules -Xcc -fno-implicit-module-maps -explicit-swift-module-map-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-dependencies-1.json -Xllvm -aarch64-use-tbi -enable-objc-interop -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -I /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -no-color-diagnostics -Xcc -fno-color-diagnostics -enable-testing -g -debug-info-format\=dwarf -dwarf-version\=5 -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -profile-generate -profile-coverage-mapping -swift-version 5 -enforce-exclusivity\=checked -Onone -D DEBUG -serialize-debugging-options -const-gather-protocols-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists_const_extract_protocols.json -enable-upcoming-feature DisableOutwardActorInference -enable-upcoming-feature InferSendableFromCaptures -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature MemberImportVisibility -enable-upcoming-feature InferIsolatedConformances -enable-upcoming-feature NonisolatedNonsendingByDefault -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -default-isolation\=MainActor -empty-abi-descriptor -validate-clang-modules-once -clang-build-session-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/johnacogan67/Projects/oralable_ios/OralableApp -enable-anonymous-context-mangled-names -file-compilation-dir /Users/johnacogan67/Projects/oralable_ios/OralableApp -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -Xcc -ivfsstatcache -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/swift-overrides.hmap -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-generated-files.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-own-target-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-all-target-headers.hmap -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/OralableForDentists-project-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources-normal/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/DerivedSources -Xcc -DDEBUG\=1 -no-auto-bridging-header-chaining -module-name OralableForDentists -frontend-parseable-output -disable-clang-spi -target-sdk-version 26.1 -target-sdk-name iphonesimulator26.1 -clang-target arm64-apple-ios26.1-simulator -in-process-plugin-server-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -emit-module-doc-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.swiftdoc -emit-module-source-info-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.swiftsourceinfo -emit-objc-header-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-Swift.h -serialize-diagnostics-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-primary-emit-module.dia -emit-dependencies-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists-primary-emit-module.d -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.swiftmodule -emit-abi-descriptor-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableForDentists.build/Objects-normal/arm64/OralableForDentists.abi.json
+SwiftCompile normal arm64 Compiling\ OralableForDentists.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.swift (in target 'OralableForDentists' from project 'OralableApp')
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/OralableForDentists.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ AddPatientViewModel.swift,\ DentistSettingsViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/AddPatientViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/DentistSettingsViewModel.swift (in target 'OralableForDentists' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/AddPatientViewModel.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/DentistSettingsViewModel.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ DentistAppDependencies.swift,\ DentistAuthenticationManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAppDependencies.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift (in target 'OralableForDentists' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAppDependencies.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistAuthenticationManager.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ PatientListViewModel.swift,\ AddPatientView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/PatientListViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/AddPatientView.swift (in target 'OralableForDentists' from project 'OralableApp')
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/ViewModels/PatientListViewModel.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/AddPatientView.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ UpgradePromptView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/UpgradePromptView.swift (in target 'OralableForDentists' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/UpgradePromptView.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ DentistSettingsView.swift,\ PatientDetailView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/DentistSettingsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/PatientDetailView.swift (in target 'OralableForDentists' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/DentistSettingsView.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/PatientDetailView.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ PatientListView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/PatientListView.swift (in target 'OralableForDentists' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Views/PatientListView.swift (in target 'OralableForDentists' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ DentistDataManager.swift,\ DentistSubscriptionManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistDataManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableForDentists/Managers/DentistSubscriptionManager.swift (in target 'OralableForDentists' from project 'OralableApp')
+
+** BUILD FAILED **
+
+
+The following build commands failed:
+	EmitSwiftModule normal arm64 (in target 'OralableForDentists' from project 'OralableApp')
+	SwiftEmitModule normal arm64 Emitting\ module\ for\ OralableForDentists (in target 'OralableForDentists' from project 'OralableApp')
+	Building project OralableApp with scheme OralableForDentists and configuration Debug
+(3 failures)

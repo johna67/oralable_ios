@@ -1,0 +1,6 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -scheme OralableApp -configuration Debug -destination "platform=iOS Simulator,name=iPhone 15" clean build
+
+2025-11-18 20:04:10.597 xcodebuild[8469:273382] Writing error result bundle to /var/folders/zt/05r9g5fs7lbfb630j589hq140000gn/T/ResultBundle_2025-18-11_20-04-0010.xcresult
+xcodebuild: error: The directory /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp does not contain an Xcode project, workspace or package.
+
