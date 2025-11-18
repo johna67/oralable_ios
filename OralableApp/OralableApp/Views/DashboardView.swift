@@ -97,7 +97,7 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingHistorical) {
                 NavigationView {
-                    HistoricalView()
+                    HistoricalView(metricType: "Movement")
                         .environmentObject(designSystem)
                         .environmentObject(HistoricalDataManager.shared)
                         .environmentObject(bleManager)
