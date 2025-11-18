@@ -683,15 +683,12 @@ class OralableBLE: ObservableObject {
         }
 
         Logger.shared.info("[OralableBLE] ✅ Aggregating \(sensorDataHistory.count) data points for range: \(range)")
-        let result = HistoricalDataAggregator.aggregate(data: sensorDataHistory, for: range, endDate: Date())
+        let metrics = HistoricalDataAggregator.aggregate(data: sensorDataHistory, for: range, endDate: Date())
 
-        if let metrics = result {
-            Logger.shared.info("[OralableBLE] ✅ Aggregation successful - \(metrics.dataPoints.count) data points in result")
-        } else {
-            Logger.shared.warning("[OralableBLE] ⚠️ Aggregation returned nil")
-        }
+        Logger.shared.info("[OralableBLE] ✅ Aggregation successful - \(metrics.dataPoints.count) data points in result")
+        Logger.shared.info("[OralableBLE] Total samples: \(metrics.totalSamples)")
 
-        return result
+        return metrics
     }
     
     // MARK: - Device State Detection
