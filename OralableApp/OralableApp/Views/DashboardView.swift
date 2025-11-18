@@ -43,9 +43,6 @@ struct DashboardView: View {
                     if viewModel.isConnected {
                         waveformSection
                     }
-                    
-                    // Action Buttons
-                    actionButtons
                 }
                 .padding(designSystem.spacing.md)
             }
@@ -249,7 +246,7 @@ struct DashboardView: View {
                 color: .red,
                 designSystem: designSystem
             )
-            
+
             // SpO2
             MetricCard(
                 icon: "lungs.fill",
@@ -259,7 +256,7 @@ struct DashboardView: View {
                 color: .blue,
                 designSystem: designSystem
             )
-            
+
             // Temperature
             MetricCard(
                 icon: "thermometer",
@@ -269,7 +266,7 @@ struct DashboardView: View {
                 color: .orange,
                 designSystem: designSystem
             )
-            
+
             // Battery
             MetricCard(
                 icon: batteryIcon,
@@ -277,26 +274,6 @@ struct DashboardView: View {
                 value: "\(Int(viewModel.batteryLevel))",
                 unit: "%",
                 color: batteryColor,
-                designSystem: designSystem
-            )
-            
-            // Session Time
-            MetricCard(
-                icon: "clock.fill",
-                title: "Session",
-                value: viewModel.sessionDuration,
-                unit: "",
-                color: .purple,
-                designSystem: designSystem
-            )
-            
-            // Signal Quality
-            MetricCard(
-                icon: "wifi",
-                title: "Signal",
-                value: "\(viewModel.signalQuality)",
-                unit: "%",
-                color: .green,
                 designSystem: designSystem
             )
         }
@@ -341,22 +318,6 @@ struct DashboardView: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
-        }
-    }
-    
-    // MARK: - Action Buttons
-    private var actionButtons: some View {
-        HStack(spacing: designSystem.spacing.md) {
-            // Share
-            Button(action: { showingShare = true }) {
-                Label("Share", systemImage: "square.and.arrow.up")
-                    .font(designSystem.typography.button)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundSecondary)
-                    .cornerRadius(designSystem.cornerRadius.medium)
-            }
         }
     }
 }
