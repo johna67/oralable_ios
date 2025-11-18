@@ -6,7 +6,7 @@ import UIKit
 /// Manager for caching and updating historical metrics
 /// This prevents recalculating aggregations on every view update
 class HistoricalDataManager: ObservableObject {
-    static let shared = HistoricalDataManager(bleManager: OralableBLE.shared)// ADD THIS LINE
+    static let shared = HistoricalDataManager(bleManager: OralableBLE.shared)
 
     
     // MARK: - Published Properties
@@ -26,9 +26,11 @@ class HistoricalDataManager: ObservableObject {
     private weak var bleManager: OralableBLE?
     
     // MARK: - Initialization
-    init(bleManager: OralableBLE) {
+    init(bleManager: OralableBLE?) {
         self.bleManager = bleManager
-        setupAutoUpdate()
+        if bleManager != nil {
+            setupAutoUpdate()
+        }
     }
     
     deinit {

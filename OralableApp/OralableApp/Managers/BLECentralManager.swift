@@ -28,23 +28,31 @@ final class BLECentralManager: NSObject {
     var onBluetoothStateChanged: ((CBManagerState) -> Void)?
     
     // MARK: - Private
-    
-    private var central: CBCentralManager!
+
+    // CRITICAL FIX: Lazy initialization prevents Bluetooth permission popup on app launch
+    // Core Bluetooth will only be initialized when actually needed (scan/connect)
+    private lazy var central: CBCentralManager = {
+        Task { @MainActor in
+            Logger.shared.info("[BLECentralManager] ⚡️ Lazy initializing CBCentralManager - BLE permission may be requested")
+        }
+        return CBCentralManager(delegate: self, queue: queue)
+    }()
+
     private var connectedPeripherals = Set<UUID>()
     private var pendingConnections = Set<UUID>()
     private let queue = DispatchQueue(label: "com.oralableapp.ble.central", qos: .userInitiated)
-    
+
     // Optional: filter by services if you want to narrow scanning
     private var serviceFilter: [CBUUID]?
-    
+
     // MARK: - Init
-    
+
     override init() {
         super.init()
         Task { @MainActor in
-            Logger.shared.info("BLECentralManager initialized")
+            Logger.shared.info("[BLECentralManager] Initialized (Core Bluetooth not yet started)")
         }
-        central = CBCentralManager(delegate: self, queue: queue)
+        // Note: central is now lazy - CBCentralManager won't be created until first access
     }
     
     // MARK: - Scanning

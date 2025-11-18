@@ -39,6 +39,7 @@ class AppDependencies: ObservableObject {
         self.designSystem = DesignSystem.shared // Keep for now (transition)
 
         // Core BLE infrastructure
+        // Note: With lazy CBCentralManager initialization, this won't trigger Bluetooth permission
         self.deviceManager = DeviceManager()
 
         // Authentication & Subscription
@@ -49,6 +50,7 @@ class AppDependencies: ObservableObject {
         self.healthKitManager = HealthKitManager()
 
         // BLE Manager (wraps DeviceManager - to be refactored)
+        // Note: BLE permission won't be requested until scan/connect is actually called
         self.bleManager = OralableBLE.shared // Keep for now
 
         // Historical data (depends on bleManager)
