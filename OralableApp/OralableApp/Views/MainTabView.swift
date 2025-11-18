@@ -23,15 +23,13 @@ struct MainTabView: View {
                     Label("Devices", systemImage: "sensor.fill")
                 }
                 .tag(1)
-            
-            // Use the real HistoricalView from your Views folder
-            HistoricalView()
+
+            ShareView(ble: OralableBLE.shared)
                 .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
+                    Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .tag(2)
-            
-            // Use SettingsView, not ShareView
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
