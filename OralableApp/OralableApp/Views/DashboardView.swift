@@ -334,20 +334,9 @@ struct DashboardView: View {
     // MARK: - Action Buttons
     private var actionButtons: some View {
         HStack(spacing: designSystem.spacing.md) {
-            // Historical Data
-            Button(action: { showingHistorical = true }) {
-                Label("History", systemImage: "chart.line.uptrend.xyaxis")
-                    .font(designSystem.typography.button)
-                    .foregroundColor(designSystem.colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(designSystem.spacing.md)
-                    .background(designSystem.colors.backgroundSecondary)
-                    .cornerRadius(designSystem.cornerRadius.medium)
-            }
-            
             // Share
             Button(action: { showingShare = true }) {
-                Label("Export", systemImage: "square.and.arrow.up")
+                Label("Share", systemImage: "square.and.arrow.up")
                     .font(designSystem.typography.button)
                     .foregroundColor(designSystem.colors.textPrimary)
                     .frame(maxWidth: .infinity)
