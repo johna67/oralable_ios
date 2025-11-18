@@ -14,13 +14,14 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            DashboardView(viewModel: dependencies.makeDashboardViewModel())
+            // Don't pass viewModel - let each view create its own stable @StateObject
+            DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "house.fill")
                 }
                 .tag(0)
 
-            DevicesView(viewModel: dependencies.makeDevicesViewModel())
+            DevicesView()
                 .tabItem {
                     Label("Devices", systemImage: "sensor.fill")
                 }
@@ -32,7 +33,7 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
-            SettingsView(viewModel: dependencies.makeSettingsViewModel())
+            SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
