@@ -109,6 +109,10 @@ class OralableBLE: ObservableObject {
     private let batchLock = NSLock()
     private var batchTimer: Timer?
     private let batchInterval: TimeInterval = 0.1  // Process batches every 100ms
+
+    // CRITICAL: Sampling to prevent processing millions of readings
+    private var sampleCounter: Int = 0
+    private let sampleRate: Int = 10  // Only process every 10th reading (90% reduction)
     
     // MARK: - Initialization
     
@@ -213,13 +217,28 @@ class OralableBLE: ObservableObject {
             .store(in: &cancellables) */
         
         // CRITICAL PERFORMANCE FIX: Instead of processing readings immediately on main thread,
-        // accumulate them into a batch for background processing
+        // accumulate them into a batch for background processing with sampling
         deviceManager.$allSensorReadings
             .sink { [weak self] readings in
                 guard let self = self else { return }
-                // Thread-safe batch accumulation
+
+                // CRITICAL SAMPLING: Only process every Nth reading to prevent millions of readings
+                // from overwhelming the system (10x = 90% reduction in data volume)
+                var sampledReadings: [SensorReading] = []
+                sampledReadings.reserveCapacity(readings.count / self.sampleRate + 1)
+
+                for reading in readings {
+                    self.sampleCounter += 1
+                    if self.sampleCounter >= self.sampleRate {
+                        sampledReadings.append(reading)
+                        self.sampleCounter = 0
+                    }
+                }
+
+                // Thread-safe batch accumulation (now with sampled data)
+                guard !sampledReadings.isEmpty else { return }
                 self.batchLock.lock()
-                self.readingsBatch.append(contentsOf: readings)
+                self.readingsBatch.append(contentsOf: sampledReadings)
                 self.batchLock.unlock()
                 // Batch will be processed by timer on background queue
             }
@@ -268,12 +287,13 @@ class OralableBLE: ObservableObject {
         // This runs on BACKGROUND queue - no @MainActor restrictions
 
         #if DEBUG
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.readingsCounter += readings.count
-            if self.readingsCounter >= 100 {
-                Logger.shared.debug("[OralableBLE] Processed \(self.readingsCounter) readings total")
-                self.readingsCounter = 0
+        // Fix race condition: update counter synchronously on background thread
+        readingsCounter += readings.count
+        if readingsCounter >= 100 {
+            let count = readingsCounter
+            readingsCounter = 0
+            Task { @MainActor in
+                Logger.shared.debug("[OralableBLE] Processed \(count) readings in batch (sampled from ~\(count * self.sampleRate) raw readings)")
             }
         }
         #endif
