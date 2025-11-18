@@ -424,7 +424,7 @@ struct DevicesView: View {
     // MARK: - Computed Properties
 
     // Filter to only show Oralable and ANR Muscle Sense devices
-    private var filteredDevices: [DeviceInfo] {
+    private var filteredDevices: [OralableBLE.DiscoveredDeviceInfo] {
         bleManager.discoveredDevicesInfo.filter { deviceInfo in
             let name = deviceInfo.name.lowercased()
             return name.contains("oralable") || name.contains("anr")
