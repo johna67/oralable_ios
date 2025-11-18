@@ -39,20 +39,32 @@ class DashboardViewModel: ObservableObject {
     @Published var sessionStartTime: Date?
     
     // MARK: - Private Properties
-    private let bleManager = OralableBLE.shared
-    private let appStateManager = AppStateManager.shared
+    private let bleManager: OralableBLE
+    private let appStateManager: AppStateManager
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
-    
+
     // Thresholds for MAM detection
     private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
     private let movementThreshold: Double = 0.1         // Accelerometer magnitude
     private let signalQualityThreshold: Double = 80.0   // Signal quality percentage
-    
+
     // MARK: - Initialization
-    init() {
+
+    /// Initialize with injected dependencies (preferred)
+    init(bleManager: OralableBLE, appStateManager: AppStateManager) {
+        self.bleManager = bleManager
+        self.appStateManager = appStateManager
         setupBindings()
         Logger.shared.info("[DashboardViewModel] ✅ Initializing in PRODUCTION MODE - REAL DATA only")
+    }
+
+    /// Legacy initializer for backward compatibility (uses singletons)
+    convenience init() {
+        self.init(
+            bleManager: OralableBLE.shared,
+            appStateManager: AppStateManager.shared
+        )
     }
 
     // MARK: - Public Methods

@@ -8,29 +8,32 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
-    
+
     var body: some View {
         TabView {
-            DashboardView()
+            DashboardView(viewModel: dependencies.makeDashboardViewModel())
                 .tabItem {
                     Label("Dashboard", systemImage: "house.fill")
                 }
                 .tag(0)
-            
-            DevicesView()
+
+            DevicesView(viewModel: dependencies.makeDevicesViewModel())
                 .tabItem {
                     Label("Devices", systemImage: "sensor.fill")
                 }
                 .tag(1)
 
-            ShareView(ble: OralableBLE.shared)
+            // Use the real HistoricalView from your Views folder
+            HistoricalView(viewModel: dependencies.makeHistoricalViewModel())
                 .tabItem {
-                    Label("Share", systemImage: "square.and.arrow.up")
+                    Label("History", systemImage: "clock.arrow.circlepath")
                 }
                 .tag(2)
 
-            SettingsView()
+            // Use SettingsView, not ShareView
+            SettingsView(viewModel: dependencies.makeSettingsViewModel())
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }

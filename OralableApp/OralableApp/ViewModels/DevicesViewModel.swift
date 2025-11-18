@@ -22,12 +22,21 @@ class DevicesViewModel: ObservableObject {
     var serialNumber: String { "ORA-2025-001" }
     var firmwareVersion: String { "1.0.0" }
     var lastSyncTime: String { "Just now" }
-    
-    private let bleManager = OralableBLE.shared
+
+    private let bleManager: OralableBLE
     private var cancellables = Set<AnyCancellable>()
-    
-    init() {
+
+    // MARK: - Initialization
+
+    /// Initialize with injected dependencies (preferred)
+    init(bleManager: OralableBLE) {
+        self.bleManager = bleManager
         setupBindings()
+    }
+
+    /// Legacy initializer for backward compatibility (uses singleton)
+    convenience init() {
+        self.init(bleManager: OralableBLE.shared)
     }
     
     private func setupBindings() {

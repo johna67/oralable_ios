@@ -10,13 +10,22 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @StateObject private var viewModel = DashboardViewModel()
-    // CRITICAL PERFORMANCE FIX: Use plain reference instead of @StateObject to prevent
-    // SwiftUI from observing ALL @Published properties in OralableBLE (60+ updates/sec)
-    // All UI-reactive properties are throttled through viewModel instead
-    private let bleManager = OralableBLE.shared
+    @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
-    
+    // Note: Using @EnvironmentObject instead of plain reference for dependency injection
+    // ViewModel throttles all @Published properties to prevent excessive UI updates
+    @EnvironmentObject var bleManager: OralableBLE
+    @StateObject private var viewModel: DashboardViewModel
+
+    init(viewModel: DashboardViewModel? = nil) {
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            // Legacy path - create with default initializer
+            _viewModel = StateObject(wrappedValue: DashboardViewModel())
+        }
+    }
+
     // NAVIGATION STATE VARIABLES
     @State private var showingProfile = false
     @State private var showingDevices = false

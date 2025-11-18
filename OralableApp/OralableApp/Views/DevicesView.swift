@@ -13,8 +13,19 @@ import SwiftUI
 import CoreBluetooth
 
 struct DevicesView: View {
-    @ObservedObject private var bleManager = OralableBLE.shared
+    @StateObject private var viewModel: DevicesViewModel
+    @EnvironmentObject var bleManager: OralableBLE
     @EnvironmentObject var designSystem: DesignSystem
+    @Environment(\.dismiss) var dismiss
+
+    init(viewModel: DevicesViewModel? = nil) {
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            // Legacy path - create with default initializer
+            _viewModel = StateObject(wrappedValue: DevicesViewModel())
+        }
+    }
 
     @State private var showingSettings = false
     @State private var isScanning = false

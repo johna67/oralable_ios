@@ -9,7 +9,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct ProfileView: View {
-    @StateObject private var authManager = AuthenticationManager.shared
+    @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
     

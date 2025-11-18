@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @StateObject private var viewModel: SettingsViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var authenticationManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
@@ -19,6 +19,15 @@ struct SettingsView: View {
     @State private var showingSubscriptionView = false
     @State private var showingSignOutAlert = false
     @State private var showingChangeModeAlert = false
+
+    init(viewModel: SettingsViewModel? = nil) {
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            // Legacy path - create with default initializer
+            _viewModel = StateObject(wrappedValue: SettingsViewModel())
+        }
+    }
 
     var body: some View {
         NavigationView {

@@ -66,12 +66,15 @@ class AppDependencies: ObservableObject {
 
     /// Creates a DashboardViewModel with injected dependencies
     func makeDashboardViewModel() -> DashboardViewModel {
-        return DashboardViewModel()
+        return DashboardViewModel(
+            bleManager: bleManager,
+            appStateManager: appStateManager
+        )
     }
 
     /// Creates a DevicesViewModel with injected dependencies
     func makeDevicesViewModel() -> DevicesViewModel {
-        return DevicesViewModel()
+        return DevicesViewModel(bleManager: bleManager)
     }
 
     /// Creates a HistoricalViewModel with injected dependencies
@@ -81,7 +84,7 @@ class AppDependencies: ObservableObject {
 
     /// Creates a SettingsViewModel with injected dependencies
     func makeSettingsViewModel() -> SettingsViewModel {
-        return SettingsViewModel()
+        return SettingsViewModel(bleManager: bleManager)
     }
 
     /// Creates an AuthenticationViewModel with injected dependencies

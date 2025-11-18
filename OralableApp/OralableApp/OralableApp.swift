@@ -9,27 +9,22 @@ import SwiftUI
 
 @main
 struct OralableApp: App {
-    // Initialize design system
-    @StateObject private var designSystem = DesignSystem.shared
+    // Initialize the dependency injection container
+    @StateObject private var dependencies: AppDependencies
 
-    // Initialize managers
-    @StateObject private var bleManager = OralableBLE.shared
-    @StateObject private var deviceManager = DeviceManager.shared
-    @StateObject private var historicalDataManager = HistoricalDataManager.shared
-    @StateObject private var authenticationManager = AuthenticationManager.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var appStateManager = AppStateManager.shared
+    init() {
+        // Determine app mode - use saved mode or default to subscription
+        let savedMode = UserDefaults.standard.string(forKey: "com.oralable.selectedMode")
+            .flatMap { AppMode(rawValue: $0) } ?? .subscription
+
+        let deps = AppDependencies(appMode: savedMode)
+        _dependencies = StateObject(wrappedValue: deps)
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(designSystem)
-                .environmentObject(bleManager)
-                .environmentObject(deviceManager)
-                .environmentObject(historicalDataManager)
-                .environmentObject(authenticationManager)
-                .environmentObject(subscriptionManager)
-                .environmentObject(appStateManager)
+                .withDependencies(dependencies)
         }
     }
 }

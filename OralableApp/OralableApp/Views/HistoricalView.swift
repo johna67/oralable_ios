@@ -22,13 +22,21 @@ struct HistoricalView: View {
     @EnvironmentObject var historicalDataManager: HistoricalDataManager
     @EnvironmentObject var bleManager: OralableBLE
     @StateObject private var viewModel: HistoricalViewModel
+    @State private var selectedDataPoint: HistoricalDataPoint?
+    @State private var showingExportSheet = false
+    @State private var showingDatePicker = false
 
     let metricType: String // "Movement", "HeartRate", "SpO2", etc.
 
-    init(metricType: String = "Movement") {
+    init(metricType: String = "Movement", viewModel: HistoricalViewModel? = nil) {
         self.metricType = metricType
-        let manager = HistoricalDataManager.shared
-        _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            // Legacy path - create with shared instance
+            let manager = HistoricalDataManager.shared
+            _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
+        }
     }
 
     var body: some View {

@@ -11,10 +11,19 @@ import AuthenticationServices
 
 struct AuthenticationView: View {
     // MVVM: Use ViewModel instead of direct manager access
-    @StateObject private var viewModel = AuthenticationViewModel()
+    @StateObject private var viewModel: AuthenticationViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @State private var showingProfileDetails = false
     @State private var showingSignOutConfirmation = false
+
+    init(viewModel: AuthenticationViewModel? = nil) {
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            // Legacy path - create with default initializer
+            _viewModel = StateObject(wrappedValue: AuthenticationViewModel())
+        }
+    }
     
     var body: some View {
         NavigationView {
