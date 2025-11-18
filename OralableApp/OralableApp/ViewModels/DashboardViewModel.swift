@@ -43,7 +43,6 @@ class DashboardViewModel: ObservableObject {
     private let appStateManager = AppStateManager.shared
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
-    private var mockDataTimer: Timer?
     
     // Thresholds for MAM detection
     private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
@@ -65,7 +64,6 @@ class DashboardViewModel: ObservableObject {
     
     func stopMonitoring() {
         sessionTimer?.invalidate()
-        mockDataTimer?.invalidate()
     }
     
     func startRecording() {
