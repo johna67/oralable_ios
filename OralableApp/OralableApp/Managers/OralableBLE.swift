@@ -825,10 +825,10 @@ class OralableBLE: ObservableObject {
                 let deviceType = DeviceType.from(peripheral: peripheral) ?? .oralable
 
                 deviceInfo = DeviceInfo(
-                    name: peripheral.name ?? "Unknown Device",
                     type: deviceType,
-                    signalStrength: 0,
-                    peripheralIdentifier: peripheral.identifier
+                    name: peripheral.name ?? "Unknown Device",
+                    peripheralIdentifier: peripheral.identifier,
+                    signalStrength: 0
                 )
             }
 
