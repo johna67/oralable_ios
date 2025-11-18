@@ -55,14 +55,9 @@ class AppDependencies: ObservableObject {
         self.historicalDataManager = HistoricalDataManager(bleManager: self.bleManager)
 
         // Data provider based on app mode
-        switch appMode {
-        case .demo:
-            Logger.shared.info("[AppDependencies] Using MockDataProvider for Demo mode")
-            self.dataProvider = MockDataProvider()
-        case .viewer, .subscription:
-            Logger.shared.info("[AppDependencies] Using RealBLEDataProvider for production mode")
-            self.dataProvider = RealBLEDataProvider(deviceManager: deviceManager)
-        }
+        // Note: Mock data provider removed - only real BLE data supported
+        Logger.shared.info("[AppDependencies] Using RealBLEDataProvider for production mode")
+        self.dataProvider = RealBLEDataProvider(deviceManager: deviceManager)
 
         Logger.shared.info("[AppDependencies] ✅ Dependency container initialized successfully")
     }
@@ -101,13 +96,13 @@ class AppDependencies: ObservableObject {
 extension AppDependencies {
     /// Creates a mock dependencies container for testing and previews
     static func mock() -> AppDependencies {
-        let deps = AppDependencies(appMode: .demo)
+        let deps = AppDependencies(appMode: .viewer)
         return deps
     }
 
     /// Creates dependencies with a specific data provider for testing
     convenience init(dataProvider: SensorDataProvider) {
-        self.init(appMode: .demo)
+        self.init(appMode: .viewer)
         // Override with provided data provider
         // Note: This is a temporary workaround - will be improved when we fully remove singletons
     }
