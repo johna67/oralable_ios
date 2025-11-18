@@ -11,7 +11,10 @@ import Charts
 
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
-    @StateObject private var bleManager = OralableBLE.shared
+    // CRITICAL PERFORMANCE FIX: Use plain reference instead of @StateObject to prevent
+    // SwiftUI from observing ALL @Published properties in OralableBLE (60+ updates/sec)
+    // All UI-reactive properties are throttled through viewModel instead
+    private let bleManager = OralableBLE.shared
     @EnvironmentObject var designSystem: DesignSystem
     
     // NAVIGATION STATE VARIABLES
@@ -27,17 +30,17 @@ struct DashboardView: View {
                 VStack(spacing: designSystem.spacing.lg) {
                     // Connection Status Card
                     connectionStatusCard
-                    
+
                     // MAM State Card - NEW
-                    if bleManager.isConnected {
+                    if viewModel.isConnected {
                         mamStateCard
                     }
-                    
+
                     // Metrics Grid
                     metricsGrid
-                    
+
                     // Waveform Section
-                    if bleManager.isConnected {
+                    if viewModel.isConnected {
                         waveformSection
                     }
                     
@@ -119,39 +122,39 @@ struct DashboardView: View {
         VStack(spacing: designSystem.spacing.md) {
             HStack {
                 // Status Icon
-                Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                Image(systemName: viewModel.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .font(.system(size: 24))
-                    .foregroundColor(bleManager.isConnected ? .green : .red)
-                
+                    .foregroundColor(viewModel.isConnected ? .green : .red)
+
                 // Status Text
                 VStack(alignment: .leading) {
-                    Text(bleManager.isConnected ? "Connected" : "Disconnected")
+                    Text(viewModel.isConnected ? "Connected" : "Disconnected")
                         .font(designSystem.typography.h3)
                         .foregroundColor(designSystem.colors.textPrimary)
-                    
-                    if bleManager.isConnected {
-                        Text(bleManager.deviceName)
+
+                    if viewModel.isConnected {
+                        Text(viewModel.deviceName)
                             .font(designSystem.typography.caption)
                             .foregroundColor(designSystem.colors.textSecondary)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Connect Button
                 Button(action: {
-                    if bleManager.isConnected {
-                        bleManager.disconnect()
+                    if viewModel.isConnected {
+                        viewModel.bleManagerRef.disconnect()
                     } else {
-                        bleManager.startScanning()
+                        viewModel.bleManagerRef.startScanning()
                     }
                 }) {
-                    Text(bleManager.isConnected ? "Disconnect" : "Connect")
+                    Text(viewModel.isConnected ? "Disconnect" : "Connect")
                         .font(designSystem.typography.button)
                         .foregroundColor(.white)
                         .padding(.horizontal, designSystem.spacing.md)
                         .padding(.vertical, designSystem.spacing.sm)
-                        .background(bleManager.isConnected ? Color.red : Color.blue)
+                        .background(viewModel.isConnected ? Color.red : Color.blue)
                         .cornerRadius(designSystem.cornerRadius.medium)
                 }
             }
@@ -261,7 +264,7 @@ struct DashboardView: View {
             MetricCard(
                 icon: batteryIcon,
                 title: "Battery",
-                value: "\(Int(bleManager.batteryLevel))",
+                value: "\(Int(viewModel.batteryLevel))",
                 unit: "%",
                 color: batteryColor,
                 designSystem: designSystem
@@ -293,15 +296,15 @@ struct DashboardView: View {
         if viewModel.isCharging {
             return "battery.100.bolt"
         }
-        let level = bleManager.batteryLevel
+        let level = viewModel.batteryLevel
         if level > 75 { return "battery.100" }
         if level > 50 { return "battery.75" }
         if level > 25 { return "battery.50" }
         return "battery.25"
     }
-    
+
     private var batteryColor: Color {
-        let level = bleManager.batteryLevel
+        let level = viewModel.batteryLevel
         if level < 20 { return .red }
         if level < 50 { return .orange }
         return .green

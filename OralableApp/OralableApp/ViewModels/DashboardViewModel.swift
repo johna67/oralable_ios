@@ -13,22 +13,27 @@ import CoreBluetooth
 class DashboardViewModel: ObservableObject {
     // MARK: - Published Properties
 
+    // Connection State (throttled from BLE manager)
+    @Published var isConnected: Bool = false
+    @Published var deviceName: String = ""
+    @Published var batteryLevel: Double = 0.0
+
     // Metrics
     @Published var heartRate: Int = 0
     @Published var spO2: Int = 0
     @Published var temperature: Double = 0.0
     @Published var signalQuality: Int = 0
     @Published var sessionDuration: String = "00:00"
-    
+
     // MAM States (Movement, Adhesion, Monitoring)
     @Published var isCharging: Bool = false
     @Published var isMoving: Bool = false
     @Published var positionQuality: String = "Good" // "Good", "Adjust", "Off"
-    
+
     // Waveform Data
     @Published var ppgData: [Double] = []
     @Published var accelerometerData: [Double] = []
-    
+
     // Session Management
     @Published var isRecording: Bool = false
     @Published var sessionStartTime: Date?
@@ -93,26 +98,45 @@ class DashboardViewModel: ObservableObject {
     
     // MARK: - Private Methods
     private func setupBindings() {
-        // Battery level changes
-        bleManager.$batteryLevel
-            .sink { [weak self] level in
-                self?.updateChargingState(batteryLevel: level)
-            }
-            .store(in: &cancellables)
-        
-        // Connection state
+        // CRITICAL PERFORMANCE FIX: Throttle connection state updates
+        // Connection state (throttled to prevent excessive UI updates)
         bleManager.$isConnected
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] connected in
+                self?.isConnected = connected
                 if !connected {
                     self?.resetMetrics()
                 }
             }
             .store(in: &cancellables)
+
+        // Device name (throttled)
+        bleManager.$deviceName
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] name in
+                self?.deviceName = name
+            }
+            .store(in: &cancellables)
+
+        // Battery level (throttled)
+        bleManager.$batteryLevel
+            .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] level in
+                self?.batteryLevel = level
+                self?.updateChargingState(batteryLevel: level)
+            }
+            .store(in: &cancellables)
     }
     
     private func setupBLESubscriptions() {
+        // CRITICAL PERFORMANCE FIX: Throttle all subscriptions to prevent SwiftUI rendering storm
+        // Sensor data arrives every 10-14ms, but UI only needs to update 1-2x per second
+        // Without throttling: 60-100 view re-renders/sec = iPhone freeze
+        // With throttling: 2 view re-renders/sec = smooth UI
+
         // Subscribe to Heart Rate (calculated from PPG)
         bleManager.$heartRate
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] hr in
                 self?.heartRate = hr
             }
@@ -120,6 +144,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to SpO2 (calculated from PPG)
         bleManager.$spO2
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] spo2 in
                 self?.spO2 = spo2
             }
@@ -127,6 +152,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to PPG data for waveform
         bleManager.$ppgRedValue
+            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] value in
                 self?.processPPGData(value)
             }
@@ -135,6 +161,7 @@ class DashboardViewModel: ObservableObject {
         // Subscribe to accelerometer data
         bleManager.$accelX
             .combineLatest(bleManager.$accelY, bleManager.$accelZ)
+            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] x, y, z in
                 self?.processAccelerometerData(x: x, y: y, z: z)
             }
@@ -142,6 +169,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to temperature
         bleManager.$temperature
+            .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] temp in
                 self?.temperature = temp
             }
@@ -149,6 +177,7 @@ class DashboardViewModel: ObservableObject {
 
         // Subscribe to HR quality for signal quality display
         bleManager.$heartRateQuality
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] quality in
                 self?.signalQuality = Int(quality * 100)
             }
@@ -291,24 +320,17 @@ class DashboardViewModel: ObservableObject {
 
 // MARK: - Extensions
 extension DashboardViewModel {
-    // Convenience methods for UI
-    var isConnected: Bool {
-        bleManager.isConnected
-    }
-    
-    var deviceName: String {
-        bleManager.deviceName
-    }
-    
-    var batteryLevel: Double {
-        bleManager.batteryLevel
-    }
-    
+    // Convenience methods for UI (connection state now comes from throttled @Published properties)
     func toggleRecording() {
         if isRecording {
             stopRecording()
         } else {
             startRecording()
         }
+    }
+
+    // BLE Manager methods (need direct access for connect/disconnect)
+    var bleManagerRef: OralableBLE {
+        bleManager
     }
 }
