@@ -821,19 +821,8 @@ class OralableBLE: ObservableObject {
             if deviceInfo == nil {
                 Logger.shared.info("[OralableBLE] Device not in discovered list, creating temporary DeviceInfo")
 
-                // Detect device type from name
-                let deviceType: DeviceType
-                if let name = peripheral.name {
-                    if name.lowercased().contains("oralable") {
-                        deviceType = .oralable
-                    } else if name.lowercased().contains("anr") || name.lowercased().contains("muscle") {
-                        deviceType = .anrMuscleSense
-                    } else {
-                        deviceType = .unknown
-                    }
-                } else {
-                    deviceType = .unknown
-                }
+                // Use DeviceType's built-in detection method
+                let deviceType = DeviceType.from(peripheral: peripheral) ?? .oralable
 
                 deviceInfo = DeviceInfo(
                     name: peripheral.name ?? "Unknown Device",
