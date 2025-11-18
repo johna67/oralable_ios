@@ -82,8 +82,6 @@ struct RootView: View {
             } else {
                 AuthenticationRequiredView()
             }
-        case .demo:
-            DemoModeView()
         }
     }
 }
