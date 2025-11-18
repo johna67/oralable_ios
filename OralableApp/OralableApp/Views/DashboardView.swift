@@ -99,10 +99,20 @@ struct DashboardView: View {
                     .environmentObject(AppStateManager.shared)
             }
             .sheet(isPresented: $showingHistorical) {
-                HistoricalView()
-                    .environmentObject(designSystem)
-                    .environmentObject(HistoricalDataManager.shared)
-                    .environmentObject(bleManager)
+                NavigationView {
+                    HistoricalView()
+                        .environmentObject(designSystem)
+                        .environmentObject(HistoricalDataManager.shared)
+                        .environmentObject(bleManager)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Done") {
+                                    showingHistorical = false
+                                }
+                                .foregroundColor(designSystem.colors.textPrimary)
+                            }
+                        }
+                }
             }
             .sheet(isPresented: $showingShare) {
                 ShareView(ble: bleManager)

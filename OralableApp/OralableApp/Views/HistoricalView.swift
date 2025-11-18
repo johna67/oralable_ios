@@ -34,8 +34,7 @@ struct HistoricalView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
                     // Time Range Selector
                     timeRangeSelector
@@ -95,10 +94,9 @@ struct HistoricalView: View {
             .refreshable {
                 await viewModel.refreshAsync()
             }
-        }
-        .onAppear {
-            viewModel.updateAllMetrics()
-        }
+            .onAppear {
+                viewModel.updateAllMetrics()
+            }
         .sheet(isPresented: $showingExportSheet) {
             ShareView(ble: bleManager)
         }

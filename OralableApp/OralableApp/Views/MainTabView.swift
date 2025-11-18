@@ -24,23 +24,17 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-            HistoricalView()
-                .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
-                }
-                .tag(2)
-
             ShareView(ble: OralableBLE.shared)
                 .tabItem {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
-                .tag(3)
+                .tag(2)
 
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
-                .tag(4)
+                .tag(3)
         }
         .accentColor(designSystem.colors.primaryBlack)
     }
