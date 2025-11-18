@@ -127,8 +127,8 @@ struct HistoricalView: View {
                 .font(designSystem.typography.h3)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            if !viewModel.currentMovementData.isEmpty {
-                Chart(viewModel.currentMovementData) { point in
+            if !viewModel.dataPoints.isEmpty {
+                Chart(viewModel.dataPoints) { point in
                     LineMark(
                         x: .value("Time", point.timestamp),
                         y: .value("Activity", point.movementIntensity)
@@ -166,8 +166,8 @@ struct HistoricalView: View {
                 .font(designSystem.typography.h3)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            if !viewModel.currentHeartRateData.isEmpty {
-                Chart(viewModel.currentHeartRateData) { point in
+            if !viewModel.dataPoints.isEmpty {
+                Chart(viewModel.dataPoints.filter { $0.averageHeartRate != nil }) { point in
                     LineMark(
                         x: .value("Time", point.timestamp),
                         y: .value("BPM", point.averageHeartRate ?? 0)
@@ -175,6 +175,20 @@ struct HistoricalView: View {
                     .foregroundStyle(.red)
                 }
                 .frame(height: 300)
+                .chartXAxis {
+                    AxisMarks(values: .automatic) { _ in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.hour().minute())
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                    }
+                }
             } else {
                 Text("No heart rate data available")
                     .font(designSystem.typography.body)
@@ -191,8 +205,8 @@ struct HistoricalView: View {
                 .font(designSystem.typography.h3)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            if !viewModel.currentSpO2Data.isEmpty {
-                Chart(viewModel.currentSpO2Data) { point in
+            if !viewModel.dataPoints.isEmpty {
+                Chart(viewModel.dataPoints.filter { $0.averageSpO2 != nil }) { point in
                     LineMark(
                         x: .value("Time", point.timestamp),
                         y: .value("SpO2", point.averageSpO2 ?? 0)
@@ -200,6 +214,20 @@ struct HistoricalView: View {
                     .foregroundStyle(.blue)
                 }
                 .frame(height: 300)
+                .chartXAxis {
+                    AxisMarks(values: .automatic) { _ in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.hour().minute())
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                    }
+                }
             } else {
                 Text("No SpO2 data available")
                     .font(designSystem.typography.body)
