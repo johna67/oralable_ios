@@ -29,17 +29,18 @@ struct ModeSelectionView: View {
                             mode: .viewer,
                             icon: "eye",
                             title: "Viewer Mode",
-                            subtitle: "View real-time data",
+                            subtitle: "Review imported data",
                             features: [
-                                "Connect to Oralable device",
-                                "View real-time sensor data",
-                                "Basic data visualization",
-                                "Export session data"
+                                "Import health data",
+                                "View historical metrics",
+                                "Export data files",
+                                "Basic visualizations"
                             ],
                             limitations: [
-                                "No data storage",
-                                "No historical tracking",
-                                "Limited features"
+                                "Cannot connect to devices",
+                                "No real-time data",
+                                "No cloud sync",
+                                "No account features"
                             ],
                             price: "Free",
                             isSelected: selectedMode == .viewer,
@@ -59,13 +60,13 @@ struct ModeSelectionView: View {
                             title: "Full Access",
                             subtitle: "Complete feature set",
                             features: [
-                                "All Viewer Mode features",
+                                "Connect to Oralable device",
+                                "View real-time sensor data",
                                 "Unlimited data storage",
                                 "Historical analysis",
                                 "Advanced visualizations",
                                 "Health insights",
-                                "Cloud sync",
-                                "Priority support"
+                                "Cloud sync"
                             ],
                             limitations: [],
                             price: "Sign in required",
@@ -429,18 +430,18 @@ extension AppMode {
     var description: String {
         switch self {
         case .viewer:
-            return "View real-time data from your Oralable device"
+            return "Review and analyze imported health data"
         case .subscription:
-            return "Unlock all features with your account"
+            return "Connect to devices and unlock all features"
         }
     }
 
     var detailedDescription: String {
         switch self {
         case .viewer:
-            return "Viewer Mode provides essential functionality for monitoring your Oralable device in real-time. Perfect for quick sessions and immediate data viewing without the need for an account."
+            return "Viewer Mode allows you to import, review, and analyze health data files without connecting to a device. Perfect for reviewing historical data or analyzing data shared by others. No account or device connection required."
         case .subscription:
-            return "Full Access unlocks the complete Oralable experience. Track your health metrics over time, gain insights from historical data, and sync across all your devices. Requires Sign in with Apple for secure authentication."
+            return "Full Access unlocks the complete Oralable experience. Connect to your Oralable device for real-time monitoring, track your health metrics over time, gain insights from historical data, and sync across all your devices. Requires Sign in with Apple for secure authentication."
         }
     }
 
@@ -448,17 +449,17 @@ extension AppMode {
         switch self {
         case .viewer:
             return [
-                "Quick monitoring sessions",
-                "Real-time data viewing",
-                "Basic health tracking",
-                "Testing device connectivity"
+                "Reviewing imported data files",
+                "Analyzing historical metrics",
+                "Viewing shared health data",
+                "Exploring the app without a device"
             ]
         case .subscription:
             return [
-                "Long-term health monitoring",
-                "Tracking treatment progress",
+                "Real-time device monitoring",
+                "Long-term health tracking",
                 "Sharing data with healthcare providers",
-                "Multiple device management"
+                "Tracking treatment progress"
             ]
         }
     }
@@ -466,7 +467,7 @@ extension AppMode {
     var requirements: [String] {
         switch self {
         case .viewer:
-            return ["Oralable device required"]
+            return ["No requirements - works offline"]
         case .subscription:
             return ["Apple ID required", "Oralable device required"]
         }
