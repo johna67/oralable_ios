@@ -104,10 +104,12 @@ struct ModeSelectionView: View {
     
     private var headerSection: some View {
         VStack(spacing: designSystem.spacing.md) {
-            // App Icon
-            Image(systemName: "waveform.path.ecg.rectangle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(designSystem.colors.primaryBlack)
+            // Oralable Logo
+            Image("AppIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 120, height: 120)
+                .cornerRadius(24)
                 .padding(.bottom, designSystem.spacing.sm)
 
             // Welcome Text
