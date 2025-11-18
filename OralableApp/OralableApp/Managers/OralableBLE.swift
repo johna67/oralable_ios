@@ -374,24 +374,8 @@ class OralableBLE: ObservableObject {
 
         Task { @MainActor in
             for (timestamp, group) in groupedReadings {
-                var sensorData = SensorData(timestamp: timestamp)
-
-                for reading in group {
-                    switch reading.sensorType {
-                    case .heartRate: sensorData.heartRate = Int(reading.value)
-                    case .spo2: sensorData.spO2 = Int(reading.value)
-                    case .temperature: sensorData.temperature = reading.value
-                    case .battery: sensorData.batteryLevel = Int(reading.value)
-                    case .ppgRed: sensorData.ppgRed = Int32(reading.value)
-                    case .ppgInfrared: sensorData.ppgIR = Int32(reading.value)
-                    case .ppgGreen: sensorData.ppgGreen = Int32(reading.value)
-                    case .accelerometerX: sensorData.accelX = Int16(reading.value * 1000)
-                    case .accelerometerY: sensorData.accelY = Int16(reading.value * 1000)
-                    case .accelerometerZ: sensorData.accelZ = Int16(reading.value * 1000)
-                    default: break
-                    }
-                }
-
+                // Use the existing helper method to convert readings to SensorData
+                let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
                 self.sensorDataHistory.append(sensorData)
             }
         }
