@@ -17,7 +17,11 @@ struct DashboardView: View {
     @EnvironmentObject var bleManager: OralableBLE
     @StateObject private var viewModel: DashboardViewModel
 
-    init(viewModel: DashboardViewModel? = nil) {
+    // Viewer Mode flag - when true, dashboard is read-only
+    let isViewerMode: Bool
+
+    init(viewModel: DashboardViewModel? = nil, isViewerMode: Bool = false) {
+        self.isViewerMode = isViewerMode
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
@@ -39,16 +43,16 @@ struct DashboardView: View {
                     // Connection Status Card
                     connectionStatusCard
 
-                    // MAM State Card - NEW
-                    if viewModel.isConnected {
+                    // MAM State Card - NEW (hidden in viewer mode)
+                    if !isViewerMode && viewModel.isConnected {
                         mamStateCard
                     }
 
                     // Metrics Grid
                     metricsGrid
 
-                    // Waveform Section
-                    if viewModel.isConnected {
+                    // Waveform Section (hidden in viewer mode)
+                    if !isViewerMode && viewModel.isConnected {
                         waveformSection
                     }
                 }
@@ -119,42 +123,63 @@ struct DashboardView: View {
     // MARK: - Connection Status Card
     private var connectionStatusCard: some View {
         VStack(spacing: designSystem.spacing.md) {
-            HStack {
-                // Status Icon
-                Image(systemName: viewModel.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(viewModel.isConnected ? .green : .red)
+            if isViewerMode {
+                // Viewer Mode - No connection status
+                HStack {
+                    Image(systemName: "eye.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.blue)
 
-                // Status Text
-                VStack(alignment: .leading) {
-                    Text(viewModel.isConnected ? "Connected" : "Disconnected")
-                        .font(designSystem.typography.h3)
-                        .foregroundColor(designSystem.colors.textPrimary)
+                    VStack(alignment: .leading) {
+                        Text("Viewer Mode")
+                            .font(designSystem.typography.h3)
+                            .foregroundColor(designSystem.colors.textPrimary)
 
-                    if viewModel.isConnected {
-                        Text(viewModel.deviceName)
+                        Text("Import data to view in History")
                             .font(designSystem.typography.caption)
                             .foregroundColor(designSystem.colors.textSecondary)
                     }
+
+                    Spacer()
                 }
+            } else {
+                HStack {
+                    // Status Icon
+                    Image(systemName: viewModel.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(viewModel.isConnected ? .green : .red)
 
-                Spacer()
+                    // Status Text
+                    VStack(alignment: .leading) {
+                        Text(viewModel.isConnected ? "Connected" : "Disconnected")
+                            .font(designSystem.typography.h3)
+                            .foregroundColor(designSystem.colors.textPrimary)
 
-                // Connect Button
-                Button(action: {
-                    if viewModel.isConnected {
-                        viewModel.bleManagerRef.disconnect()
-                    } else {
-                        viewModel.bleManagerRef.startScanning()
+                        if viewModel.isConnected {
+                            Text(viewModel.deviceName)
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
                     }
-                }) {
-                    Text(viewModel.isConnected ? "Disconnect" : "Connect")
-                        .font(designSystem.typography.button)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, designSystem.spacing.md)
-                        .padding(.vertical, designSystem.spacing.sm)
-                        .background(viewModel.isConnected ? Color.red : Color.blue)
-                        .cornerRadius(designSystem.cornerRadius.medium)
+
+                    Spacer()
+
+                    // Connect Button
+                    Button(action: {
+                        if viewModel.isConnected {
+                            viewModel.bleManagerRef.disconnect()
+                        } else {
+                            viewModel.bleManagerRef.startScanning()
+                        }
+                    }) {
+                        Text(viewModel.isConnected ? "Disconnect" : "Connect")
+                            .font(designSystem.typography.button)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, designSystem.spacing.md)
+                            .padding(.vertical, designSystem.spacing.sm)
+                            .background(viewModel.isConnected ? Color.red : Color.blue)
+                            .cornerRadius(designSystem.cornerRadius.medium)
+                    }
                 }
             }
         }

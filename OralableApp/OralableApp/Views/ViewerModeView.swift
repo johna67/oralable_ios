@@ -4,8 +4,7 @@ struct ViewerModeView: View {
     @Binding var selectedMode: AppMode?
     @EnvironmentObject var ble: OralableBLE
     @State private var selectedTab = 0
-    @State private var showDevices = false
-    
+
     @Environment(\.horizontalSizeClass) var sizeClass
 
     var body: some View {
@@ -18,13 +17,10 @@ struct ViewerModeView: View {
                 iPhoneTabView
             }
         }
-        .sheet(isPresented: $showDevices) {
-            DevicesView()
-        }
     }
     
     // MARK: - iPad Split View Layout
-    
+
     private var iPadSplitView: some View {
         NavigationSplitView {
             List {
@@ -32,18 +28,32 @@ struct ViewerModeView: View {
                     Button {
                         selectedTab = 0
                     } label: {
-                        Label("Dashboard", systemImage: "gauge")
+                        Label("Dashboard", systemImage: "house.fill")
                     }
                     .listRowBackground(selectedTab == 0 ? Color.accentColor.opacity(0.15) : Color.clear)
-                    
+
                     Button {
                         selectedTab = 1
                     } label: {
-                        Label("Import/Export", systemImage: "square.and.arrow.up")
+                        Label("Devices", systemImage: "sensor.fill")
                     }
                     .listRowBackground(selectedTab == 1 ? Color.accentColor.opacity(0.15) : Color.clear)
+
+                    Button {
+                        selectedTab = 2
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .listRowBackground(selectedTab == 2 ? Color.accentColor.opacity(0.15) : Color.clear)
+
+                    Button {
+                        selectedTab = 3
+                    } label: {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+                    .listRowBackground(selectedTab == 3 ? Color.accentColor.opacity(0.15) : Color.clear)
                 }
-                
+
                 Section {
                     Button(action: { selectedMode = nil }) {
                         HStack {
@@ -55,15 +65,6 @@ struct ViewerModeView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle("Oralable Viewer")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showDevices = true }) {
-                        Image(systemName: "wave.3.right.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(ble.isConnected ? .green : .gray)
-                    }
-                }
-            }
         } detail: {
             NavigationStack {
                 detailView(for: selectedTab)
@@ -72,30 +73,38 @@ struct ViewerModeView: View {
     }
     
     // MARK: - iPhone Tab View Layout
-    
+
     private var iPhoneTabView: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                DashboardView()
+                DashboardView(isViewerMode: true)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(action: { selectedMode = nil }) {
                                 Label("Modes", systemImage: "chevron.left")
                             }
                         }
-                        
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(action: { showDevices = true }) {
-                                Image(systemName: "wave.3.right.circle.fill")
-                                    .foregroundColor(ble.isConnected ? .green : .gray)
+                    }
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "house.fill")
+            }
+            .tag(0)
+
+            NavigationStack {
+                DevicesView(isViewerMode: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: { selectedMode = nil }) {
+                                Label("Modes", systemImage: "chevron.left")
                             }
                         }
                     }
             }
             .tabItem {
-                Label("Dashboard", systemImage: "gauge")
+                Label("Devices", systemImage: "sensor.fill")
             }
-            .tag(0)
+            .tag(1)
 
             NavigationStack {
                 ShareView(ble: ble, isViewerMode: true)
@@ -105,33 +114,45 @@ struct ViewerModeView: View {
                                 Label("Modes", systemImage: "chevron.left")
                             }
                         }
-                        
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(action: { showDevices = true }) {
-                                Image(systemName: "wave.3.right.circle.fill")
-                                    .foregroundColor(ble.isConnected ? .green : .gray)
+                    }
+            }
+            .tabItem {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .tag(2)
+
+            NavigationStack {
+                SettingsView(isViewerMode: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: { selectedMode = nil }) {
+                                Label("Modes", systemImage: "chevron.left")
                             }
                         }
                     }
             }
             .tabItem {
-                Label("Import/Export", systemImage: "square.and.arrow.up")
+                Label("Settings", systemImage: "gearshape.fill")
             }
-            .tag(1)
+            .tag(3)
         }
     }
     
     // MARK: - Detail View Helper
-    
+
     @ViewBuilder
     private func detailView(for tab: Int) -> some View {
         switch tab {
         case 0:
-            DashboardView()
+            DashboardView(isViewerMode: true)
         case 1:
+            DevicesView(isViewerMode: true)
+        case 2:
             ShareView(ble: ble, isViewerMode: true)
+        case 3:
+            SettingsView(isViewerMode: true)
         default:
-            DashboardView()
+            DashboardView(isViewerMode: true)
         }
     }
 }

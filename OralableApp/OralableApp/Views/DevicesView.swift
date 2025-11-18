@@ -18,7 +18,11 @@ struct DevicesView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
 
-    init(viewModel: DevicesViewModel? = nil) {
+    // Viewer Mode flag - when true, device operations are disabled
+    let isViewerMode: Bool
+
+    init(viewModel: DevicesViewModel? = nil, isViewerMode: Bool = false) {
+        self.isViewerMode = isViewerMode
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
@@ -36,22 +40,28 @@ struct DevicesView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
-                    // Connection Status Card
-                    connectionCard
-                    
-                    // Device Info (if connected)
-                    if bleManager.isConnected {
-                        deviceInfoCard
-                        deviceMetricsCard
-                        deviceSettingsCard
-                        advancedSettingsCard
+                    if isViewerMode {
+                        // Viewer Mode - Show informational card
+                        viewerModeInfoCard
                     } else {
-                        // Show scanning view when not connected
-                        scanningView
+                        // Subscription Mode - Full device functionality
+                        // Connection Status Card
+                        connectionCard
+
+                        // Device Info (if connected)
+                        if bleManager.isConnected {
+                            deviceInfoCard
+                            deviceMetricsCard
+                            deviceSettingsCard
+                            advancedSettingsCard
+                        } else {
+                            // Show scanning view when not connected
+                            scanningView
+                        }
+
+                        // Action Buttons
+                        actionButtons
                     }
-                    
-                    // Action Buttons
-                    actionButtons
                 }
                 .padding(designSystem.spacing.lg)
             }
@@ -68,10 +78,64 @@ struct DevicesView: View {
             Text("Are you sure you want to forget this device? You'll need to reconnect it later.")
         }
         .onAppear {
-            synchronizeScanningState()
+            if !isViewerMode {
+                synchronizeScanningState()
+            }
         }
     }
     
+    // MARK: - Viewer Mode Info Card
+    private var viewerModeInfoCard: some View {
+        VStack(spacing: designSystem.spacing.lg) {
+            // Icon
+            Image(systemName: "sensor.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+
+            // Title
+            Text("Device Connection Unavailable")
+                .font(designSystem.typography.h2)
+                .foregroundColor(designSystem.colors.textPrimary)
+                .multilineTextAlignment(.center)
+
+            // Description
+            VStack(spacing: designSystem.spacing.md) {
+                Text("Viewer Mode is for reviewing imported data only.")
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                Text("To connect to devices and collect real-time data, you need to:")
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+                    HStack(alignment: .top, spacing: designSystem.spacing.sm) {
+                        Text("1.")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Sign in with your Apple ID")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+
+                    HStack(alignment: .top, spacing: designSystem.spacing.sm) {
+                        Text("2.")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                        Text("Switch to Subscription Mode")
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
+                .padding(designSystem.spacing.md)
+                .background(designSystem.colors.backgroundSecondary)
+                .cornerRadius(designSystem.cornerRadius.medium)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(designSystem.spacing.xl)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
+    }
+
     // MARK: - Connection Card
     private var connectionCard: some View {
         VStack(spacing: designSystem.spacing.md) {
@@ -79,12 +143,12 @@ struct DevicesView: View {
             Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.system(size: 60))
                 .foregroundColor(bleManager.isConnected ? .green : .red)
-            
+
             // Status Text
             Text(bleManager.isConnected ? "Connected" : "Disconnected")
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
-            
+
             if bleManager.isConnected {
                 Text(bleManager.deviceName)
                     .font(designSystem.typography.body)

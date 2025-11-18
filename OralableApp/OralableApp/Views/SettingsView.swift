@@ -20,7 +20,11 @@ struct SettingsView: View {
     @State private var showingSignOutAlert = false
     @State private var showingChangeModeAlert = false
 
-    init(viewModel: SettingsViewModel? = nil) {
+    // Viewer Mode flag - when true, certain settings are read-only
+    let isViewerMode: Bool
+
+    init(viewModel: SettingsViewModel? = nil, isViewerMode: Bool = false) {
+        self.isViewerMode = isViewerMode
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
@@ -32,8 +36,31 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                // Account Section
-                Section {
+                // Viewer Mode Info (only shown in viewer mode)
+                if isViewerMode {
+                    Section {
+                        HStack(spacing: designSystem.spacing.md) {
+                            Image(systemName: "eye.fill")
+                                .foregroundColor(.blue)
+                                .font(.title2)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Viewer Mode")
+                                    .font(designSystem.typography.body)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+
+                                Text("Settings are read-only in viewer mode")
+                                    .font(designSystem.typography.caption)
+                                    .foregroundColor(designSystem.colors.textSecondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                // Account Section (hidden in viewer mode)
+                if !isViewerMode {
+                    Section {
                     if authenticationManager.isAuthenticated {
                         // Signed In State
                         HStack {
@@ -93,16 +120,18 @@ struct SettingsView: View {
                             }
                         }
                     }
-                } header: {
-                    Text("Account")
-                } footer: {
-                    if !authenticationManager.isAuthenticated {
-                        Text("Sign in to access all features and sync your data across devices")
+                    } header: {
+                        Text("Account")
+                    } footer: {
+                        if !authenticationManager.isAuthenticated {
+                            Text("Sign in to access all features and sync your data across devices")
+                        }
                     }
                 }
 
-                // Subscription Section
-                Section {
+                // Subscription Section (hidden in viewer mode)
+                if !isViewerMode {
+                    Section {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Current Plan")
@@ -145,16 +174,18 @@ struct SettingsView: View {
                                 .foregroundColor(designSystem.colors.textSecondary)
                         }
                     }
-                } header: {
-                    Text("Subscription")
-                } footer: {
-                    if subscriptionManager.currentTier == .basic {
-                        Text("Upgrade to Premium for unlimited data storage, advanced analytics, and more")
+                    } header: {
+                        Text("Subscription")
+                    } footer: {
+                        if subscriptionManager.currentTier == .basic {
+                            Text("Upgrade to Premium for unlimited data storage, advanced analytics, and more")
+                        }
                     }
                 }
 
-                // App Mode Section
-                Section {
+                // App Mode Section (hidden in viewer mode)
+                if !isViewerMode {
+                    Section {
                     HStack {
                         Image(systemName: appStateManager.selectedMode?.icon ?? "questionmark.circle")
                             .foregroundColor(appStateManager.selectedMode?.color ?? .gray)
@@ -183,14 +214,16 @@ struct SettingsView: View {
                                 .foregroundColor(designSystem.colors.textSecondary)
                         }
                     }
-                } header: {
-                    Text("App Mode")
-                } footer: {
-                    Text(appStateManager.selectedMode?.description ?? "")
+                    } header: {
+                        Text("App Mode")
+                    } footer: {
+                        Text(appStateManager.selectedMode?.description ?? "")
+                    }
                 }
 
-                // Device Settings Section
-                Section {
+                // Device Settings Section (hidden in viewer mode)
+                if !isViewerMode {
+                    Section {
                     // PPG Channel Order
                     NavigationLink {
                         PPGChannelOrderView(selectedOrder: $viewModel.ppgChannelOrder)
@@ -206,31 +239,36 @@ struct SettingsView: View {
                     // Auto-connect
                     Toggle("Auto-connect", isOn: $viewModel.autoConnectEnabled)
 
-                    // Debug Info
-                    Toggle("Show Debug Info", isOn: $viewModel.showDebugInfo)
-                        .tint(designSystem.colors.primaryBlack)
+                        // Debug Info
+                        Toggle("Show Debug Info", isOn: $viewModel.showDebugInfo)
+                            .tint(designSystem.colors.primaryBlack)
 
-                } header: {
-                    Text("Device Settings")
+                    } header: {
+                        Text("Device Settings")
+                    }
                 }
 
                 // Notification Settings Section
                 Section {
                     Toggle("Notifications", isOn: $viewModel.notificationsEnabled)
                         .tint(designSystem.colors.primaryBlack)
+                        .disabled(isViewerMode)
 
                     if viewModel.notificationsEnabled {
                         Toggle("Connection Alerts", isOn: $viewModel.connectionAlerts)
                             .tint(designSystem.colors.primaryBlack)
+                            .disabled(isViewerMode)
 
                         Toggle("Battery Alerts", isOn: $viewModel.batteryAlerts)
                             .tint(designSystem.colors.primaryBlack)
+                            .disabled(isViewerMode)
 
                         if viewModel.batteryAlerts {
                             Stepper("Low Battery: \(viewModel.lowBatteryThreshold)%",
                                    value: $viewModel.lowBatteryThreshold,
                                    in: 5...50,
                                    step: 5)
+                                .disabled(isViewerMode)
                         }
                     }
                 } header: {
@@ -241,15 +279,18 @@ struct SettingsView: View {
                 Section {
                     Toggle("Use Metric Units", isOn: $viewModel.useMetricUnits)
                         .tint(designSystem.colors.primaryBlack)
+                        .disabled(isViewerMode)
 
                     Toggle("24-Hour Time", isOn: $viewModel.show24HourTime)
                         .tint(designSystem.colors.primaryBlack)
+                        .disabled(isViewerMode)
 
                     Picker("Chart Refresh", selection: $viewModel.chartRefreshRate) {
                         ForEach(ChartRefreshRate.allCases, id: \.self) { rate in
                             Text(rate.rawValue).tag(rate)
                         }
                     }
+                    .disabled(isViewerMode)
                 } header: {
                     Text("Display")
                 }
@@ -259,6 +300,7 @@ struct SettingsView: View {
                     Stepper("Retention: \(viewModel.dataRetentionDays) days",
                            value: $viewModel.dataRetentionDays,
                            in: 1...365)
+                        .disabled(isViewerMode)
 
                     Button(role: .destructive) {
                         viewModel.showClearDataConfirmation = true
@@ -268,6 +310,7 @@ struct SettingsView: View {
                             Text("Clear All Data")
                         }
                     }
+                    .disabled(isViewerMode)
                 } header: {
                     Text("Data Management")
                 } footer: {
@@ -278,29 +321,33 @@ struct SettingsView: View {
                 Section {
                     Toggle("Share Analytics", isOn: $viewModel.shareAnalytics)
                         .tint(designSystem.colors.primaryBlack)
+                        .disabled(isViewerMode)
 
                     Toggle("Local Storage Only", isOn: $viewModel.localStorageOnly)
                         .tint(designSystem.colors.primaryBlack)
+                        .disabled(isViewerMode)
                 } header: {
                     Text("Privacy")
                 } footer: {
                     Text("When enabled, all data stays on this device and is never sent to cloud services.")
                 }
 
-                // Export & Share Section
-                Section {
-                    Button {
-                        showingExportSheet = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up")
-                                .foregroundColor(designSystem.colors.primaryBlack)
-                            Text("Export Data")
-                                .foregroundColor(designSystem.colors.textPrimary)
+                // Export & Share Section (hidden in viewer mode - use Share tab instead)
+                if !isViewerMode {
+                    Section {
+                        Button {
+                            showingExportSheet = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundColor(designSystem.colors.primaryBlack)
+                                Text("Export Data")
+                                    .foregroundColor(designSystem.colors.textPrimary)
+                            }
                         }
+                    } header: {
+                        Text("Data Export")
                     }
-                } header: {
-                    Text("Data Export")
                 }
 
                 // About Section
@@ -308,12 +355,14 @@ struct SettingsView: View {
                     InfoRowView(icon: "info.circle", title: "Version", value: viewModel.appVersion)
                     InfoRowView(icon: "number", title: "Build", value: viewModel.buildNumber)
 
-                    Button {
-                        viewModel.showResetConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("Reset to Defaults")
+                    if !isViewerMode {
+                        Button {
+                            viewModel.showResetConfirmation = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Reset to Defaults")
+                            }
                         }
                     }
                 } header: {
