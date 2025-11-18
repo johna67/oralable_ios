@@ -102,6 +102,13 @@ class OralableBLE: ObservableObject {
     private var lastHRCalculation: Date = Date.distantPast
     private var lastSpO2Calculation: Date = Date.distantPast
     private let calculationInterval: TimeInterval = 0.5  // Only calculate every 500ms
+
+    // CRITICAL PERFORMANCE FIX: Batching system to process readings in background
+    private let processingQueue = DispatchQueue(label: "com.oralable.processing", qos: .userInitiated)
+    private var readingsBatch: [SensorReading] = []
+    private let batchLock = NSLock()
+    private var batchTimer: Timer?
+    private let batchInterval: TimeInterval = 0.1  // Process batches every 100ms
     
     // MARK: - Initialization
     
@@ -110,6 +117,7 @@ class OralableBLE: ObservableObject {
         self.stateDetector = DeviceStateDetector()
         setupBindings()
         setupDirectBLECallbacks()  // NEW: Direct BLE callbacks for UI
+        startBatchProcessing()  // CRITICAL: Start background batch processing
         addLog("OralableBLE initialized")
     }
     
@@ -204,10 +212,16 @@ class OralableBLE: ObservableObject {
             }
             .store(in: &cancellables) */
         
+        // CRITICAL PERFORMANCE FIX: Instead of processing readings immediately on main thread,
+        // accumulate them into a batch for background processing
         deviceManager.$allSensorReadings
             .sink { [weak self] readings in
-                self?.updateHistoriesFromReadings(readings)
-                self?.updateLegacySensorData(with: readings)
+                guard let self = self else { return }
+                // Thread-safe batch accumulation
+                self.batchLock.lock()
+                self.readingsBatch.append(contentsOf: readings)
+                self.batchLock.unlock()
+                // Batch will be processed by timer on background queue
             }
             .store(in: &cancellables)
         
@@ -217,8 +231,173 @@ class OralableBLE: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
-    // MARK: - History Management from Sensor Readings
+
+    // MARK: - Batched Background Processing
+
+    private func startBatchProcessing() {
+        // Run batch processing timer on main thread (timer needs runloop)
+        // but actual processing happens on background queue
+        batchTimer = Timer.scheduledTimer(withTimeInterval: batchInterval, repeats: true) { [weak self] _ in
+            self?.processBatch()
+        }
+    }
+
+    private func processBatch() {
+        // Get batch and clear it atomically
+        batchLock.lock()
+        let batch = readingsBatch
+        readingsBatch.removeAll(keepingCapacity: true)  // Keep capacity to avoid reallocation
+        batchLock.unlock()
+
+        // Skip if batch is empty
+        guard !batch.isEmpty else { return }
+
+        // Process batch on background queue
+        processingQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Do heavy processing on background thread
+            self.processReadingsBatch(batch)
+
+            // Update legacy sensor data (also on background)
+            self.updateLegacySensorDataBackground(with: batch)
+        }
+    }
+
+    private func processReadingsBatch(_ readings: [SensorReading]) {
+        // This runs on BACKGROUND queue - no @MainActor restrictions
+
+        #if DEBUG
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.readingsCounter += readings.count
+            if self.readingsCounter >= 100 {
+                Logger.shared.debug("[OralableBLE] Processed \(self.readingsCounter) readings total")
+                self.readingsCounter = 0
+            }
+        }
+        #endif
+
+        // Track which types of data we have to avoid redundant processing
+        var hasPPGData = false
+        var hasAccelData = false
+
+        // Prepare batched updates for main thread
+        var batteryUpdates: [(BatteryData, Int)] = []
+        var hrUpdates: [HeartRateData] = []
+        var spo2Updates: [SpO2Data] = []
+        var tempUpdates: [(Double, TemperatureData)] = []
+
+        for reading in readings {
+            switch reading.sensorType {
+            case .battery:
+                let batteryData = BatteryData(percentage: Int(reading.value), timestamp: reading.timestamp)
+                batteryUpdates.append((batteryData, Int(reading.value)))
+
+            case .heartRate:
+                let hrData = HeartRateData(bpm: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
+                hrUpdates.append(hrData)
+
+            case .spo2:
+                let spo2Data = SpO2Data(percentage: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
+                spo2Updates.append(spo2Data)
+
+            case .temperature:
+                let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
+                tempUpdates.append((reading.value, tempData))
+
+            case .ppgRed, .ppgInfrared, .ppgGreen:
+                hasPPGData = true
+
+            case .accelerometerX, .accelerometerY, .accelerometerZ:
+                hasAccelData = true
+
+            default:
+                break
+            }
+        }
+
+        // Apply all updates on main thread in a single batch
+        Task { @MainActor in
+            // Battery updates
+            for (data, value) in batteryUpdates {
+                self.batteryHistory.append(data)
+                if value % 10 == 0 {
+                    Logger.shared.info("[OralableBLE] Battery: \(value)%")
+                }
+            }
+
+            // Heart rate updates
+            for hrData in hrUpdates {
+                self.isConnected = true
+                self.accelX = Double.random(in: -0.1...0.1)
+                self.accelY = Double.random(in: -0.1...0.1)
+                self.accelZ = 1.0 + Double.random(in: -0.05...0.05)
+                self.heartRateHistory.append(hrData)
+                if hrData.quality < 0.5 || hrData.bpm < 40 || hrData.bpm > 200 {
+                    Logger.shared.warning("[OralableBLE] Heart Rate: \(Int(hrData.bpm)) bpm | Quality: \(String(format: "%.2f", hrData.quality))")
+                }
+            }
+
+            // SpO2 updates
+            for spo2Data in spo2Updates {
+                self.spo2History.append(spo2Data)
+                if spo2Data.percentage < 90 {
+                    Logger.shared.warning("[OralableBLE] SpO2: \(Int(spo2Data.percentage))% | Quality: \(String(format: "%.2f", spo2Data.quality))")
+                }
+            }
+
+            // Temperature updates
+            for (value, data) in tempUpdates {
+                self.temperature = value
+                self.temperatureHistory.append(data)
+            }
+
+            // Process PPG and accel data (if present)
+            if hasPPGData {
+                self.updatePPGHistory(from: readings)
+            }
+            if hasAccelData {
+                self.updateAccelHistory(from: readings)
+            }
+        }
+    }
+
+    private func updateLegacySensorDataBackground(with readings: [SensorReading]) {
+        // Process legacy data on background, then update on main
+        var groupedReadings: [Date: [SensorReading]] = [:]
+
+        for reading in readings {
+            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
+            groupedReadings[roundedTime, default: []].append(reading)
+        }
+
+        Task { @MainActor in
+            for (timestamp, group) in groupedReadings {
+                var sensorData = SensorData(timestamp: timestamp)
+
+                for reading in group {
+                    switch reading.sensorType {
+                    case .heartRate: sensorData.heartRate = Int(reading.value)
+                    case .spo2: sensorData.spO2 = Int(reading.value)
+                    case .temperature: sensorData.temperature = reading.value
+                    case .battery: sensorData.batteryLevel = Int(reading.value)
+                    case .ppgRed: sensorData.ppgRed = Int32(reading.value)
+                    case .ppgInfrared: sensorData.ppgIR = Int32(reading.value)
+                    case .ppgGreen: sensorData.ppgGreen = Int32(reading.value)
+                    case .accelerometerX: sensorData.accelX = Int16(reading.value * 1000)
+                    case .accelerometerY: sensorData.accelY = Int16(reading.value * 1000)
+                    case .accelerometerZ: sensorData.accelZ = Int16(reading.value * 1000)
+                    default: break
+                    }
+                }
+
+                self.sensorDataHistory.append(sensorData)
+            }
+        }
+    }
+
+    // MARK: - History Management from Sensor Readings (DEPRECATED - kept for compatibility)
 
     private func updateHistoriesFromReadings(_ readings: [SensorReading]) {
         // PERFORMANCE: Removed excessive debug logging from hot path
@@ -420,9 +599,10 @@ class OralableBLE: ObservableObject {
         // PERFORMANCE: CircularBuffer automatically handles capacity limits (O(1) append)
     }
     
-    // MARK: - Legacy SensorData Conversion
-    
+    // MARK: - Legacy SensorData Conversion (DEPRECATED - now handled by background processing)
+
     private func updateLegacySensorData(with readings: [SensorReading]) {
+        // DEPRECATED: This method is no longer called - updateLegacySensorDataBackground handles this
         var groupedReadings: [Date: [SensorReading]] = [:]
         
         for reading in readings {
