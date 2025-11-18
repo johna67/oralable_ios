@@ -18,11 +18,7 @@ struct DevicesView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
 
-    // Viewer Mode flag - when true, device operations are disabled
-    let isViewerMode: Bool
-
-    init(viewModel: DevicesViewModel? = nil, isViewerMode: Bool = false) {
-        self.isViewerMode = isViewerMode
+    init(viewModel: DevicesViewModel? = nil) {
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
@@ -40,28 +36,22 @@ struct DevicesView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
-                    if isViewerMode {
-                        // Viewer Mode - Show informational card
-                        viewerModeInfoCard
+                    // Connection Status Card
+                    connectionCard
+
+                    // Device Info (if connected)
+                    if bleManager.isConnected {
+                        deviceInfoCard
+                        deviceMetricsCard
+                        deviceSettingsCard
+                        advancedSettingsCard
                     } else {
-                        // Subscription Mode - Full device functionality
-                        // Connection Status Card
-                        connectionCard
-
-                        // Device Info (if connected)
-                        if bleManager.isConnected {
-                            deviceInfoCard
-                            deviceMetricsCard
-                            deviceSettingsCard
-                            advancedSettingsCard
-                        } else {
-                            // Show scanning view when not connected
-                            scanningView
-                        }
-
-                        // Action Buttons
-                        actionButtons
+                        // Show scanning view when not connected
+                        scanningView
                     }
+
+                    // Action Buttons
+                    actionButtons
                 }
                 .padding(designSystem.spacing.lg)
             }
@@ -78,9 +68,7 @@ struct DevicesView: View {
             Text("Are you sure you want to forget this device? You'll need to reconnect it later.")
         }
         .onAppear {
-            if !isViewerMode {
-                synchronizeScanningState()
-            }
+            synchronizeScanningState()
         }
     }
     

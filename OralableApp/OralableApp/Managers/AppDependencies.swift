@@ -19,6 +19,7 @@ class AppDependencies: ObservableObject {
     let bleManager: OralableBLE
     let authenticationManager: AuthenticationManager
     let subscriptionManager: SubscriptionManager
+    let sharedDataManager: SharedDataManager
     let appStateManager: AppStateManager
     let healthKitManager: HealthKitManager
     let historicalDataManager: HistoricalDataManager
@@ -45,6 +46,10 @@ class AppDependencies: ObservableObject {
         // Authentication & Subscription
         self.authenticationManager = AuthenticationManager.shared // Keep for now
         self.subscriptionManager = SubscriptionManager.shared // Keep for now
+        self.sharedDataManager = SharedDataManager.shared
+
+        // Patient app is always in subscription mode
+        self.appStateManager.selectedMode = .subscription
 
         // Health integration - create new instance
         self.healthKitManager = HealthKitManager()
@@ -145,6 +150,7 @@ extension View {
             .environmentObject(dependencies.deviceManager)
             .environmentObject(dependencies.authenticationManager)
             .environmentObject(dependencies.subscriptionManager)
+            .environmentObject(dependencies.sharedDataManager)
             .environmentObject(dependencies.appStateManager)
             .environmentObject(dependencies.healthKitManager)
             .environmentObject(dependencies.historicalDataManager)

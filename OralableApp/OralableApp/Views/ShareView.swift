@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 
 struct ShareView: View {
     @ObservedObject var ble: OralableBLE
-    var isViewerMode: Bool = false
     
     @State private var showShareSheet = false
     @State private var showDocumentExporter = false
@@ -63,7 +62,7 @@ struct ShareView: View {
     // MARK: - Computed Properties for Body
     
     private var navigationTitle: String {
-        isViewerMode ? "Import & Export" : "Share Data"
+        "Share Data"
     }
     
     private var navigationBarTitleDisplayMode: NavigationBarItem.TitleDisplayMode {
@@ -101,23 +100,14 @@ struct ShareView: View {
     
     @ViewBuilder
     private var mainContentStack: some View {
-        // Viewer Mode Import Section
-        if isViewerMode {
-            ImportSection(
-                showImportPicker: $showImportPicker,
-                ble: ble,
-                showImportSuccess: $showImportSuccess,
-                importedCount: $importedCount,
-                showImportError: $showImportError,
-                importErrorMessage: $importErrorMessage
-            )
-            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-        }
-        
         // Data Summary Card
         DataSummaryCard(ble: ble)
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-        
+
+        // Share with Dentist Section
+        ShareWithDentistSection()
+            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+
         // Export Button
         ExportButton(
             showShareSheet: $showShareSheet,
@@ -133,7 +123,7 @@ struct ShareView: View {
             .frame(maxWidth: .infinity)
         
         // Device Info Card (collapsed/minimal)
-        DeviceInfoCard(isViewerMode: isViewerMode)
+        DeviceInfoCard()
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
         
         // Clear Data Button
@@ -480,7 +470,6 @@ struct TroubleshootItem: View {
 
 // MARK: - Device Info Card
 struct DeviceInfoCard: View {
-    let isViewerMode: Bool
     @State private var isExpanded = false
     
     private var deviceID: String {
@@ -524,19 +513,6 @@ struct DeviceInfoCard: View {
                     InfoRow(label: "iOS", value: systemVersion)
                     InfoRow(label: "App Version", value: appVersion)
                     InfoRow(label: "Device ID", value: String(deviceID.prefix(12)) + "...")
-                    
-                    if isViewerMode {
-                        HStack {
-                            Image(systemName: "eye")
-                                .font(.system(size: DesignSystem.Sizing.Icon.xs))
-                                .foregroundColor(DesignSystem.Colors.info)
-                            
-                            Text("Viewing mode - no device connected")
-                                .font(DesignSystem.Typography.caption)
-                                .foregroundColor(DesignSystem.Colors.textTertiary)
-                        }
-                        .padding(.top, DesignSystem.Spacing.xs)
-                    }
                 }
             }
         }
@@ -1163,6 +1139,252 @@ struct DebugConnectionSection: View {
                 LogsView()
                     .environmentObject(DesignSystem.shared)
             }
+        }
+    }
+}
+
+// MARK: - Share with Dentist Section
+
+struct ShareWithDentistSection: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var sharedDataManager: SharedDataManager
+    @EnvironmentObject var subscriptionManager: SubscriptionManager
+    @State private var shareCode: String = ""
+    @State private var showShareCode = false
+    @State private var showUpgradePrompt = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
+            // Header
+            HStack {
+                Image(systemName: "person.2.fill")
+                    .font(.title2)
+                    .foregroundColor(.black)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Share with Dentist")
+                        .font(designSystem.typography.headline)
+                    
+                    Text("Allow your dentist to view your data")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                }
+                
+                Spacer()
+            }
+            
+            // Generate Share Code Button
+            Button(action: {
+                if subscriptionManager.currentTier == .basic && sharedDataManager.sharedDentists.count >= 1 {
+                    showUpgradePrompt = true
+                } else {
+                    generateShareCode()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "qrcode")
+                    Text("Generate Share Code")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.black)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            
+            // Show generated code
+            if showShareCode {
+                VStack(spacing: 12) {
+                    Text("Share Code:")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    
+                    Text(shareCode)
+                        .font(.system(size: 48, weight: .bold, design: .monospaced))
+                        .foregroundColor(.black)
+                        .tracking(8)
+                    
+                    Text("Code expires in 48 hours")
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
+                    
+                    Button("Copy Code") {
+                        UIPasteboard.general.string = shareCode
+                    }
+                    .font(designSystem.typography.buttonSmall)
+                }
+                .padding()
+                .background(designSystem.colors.backgroundSecondary)
+                .cornerRadius(12)
+            }
+            
+            // List of shared dentists
+            if !sharedDataManager.sharedDentists.isEmpty {
+                Divider()
+                    .padding(.vertical, 8)
+                
+                Text("Shared With:")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                
+                ForEach(sharedDataManager.sharedDentists) { dentist in
+                    SharedDentistRow(dentist: dentist)
+                }
+            }
+            
+            // Tier limitation message
+            if subscriptionManager.currentTier == .basic {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                    Text("Basic tier: Share with 1 dentist")
+                        .font(designSystem.typography.caption)
+                }
+                .foregroundColor(designSystem.colors.textSecondary)
+                .padding(.top, 8)
+            }
+        }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundPrimary)
+        .cornerRadius(designSystem.cornerRadius.md)
+        .sheet(isPresented: $showUpgradePrompt) {
+            UpgradeToShareMoreView()
+        }
+    }
+    
+    private func generateShareCode() {
+        Task {
+            do {
+                shareCode = try await sharedDataManager.createShareInvitation()
+                showShareCode = true
+            } catch {
+                // Handle error
+                print("Error generating share code: \(error)")
+            }
+        }
+    }
+}
+
+struct SharedDentistRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var sharedDataManager: SharedDataManager
+    let dentist: SharedDentist
+    @State private var showRevokeConfirmation = false
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dentist.dentistName ?? "Dentist")
+                    .font(designSystem.typography.body)
+                
+                Text("Shared: \(dentist.sharedDate.formatted(date: .abbreviated, time: .omitted))")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+            }
+            
+            Spacer()
+            
+            Button("Revoke") {
+                showRevokeConfirmation = true
+            }
+            .font(designSystem.typography.caption)
+            .foregroundColor(.red)
+        }
+        .padding()
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(8)
+        .alert("Revoke Access?", isPresented: $showRevokeConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Revoke", role: .destructive) {
+                revokeAccess()
+            }
+        } message: {
+            Text("This dentist will no longer be able to view your data.")
+        }
+    }
+    
+    private func revokeAccess() {
+        Task {
+            do {
+                try await sharedDataManager.revokeAccessForDentist(dentistID: dentist.dentistID)
+            } catch {
+                print("Error revoking access: \(error)")
+            }
+        }
+    }
+}
+
+struct UpgradeToShareMoreView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var designSystem: DesignSystem
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.black)
+                
+                Text("Share with More Providers")
+                    .font(designSystem.typography.title)
+                
+                Text("Upgrade to Premium to share your data with unlimited healthcare providers.")
+                    .font(designSystem.typography.body)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    FeatureRow(icon: "checkmark.circle.fill", text: "Share with unlimited providers")
+                    FeatureRow(icon: "checkmark.circle.fill", text: "Advanced analytics")
+                    FeatureRow(icon: "checkmark.circle.fill", text: "Unlimited data export")
+                    FeatureRow(icon: "checkmark.circle.fill", text: "Priority support")
+                }
+                .padding()
+                
+                Button("Upgrade to Premium") {
+                    // Navigate to subscription view
+                    dismiss()
+                }
+                .font(designSystem.typography.buttonLarge)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.black)
+                .cornerRadius(12)
+                .padding(.horizontal)
+                
+                Button("Maybe Later") {
+                    dismiss()
+                }
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Upgrade")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.green)
+            Text(text)
+                .font(.system(size: 15))
         }
     }
 }

@@ -1,197 +1,131 @@
-//
-//  OnboardingView.swift
-//  OralableApp
-//
-//  Created: November 12, 2025
-//  First-launch onboarding experience
-//
-
 import SwiftUI
+import AuthenticationServices
 
 struct OnboardingView: View {
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var authenticationManager: AuthenticationManager
+    @State private var showingAuthenticationView = false
     @State private var currentPage = 0
-    let onComplete: () -> Void
 
-    private let pages: [OnboardingPage] = [
+    private let onboardingPages = [
         OnboardingPage(
             icon: "waveform.path.ecg",
-            iconColor: .blue,
-            title: "Real-Time Health Monitoring",
-            description: "Connect to your Oralable device and view live PPG, heart rate, SpO2, and temperature data in real-time",
-            features: [
-                "Live sensor data streaming",
-                "PPG waveform visualization",
-                "Accurate vital signs"
-            ]
+            title: "Monitor Your Bruxism",
+            description: "Track teeth grinding and jaw clenching with precision PPG sensor technology",
+            color: .black
         ),
         OnboardingPage(
             icon: "chart.line.uptrend.xyaxis",
-            iconColor: .green,
-            title: "Historical Tracking",
-            description: "Track your health metrics over time with beautiful charts and detailed analytics",
-            features: [
-                "Daily, weekly, monthly views",
-                "Trend analysis",
-                "Data insights"
-            ]
+            title: "Understand Your Patterns",
+            description: "Gain insights into when and why grinding occurs with detailed analytics",
+            color: .black
         ),
         OnboardingPage(
-            icon: "square.and.arrow.up",
-            iconColor: .orange,
-            title: "Export & Share",
-            description: "Export your data in CSV format and share with healthcare professionals or for personal analysis",
-            features: [
-                "CSV export",
-                "Data import for review",
-                "Secure data management"
-            ]
-        ),
-        OnboardingPage(
-            icon: "star.circle.fill",
-            iconColor: .purple,
-            title: "Choose Your Mode",
-            description: "Select how you'd like to use Oralable based on your needs",
-            features: [
-                "Viewer: Real-time monitoring",
-                "Full Access: Complete features",
-                "Demo: Try before connecting"
-            ]
+            icon: "person.2.fill",
+            title: "Share with Your Dentist",
+            description: "Collaborate with your healthcare provider by securely sharing your data",
+            color: .black
         )
     ]
 
     var body: some View {
         VStack(spacing: 0) {
-            // Skip button
-            HStack {
-                Spacer()
-                Button {
-                    onComplete()
-                } label: {
-                    Text("Skip")
-                        .font(designSystem.typography.body)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                }
-                .padding()
-            }
+            // Logo
+            Image("OralableLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 120, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+                .padding(.top, 60)
+                .padding(.bottom, 40)
 
-            // Content
+            // Paging content
             TabView(selection: $currentPage) {
-                ForEach(0..<pages.count, id: \.self) { index in
-                    OnboardingPageView(page: pages[index])
+                ForEach(0..<onboardingPages.count, id: \.self) { index in
+                    OnboardingPageView(page: onboardingPages[index])
                         .tag(index)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .frame(height: 400)
 
-            // Bottom button
-            VStack(spacing: designSystem.spacing.md) {
-                if currentPage == pages.count - 1 {
-                    // Last page - Get Started
-                    Button {
-                        onComplete()
-                    } label: {
-                        Text("Get Started")
-                            .font(designSystem.typography.buttonLarge)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(designSystem.spacing.md)
-                            .background(designSystem.colors.primaryBlack)
-                            .cornerRadius(designSystem.cornerRadius.md)
-                    }
-                } else {
-                    // Other pages - Next
-                    Button {
-                        withAnimation {
-                            currentPage += 1
-                        }
-                    } label: {
-                        HStack {
-                            Text("Next")
-                            Image(systemName: "arrow.right")
-                        }
-                        .font(designSystem.typography.buttonLarge)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(designSystem.spacing.md)
-                        .background(designSystem.colors.primaryBlack)
-                        .cornerRadius(designSystem.cornerRadius.md)
-                    }
+            Spacer()
+
+            // Sign In Button
+            Button(action: {
+                showingAuthenticationView = true
+            }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.badge.key.fill")
+                    Text("Sign In with Apple")
                 }
+                .font(designSystem.typography.buttonLarge)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.black)
+                .cornerRadius(12)
             }
-            .padding()
+            .padding(.horizontal, 24)
+            .padding(.bottom, 20)
+
+            // Footer
+            VStack(spacing: 8) {
+                Text("Requires Oralable device")
+                    .font(designSystem.typography.caption)
+                    .foregroundColor(designSystem.colors.textTertiary)
+
+                HStack(spacing: 12) {
+                    Link("Privacy Policy", destination: URL(string: "https://oralable.com/privacy")!)
+                    Text("•")
+                    Link("Terms of Service", destination: URL(string: "https://oralable.com/terms")!)
+                }
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+            }
+            .padding(.bottom, 40)
+        }
+        .sheet(isPresented: $showingAuthenticationView) {
+            NavigationView {
+                AuthenticationView()
+            }
         }
     }
 }
 
-// MARK: - Onboarding Page View
+struct OnboardingPage {
+    let icon: String
+    let title: String
+    let description: String
+    let color: Color
+}
 
 struct OnboardingPageView: View {
     @EnvironmentObject var designSystem: DesignSystem
     let page: OnboardingPage
 
     var body: some View {
-        VStack(spacing: designSystem.spacing.xl) {
-            Spacer()
-
-            // Icon
+        VStack(spacing: 24) {
             Image(systemName: page.icon)
                 .font(.system(size: 80))
-                .foregroundColor(page.iconColor)
-                .padding(.bottom, designSystem.spacing.lg)
+                .foregroundColor(page.color)
 
-            // Title
             Text(page.title)
-                .font(designSystem.typography.h1)
+                .font(designSystem.typography.largeTitle)
                 .foregroundColor(designSystem.colors.textPrimary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal)
 
-            // Description
             Text(page.description)
                 .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, designSystem.spacing.xl)
-                .padding(.bottom, designSystem.spacing.lg)
-
-            // Features
-            VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-                ForEach(page.features, id: \.self) { feature in
-                    HStack(spacing: designSystem.spacing.sm) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.body)
-
-                        Text(feature)
-                            .font(designSystem.typography.body)
-                            .foregroundColor(designSystem.colors.textPrimary)
-                    }
-                }
-            }
-            .padding(.horizontal, designSystem.spacing.xl)
-
-            Spacer()
+                .padding(.horizontal, 40)
         }
     }
 }
 
-// MARK: - Onboarding Page Model
-
-struct OnboardingPage {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let description: String
-    let features: [String]
-}
-
-// MARK: - Preview
-
-struct OnboardingView_Previews: PreviewProvider {
-    static var previews: some View {
-        OnboardingView(onComplete: {})
-            .environmentObject(DesignSystem.shared)
-    }
+#Preview {
+    OnboardingView()
+        .environmentObject(DesignSystem.shared)
+        .environmentObject(AuthenticationManager.shared)
 }

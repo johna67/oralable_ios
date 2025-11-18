@@ -26,14 +26,14 @@
 	<key>CFBundleDisplayName</key>
 	<string>Oralable</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.oralable.mam</string>
+	<string>com.jacdental.oralable</string>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
 	<key>CFBundleSignature</key>
 	<string></string>
 	<key>NSUbiquitousContainer</key>
 	<dict>
-		<key>iCloud.jacdentalsolutions.Oralable</key>
+		<key>iCloud.com.jacdental.oralable.shared</key>
 		<dict>
 			<key>NSUbiquitousContainerName</key>
 			<string>Oralable Data</string>

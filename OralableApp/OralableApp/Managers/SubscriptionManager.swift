@@ -5,13 +5,13 @@ import StoreKit
 
 enum SubscriptionTier: String, Codable {
     case basic = "basic"
-    case paid = "paid"
+    case premium = "premium"
 
     var displayName: String {
         switch self {
         case .basic:
             return "Basic (Free)"
-        case .paid:
+        case .premium:
             return "Premium"
         }
     }
@@ -20,20 +20,21 @@ enum SubscriptionTier: String, Codable {
         switch self {
         case .basic:
             return [
-                "Connect to TGM device",
+                "Connect to Oralable device",
                 "View real-time sensor data",
-                "Export data logs (limited)",
-                "Basic data visualization"
+                "Daily/weekly summaries",
+                "Basic data export",
+                "Share with ONE dentist"
             ]
-        case .paid:
+        case .premium:
             return [
                 "All Basic features",
-                "Unlimited data export",
-                "Advanced analytics",
-                "Historical data tracking",
-                "Cloud backup",
-                "Premium support",
-                "Future premium features"
+                "Advanced analytics & insights",
+                "Unlimited historical data storage",
+                "Share with multiple providers",
+                "Export to health records",
+                "Trend analysis & predictions",
+                "Priority support"
             ]
         }
     }
@@ -86,17 +87,15 @@ class SubscriptionManager: ObservableObject {
 
     static let shared = SubscriptionManager()
 
-    // Product IDs - Update these with your actual App Store Connect product IDs
+    // Product IDs for Patient App
     private enum ProductIdentifier {
-        static let monthlySubscription = "com.oralable.mam.subscription.monthly"
-        static let yearlySubscription = "com.oralable.mam.subscription.yearly"
-        static let lifetimePurchase = "com.oralable.mam.lifetime"
+        static let monthlySubscription = "com.jacdental.oralable.premium.monthly"
+        static let yearlySubscription = "com.jacdental.oralable.premium.yearly"
     }
 
     private let productIdentifiers: Set<String> = [
         ProductIdentifier.monthlySubscription,
-        ProductIdentifier.yearlySubscription,
-        ProductIdentifier.lifetimePurchase
+        ProductIdentifier.yearlySubscription
     ]
 
     // MARK: - Private Properties
@@ -236,7 +235,7 @@ class SubscriptionManager: ObservableObject {
 
         // Update tier
         if hasPaidAccess {
-            currentTier = .paid
+            currentTier = .premium
             isPaidSubscriber = true
         } else {
             currentTier = .basic
@@ -268,7 +267,7 @@ class SubscriptionManager: ObservableObject {
         if let tierString = UserDefaults.standard.string(forKey: "subscriptionTier"),
            let tier = SubscriptionTier(rawValue: tierString) {
             self.currentTier = tier
-            self.isPaidSubscriber = (tier == .paid)
+            self.isPaidSubscriber = (tier == .premium)
         }
     }
 
@@ -282,7 +281,7 @@ class SubscriptionManager: ObservableObject {
         switch currentTier {
         case .basic:
             return false // Can add specific basic features check here
-        case .paid:
+        case .premium:
             return true
         }
     }
@@ -299,10 +298,6 @@ class SubscriptionManager: ObservableObject {
 
     var yearlyProduct: Product? {
         return product(for: ProductIdentifier.yearlySubscription)
-    }
-
-    var lifetimeProduct: Product? {
-        return product(for: ProductIdentifier.lifetimePurchase)
     }
 
     // MARK: - Subscription Expiry Tracking
@@ -348,6 +343,29 @@ class SubscriptionManager: ObservableObject {
         showExpiryWarning = isExpiringSoon || hasExpired
     }
 
+    // MARK: - Feature Access
+
+    func canShareWithMultipleDentists() -> Bool {
+        return currentTier == .premium
+    }
+
+    func hasAdvancedAnalytics() -> Bool {
+        return currentTier == .premium
+    }
+
+    func hasUnlimitedExport() -> Bool {
+        return currentTier == .premium
+    }
+
+    func maxDentistShares() -> Int {
+        switch currentTier {
+        case .basic:
+            return 1
+        case .premium:
+            return .max  // Unlimited
+        }
+    }
+
     // MARK: - Testing/Development
 
     #if DEBUG
@@ -358,7 +376,7 @@ class SubscriptionManager: ObservableObject {
     }
 
     func simulatePurchase() {
-        currentTier = .paid
+        currentTier = .premium
         isPaidSubscriber = true
         saveSubscriptionStatus()
     }

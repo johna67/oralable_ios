@@ -20,11 +20,7 @@ struct SettingsView: View {
     @State private var showingSignOutAlert = false
     @State private var showingChangeModeAlert = false
 
-    // Viewer Mode flag - when true, certain settings are read-only
-    let isViewerMode: Bool
-
-    init(viewModel: SettingsViewModel? = nil, isViewerMode: Bool = false) {
-        self.isViewerMode = isViewerMode
+    init(viewModel: SettingsViewModel? = nil) {
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
@@ -36,30 +32,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                // Viewer Mode Info (only shown in viewer mode)
-                if isViewerMode {
-                    Section {
-                        HStack(spacing: designSystem.spacing.md) {
-                            Image(systemName: "eye.fill")
-                                .foregroundColor(.blue)
-                                .font(.title2)
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Viewer Mode")
-                                    .font(designSystem.typography.body)
-                                    .foregroundColor(designSystem.colors.textPrimary)
-
-                                Text("Settings are read-only in viewer mode")
-                                    .font(designSystem.typography.caption)
-                                    .foregroundColor(designSystem.colors.textSecondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-
-                // Account Section (hidden in viewer mode)
-                if !isViewerMode {
+                // Account Section
                     Section {
                     if authenticationManager.isAuthenticated {
                         // Signed In State
@@ -129,8 +102,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // Subscription Section (hidden in viewer mode)
-                if !isViewerMode {
+                // Subscription Section
                     Section {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
@@ -183,8 +155,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // App Mode Section (hidden in viewer mode)
-                if !isViewerMode {
+                // App Mode Section
                     Section {
                     HStack {
                         Image(systemName: appStateManager.selectedMode?.icon ?? "questionmark.circle")
@@ -221,8 +192,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // Device Settings Section (hidden in viewer mode)
-                if !isViewerMode {
+                // Device Settings Section
                     Section {
                     // PPG Channel Order
                     NavigationLink {
@@ -252,24 +222,20 @@ struct SettingsView: View {
                 Section {
                     Toggle("Notifications", isOn: $viewModel.notificationsEnabled)
                         .tint(designSystem.colors.primaryBlack)
-                        .disabled(isViewerMode)
 
                     if viewModel.notificationsEnabled {
                         Toggle("Connection Alerts", isOn: $viewModel.connectionAlerts)
                             .tint(designSystem.colors.primaryBlack)
-                            .disabled(isViewerMode)
-
+    
                         Toggle("Battery Alerts", isOn: $viewModel.batteryAlerts)
                             .tint(designSystem.colors.primaryBlack)
-                            .disabled(isViewerMode)
-
+    
                         if viewModel.batteryAlerts {
                             Stepper("Low Battery: \(viewModel.lowBatteryThreshold)%",
                                    value: $viewModel.lowBatteryThreshold,
                                    in: 5...50,
                                    step: 5)
-                                .disabled(isViewerMode)
-                        }
+                                }
                     }
                 } header: {
                     Text("Notifications")
@@ -279,18 +245,15 @@ struct SettingsView: View {
                 Section {
                     Toggle("Use Metric Units", isOn: $viewModel.useMetricUnits)
                         .tint(designSystem.colors.primaryBlack)
-                        .disabled(isViewerMode)
 
                     Toggle("24-Hour Time", isOn: $viewModel.show24HourTime)
                         .tint(designSystem.colors.primaryBlack)
-                        .disabled(isViewerMode)
 
                     Picker("Chart Refresh", selection: $viewModel.chartRefreshRate) {
                         ForEach(ChartRefreshRate.allCases, id: \.self) { rate in
                             Text(rate.rawValue).tag(rate)
                         }
                     }
-                    .disabled(isViewerMode)
                 } header: {
                     Text("Display")
                 }
@@ -300,7 +263,6 @@ struct SettingsView: View {
                     Stepper("Retention: \(viewModel.dataRetentionDays) days",
                            value: $viewModel.dataRetentionDays,
                            in: 1...365)
-                        .disabled(isViewerMode)
 
                     Button(role: .destructive) {
                         viewModel.showClearDataConfirmation = true
@@ -310,7 +272,6 @@ struct SettingsView: View {
                             Text("Clear All Data")
                         }
                     }
-                    .disabled(isViewerMode)
                 } header: {
                     Text("Data Management")
                 } footer: {
@@ -321,19 +282,16 @@ struct SettingsView: View {
                 Section {
                     Toggle("Share Analytics", isOn: $viewModel.shareAnalytics)
                         .tint(designSystem.colors.primaryBlack)
-                        .disabled(isViewerMode)
 
                     Toggle("Local Storage Only", isOn: $viewModel.localStorageOnly)
                         .tint(designSystem.colors.primaryBlack)
-                        .disabled(isViewerMode)
                 } header: {
                     Text("Privacy")
                 } footer: {
                     Text("When enabled, all data stays on this device and is never sent to cloud services.")
                 }
 
-                // Export & Share Section (hidden in viewer mode - use Share tab instead)
-                if !isViewerMode {
+                // Export & Share Section
                     Section {
                         Button {
                             showingExportSheet = true
@@ -355,7 +313,6 @@ struct SettingsView: View {
                     InfoRowView(icon: "info.circle", title: "Version", value: viewModel.appVersion)
                     InfoRowView(icon: "number", title: "Build", value: viewModel.buildNumber)
 
-                    if !isViewerMode {
                         Button {
                             viewModel.showResetConfirmation = true
                         } label: {
