@@ -15,8 +15,7 @@ import CoreBluetooth
 struct DevicesView: View {
     @ObservedObject private var bleManager = OralableBLE.shared
     @EnvironmentObject var designSystem: DesignSystem
-    @Environment(\.dismiss) var dismiss
-    
+
     @State private var showingSettings = false
     @State private var isScanning = false
     @State private var showingForgetDevice = false
@@ -48,14 +47,6 @@ struct DevicesView: View {
             .background(designSystem.colors.backgroundPrimary)
             .navigationTitle("Devices")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(designSystem.colors.textPrimary)
-                }
-            }
         }
         .alert("Forget Device", isPresented: $showingForgetDevice) {
             Button("Cancel", role: .cancel) { }
