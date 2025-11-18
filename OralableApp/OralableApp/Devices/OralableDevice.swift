@@ -81,6 +81,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     private var sensorDataCharacteristic: CBCharacteristic?
     private var ppgWaveformCharacteristic: CBCharacteristic?
     private var controlCharacteristic: CBCharacteristic?
+    private var batteryCharacteristic: CBCharacteristic?
+    private var otherCharacteristics: [CBCharacteristic] = []  // For characteristics 003-008
     private var cancellables = Set<AnyCancellable>()
 
     // Continuation for waiting until service discovery completes
@@ -143,15 +145,23 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         connectionState = .disconnecting
         deviceInfo.connectionState = .disconnecting
         isStreaming = false
-        
+
         if let characteristic = sensorDataCharacteristic {
             peripheral?.setNotifyValue(false, for: characteristic)
         }
-        
+
         if let characteristic = ppgWaveformCharacteristic {
             peripheral?.setNotifyValue(false, for: characteristic)
         }
-        
+
+        if let characteristic = batteryCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+
+        for characteristic in otherCharacteristics {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+
         connectionState = .disconnected
         deviceInfo.connectionState = .disconnected
         print("🔌 [OralableDevice] Disconnected")
@@ -194,20 +204,46 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             print("⚠️ [OralableDevice] PPG waveform characteristic not available - skipping")
         }
 
+        // Enable notifications on battery characteristic
+        if let batteryChar = batteryCharacteristic {
+            print("🔋 [OralableDevice] Enabling battery notifications on characteristic \(batteryChar.uuid.uuidString)")
+            peripheral?.setNotifyValue(true, for: batteryChar)
+            print("✅ [OralableDevice] Battery notifications enabled")
+        } else {
+            print("⚠️ [OralableDevice] Battery characteristic not available - skipping")
+        }
+
+        // Enable notifications on other TGM characteristics (may contain temperature, etc.)
+        for char in otherCharacteristics {
+            print("📊 [OralableDevice] Enabling notifications on characteristic \(char.uuid.uuidString)")
+            peripheral?.setNotifyValue(true, for: char)
+        }
+        if !otherCharacteristics.isEmpty {
+            print("✅ [OralableDevice] Enabled notifications on \(otherCharacteristics.count) additional TGM characteristics")
+        }
+
         print("✅ [OralableDevice] Data stream started successfully")
     }
     
     func stopDataStream() async {
         print("\n📊 [OralableDevice] stopDataStream() called")
-        
+
         if let characteristic = sensorDataCharacteristic {
             peripheral?.setNotifyValue(false, for: characteristic)
         }
-        
+
         if let characteristic = ppgWaveformCharacteristic {
             peripheral?.setNotifyValue(false, for: characteristic)
         }
-        
+
+        if let characteristic = batteryCharacteristic {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+
+        for characteristic in otherCharacteristics {
+            peripheral?.setNotifyValue(false, for: characteristic)
+        }
+
         isStreaming = false
         print("✅ [OralableDevice] Data streaming stopped")
     }
@@ -685,8 +721,14 @@ extension OralableDevice: CBPeripheralDelegate {
                 controlCharacteristic = characteristic
                 print("✅ [OralableDevice] Found control characteristic")
             } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-                print("🔋 [OralableDevice] Reading battery level...")
-                peripheral.readValue(for: characteristic)
+                batteryCharacteristic = characteristic
+                print("🔋 [OralableDevice] Found battery characteristic - will enable notifications")
+            } else if characteristic.uuid == BLEConstants.characteristic003UUID ||
+                      characteristic.uuid == BLEConstants.characteristic004UUID ||
+                      characteristic.uuid == BLEConstants.characteristic007UUID ||
+                      characteristic.uuid == BLEConstants.characteristic008UUID {
+                otherCharacteristics.append(characteristic)
+                print("📊 [OralableDevice] Found TGM characteristic \(characteristic.uuid.uuidString) - will enable notifications")
             } else if characteristic.uuid == BLEConstants.firmwareVersionCharacteristicUUID {
                 print("📱 [OralableDevice] Reading firmware version...")
                 peripheral.readValue(for: characteristic)
