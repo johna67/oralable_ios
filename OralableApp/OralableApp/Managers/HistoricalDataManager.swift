@@ -39,13 +39,19 @@ class HistoricalDataManager: ObservableObject {
     
     /// Manually trigger an update of all metrics
     @MainActor func updateAllMetrics() {
-        guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
-            Logger.shared.debug("[HistoricalDataManager] No sensor data available, clearing metrics")
+        guard let ble = bleManager else {
+            Logger.shared.warning("[HistoricalDataManager] ⚠️ BLE manager is nil, cannot update metrics")
             clearAllMetrics()
             return
         }
 
-        Logger.shared.info("[HistoricalDataManager] Starting metrics update | Sensor data count: \(ble.sensorDataHistory.count)")
+        if ble.sensorDataHistory.isEmpty {
+            Logger.shared.warning("[HistoricalDataManager] ⚠️ No sensor data available (sensorDataHistory is empty), clearing metrics")
+            clearAllMetrics()
+            return
+        }
+
+        Logger.shared.info("[HistoricalDataManager] ✅ Starting metrics update | Sensor data count: \(ble.sensorDataHistory.count)")
         isUpdating = true
 
         // Use Task for proper async handling with main actor isolation

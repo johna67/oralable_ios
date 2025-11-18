@@ -399,6 +399,18 @@ class OralableBLE: ObservableObject {
                 let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
                 self.sensorDataHistory.append(sensorData)
             }
+
+            // Limit history to last 1000 entries to prevent unbounded growth
+            if self.sensorDataHistory.count > 1000 {
+                self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 1000)
+            }
+
+            // Log occasionally for debugging
+            #if DEBUG
+            if self.sensorDataHistory.count % 50 == 0 {
+                Logger.shared.debug("[OralableBLE] Sensor data history: \(self.sensorDataHistory.count) entries")
+            }
+            #endif
         }
     }
 

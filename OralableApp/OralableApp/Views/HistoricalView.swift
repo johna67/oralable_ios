@@ -49,7 +49,14 @@ struct HistoricalView: View {
         .navigationTitle(metricType)
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
+            Logger.shared.debug("[HistoricalView] View appeared for metric: \(metricType)")
             viewModel.updateAllMetrics()
+
+            // Force another update after a short delay to ensure data is loaded
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                Logger.shared.debug("[HistoricalView] Triggering delayed update for metric: \(metricType)")
+                viewModel.updateCurrentRangeMetrics()
+            }
         }
     }
 
