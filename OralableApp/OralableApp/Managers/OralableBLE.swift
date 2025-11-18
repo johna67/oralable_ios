@@ -674,8 +674,24 @@ class OralableBLE: ObservableObject {
     // MARK: - Historical Metrics
     
     func getHistoricalMetrics(for range: TimeRange) -> HistoricalMetrics? {
-        guard !sensorDataHistory.isEmpty else { return nil }
-        return HistoricalDataAggregator.aggregate(data: sensorDataHistory, for: range, endDate: Date())
+        Logger.shared.info("[OralableBLE] getHistoricalMetrics called for range: \(range)")
+        Logger.shared.info("[OralableBLE] sensorDataHistory count: \(sensorDataHistory.count)")
+
+        guard !sensorDataHistory.isEmpty else {
+            Logger.shared.warning("[OralableBLE] ❌ Cannot get metrics - sensorDataHistory is empty")
+            return nil
+        }
+
+        Logger.shared.info("[OralableBLE] ✅ Aggregating \(sensorDataHistory.count) data points for range: \(range)")
+        let metrics = HistoricalDataAggregator.aggregate(data: sensorDataHistory, for: range, endDate: Date())
+
+        if let metrics = metrics {
+            Logger.shared.info("[OralableBLE] ✅ Aggregation successful - \(metrics.dataPoints.count) data points in result")
+        } else {
+            Logger.shared.warning("[OralableBLE] ⚠️ Aggregation returned nil")
+        }
+
+        return metrics
     }
     
     // MARK: - Device State Detection

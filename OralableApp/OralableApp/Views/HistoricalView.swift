@@ -34,6 +34,13 @@ struct HistoricalView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: designSystem.spacing.lg) {
+                // Debug info
+                if !viewModel.dataPoints.isEmpty {
+                    Text("Data points: \(viewModel.dataPoints.count)")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+
                 // Time Range Selector
                 timeRangeSelector
 
@@ -50,11 +57,30 @@ struct HistoricalView: View {
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
             Logger.shared.debug("[HistoricalView] View appeared for metric: \(metricType)")
+
+            // Check BLE sensor data immediately
+            let bleDataCount = bleManager.sensorDataHistory.count
+            Logger.shared.info("[HistoricalView] ⚠️ BLE sensorDataHistory count: \(bleDataCount)")
+
+            if bleDataCount == 0 {
+                Logger.shared.warning("[HistoricalView] ❌ No sensor data in BLE history - cannot show historical data")
+            } else {
+                Logger.shared.info("[HistoricalView] ✅ Found \(bleDataCount) sensor data entries")
+
+                // Log first and last entry timestamps
+                if let first = bleManager.sensorDataHistory.first,
+                   let last = bleManager.sensorDataHistory.last {
+                    Logger.shared.info("[HistoricalView] Data range: \(first.timestamp) to \(last.timestamp)")
+                }
+            }
+
             viewModel.updateAllMetrics()
 
             // Force another update after a short delay to ensure data is loaded
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 Logger.shared.debug("[HistoricalView] Triggering delayed update for metric: \(metricType)")
+                Logger.shared.info("[HistoricalView] Current metrics available: \(viewModel.hasCurrentMetrics)")
+                Logger.shared.info("[HistoricalView] Data points count: \(viewModel.dataPoints.count)")
                 viewModel.updateCurrentRangeMetrics()
             }
         }
