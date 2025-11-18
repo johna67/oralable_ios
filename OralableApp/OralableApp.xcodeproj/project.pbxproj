@@ -76,19 +76,15 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Managers/DentistAppDependencies.swift,
-				Managers/DentistAuthenticationManager.swift,
-				Managers/DentistDataManager.swift,
-				Managers/DentistSubscriptionManager.swift,
-				OralableForDentists.swift,
-				ViewModels/AddPatientViewModel.swift,
-				ViewModels/DentistSettingsViewModel.swift,
-				ViewModels/PatientListViewModel.swift,
-				Views/AddPatientView.swift,
-				Views/DentistSettingsView.swift,
-				Views/PatientDetailView.swift,
-				Views/PatientListView.swift,
-				Views/UpgradePromptView.swift,
+			);
+			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
+		};
+		26D6C45C2ECD238800C60C3D /* Exceptions for "OralableApp" folder in "OralableForDentists" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Managers/Logger.swift,
+				Models/Devices/LoggingService.swift,
+				Models/LogModels.swift,
 			);
 			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
 		};
@@ -99,6 +95,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				269F12F92EBAF6CC00D8F477 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
+				26D6C45C2ECD238800C60C3D /* Exceptions for "OralableApp" folder in "OralableForDentists" target */,
 			);
 			path = OralableApp;
 			sourceTree = "<group>";

@@ -1,6 +1,7 @@
 import Foundation
 import AuthenticationServices
 import SwiftUI
+import Combine
 
 /// Manages authentication for dentist app using Sign in with Apple
 @MainActor

@@ -1,5 +1,6 @@
 import Foundation
 import CloudKit
+import Combine
 
 // MARK: - Patient Models
 
@@ -67,7 +68,8 @@ class DentistDataManager: ObservableObject {
         self.publicDatabase = container.publicCloudDatabase
 
         // Get dentist's Apple ID (from Sign in with Apple)
-        self.dentistID = getCurrentDentistID()
+        // Inline the call to avoid using 'self' before initialization is complete
+        self.dentistID = UserDefaults.standard.string(forKey: "dentistAppleID")
 
         // Load existing patients
         loadPatients()

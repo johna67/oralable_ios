@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 /// Central dependency injection container for the dentist app
 /// Manages all core services and provides factory methods for ViewModels

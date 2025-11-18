@@ -255,7 +255,7 @@ class DentistSubscriptionManager: ObservableObject {
 
     // MARK: - Transaction Verification
 
-    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
+    nonisolated private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
         case .unverified:
             throw StoreError.failedVerification
@@ -300,11 +300,11 @@ class DentistSubscriptionManager: ObservableObject {
     }
 
     func patientsRemaining(currentCount: Int) -> Int {
-        let max = currentTier.maxPatients
-        if max == .max {
+        let maxPatients = currentTier.maxPatients
+        if maxPatients == .max {
             return .max
         }
-        return max(0, max - currentCount)
+        return Swift.max(0, maxPatients - currentCount)
     }
 
     func needsUpgrade(forPatientCount count: Int) -> Bool {
