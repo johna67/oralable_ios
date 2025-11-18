@@ -21,7 +21,6 @@ struct DashboardView: View {
     @State private var showingProfile = false
     @State private var showingDevices = false
     @State private var showingSettings = false
-    @State private var showingHistorical = false
     @State private var showingShare = false
     
     var body: some View {
@@ -94,22 +93,6 @@ struct DashboardView: View {
                     .environmentObject(AuthenticationManager.shared)
                     .environmentObject(SubscriptionManager.shared)
                     .environmentObject(AppStateManager.shared)
-            }
-            .sheet(isPresented: $showingHistorical) {
-                NavigationView {
-                    HistoricalView(metricType: "Movement")
-                        .environmentObject(designSystem)
-                        .environmentObject(HistoricalDataManager.shared)
-                        .environmentObject(bleManager)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Done") {
-                                    showingHistorical = false
-                                }
-                                .foregroundColor(designSystem.colors.textPrimary)
-                            }
-                        }
-                }
             }
             .sheet(isPresented: $showingShare) {
                 ShareView(ble: bleManager)
@@ -309,7 +292,10 @@ struct DashboardView: View {
             )
 
             // Accelerometer - Tappable to view history
-            Button(action: { showingHistorical = true }) {
+            NavigationLink(destination: HistoricalView(metricType: "Movement")
+                .environmentObject(designSystem)
+                .environmentObject(HistoricalDataManager.shared)
+                .environmentObject(bleManager)) {
                 WaveformCard(
                     title: "Movement",
                     data: viewModel.accelerometerData,
