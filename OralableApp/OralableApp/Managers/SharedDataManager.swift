@@ -43,25 +43,36 @@ struct SharedDentist: Identifiable {
 
 @MainActor
 class SharedDataManager: ObservableObject {
-    static let shared = SharedDataManager()
-
     @Published var sharedDentists: [SharedDentist] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private let container: CKContainer
     private let publicDatabase: CKDatabase
-    private let userID: String?
+    private let authenticationManager: AuthenticationManager
+    private let healthKitManager: HealthKitManager
+    private weak var bleManager: OralableBLE?
 
-    private init() {
+    init(authenticationManager: AuthenticationManager, healthKitManager: HealthKitManager, bleManager: OralableBLE? = nil) {
         // Use shared container for both patient and dentist apps
         self.container = CKContainer(identifier: "iCloud.com.jacdental.oralable.shared")
         self.publicDatabase = container.publicCloudDatabase
 
-        // Get patient's user ID (from authentication)
-        self.userID = AuthenticationManager.shared.userID
+        // Store reference to authentication manager
+        self.authenticationManager = authenticationManager
+
+        // Store reference to HealthKit manager
+        self.healthKitManager = healthKitManager
+
+        // Store reference to BLE manager for sensor data access
+        self.bleManager = bleManager
 
         loadSharedDentists()
+    }
+
+    // Computed property for backward compatibility
+    private var userID: String? {
+        return authenticationManager.userID
     }
 
     // MARK: - Patient Side: Generate Share Code
@@ -126,7 +137,7 @@ class SharedDataManager: ObservableObject {
                     record["isActive"] = 0 as CKRecordValue
                     try await publicDatabase.save(record)
                 case .failure(let error):
-                    print("Error fetching record: \(error)")
+                    Logger.shared.error("[SharedDataManager] Error fetching record: \(error)")
                 }
             }
 
@@ -170,7 +181,7 @@ class SharedDataManager: ObservableObject {
                             dentists.append(dentist)
                         }
                     case .failure(let error):
-                        print("Error loading dentist: \(error)")
+                        Logger.shared.error("[SharedDataManager] Error loading dentist: \(error)")
                     }
                 }
 
@@ -190,10 +201,107 @@ class SharedDataManager: ObservableObject {
     // MARK: - Get Patient Health Data for Sharing
 
     func getPatientHealthDataForSharing(from startDate: Date, to endDate: Date) async throws -> [HealthDataRecord] {
-        // TODO: Implement fetching health data from local storage
-        // This will query your existing health data storage and return records
-        // Format them for CloudKit sharing
-        return []
+        // Fetch HealthKit data if authorized
+        var healthKitData: HealthKitDataForSharing? = nil
+
+        if healthKitManager.isAuthorized {
+            do {
+                // Fetch heart rate data
+                let heartRateReadings = try await healthKitManager.readHeartRateSamples(
+                    from: startDate,
+                    to: endDate
+                )
+
+                // Fetch SpO2 data
+                let spo2Readings = try await healthKitManager.readBloodOxygenSamples(
+                    from: startDate,
+                    to: endDate
+                )
+
+                // Create HealthKit data package
+                healthKitData = HealthKitDataForSharing(
+                    heartRateReadings: heartRateReadings,
+                    spo2Readings: spo2Readings,
+                    sleepData: nil  // Sleep data can be added later if needed
+                )
+
+                Logger.shared.info("[SharedDataManager] Fetched HealthKit data: \(heartRateReadings.count) HR readings, \(spo2Readings.count) SpO2 readings")
+            } catch {
+                Logger.shared.error("[SharedDataManager] Failed to fetch HealthKit data: \(error)")
+                // Continue without HealthKit data - don't fail the entire share
+            }
+        }
+
+        // Fetch bruxism sensor data from local storage
+        var measurements = Data()
+        var recordingDate = startDate
+        var actualDataCount = 0
+
+        if let ble = bleManager {
+            do {
+                // Filter sensor data to the requested time range
+                let filteredData = ble.sensorDataHistory.filter {
+                    $0.timestamp >= startDate && $0.timestamp <= endDate
+                }
+
+                if !filteredData.isEmpty {
+                    // Create serializable bruxism session data
+                    let sessionData = BruxismSessionData(sensorData: filteredData)
+
+                    // Serialize to Data
+                    let encoder = JSONEncoder()
+                    encoder.dateEncodingStrategy = .iso8601
+                    measurements = try encoder.encode(sessionData)
+
+                    // Use the earliest timestamp as recording date
+                    recordingDate = filteredData.first?.timestamp ?? startDate
+                    actualDataCount = filteredData.count
+
+                    Logger.shared.info("[SharedDataManager] Serialized \(filteredData.count) sensor readings for sharing (\(measurements.count) bytes)")
+                } else {
+                    Logger.shared.warning("[SharedDataManager] No sensor data available for time range \(startDate) to \(endDate)")
+                }
+            } catch {
+                Logger.shared.error("[SharedDataManager] Failed to serialize sensor data: \(error)")
+                // Continue with empty measurements - don't fail the entire share
+            }
+        } else {
+            Logger.shared.warning("[SharedDataManager] BLE manager not available, sharing without sensor data")
+        }
+
+        let record = HealthDataRecord(
+            recordID: UUID().uuidString,
+            recordingDate: recordingDate,
+            dataType: "bruxism_session",
+            measurements: measurements,
+            sessionDuration: endDate.timeIntervalSince(startDate),
+            healthKitData: healthKitData
+        )
+
+        return [record]
+    }
+
+    /// Fetch HealthKit data for a specific time period
+    func fetchHealthKitData(from startDate: Date, to endDate: Date) async throws -> HealthKitDataForSharing? {
+        guard healthKitManager.isAuthorized else {
+            return nil
+        }
+
+        let heartRateReadings = try await healthKitManager.readHeartRateSamples(
+            from: startDate,
+            to: endDate
+        )
+
+        let spo2Readings = try await healthKitManager.readBloodOxygenSamples(
+            from: startDate,
+            to: endDate
+        )
+
+        return HealthKitDataForSharing(
+            heartRateReadings: heartRateReadings,
+            spo2Readings: spo2Readings,
+            sleepData: nil
+        )
     }
 }
 
@@ -230,4 +338,101 @@ struct HealthDataRecord: Codable {
     let dataType: String
     let measurements: Data
     let sessionDuration: TimeInterval
+    let healthKitData: HealthKitDataForSharing?  // NEW: Include HealthKit data
+}
+
+// MARK: - HealthKit Data for Sharing
+
+struct HealthKitDataForSharing: Codable {
+    let heartRateReadings: [HealthDataReading]
+    let spo2Readings: [HealthDataReading]
+    let sleepData: [SleepDataPoint]?
+
+    var averageHeartRate: Double? {
+        guard !heartRateReadings.isEmpty else { return nil }
+        return heartRateReadings.reduce(0.0) { $0 + $1.value } / Double(heartRateReadings.count)
+    }
+
+    var averageSpO2: Double? {
+        guard !spo2Readings.isEmpty else { return nil }
+        return spo2Readings.reduce(0.0) { $0 + $1.value } / Double(spo2Readings.count)
+    }
+}
+
+struct SleepDataPoint: Codable {
+    let startDate: Date
+    let endDate: Date
+    let sleepStage: String  // "deep", "light", "rem", "awake"
+}
+
+// MARK: - Bruxism Session Data (for sharing sensor data)
+
+/// Serializable structure containing bruxism sensor data for sharing with dentists
+struct BruxismSessionData: Codable {
+    let sensorReadings: [SerializableSensorData]
+    let recordingCount: Int
+    let startDate: Date
+    let endDate: Date
+
+    init(sensorData: [SensorData]) {
+        self.sensorReadings = sensorData.map { SerializableSensorData(from: $0) }
+        self.recordingCount = sensorData.count
+        self.startDate = sensorData.first?.timestamp ?? Date()
+        self.endDate = sensorData.last?.timestamp ?? Date()
+    }
+}
+
+/// Simplified sensor data structure for serialization
+struct SerializableSensorData: Codable {
+    let timestamp: Date
+
+    // PPG data
+    let ppgRed: Int32
+    let ppgIR: Int32
+    let ppgGreen: Int32
+
+    // Accelerometer data
+    let accelX: Int16
+    let accelY: Int16
+    let accelZ: Int16
+    let accelMagnitude: Double
+
+    // Temperature
+    let temperatureCelsius: Double
+
+    // Battery
+    let batteryPercentage: Int
+
+    // Calculated metrics
+    let heartRateBPM: Double?
+    let heartRateQuality: Double?
+    let spo2Percentage: Double?
+    let spo2Quality: Double?
+
+    init(from sensorData: SensorData) {
+        self.timestamp = sensorData.timestamp
+
+        // PPG data
+        self.ppgRed = sensorData.ppg.red
+        self.ppgIR = sensorData.ppg.ir
+        self.ppgGreen = sensorData.ppg.green
+
+        // Accelerometer data
+        self.accelX = sensorData.accelerometer.x
+        self.accelY = sensorData.accelerometer.y
+        self.accelZ = sensorData.accelerometer.z
+        self.accelMagnitude = sensorData.accelerometer.magnitude
+
+        // Temperature
+        self.temperatureCelsius = sensorData.temperature.celsius
+
+        // Battery
+        self.batteryPercentage = sensorData.battery.percentage
+
+        // Calculated metrics
+        self.heartRateBPM = sensorData.heartRate?.bpm
+        self.heartRateQuality = sensorData.heartRate?.quality
+        self.spo2Percentage = sensorData.spo2?.percentage
+        self.spo2Quality = sensorData.spo2?.quality
+    }
 }

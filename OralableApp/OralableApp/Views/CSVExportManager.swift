@@ -3,10 +3,10 @@ import Foundation
 // MARK: - CSV Export Manager
 
 /// Manager for exporting sensor data and logs to CSV format
-class CSVExportManager {
+class CSVExportManager: ObservableObject {
     static let shared = CSVExportManager()
-    
-    private init() {}
+
+    init() {}
     
     /// Export sensor data and logs to CSV file
     /// - Parameters:
@@ -44,10 +44,10 @@ class CSVExportManager {
             // Write the CSV content
             try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
             
-            print("Successfully exported CSV to: \(fileURL.path)")
+            Logger.shared.info("[CSVExportManager] Successfully exported CSV to: \(fileURL.path)")
             return fileURL
         } catch {
-            print("Failed to write CSV file: \(error)")
+            Logger.shared.error("[to write CSV file: \(error)")
             return nil
         }
     }
@@ -241,11 +241,11 @@ class CSVExportManager {
                    let creationDate = attributes[.creationDate] as? Date,
                    creationDate < dayAgo {
                     try? fileManager.removeItem(at: fileURL)
-                    print("Cleaned up old export file: \(fileURL.lastPathComponent)")
+                    Logger.shared.debug("[CSVExportManager] Cleaned up old export file: \(fileURL.lastPathComponent)")
                 }
             }
         } catch {
-            print("Error cleaning up exports: \(error)")
+            Logger.shared.error("[cleaning up exports: \(error)")
         }
     }
 }

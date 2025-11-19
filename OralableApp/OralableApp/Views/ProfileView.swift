@@ -434,6 +434,6 @@ struct SettingRow: View {
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
-            .environmentObject(DesignSystem.shared)
+            .environmentObject(DesignSystem())
     }
 }

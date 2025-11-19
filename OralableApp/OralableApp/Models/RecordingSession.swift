@@ -121,7 +121,7 @@ class RecordingSessionManager: ObservableObject {
             currentSession?.dataFilePath = filePath
         }
 
-        print("📝 [RecordingSessionManager] Started session: \(session.id)")
+        Logger.shared.debug(" [RecordingSessionManager] Started session: \(session.id)")
         saveSessions()
 
         return session
@@ -145,7 +145,7 @@ class RecordingSessionManager: ObservableObject {
         }
 
         currentSession = nil
-        print("✅ [RecordingSessionManager] Stopped session: \(session.id) - Duration: \(session.formattedDuration)")
+        Logger.shared.info(" [RecordingSessionManager] Stopped session: \(session.id) - Duration: \(session.formattedDuration)")
         saveSessions()
     }
 
@@ -162,7 +162,7 @@ class RecordingSessionManager: ObservableObject {
             sessions[index] = session
         }
 
-        print("⏸️ [RecordingSessionManager] Paused session: \(session.id)")
+        Logger.shared.info("⏸️ [RecordingSessionManager] Paused session: \(session.id)")
         saveSessions()
     }
 
@@ -178,7 +178,7 @@ class RecordingSessionManager: ObservableObject {
             sessions[index] = session
         }
 
-        print("▶️ [RecordingSessionManager] Resumed session: \(session.id)")
+        Logger.shared.info("▶️ [RecordingSessionManager] Resumed session: \(session.id)")
         saveSessions()
     }
 
@@ -227,9 +227,9 @@ class RecordingSessionManager: ObservableObject {
             }
 
             sessionDataBuffer.removeAll()
-            print("💾 [RecordingSessionManager] Flushed data buffer to file")
+            Logger.shared.debug("💾 [RecordingSessionManager] Flushed data buffer to file")
         } catch {
-            print("❌ [RecordingSessionManager] Failed to flush data: \(error)")
+            Logger.shared.error(" [RecordingSessionManager] Failed to flush data: \(error)")
         }
     }
 
@@ -255,7 +255,7 @@ class RecordingSessionManager: ObservableObject {
         let header = "timestamp,deviceID,sensorType,value,quality\n"
         try? header.write(to: filePath, atomically: true, encoding: .utf8)
 
-        print("📁 [RecordingSessionManager] Created session file: \(fileName)")
+        Logger.shared.info("📁 [RecordingSessionManager] Created session file: \(fileName)")
         return filePath
     }
 
@@ -270,7 +270,7 @@ class RecordingSessionManager: ObservableObject {
         sessions.removeAll { $0.id == session.id }
         saveSessions()
 
-        print("🗑️ [RecordingSessionManager] Deleted session: \(session.id)")
+        Logger.shared.info("🗑️ [RecordingSessionManager] Deleted session: \(session.id)")
     }
 
     // MARK: - Persistence
@@ -285,9 +285,9 @@ class RecordingSessionManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(sessions)
             try data.write(to: sessionsFileURL)
-            print("💾 [RecordingSessionManager] Saved \(sessions.count) sessions")
+            Logger.shared.debug("💾 [RecordingSessionManager] Saved \(sessions.count) sessions")
         } catch {
-            print("❌ [RecordingSessionManager] Failed to save sessions: \(error)")
+            Logger.shared.error(" [RecordingSessionManager] Failed to save sessions: \(error)")
         }
     }
 
@@ -300,9 +300,9 @@ class RecordingSessionManager: ObservableObject {
         do {
             let data = try Data(contentsOf: sessionsFileURL)
             sessions = try JSONDecoder().decode([RecordingSession].self, from: data)
-            print("📂 [RecordingSessionManager] Loaded \(sessions.count) sessions")
+            Logger.shared.debug("📂 [RecordingSessionManager] Loaded \(sessions.count) sessions")
         } catch {
-            print("❌ [RecordingSessionManager] Failed to load sessions: \(error)")
+            Logger.shared.error(" [RecordingSessionManager] Failed to load sessions: \(error)")
         }
     }
 }

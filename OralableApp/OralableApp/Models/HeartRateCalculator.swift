@@ -58,7 +58,9 @@ class HeartRateCalculator {
         // Need at least 80% valid samples to proceed
         guard Double(validSamples.count) / Double(irSamples.count) >= 0.8 else {
             if shouldLogWarning() {
-                print("⚠️ Heart Rate: Too many invalid samples (\(validSamples.count)/\(irSamples.count))")
+                Task { @MainActor in
+                    Logger.shared.warning("[HeartRateCalculator] Too many invalid samples (\(validSamples.count)/\(irSamples.count))")
+                }
             }
             return nil
         }
@@ -75,7 +77,9 @@ class HeartRateCalculator {
         // Signal should have some variability (>0.5%) but not too much (>50%)
         guard coefficientOfVariation > 0.005 && coefficientOfVariation < 0.5 else {
             if shouldLogWarning() {
-                print("⚠️ Heart Rate: Poor signal variability (CV: \(String(format: "%.3f", coefficientOfVariation)))")
+                Task { @MainActor in
+                    Logger.shared.warning("[HeartRateCalculator] Poor signal variability (CV: \(String(format: "%.3f", coefficientOfVariation)))")
+                }
             }
             return nil
         }
@@ -107,7 +111,9 @@ class HeartRateCalculator {
         // Additional validation: reject physiologically impossible heart rates
         guard bpm >= 40 && bpm <= 180 else {
             if shouldLogWarning() {
-                print("⚠️ Heart Rate: Physiologically impossible BPM: \(bpm)")
+                Task { @MainActor in
+                    Logger.shared.warning("[HeartRateCalculator] Physiologically impossible BPM: \(bpm)")
+                }
             }
             return nil
         }
@@ -120,7 +126,9 @@ class HeartRateCalculator {
             // Reject changes > 30% between readings (too fast for real HR change)
             if percentChange > 0.3 {
                 if shouldLogWarning() {
-                    print("⚠️ Heart Rate: Unrealistic jump from \(Int(lastBPM)) to \(Int(bpm)) BPM")
+                    Task { @MainActor in
+                        Logger.shared.warning("[HeartRateCalculator] Unrealistic jump from \(Int(lastBPM)) to \(Int(bpm)) BPM")
+                    }
                 }
                 // Don't return nil, but reduce quality
                 let adjustedQuality = quality * 0.5

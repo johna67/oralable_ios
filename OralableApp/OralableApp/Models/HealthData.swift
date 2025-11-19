@@ -279,9 +279,10 @@ extension Array where Element == HealthDataReading {
 import SwiftUI
 
 struct HealthDataPreview: View {
-    
+    @EnvironmentObject var designSystem: DesignSystem
+
     let readings: [HealthDataReading] = HealthDataType.allCases.map { .mock(type: $0) }
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -290,28 +291,28 @@ struct HealthDataPreview: View {
                         HStack {
                             Image(systemName: reading.type.iconName)
                                 .font(.system(size: DesignSystem.Sizing.Icon.lg))
-                                .foregroundColor(DesignSystem.Colors.textPrimary)
+                                .foregroundColor(designSystem.colors.textPrimary)
                                 .frame(width: 40)
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(reading.type.displayName)
-                                    .font(DesignSystem.Typography.bodyLarge)
-                                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                                
+                                    .font(designSystem.typography.bodyLarge)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+
                                 if let source = reading.source {
                                     Text("Source: \(source)")
-                                        .font(DesignSystem.Typography.caption)
-                                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                                        .font(designSystem.typography.caption)
+                                        .foregroundColor(designSystem.colors.textTertiary)
                                 }
                             }
                             
                             Spacer()
                             
                             Text(reading.formattedValue)
-                                .font(DesignSystem.Typography.labelLarge)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                                .font(designSystem.typography.labelLarge)
+                                .foregroundColor(designSystem.colors.textSecondary)
                         }
-                        .padding(.vertical, DesignSystem.Spacing.xs)
+                        .padding(.vertical, designSystem.spacing.xs)
                     }
                 }
                 
@@ -319,27 +320,27 @@ struct HealthDataPreview: View {
                     ForEach(HealthDataType.allCases, id: \.self) { type in
                         HStack {
                             Text(type.displayName)
-                                .font(DesignSystem.Typography.bodyMedium)
-                            
+                                .font(designSystem.typography.bodyMedium)
+
                             Spacer()
-                            
+
                             if HealthKitPermissions.readTypes.contains(type) {
                                 Image(systemName: "book.fill")
                                     .font(.system(size: DesignSystem.Sizing.Icon.sm))
-                                    .foregroundColor(DesignSystem.Colors.info)
+                                    .foregroundColor(designSystem.colors.info)
                             }
-                            
+
                             if HealthKitPermissions.writeTypes.contains(type) {
                                 Image(systemName: "pencil")
                                     .font(.system(size: DesignSystem.Sizing.Icon.sm))
-                                    .foregroundColor(DesignSystem.Colors.success)
+                                    .foregroundColor(designSystem.colors.success)
                             }
                         }
                     }
                 }
             }
             .navigationTitle("Health Data")
-            .background(DesignSystem.Colors.backgroundPrimary)
+            .background(designSystem.colors.backgroundPrimary)
         }
     }
 }
@@ -347,6 +348,7 @@ struct HealthDataPreview: View {
 struct HealthData_Previews: PreviewProvider {
     static var previews: some View {
         HealthDataPreview()
+            .environmentObject(DesignSystem())
     }
 }
 

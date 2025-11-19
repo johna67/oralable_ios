@@ -33,8 +33,8 @@ struct HistoricalView: View {
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
-            // Legacy path - create with shared instance
-            let manager = HistoricalDataManager.shared
+            // Legacy path - create with new instance (nil bleManager for preview)
+            let manager = HistoricalDataManager(bleManager: nil)
             _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
         }
     }

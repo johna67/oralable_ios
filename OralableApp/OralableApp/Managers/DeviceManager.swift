@@ -13,8 +13,6 @@ import Combine
 /// Manager for coordinating multiple BLE devices
 @MainActor
 class DeviceManager: ObservableObject {
-    static let shared = DeviceManager()
-    
     // MARK: - Published Properties
     
     /// All discovered devices
@@ -60,65 +58,65 @@ class DeviceManager: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        print("\n🏭 [DeviceManager] Initializing...")
+        Logger.shared.info("[DeviceManager] Initializing...")
         bleManager = BLECentralManager()
         setupBLECallbacks()
-        print("🏭 [DeviceManager] Initialization complete")
+        Logger.shared.info("[DeviceManager] Initialization complete")
     }
     
     // MARK: - BLE Callbacks Setup
     
     private func setupBLECallbacks() {
-        print("\n🔗 [DeviceManager] Setting up BLE callbacks...")
-        
+        Logger.shared.info("[DeviceManager] Setting up BLE callbacks...")
+
         bleManager?.onDeviceDiscovered = { [weak self] peripheral, name, rssi in
-            print("\n📨 [DeviceManager] onDeviceDiscovered callback received")
-            print("📨 [DeviceManager] Peripheral: \(peripheral.identifier)")
-            print("📨 [DeviceManager] Name: \(name)")
-            print("📨 [DeviceManager] RSSI: \(rssi)")
-            
+            Logger.shared.debug("[DeviceManager] onDeviceDiscovered callback received")
+            Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
+            Logger.shared.debug("[DeviceManager] Name: \(name)")
+            Logger.shared.debug("[DeviceManager] RSSI: \(rssi)")
+
             Task { @MainActor [weak self] in
-                print("📨 [DeviceManager] Dispatching to main actor...")
+                Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
                 self?.handleDeviceDiscovered(peripheral: peripheral, name: name, rssi: rssi)
             }
         }
-        
+
         bleManager?.onDeviceConnected = { [weak self] peripheral in
-            print("\n📨 [DeviceManager] onDeviceConnected callback received")
-            print("📨 [DeviceManager] Peripheral: \(peripheral.identifier)")
-            
+            Logger.shared.debug("[DeviceManager] onDeviceConnected callback received")
+            Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
+
             Task { @MainActor [weak self] in
-                print("📨 [DeviceManager] Dispatching to main actor...")
+                Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
                 self?.handleDeviceConnected(peripheral: peripheral)
             }
         }
-        
+
         bleManager?.onDeviceDisconnected = { [weak self] peripheral, error in
-            print("\n📨 [DeviceManager] onDeviceDisconnected callback received")
-            print("📨 [DeviceManager] Peripheral: \(peripheral.identifier)")
+            Logger.shared.debug("[DeviceManager] onDeviceDisconnected callback received")
+            Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
             if let error = error {
-                print("📨 [DeviceManager] Error: \(error.localizedDescription)")
+                Logger.shared.error("[DeviceManager] Error: \(error.localizedDescription)")
             }
-            
+
             Task { @MainActor [weak self] in
-                print("📨 [DeviceManager] Dispatching to main actor...")
+                Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
                 self?.handleDeviceDisconnected(peripheral: peripheral, error: error)
             }
         }
-        
+
         bleManager?.onBluetoothStateChanged = { [weak self] state in
-            print("\n📨 [DeviceManager] onBluetoothStateChanged callback received")
-            print("📨 [DeviceManager] State: \(state.rawValue)")
-            
+            Logger.shared.debug("[DeviceManager] onBluetoothStateChanged callback received")
+            Logger.shared.debug("[DeviceManager] State: \(state.rawValue)")
+
             Task { @MainActor [weak self] in
                 if state != .poweredOn && (self?.isScanning ?? false) {
-                    print("⚠️ [DeviceManager] Bluetooth not powered on, stopping scan")
+                    Logger.shared.warning("[DeviceManager] Bluetooth not powered on, stopping scan")
                     self?.isScanning = false
                 }
             }
         }
-        
-        print("🔗 [DeviceManager] BLE callbacks configured successfully")
+
+        Logger.shared.info("[DeviceManager] BLE callbacks configured successfully")
     }
     
     // MARK: - Device Discovery Handlers
@@ -435,17 +433,17 @@ class DeviceManager: ObservableObject {
     // MARK: - Sensor Data Management
     
     private func subscribeToDevice(_ device: BLEDeviceProtocol) {
-        print("📊 [DeviceManager] subscribeToDevice")
-        print("📊 [DeviceManager] Device: \(device.deviceInfo.name)")
-        
+        Logger.shared.debug("[DeviceManager] subscribeToDevice")
+        Logger.shared.debug("[DeviceManager] Device: \(device.deviceInfo.name)")
+
         device.sensorReadingsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] reading in
                 self?.handleSensorReading(reading, from: device)
             }
             .store(in: &cancellables)
-        
-        print("📊 [DeviceManager] Subscription created")
+
+        Logger.shared.debug("[DeviceManager] Subscription created")
     }
     
     private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
@@ -471,19 +469,19 @@ class DeviceManager: ObservableObject {
     
     /// Clear all sensor readings
     func clearReadings() {
-        print("\n🗑️ [DeviceManager] clearReadings() called")
+        Logger.shared.info("[DeviceManager] clearReadings() called")
         allSensorReadings.removeAll()
         latestReadings.removeAll()
-        print("🗑️ [DeviceManager] All readings cleared")
+        Logger.shared.info("[DeviceManager] All readings cleared")
     }
     
     /// Set a device as the primary device
     func setPrimaryDevice(_ deviceInfo: DeviceInfo?) {
-        print("\n📌 [DeviceManager] setPrimaryDevice() called")
+        Logger.shared.info("[DeviceManager] setPrimaryDevice() called")
         if let device = deviceInfo {
-            print("📌 [DeviceManager] Setting primary device to: \(device.name)")
+            Logger.shared.info("[DeviceManager] Setting primary device to: \(device.name)")
         } else {
-            print("📌 [DeviceManager] Clearing primary device")
+            Logger.shared.info("[DeviceManager] Clearing primary device")
         }
         primaryDevice = deviceInfo
     }

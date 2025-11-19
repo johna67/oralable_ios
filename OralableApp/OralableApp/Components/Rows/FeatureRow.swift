@@ -18,33 +18,34 @@ import SwiftUI
 
 /// Feature Row Component
 struct FeatureRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let icon: String
     let title: String
     let description: String
-    
+
     var body: some View {
-        HStack(alignment: .top, spacing: DesignSystem.Spacing.md) {
+        HStack(alignment: .top, spacing: designSystem.spacing.md) {
             // Icon
             Image(systemName: icon)
                 .font(.system(size: DesignSystem.Sizing.Icon.lg))
-                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .foregroundColor(designSystem.colors.textPrimary)
                 .frame(width: 40)
-            
+
             // Content
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xxs) {
+            VStack(alignment: .leading, spacing: designSystem.spacing.xxs) {
                 Text(title)
-                    .font(DesignSystem.Typography.bodyLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
+                    .font(designSystem.typography.bodyLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
+
                 Text(description)
-                    .font(DesignSystem.Typography.bodySmall)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .font(designSystem.typography.bodySmall)
+                    .foregroundColor(designSystem.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            
+
             Spacer()
         }
-        .padding(.vertical, DesignSystem.Spacing.sm)
+        .padding(.vertical, designSystem.spacing.sm)
     }
 }
 
@@ -54,25 +55,26 @@ struct FeatureRow: View {
 
 struct FeatureRow_Previews: PreviewProvider {
     static var previews: some View {
-        VStack(spacing: DesignSystem.Spacing.md) {
+        let designSystem = DesignSystem()
+        VStack(spacing: designSystem.spacing.md) {
             FeatureRow(
                 icon: "waveform.path.ecg",
                 title: "Real-time Monitoring",
                 description: "Track your dental health metrics in real-time with advanced sensors"
             )
-            
+
             FeatureRow(
                 icon: "heart.fill",
                 title: "Heart Rate Tracking",
                 description: "Monitor your heart rate during dental procedures"
             )
-            
+
             FeatureRow(
                 icon: "chart.line.uptrend.xyaxis",
                 title: "Historical Data",
                 description: "View and analyze your health data over time"
             )
-            
+
             FeatureRow(
                 icon: "arrow.down.doc.fill",
                 title: "Export Data",
@@ -80,7 +82,8 @@ struct FeatureRow_Previews: PreviewProvider {
             )
         }
         .padding()
-        .background(DesignSystem.Colors.backgroundPrimary)
+        .background(designSystem.colors.backgroundPrimary)
+        .environmentObject(designSystem)
     }
 }
 

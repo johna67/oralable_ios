@@ -18,14 +18,13 @@ import SwiftUI
 
 /// Action Card Component
 struct ActionCardView: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let icon: String
     let title: String
     let description: String
-    let iconColor: Color
+    let iconColor: Color?
     let action: () -> Void
-    
-    @ObservedObject private var designSystem = DesignSystem.shared
-    
+
     init(
         icon: String,
         title: String,
@@ -36,7 +35,7 @@ struct ActionCardView: View {
         self.icon = icon
         self.title = title
         self.description = description
-        self.iconColor = iconColor ?? DesignSystem.shared.colors.textPrimary
+        self.iconColor = iconColor
         self.action = action
     }
     
@@ -46,7 +45,7 @@ struct ActionCardView: View {
                 // Icon
                 Image(systemName: icon)
                     .font(.system(size: 32))
-                    .foregroundColor(iconColor)
+                    .foregroundColor(iconColor ?? designSystem.colors.textPrimary)
                 
                 // Title
                 Text(title)
@@ -76,8 +75,8 @@ struct ActionCardView: View {
 
 struct ActionCardView_Previews: PreviewProvider {
     static var previews: some View {
-        let designSystem = DesignSystem.shared
-        
+        let designSystem = DesignSystem()
+
         VStack(spacing: designSystem.spacing.md) {
             ActionCardView(
                 icon: "chart.line.uptrend.xyaxis",
@@ -104,6 +103,7 @@ struct ActionCardView_Previews: PreviewProvider {
         }
         .padding()
         .background(designSystem.colors.backgroundPrimary)
+        .environmentObject(designSystem)
     }
 }
 

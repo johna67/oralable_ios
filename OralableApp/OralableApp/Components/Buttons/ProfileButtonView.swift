@@ -10,6 +10,7 @@ import SwiftUI
 
 /// Enhanced Profile Button
 struct ProfileButtonView: View {
+    @EnvironmentObject var designSystem: DesignSystem
     @ObservedObject var authManager: AuthenticationManager
     let action: () -> Void
     @State private var isPressed = false
@@ -21,7 +22,7 @@ struct ProfileButtonView: View {
             impact.impactOccurred()
             action()
         }) {
-            HStack(spacing: DesignSystem.Spacing.sm) {
+            HStack(spacing: designSystem.spacing.sm) {
                 // User avatar
                 UserAvatarView(
                     initials: authManager.userInitials,
@@ -32,19 +33,19 @@ struct ProfileButtonView: View {
                 // User info
                 VStack(alignment: .leading, spacing: 2) {
                     Text(authManager.displayName)
-                        .font(DesignSystem.Typography.labelLarge)
-                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .font(designSystem.typography.labelLarge)
+                        .foregroundColor(designSystem.colors.textPrimary)
                         .lineLimit(1)
                     
                     if let email = authManager.userEmail {
                         Text(email)
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
                             .lineLimit(1)
                     } else {
                         Text("Tap to view profile")
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                            .font(designSystem.typography.caption)
+                            .foregroundColor(designSystem.colors.textTertiary)
                     }
                 }
                 
@@ -53,12 +54,12 @@ struct ProfileButtonView: View {
                 // Arrow indicator
                 Image(systemName: "chevron.right")
                     .font(.system(size: DesignSystem.Sizing.Icon.sm, weight: .semibold))
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                    .foregroundColor(designSystem.colors.textTertiary)
             }
-            .padding(DesignSystem.Spacing.md)
+            .padding(designSystem.spacing.md)
             .background(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
-                    .fill(DesignSystem.Colors.backgroundSecondary)
+                RoundedRectangle(cornerRadius: designSystem.cornerRadius.lg)
+                    .fill(designSystem.colors.backgroundSecondary)
             )
             .scaleEffect(isPressed ? 0.98 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
@@ -82,14 +83,17 @@ struct ProfileButtonView: View {
 
 struct ProfileButtonView_Previews: PreviewProvider {
     static var previews: some View {
-        VStack(spacing: DesignSystem.Spacing.lg) {
+        let designSystem = DesignSystem()
+        let authManager = AuthenticationManager()
+        VStack(spacing: designSystem.spacing.lg) {
             ProfileButtonView(
-                authManager: AuthenticationManager.shared,
+                authManager: authManager,
                 action: {}
             )
         }
         .padding()
-        .background(DesignSystem.Colors.backgroundPrimary)
+        .background(designSystem.colors.backgroundPrimary)
+        .environmentObject(designSystem)
     }
 }
 

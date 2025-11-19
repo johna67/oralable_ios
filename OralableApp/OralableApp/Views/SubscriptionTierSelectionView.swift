@@ -10,7 +10,7 @@ import SwiftUI
 import StoreKit
 
 struct SubscriptionTierSelectionView: View {
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager()
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) private var dismiss
     @State private var selectedProduct: Product?
@@ -154,19 +154,6 @@ struct SubscriptionTierSelectionView: View {
                     }
                 )
             }
-
-            if let lifetimeProduct = subscriptionManager.lifetimeProduct {
-                SubscriptionPlanCard(
-                    product: lifetimeProduct,
-                    isSelected: selectedProduct?.id == lifetimeProduct.id,
-                    isPurchasing: subscriptionManager.isLoading,
-                    action: {
-                        Task {
-                            await purchaseProduct(lifetimeProduct)
-                        }
-                    }
-                )
-            }
         }
     }
 
@@ -179,7 +166,7 @@ struct SubscriptionTierSelectionView: View {
                 .foregroundColor(designSystem.colors.textPrimary)
 
             VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-                ForEach(SubscriptionTier.paid.features, id: \.self) { feature in
+                ForEach(SubscriptionTier.premium.features, id: \.self) { feature in
                     SubscriptionFeatureRow(feature: feature)
                 }
             }
@@ -422,6 +409,6 @@ struct SubscriptionFeatureRow: View {
 struct SubscriptionTierSelectionView_Previews: PreviewProvider {
     static var previews: some View {
         SubscriptionTierSelectionView()
-            .environmentObject(DesignSystem.shared)
+            .environmentObject(DesignSystem())
     }
 }

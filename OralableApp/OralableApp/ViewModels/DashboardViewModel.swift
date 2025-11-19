@@ -59,14 +59,6 @@ class DashboardViewModel: ObservableObject {
         Logger.shared.info("[DashboardViewModel] ✅ Initializing in PRODUCTION MODE - REAL DATA only")
     }
 
-    /// Legacy initializer for backward compatibility (uses singletons)
-    convenience init() {
-        self.init(
-            bleManager: OralableBLE.shared,
-            appStateManager: AppStateManager.shared
-        )
-    }
-
     // MARK: - Public Methods
     func startMonitoring() {
         setupBLESubscriptions()

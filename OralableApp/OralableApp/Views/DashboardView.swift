@@ -12,6 +12,7 @@ import Charts
 struct DashboardView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var healthKitManager: HealthKitManager
     // Note: Using @EnvironmentObject instead of plain reference for dependency injection
     // ViewModel throttles all @Published properties to prevent excessive UI updates
     @EnvironmentObject var bleManager: OralableBLE
@@ -21,8 +22,9 @@ struct DashboardView: View {
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
-            // Legacy path - create with default initializer
-            _viewModel = StateObject(wrappedValue: DashboardViewModel())
+            // This initializer is not used in normal flow since dependencies are injected
+            // Fallback for testing - requires BLE and AppStateManager to be available
+            fatalError("DashboardView requires bleManager and appStateManager via @EnvironmentObject")
         }
     }
 
@@ -38,6 +40,11 @@ struct DashboardView: View {
                 VStack(spacing: designSystem.spacing.lg) {
                     // Connection Status Card
                     connectionStatusCard
+
+                    // HealthKit Integration Card
+                    if healthKitManager.isAvailable {
+                        HealthKitIntegrationCard()
+                    }
 
                     // MAM State Card
                     if viewModel.isConnected {
@@ -87,21 +94,21 @@ struct DashboardView: View {
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
                     .environmentObject(designSystem)
-                    .environmentObject(AuthenticationManager.shared)
-                    .environmentObject(SubscriptionManager.shared)
+                    .environmentObject(dependencies.authenticationManager)
+                    .environmentObject(dependencies.subscriptionManager)
             }
             .sheet(isPresented: $showingDevices) {
                 DevicesView()
                     .environmentObject(designSystem)
                     .environmentObject(bleManager)
-                    .environmentObject(DeviceManager.shared)
+                    .environmentObject(dependencies.deviceManager)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
                     .environmentObject(designSystem)
-                    .environmentObject(AuthenticationManager.shared)
-                    .environmentObject(SubscriptionManager.shared)
-                    .environmentObject(AppStateManager.shared)
+                    .environmentObject(dependencies.authenticationManager)
+                    .environmentObject(dependencies.subscriptionManager)
+                    .environmentObject(dependencies.appStateManager)
             }
             .sheet(isPresented: $showingShare) {
                 ShareView(ble: bleManager)
@@ -303,7 +310,7 @@ struct DashboardView: View {
             // Accelerometer - Tappable to view history
             NavigationLink(destination: HistoricalView(metricType: "Movement")
                 .environmentObject(designSystem)
-                .environmentObject(HistoricalDataManager.shared)
+                .environmentObject(dependencies.historicalDataManager)
                 .environmentObject(bleManager)) {
                 WaveformCard(
                     title: "Movement",
@@ -388,6 +395,9 @@ struct WaveformCard: View {
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         DashboardView()
-            .environmentObject(DesignSystem.shared)
+            .environmentObject(DesignSystem())
+            .environmentObject(AppDependencies())
+            .environmentObject(HealthKitManager())
+            .environmentObject(OralableBLE())
     }
 }

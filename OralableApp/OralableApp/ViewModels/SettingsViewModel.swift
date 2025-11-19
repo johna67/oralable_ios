@@ -84,11 +84,6 @@ class SettingsViewModel: ObservableObject {
         setupBindings()
     }
 
-    /// Legacy initializer for backward compatibility (uses singleton)
-    convenience init() {
-        self.init(bleManager: OralableBLE.shared)
-    }
-    
     // MARK: - Setup
     
     private func setupBindings() {

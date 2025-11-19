@@ -3,8 +3,6 @@ import Combine
 
 @MainActor
 class AppStateManager: ObservableObject {
-    static let shared = AppStateManager()
-
     // Patient app is always in subscription mode
     @Published var selectedMode: AppMode? = .subscription
 
@@ -13,7 +11,7 @@ class AppStateManager: ObservableObject {
         return false
     }
 
-    private init() {}
+    init() {}
 
     // Mode management not needed for patient app, but keep for compatibility
     func setMode(_ mode: AppMode) {

@@ -34,11 +34,6 @@ class DevicesViewModel: ObservableObject {
         setupBindings()
     }
 
-    /// Legacy initializer for backward compatibility (uses singleton)
-    convenience init() {
-        self.init(bleManager: OralableBLE.shared)
-    }
-    
     private func setupBindings() {
         bleManager.$isConnected
             .assign(to: &$isConnected)
@@ -60,7 +55,7 @@ class DevicesViewModel: ObservableObject {
     
     func connect(to device: DiscoveredDevice) {
         // Implement connection logic
-        print("Connecting to \(device.name)")
+        Logger.shared.info("[DevicesViewModel] Connecting to \(device.name)")
     }
     
     func disconnect() {

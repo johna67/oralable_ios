@@ -4,6 +4,7 @@ import AuthenticationServices
 struct OnboardingView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var authenticationManager: AuthenticationManager
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @State private var showingAuthenticationView = false
     @State private var currentPage = 0
 
@@ -12,6 +13,12 @@ struct OnboardingView: View {
             icon: "waveform.path.ecg",
             title: "Monitor Your Bruxism",
             description: "Track teeth grinding and jaw clenching with precision PPG sensor technology",
+            color: .black
+        ),
+        OnboardingPage(
+            icon: "heart.fill",
+            title: "Integrate with Apple Health",
+            description: "Sync heart rate and SpO2 data with Apple Health for comprehensive health tracking",
             color: .black
         ),
         OnboardingPage(
@@ -71,7 +78,7 @@ struct OnboardingView: View {
 
             // Footer
             VStack(spacing: 8) {
-                Text("Requires Oralable device")
+                Text("Requires Oralable device & Apple Health access")
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textTertiary)
 
@@ -126,6 +133,6 @@ struct OnboardingPageView: View {
 
 #Preview {
     OnboardingView()
-        .environmentObject(DesignSystem.shared)
-        .environmentObject(AuthenticationManager.shared)
+        .environmentObject(DesignSystem())
+        .environmentObject(AuthenticationManager())
 }

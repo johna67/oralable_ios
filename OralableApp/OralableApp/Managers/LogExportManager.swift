@@ -26,7 +26,7 @@ class LogExportManager {
                 UserDefaults.standard.set(userID, forKey: "appleUserID")
                 completion(userID)
             } else {
-                print("CloudKit error: \(error?.localizedDescription ?? "unknown")")
+                Logger.shared.error("[LogExportManager] CloudKit error: \(error?.localizedDescription ?? "unknown")")
                 completion(nil)
             }
         }
@@ -84,10 +84,11 @@ class LogExportManager {
             
             let jsonData = try encoder.encode(exportData)
             let filename = "oralable_logs_\(Int(Date().timeIntervalSince1970)).json"
-            
+
+
             return saveToFile(content: String(data: jsonData, encoding: .utf8) ?? "", filename: filename)
         } catch {
-            print("JSON encoding failed: \(error)")
+            Logger.shared.error("[LogExportManager] JSON encoding failed: \(error)")
             return nil
         }
     }
@@ -100,7 +101,7 @@ class LogExportManager {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            print("Failed to save file: \(error)")
+            Logger.shared.error("[LogExportManager] Failed to save file: \(error)")
             return nil
         }
     }

@@ -278,58 +278,65 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
 
 extension ANRMuscleSenseDevice: CBPeripheralDelegate {
     
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard error == nil else {
-            print("❌ ANR Service discovery error: \(error!.localizedDescription)")
+            Logger.shared.error(" ANR Service discovery error: \(error!.localizedDescription)")
             return
         }
-        
+
         guard let services = peripheral.services else { return }
-        
+
         for service in services {
             if service.uuid == Self.serviceUUID || service.uuid == Self.batteryServiceUUID {
                 peripheral.discoverCharacteristics(nil, for: service)
             }
         }
     }
-    
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard error == nil else {
-            print("❌ ANR Characteristic discovery error: \(error!.localizedDescription)")
+            Logger.shared.error(" ANR Characteristic discovery error: \(error!.localizedDescription)")
             return
         }
-        
+
         guard let characteristics = service.characteristics else { return }
-        
+
         for characteristic in characteristics {
-            self.characteristics[characteristic.uuid] = characteristic
-            
-            // Read initial battery value
-            if characteristic.uuid == Self.batteryCharacteristicUUID {
-                peripheral.readValue(for: characteristic)
+            // Need to dispatch to main actor for state updates
+            Task { @MainActor in
+                self.characteristics[characteristic.uuid] = characteristic
+
+                // Read initial battery value
+                if characteristic.uuid == Self.batteryCharacteristicUUID {
+                    peripheral.readValue(for: characteristic)
+                }
             }
         }
-        
-        deviceInfo.connectionState = .connected
+
+        Task { @MainActor in
+            self.deviceInfo.connectionState = .connected
+        }
     }
-    
-    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard error == nil else {
-            print("❌ ANR Value update error: \(error!.localizedDescription)")
+            Logger.shared.error(" ANR Value update error: \(error!.localizedDescription)")
             return
         }
-        
+
         guard let data = characteristic.value else { return }
-        
+
         // Parse data using the existing parseData method
-        let _ = parseData(data, from: characteristic)
+        Task { @MainActor in
+            let _ = self.parseData(data, from: characteristic)
+        }
     }
-    
-    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            print("❌ ANR Notification state error: \(error.localizedDescription)")
+            Logger.shared.error(" ANR Notification state error: \(error.localizedDescription)")
         } else {
-            print("✅ ANR Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid)")
+            Logger.shared.info(" ANR Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid)")
         }
     }
 }

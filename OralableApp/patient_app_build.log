@@ -1,0 +1,418 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project OralableApp.xcodeproj -scheme OralableApp -configuration Debug -destination "platform=iOS Simulator,name=iPhone 17 Pro" build
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  swift-collections: https://github.com/apple/swift-collections.git @ 1.3.0
+  swift-async-algorithms: https://github.com/apple/swift-async-algorithms.git @ 1.0.4
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (8 targets)
+    Target 'OralableApp' in project 'OralableApp'
+        ➜ Explicit dependency on target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+    Target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+        ➜ Explicit dependency on target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+    Target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+    Target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'InternalCollectionsUtilities' in project 'swift-collections' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Assets.xcassets
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ReadFileContents /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/share/docc/features.json
+
+Build description signature: ac66b36b0200faafaddddc796d2467fc
+Build description path: /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/XCBuildData/ac66b36b0200faafaddddc796d2467fc.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache
+
+ProcessProductPackaging /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Oralable.entitlements /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app-Simulated.xcent (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+    Entitlements:
+    
+    {
+    "application-identifier" = "THKF822TTP.com.oralable.mam";
+    "aps-environment" = production;
+    "com.apple.developer.applesignin" =     (
+        Default
+    );
+    "com.apple.developer.associated-domains" =     (
+        "applinks:oralable.com"
+    );
+    "com.apple.developer.icloud-container-environment" = Production;
+    "com.apple.developer.icloud-container-identifiers" =     (
+        "iCloud.com.jacdental.oralable.shared"
+    );
+    "com.apple.developer.icloud-services" =     (
+        CloudKit
+    );
+}
+    
+    builtin-productPackagingUtility /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Oralable.entitlements -entitlements -format xml -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app-Simulated.xcent
+
+ProcessProductPackaging /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Oralable.entitlements /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app.xcent (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+    Entitlements:
+    
+    {
+}
+    
+    builtin-productPackagingUtility /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Oralable.entitlements -entitlements -format xml -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app.xcent
+
+ProcessProductPackagingDER /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app.xcent /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app.xcent.der (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /usr/bin/derq query -f xml -i /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app.xcent -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app.xcent.der --raw
+
+ProcessProductPackagingDER /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app-Simulated.xcent /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app-Simulated.xcent.der (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /usr/bin/derq query -f xml -i /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app-Simulated.xcent -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp.app-Simulated.xcent.der --raw
+
+CompileAssetCatalogVariant thinned /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableApp.app /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Assets.xcassets (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /Applications/Xcode.app/Contents/Developer/usr/bin/actool /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Assets.xcassets --compile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/assetcatalog_output/thinned --output-format human-readable-text --notices --warnings --export-dependency-info /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/assetcatalog_dependencies_thinned --output-partial-info-plist /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/assetcatalog_generated_info.plist_thinned --app-icon AppIcon --accent-color AccentColor --compress-pngs --enable-on-demand-resources YES --filter-for-thinning-device-configuration iPhone18,1 --filter-for-device-os-version 26.1 --development-region en --target-device iphone --target-device ipad --minimum-deployment-target 18.5 --platform iphonesimulator
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SubscriptionManagerTests.swift:11:18: warning: file 'SubscriptionManagerTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DevicesViewModelTests.swift:20:18: warning: file 'DevicesViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SpO2CalculatorTests.swift:10:18: warning: file 'SpO2CalculatorTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SettingsViewModelTests.swift:11:18: warning: file 'SettingsViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HistoricalViewModelTests.swift:19:18: warning: file 'HistoricalViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/OralableAppTests.swift:9:18: warning: file 'OralableAppTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HeartRateCalculatorTests.swift:10:18: warning: file 'HeartRateCalculatorTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DashboardViewModelTests.swift:19:18: warning: file 'DashboardViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:196:21: error: expected 'func' keyword in instance method declaration
+                    Section {
+                    ^
+                    func 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:196:29: error: expected '(' in argument list of function declaration
+                    Section {
+                            ^
+                           ()
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:216:22: error: consecutive declarations on a line must be separated by ';'
+                    } header: {
+                     ^
+                     ;
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:216:23: error: expected declaration
+                    } header: {
+                      ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:11:8: note: in declaration of 'SettingsView'
+struct SettingsView: View {
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:222:17: error: expressions are not allowed at the top level
+                Section {
+                ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:245:17: error: expressions are not allowed at the top level
+                Section {
+                ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:262:17: error: expressions are not allowed at the top level
+                Section {
+                ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:282:17: error: expressions are not allowed at the top level
+                Section {
+                ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:295:21: error: expressions are not allowed at the top level
+                    Section {
+                    ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:309:17: error: extraneous '}' at top level
+                }
+                ^
+                
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:312:17: error: expressions are not allowed at the top level
+                Section {
+                ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:17: error: extraneous '}' at top level
+                } header: {
+                ^~
+                
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:18: error: consecutive statements on a line must be separated by ';'
+                } header: {
+                 ^
+                 ;
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:27: error: labeled block needs 'do'
+                } header: {
+                          ^
+                          do 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:19: error: statements are not allowed at the top level
+                } header: {
+                  ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:327:18: error: consecutive statements on a line must be separated by ';'
+                } footer: {
+                 ^
+                 ;
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:327:27: error: labeled block needs 'do'
+                } footer: {
+                          ^
+                          do 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:327:19: error: statements are not allowed at the top level
+                } footer: {
+                  ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:333:13: error: extraneous '}' at top level
+            }
+            ^
+            
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:334:13: error: expressions are not allowed at the top level
+            .navigationTitle("Settings")
+            ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:336:9: error: extraneous '}' at top level
+        }
+        ^
+        
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:337:9: error: expressions are not allowed at the top level
+        .alert("Clear All Data?", isPresented: $viewModel.showClearDataConfirmation) {
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:380:5: error: extraneous '}' at top level
+    }
+    ^
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:381:1: error: extraneous '}' at top level
+}
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SubscriptionManagerTests.swift:9:8: error: Unable to find module dependency: 'XCTest'
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SubscriptionManagerTests.swift:9:8: note: a dependency of main module 'OralableApp'
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DevicesViewModelTests.swift:17:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SpO2CalculatorTests.swift:9:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SettingsViewModelTests.swift:9:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HistoricalViewModelTests.swift:17:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HeartRateCalculatorTests.swift:9:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DashboardViewModelTests.swift:17:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableUITests/OralableAppUITests.swift:8:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableUITests/OralableAppUITestsLaunchTests.swift:8:8: note: also imported here
+import XCTest
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/OralableAppTests.swift:8:8: error: Unable to find module dependency: 'Testing'
+import Testing
+       ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/OralableAppTests.swift:8:8: note: a dependency of main module 'OralableApp'
+import Testing
+       ^
+
+SwiftDriver OralableApp normal arm64 com.apple.xcode.tools.swift.compiler (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name OralableApp -Onone -enforce-exclusivity\=checked @/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -target arm64-apple-ios18.5-simulator -g -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/OralableApp-bbqtqzgjthkkwbbxnapmqywzpgkr/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -emit-localized-strings -emit-localized-strings-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64 -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache -output-file-map /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp_const_extract_protocols.json -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-generated-files.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-own-target-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp-278a5c60fc3a80913799e1fb6e20741b-VFS-iphonesimulator/all-product-headers.yaml -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-project-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources-normal/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp-Swift.h -working-directory /Users/johnacogan67/Projects/oralable_ios/OralableApp -experimental-emit-module-separately -disable-cmo
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SubscriptionManagerTests.swift:11:18: warning: File 'SubscriptionManagerTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DevicesViewModelTests.swift:20:18: warning: File 'DevicesViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SpO2CalculatorTests.swift:10:18: warning: File 'SpO2CalculatorTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SettingsViewModelTests.swift:11:18: warning: File 'SettingsViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HistoricalViewModelTests.swift:19:18: warning: File 'HistoricalViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/OralableAppTests.swift:9:18: warning: File 'OralableAppTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HeartRateCalculatorTests.swift:10:18: warning: File 'HeartRateCalculatorTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DashboardViewModelTests.swift:19:18: warning: File 'DashboardViewModelTests.swift' is part of module 'OralableApp'; ignoring import
+@testable import OralableApp
+                 ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:196:21: error: Expected 'func' keyword in instance method declaration
+                    Section {
+                    ^
+                    func  (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:196:29: error: Expected '(' in argument list of function declaration
+                    Section {
+                            ^
+                           () (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:216:22: error: Consecutive declarations on a line must be separated by ';'
+                    } header: {
+                     ^
+                     ; (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:216:23: error: Expected declaration
+                    } header: {
+                      ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:11:8: note: In declaration of 'SettingsView'
+struct SettingsView: View {
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:222:17: error: Expressions are not allowed at the top level
+                Section {
+                ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:245:17: error: Expressions are not allowed at the top level
+                Section {
+                ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:262:17: error: Expressions are not allowed at the top level
+                Section {
+                ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:282:17: error: Expressions are not allowed at the top level
+                Section {
+                ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:295:21: error: Expressions are not allowed at the top level
+                    Section {
+                    ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:309:17: error: Extraneous '}' at top level
+                }
+                ^
+                 (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:312:17: error: Expressions are not allowed at the top level
+                Section {
+                ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:17: error: Extraneous '}' at top level
+                } header: {
+                ^~
+                 (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:18: error: Consecutive statements on a line must be separated by ';'
+                } header: {
+                 ^
+                 ; (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:27: error: Labeled block needs 'do'
+                } header: {
+                          ^
+                          do  (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:325:19: error: Statements are not allowed at the top level
+                } header: {
+                  ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:327:18: error: Consecutive statements on a line must be separated by ';'
+                } footer: {
+                 ^
+                 ; (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:327:27: error: Labeled block needs 'do'
+                } footer: {
+                          ^
+                          do  (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:327:19: error: Statements are not allowed at the top level
+                } footer: {
+                  ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:333:13: error: Extraneous '}' at top level
+            }
+            ^
+             (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:334:13: error: Expressions are not allowed at the top level
+            .navigationTitle("Settings")
+            ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:336:9: error: Extraneous '}' at top level
+        }
+        ^
+         (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:337:9: error: Expressions are not allowed at the top level
+        .alert("Clear All Data?", isPresented: $viewModel.showClearDataConfirmation) {
+        ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:380:5: error: Extraneous '}' at top level
+    }
+    ^
+     (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift:381:1: error: Extraneous '}' at top level
+}
+^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SubscriptionManagerTests.swift:9:8: error: Unable to find module dependency: 'XCTest'
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SubscriptionManagerTests.swift:9:8: note: A dependency of main module 'OralableApp'
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DevicesViewModelTests.swift:17:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SpO2CalculatorTests.swift:9:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/SettingsViewModelTests.swift:9:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HistoricalViewModelTests.swift:17:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/HeartRateCalculatorTests.swift:9:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/DashboardViewModelTests.swift:17:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableUITests/OralableAppUITests.swift:8:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableUITests/OralableAppUITestsLaunchTests.swift:8:8: note: Also imported here
+import XCTest
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/OralableAppTests.swift:8:8: error: Unable to find module dependency: 'Testing'
+import Testing
+       ^ (in target 'OralableApp' from project 'OralableApp')
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableTests/OralableAppTests.swift:8:8: note: A dependency of main module 'OralableApp'
+import Testing
+       ^ (in target 'OralableApp' from project 'OralableApp')
+
+** BUILD FAILED **
+
+
+The following build commands failed:
+	SwiftDriver OralableApp normal arm64 com.apple.xcode.tools.swift.compiler (in target 'OralableApp' from project 'OralableApp')
+	Building project OralableApp with scheme OralableApp and configuration Debug
+(2 failures)

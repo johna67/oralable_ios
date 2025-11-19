@@ -10,11 +10,12 @@ import SwiftUI
 
 struct DeviceTestView: View {
     @StateObject private var deviceManager = DeviceManager()
+    @EnvironmentObject var designSystem: DesignSystem
     @State private var autoStopTimer: Timer?
-    
+
     // For preview/testing purposes
     private let previewDeviceManager: DeviceManager?
-    
+
     init(previewDeviceManager: DeviceManager? = nil) {
         self.previewDeviceManager = previewDeviceManager
     }
@@ -31,17 +32,17 @@ struct DeviceTestView: View {
                     if currentDeviceManager.isScanning {
                         HStack {
                             ProgressView()
-                                .padding(.trailing, DesignSystem.Spacing.xs)
+                                .padding(.trailing, designSystem.spacing.xs)
                             Text("Scanning for devices...")
-                                .font(DesignSystem.Typography.bodyMedium)
-                                .foregroundColor(DesignSystem.Colors.textPrimary)
+                                .font(designSystem.typography.bodyMedium)
+                                .foregroundColor(designSystem.colors.textPrimary)
                         }
-                        
+
                         Button("Stop Scanning") {
                             currentDeviceManager.stopScanning()
                         }
-                        .font(DesignSystem.Typography.buttonMedium)
-                        .foregroundColor(DesignSystem.Colors.error)
+                        .font(designSystem.typography.buttonMedium)
+                        .foregroundColor(designSystem.colors.error)
                     } else {
                         Button {
                             Task {
@@ -58,20 +59,20 @@ struct DeviceTestView: View {
                                 Image(systemName: "antenna.radiowaves.left.and.right")
                                 Text("Start Scanning")
                             }
-                            .font(DesignSystem.Typography.buttonMedium)
+                            .font(designSystem.typography.buttonMedium)
                         }
                     }
                 } header: {
                     Text("Bluetooth Scanning")
-                        .font(DesignSystem.Typography.labelMedium)
+                        .font(designSystem.typography.labelMedium)
                 }
                 
                 // MARK: - Discovered Devices Section
                 Section {
                     if currentDeviceManager.discoveredDevices.isEmpty {
                         Text("No devices found")
-                            .font(DesignSystem.Typography.bodyMedium)
-                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                            .font(designSystem.typography.bodyMedium)
+                            .foregroundColor(designSystem.colors.textTertiary)
                             .italic()
                     } else {
                         ForEach(currentDeviceManager.discoveredDevices) { device in
@@ -81,11 +82,11 @@ struct DeviceTestView: View {
                 } header: {
                     HStack {
                         Text("Discovered Devices")
-                            .font(DesignSystem.Typography.labelMedium)
+                            .font(designSystem.typography.labelMedium)
                         Spacer()
                         Text("\(currentDeviceManager.discoveredDevices.count)")
-                            .font(DesignSystem.Typography.labelSmall)
-                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                            .font(designSystem.typography.labelSmall)
+                            .foregroundColor(designSystem.colors.textSecondary)
                     }
                 }
                 
@@ -98,11 +99,11 @@ struct DeviceTestView: View {
                     } header: {
                         HStack {
                             Text("Connected Devices")
-                                .font(DesignSystem.Typography.labelMedium)
+                                .font(designSystem.typography.labelMedium)
                             Spacer()
                             Text("\(currentDeviceManager.connectedDevices.count)")
-                                .font(DesignSystem.Typography.labelSmall)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                                .font(designSystem.typography.labelSmall)
+                                .foregroundColor(designSystem.colors.textSecondary)
                         }
                     }
                 }
@@ -118,11 +119,11 @@ struct DeviceTestView: View {
                     } header: {
                         HStack {
                             Text("Latest Sensor Readings")
-                                .font(DesignSystem.Typography.labelMedium)
+                                .font(designSystem.typography.labelMedium)
                             Spacer()
                             Text("\(currentDeviceManager.latestReadings.count)")
-                                .font(DesignSystem.Typography.labelSmall)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                                .font(designSystem.typography.labelSmall)
+                                .foregroundColor(designSystem.colors.textSecondary)
                         }
                     }
                 }
@@ -132,20 +133,20 @@ struct DeviceTestView: View {
                     Button("Clear All Data") {
                         currentDeviceManager.clearReadings()
                     }
-                    .font(DesignSystem.Typography.buttonMedium)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
-                    
+                    .font(designSystem.typography.buttonMedium)
+                    .foregroundColor(designSystem.colors.textSecondary)
+
                     Button("Disconnect All") {
                         Task {
                             await currentDeviceManager.disconnectAll()
                         }
                     }
-                    .font(DesignSystem.Typography.buttonMedium)
-                    .foregroundColor(DesignSystem.Colors.error)
+                    .font(designSystem.typography.buttonMedium)
+                    .foregroundColor(designSystem.colors.error)
                     .disabled(currentDeviceManager.connectedDevices.isEmpty)
                 } header: {
                     Text("Actions")
-                        .font(DesignSystem.Typography.labelMedium)
+                        .font(designSystem.typography.labelMedium)
                 }
             }
             .navigationTitle("Device Test")
@@ -163,50 +164,51 @@ struct DeviceTestView: View {
 struct DeviceRowView: View {
     let device: DeviceInfo
     @ObservedObject var deviceManager: DeviceManager
-    
+    @EnvironmentObject var designSystem: DesignSystem
+
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+        VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
             // Device Name and Icon
             HStack {
                 Image(systemName: device.type.icon)
                     .font(.system(size: DesignSystem.Sizing.Icon.lg))
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
+                    .foregroundColor(designSystem.colors.textPrimary)
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(device.name)
-                        .font(DesignSystem.Typography.bodyLarge)
-                        .foregroundColor(DesignSystem.Colors.textPrimary)
-                    
+                        .font(designSystem.typography.bodyLarge)
+                        .foregroundColor(designSystem.colors.textPrimary)
+
                     Text(device.type.displayName)
-                        .font(DesignSystem.Typography.caption)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
-                
+
                 Spacer()
-                
+
                 // Connection Status
                 if device.connectionState == .connected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(DesignSystem.Colors.success)
+                        .foregroundColor(designSystem.colors.success)
                         .font(.system(size: DesignSystem.Sizing.Icon.lg))
                 } else if device.connectionState == .connecting {
                     ProgressView()
                 }
             }
-            
+
             // Signal Strength
             if let rssi = device.signalStrength {
-                HStack(spacing: DesignSystem.Spacing.xs) {
+                HStack(spacing: designSystem.spacing.xs) {
                     Image(systemName: signalIcon(for: rssi))
                         .font(.system(size: DesignSystem.Sizing.Icon.sm))
                         .foregroundColor(signalColor(for: rssi))
-                    
+
                     Text("\(signalText(for: rssi)) (\(rssi) dBm)")
-                        .font(DesignSystem.Typography.captionSmall)
-                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                        .font(designSystem.typography.captionSmall)
+                        .foregroundColor(designSystem.colors.textTertiary)
                 }
             }
-            
+
             // Connection Button
             if device.connectionState != .connected && device.connectionState != .connecting {
                 Button {
@@ -214,7 +216,7 @@ struct DeviceRowView: View {
                         do {
                             try await deviceManager.connect(to: device)
                         } catch {
-                            print("❌ Connection failed: \(error.localizedDescription)")
+                            Logger.shared.error(" Connection failed: \(error.localizedDescription)")
                         }
                     }
                 } label: {
@@ -222,12 +224,12 @@ struct DeviceRowView: View {
                         Image(systemName: "link")
                         Text("Connect")
                     }
-                    .font(DesignSystem.Typography.buttonSmall)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                    .padding(.vertical, DesignSystem.Spacing.xs)
-                    .padding(.horizontal, DesignSystem.Spacing.sm)
-                    .background(DesignSystem.Colors.backgroundSecondary)
-                    .cornerRadius(DesignSystem.CornerRadius.md)
+                    .font(designSystem.typography.buttonSmall)
+                    .foregroundColor(designSystem.colors.textPrimary)
+                    .padding(.vertical, designSystem.spacing.xs)
+                    .padding(.horizontal, designSystem.spacing.sm)
+                    .background(designSystem.colors.backgroundSecondary)
+                    .cornerRadius(designSystem.cornerRadius.md)
                 }
                 .buttonStyle(.plain)
             } else if device.connectionState == .connected {
@@ -240,19 +242,19 @@ struct DeviceRowView: View {
                         Image(systemName: "link.slash")
                         Text("Disconnect")
                     }
-                    .font(DesignSystem.Typography.buttonSmall)
-                    .foregroundColor(DesignSystem.Colors.error)
-                    .padding(.vertical, DesignSystem.Spacing.xs)
-                    .padding(.horizontal, DesignSystem.Spacing.sm)
-                    .background(DesignSystem.Colors.backgroundSecondary)
-                    .cornerRadius(DesignSystem.CornerRadius.md)
+                    .font(designSystem.typography.buttonSmall)
+                    .foregroundColor(designSystem.colors.error)
+                    .padding(.vertical, designSystem.spacing.xs)
+                    .padding(.horizontal, designSystem.spacing.sm)
+                    .background(designSystem.colors.backgroundSecondary)
+                    .cornerRadius(designSystem.cornerRadius.md)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, DesignSystem.Spacing.xs)
+        .padding(.vertical, designSystem.spacing.xs)
     }
-    
+
     private func signalIcon(for rssi: Int) -> String {
         switch rssi {
         case -50...0: return "antenna.radiowaves.left.and.right"
@@ -261,13 +263,13 @@ struct DeviceRowView: View {
         default: return "wifi.slash"
         }
     }
-    
+
     private func signalColor(for rssi: Int) -> Color {
         switch rssi {
-        case -50...0: return DesignSystem.Colors.success
-        case -70 ..< -50: return DesignSystem.Colors.success
-        case -85 ..< -70: return DesignSystem.Colors.warning
-        default: return DesignSystem.Colors.error
+        case -50...0: return designSystem.colors.success
+        case -70 ..< -50: return designSystem.colors.success
+        case -85 ..< -70: return designSystem.colors.warning
+        default: return designSystem.colors.error
         }
     }
     
@@ -286,67 +288,68 @@ struct DeviceRowView: View {
 struct ConnectedDeviceRowView: View {
     let device: DeviceInfo
     @ObservedObject var deviceManager: DeviceManager
-    
+    @EnvironmentObject var designSystem: DesignSystem
+
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+        VStack(alignment: .leading, spacing: designSystem.spacing.xs) {
             // Device Name
             HStack {
                 Image(systemName: device.type.icon)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
+                    .foregroundColor(designSystem.colors.textPrimary)
+
                 Text(device.name)
-                    .font(DesignSystem.Typography.bodyLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
+                    .font(designSystem.typography.bodyLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
+
                 Spacer()
-                
+
                 if deviceManager.primaryDevice?.id == device.id {
                     Text("PRIMARY")
-                        .font(DesignSystem.Typography.captionSmall)
-                        .foregroundColor(DesignSystem.Colors.success)
-                        .padding(.horizontal, DesignSystem.Spacing.xs)
+                        .font(designSystem.typography.captionSmall)
+                        .foregroundColor(designSystem.colors.success)
+                        .padding(.horizontal, designSystem.spacing.xs)
                         .padding(.vertical, 2)
-                        .background(DesignSystem.Colors.success.opacity(0.1))
-                        .cornerRadius(DesignSystem.CornerRadius.sm)
+                        .background(designSystem.colors.success.opacity(0.1))
+                        .cornerRadius(designSystem.cornerRadius.sm)
                 }
             }
-            
+
             // Battery Level
             if let battery = device.batteryLevel {
-                HStack(spacing: DesignSystem.Spacing.xs) {
+                HStack(spacing: designSystem.spacing.xs) {
                     Image(systemName: batteryIcon(for: battery))
                         .foregroundColor(batteryColor(for: battery))
-                    
+
                     Text("\(battery)%")
-                        .font(DesignSystem.Typography.caption)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
             }
-            
+
             // Firmware Version
             if let firmware = device.firmwareVersion {
-                HStack(spacing: DesignSystem.Spacing.xs) {
+                HStack(spacing: designSystem.spacing.xs) {
                     Image(systemName: "info.circle")
-                        .foregroundColor(DesignSystem.Colors.textTertiary)
-                    
+                        .foregroundColor(designSystem.colors.textTertiary)
+
                     Text("Firmware: \(firmware)")
-                        .font(DesignSystem.Typography.caption)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
             }
-            
+
             // Set Primary Button
             if deviceManager.primaryDevice?.id != device.id {
                 Button("Set as Primary") {
                     deviceManager.setPrimaryDevice(device)
                 }
-                .font(DesignSystem.Typography.buttonSmall)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
+                .font(designSystem.typography.buttonSmall)
+                .foregroundColor(designSystem.colors.textSecondary)
             }
         }
-        .padding(.vertical, DesignSystem.Spacing.xs)
+        .padding(.vertical, designSystem.spacing.xs)
     }
-    
+
     private func batteryIcon(for level: Int) -> String {
         switch level {
         case 75...100: return "battery.100"
@@ -355,12 +358,12 @@ struct ConnectedDeviceRowView: View {
         default: return "battery.25"
         }
     }
-    
+
     private func batteryColor(for level: Int) -> Color {
         switch level {
-        case 50...100: return DesignSystem.Colors.success
-        case 20..<50: return DesignSystem.Colors.warning
-        default: return DesignSystem.Colors.error
+        case 50...100: return designSystem.colors.success
+        case 20..<50: return designSystem.colors.warning
+        default: return designSystem.colors.error
         }
     }
 }
@@ -369,43 +372,44 @@ struct ConnectedDeviceRowView: View {
 
 struct SensorReadingRowView: View {
     let reading: SensorReading
-    
+    @EnvironmentObject var designSystem: DesignSystem
+
     var body: some View {
         HStack {
             Image(systemName: reading.sensorType.iconName)
                 .font(.system(size: DesignSystem.Sizing.Icon.md))
-                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .foregroundColor(designSystem.colors.textPrimary)
                 .frame(width: 30)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(reading.sensorType.displayName)
-                    .font(DesignSystem.Typography.bodyMedium)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
+                    .font(designSystem.typography.bodyMedium)
+                    .foregroundColor(designSystem.colors.textPrimary)
+
                 Text(timeAgo(from: reading.timestamp))
-                    .font(DesignSystem.Typography.captionSmall)
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                    .font(designSystem.typography.captionSmall)
+                    .foregroundColor(designSystem.colors.textTertiary)
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing, spacing: 2) {
                 Text(reading.formattedValue)
-                    .font(DesignSystem.Typography.labelLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
+                    .font(designSystem.typography.labelLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
+
                 if reading.isValid {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: DesignSystem.Sizing.Icon.xs))
-                        .foregroundColor(DesignSystem.Colors.success)
+                        .foregroundColor(designSystem.colors.success)
                 } else {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: DesignSystem.Sizing.Icon.xs))
-                        .foregroundColor(DesignSystem.Colors.error)
+                        .foregroundColor(designSystem.colors.error)
                 }
             }
         }
-        .padding(.vertical, DesignSystem.Spacing.xxs)
+        .padding(.vertical, designSystem.spacing.xxs)
     }
     
     private func timeAgo(from date: Date) -> String {
@@ -426,6 +430,7 @@ struct SensorReadingRowView: View {
 
 #Preview {
     DeviceTestView()
+        .environmentObject(DesignSystem())
 }
 
 #Preview("With Mock Data") {
@@ -435,6 +440,7 @@ struct SensorReadingRowView: View {
         DeviceInfo.demo(type: .anr)
     ]
     mockDeviceManager.discoveredDevices = demoDevices
-    
+
     return DeviceTestView(previewDeviceManager: mockDeviceManager)
+        .environmentObject(DesignSystem()) as any View
 }

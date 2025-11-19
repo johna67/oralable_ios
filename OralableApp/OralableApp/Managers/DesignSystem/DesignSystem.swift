@@ -10,23 +10,20 @@ import SwiftUI
 // MARK: - Main Design System
 
 class DesignSystem: ObservableObject {
-    // Singleton instance
-    static let shared = DesignSystem()
-    
     // Published properties for SwiftUI updates (lowercase - correct)
     @Published var colors: ColorSystem
     @Published var typography: TypographySystem
     @Published var spacing: SpacingSystem
     @Published var cornerRadius: CornerRadiusSystem
-    
+
     // Uppercase aliases for backward compatibility (fixes your errors)
     var Colors: ColorSystem { colors }
     var Typography: TypographySystem { typography }
     var Spacing: SpacingSystem { spacing }
     var CornerRadius: CornerRadiusSystem { cornerRadius }
     var Sizing: SpacingSystem { spacing }  // Alias Sizing to spacing
-    
-    private init() {
+
+    init() {
         self.colors = ColorSystem()
         self.typography = TypographySystem()
         self.spacing = SpacingSystem()
@@ -34,23 +31,13 @@ class DesignSystem: ObservableObject {
     }
 }
 
-// MARK: - Static Accessors
+// MARK: - Static Accessors (Stateless Systems Only)
 extension DesignSystem {
-    // Static accessors so views can use DesignSystem.Spacing directly without .shared
-    static var Spacing: SpacingSystem { shared.spacing }
-    static var Colors: ColorSystem { shared.colors }
-    static var Typography: TypographySystem { shared.typography }
-    static var CornerRadius: CornerRadiusSystem { shared.cornerRadius }
-    static var Sizing: SizingSystem { SizingSystem() }  // Returns new instance
-    static var Layout: LayoutSystem { LayoutSystem() }  // Added
-    static var Shadow: ShadowSystem { ShadowSystem() }  // Added
-    static var Animation: AnimationSystem { AnimationSystem() }  // Added
-    
-    // Lowercase versions for consistency
-    static var spacing: SpacingSystem { shared.spacing }
-    static var colors: ColorSystem { shared.colors }
-    static var typography: TypographySystem { shared.typography }
-    static var cornerRadius: CornerRadiusSystem { shared.cornerRadius }
+    // Static accessors for stateless systems only
+    static var Sizing: SizingSystem { SizingSystem() }
+    static var Layout: LayoutSystem { LayoutSystem() }
+    static var Shadow: ShadowSystem { ShadowSystem() }
+    static var Animation: AnimationSystem { AnimationSystem() }
     static var sizing: SizingSystem { SizingSystem() }
 }
 
@@ -302,32 +289,32 @@ extension CGFloat {
 
 extension View {
     // Card Styling
-    func cardStyle() -> some View {
+    func cardStyle(designSystem: DesignSystem) -> some View {
         self
-            .background(DesignSystem.colors.backgroundPrimary)
+            .background(designSystem.colors.backgroundPrimary)
             .cornerRadius(DesignSystem.sizing.card)
-            .shadow(color: DesignSystem.colors.shadow, radius: 4, x: 0, y: 2)
+            .shadow(color: designSystem.colors.shadow, radius: 4, x: 0, y: 2)
     }
-    
+
     // Button Styling
-    func primaryButtonStyle() -> some View {
+    func primaryButtonStyle(designSystem: DesignSystem) -> some View {
         self
             .foregroundColor(.white)
-            .font(DesignSystem.typography.headline)
+            .font(designSystem.typography.headline)
             .frame(height: 44)
             .frame(maxWidth: .infinity)
-            .background(DesignSystem.colors.primaryBlack)
-            .cornerRadius(DesignSystem.cornerRadius.button)
+            .background(designSystem.colors.primaryBlack)
+            .cornerRadius(designSystem.cornerRadius.button)
     }
-    
-    func secondaryButtonStyle() -> some View {
+
+    func secondaryButtonStyle(designSystem: DesignSystem) -> some View {
         self
-            .foregroundColor(DesignSystem.colors.primaryBlack)
-            .font(DesignSystem.typography.headline)
+            .foregroundColor(designSystem.colors.primaryBlack)
+            .font(designSystem.typography.headline)
             .frame(height: 44)
             .frame(maxWidth: .infinity)
-            .background(DesignSystem.colors.backgroundSecondary)
-            .cornerRadius(DesignSystem.cornerRadius.button)
+            .background(designSystem.colors.backgroundSecondary)
+            .cornerRadius(designSystem.cornerRadius.button)
     }
     
     // Design Shadow modifier with ShadowLevel enum

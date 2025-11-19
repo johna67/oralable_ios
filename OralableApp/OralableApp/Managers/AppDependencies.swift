@@ -24,6 +24,10 @@ class AppDependencies: ObservableObject {
     let healthKitManager: HealthKitManager
     let historicalDataManager: HistoricalDataManager
     let designSystem: DesignSystem
+    let csvExportManager: CSVExportManager
+    let csvImportManager: CSVImportManager
+    let ppgNormalizationService: PPGNormalizationService
+    let logsManager: LogsManager
 
     // MARK: - Data Provider
 
@@ -35,31 +39,47 @@ class AppDependencies: ObservableObject {
     init(appMode: AppMode = .subscription) {
         Logger.shared.info("[AppDependencies] Initializing dependency container for mode: \(appMode)")
 
-        // Initialize managers in correct order
-        self.appStateManager = AppStateManager.shared // Keep for now (transition)
-        self.designSystem = DesignSystem.shared // Keep for now (transition)
+        // Initialize managers in correct order (dependency injection - no more singletons!)
+        self.appStateManager = AppStateManager()
+        self.designSystem = DesignSystem()
 
         // Core BLE infrastructure
         // Note: With lazy CBCentralManager initialization, this won't trigger Bluetooth permission
         self.deviceManager = DeviceManager()
 
         // Authentication & Subscription
-        self.authenticationManager = AuthenticationManager.shared // Keep for now
-        self.subscriptionManager = SubscriptionManager.shared // Keep for now
-        self.sharedDataManager = SharedDataManager.shared
-
-        // Patient app is always in subscription mode
-        self.appStateManager.selectedMode = .subscription
+        self.authenticationManager = AuthenticationManager()
+        self.subscriptionManager = SubscriptionManager()
 
         // Health integration - create new instance
         self.healthKitManager = HealthKitManager()
 
-        // BLE Manager (wraps DeviceManager - to be refactored)
+        // BLE Manager (wraps DeviceManager)
         // Note: BLE permission won't be requested until scan/connect is actually called
-        self.bleManager = OralableBLE.shared // Keep for now
+        self.bleManager = OralableBLE()
+
+        // Shared data manager (depends on authentication, healthKit, and bleManager)
+        self.sharedDataManager = SharedDataManager(
+            authenticationManager: self.authenticationManager,
+            healthKitManager: self.healthKitManager,
+            bleManager: self.bleManager
+        )
+
+        // Patient app is always in subscription mode
+        self.appStateManager.selectedMode = .subscription
 
         // Historical data (depends on bleManager)
         self.historicalDataManager = HistoricalDataManager(bleManager: self.bleManager)
+
+        // CSV managers
+        self.csvExportManager = CSVExportManager()
+        self.csvImportManager = CSVImportManager()
+
+        // PPG normalization service
+        self.ppgNormalizationService = PPGNormalizationService()
+
+        // Logs manager
+        self.logsManager = LogsManager()
 
         // Data provider based on app mode
         // Note: Mock data provider removed - only real BLE data supported
@@ -96,7 +116,10 @@ class AppDependencies: ObservableObject {
 
     /// Creates an AuthenticationViewModel with injected dependencies
     func makeAuthenticationViewModel() -> AuthenticationViewModel {
-        return AuthenticationViewModel()
+        return AuthenticationViewModel(
+            authenticationManager: authenticationManager,
+            subscriptionManager: subscriptionManager
+        )
     }
 }
 
@@ -106,13 +129,13 @@ class AppDependencies: ObservableObject {
 extension AppDependencies {
     /// Creates a mock dependencies container for testing and previews
     static func mock() -> AppDependencies {
-        let deps = AppDependencies(appMode: .viewer)
+        let deps = AppDependencies(appMode: .subscription)
         return deps
     }
 
     /// Creates dependencies with a specific data provider for testing
     convenience init(dataProvider: SensorDataProvider) {
-        self.init(appMode: .viewer)
+        self.init(appMode: .subscription)
         // Override with provided data provider
         // Note: This is a temporary workaround - will be improved when we fully remove singletons
     }
@@ -155,5 +178,9 @@ extension View {
             .environmentObject(dependencies.healthKitManager)
             .environmentObject(dependencies.historicalDataManager)
             .environmentObject(dependencies.designSystem)
+            .environmentObject(dependencies.csvExportManager)
+            .environmentObject(dependencies.csvImportManager)
+            .environmentObject(dependencies.ppgNormalizationService)
+            .environmentObject(dependencies.logsManager)
     }
 }

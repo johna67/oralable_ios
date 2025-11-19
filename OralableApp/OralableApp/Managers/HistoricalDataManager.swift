@@ -6,9 +6,6 @@ import UIKit
 /// Manager for caching and updating historical metrics
 /// This prevents recalculating aggregations on every view update
 class HistoricalDataManager: ObservableObject {
-    static let shared = HistoricalDataManager(bleManager: OralableBLE.shared)
-
-    
     // MARK: - Published Properties
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?

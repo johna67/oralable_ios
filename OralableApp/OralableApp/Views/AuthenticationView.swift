@@ -13,15 +13,22 @@ struct AuthenticationView: View {
     // MVVM: Use ViewModel instead of direct manager access
     @StateObject private var viewModel: AuthenticationViewModel
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @State private var showingProfileDetails = false
     @State private var showingSignOutConfirmation = false
+    @State private var showingHealthKitPermission = false
 
     init(viewModel: AuthenticationViewModel? = nil) {
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
-            // Legacy path - create with default initializer
-            _viewModel = StateObject(wrappedValue: AuthenticationViewModel())
+            // Legacy path - create with new manager instances
+            let authManager = AuthenticationManager()
+            let subsManager = SubscriptionManager()
+            _viewModel = StateObject(wrappedValue: AuthenticationViewModel(
+                authenticationManager: authManager,
+                subscriptionManager: subsManager
+            ))
         }
     }
     
@@ -83,6 +90,18 @@ struct AuthenticationView: View {
         }
         .sheet(isPresented: $showingProfileDetails) {
             ProfileDetailView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingHealthKitPermission) {
+            HealthKitPermissionView()
+        }
+        .onChange(of: viewModel.isAuthenticated) { oldValue, newValue in
+            // Show HealthKit permission after successful sign in
+            if !oldValue && newValue {
+                // Check if HealthKit hasn't been authorized yet
+                if !healthKitManager.isAuthorized {
+                    showingHealthKitPermission = true
+                }
+            }
         }
     }
     
@@ -509,6 +528,6 @@ struct CircularProgressView<Content: View>: View {
 struct AuthenticationView_Previews: PreviewProvider {
     static var previews: some View {
         AuthenticationView()
-            .environmentObject(DesignSystem.shared)
+            .environmentObject(DesignSystem())
     }
 }

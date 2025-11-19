@@ -1,10 +1,10 @@
 import Foundation
 
 /// Manager for importing sensor data and logs from CSV format
-class CSVImportManager {
+class CSVImportManager: ObservableObject {
     static let shared = CSVImportManager()
-    
-    private init() {}
+
+    init() {}
     
     /// Import sensor data and logs from CSV file
     /// - Parameter url: URL of the CSV file to import
@@ -14,7 +14,7 @@ class CSVImportManager {
             let csvContent = try String(contentsOf: url, encoding: .utf8)
             return parseCSVContent(csvContent)
         } catch {
-            print("Failed to read CSV file: \(error)")
+            Logger.shared.error("[CSVImportManager] Failed to read CSV file: \(error)")
             return nil
         }
     }
@@ -22,9 +22,9 @@ class CSVImportManager {
     /// Parse CSV content and extract sensor data and logs
     private func parseCSVContent(_ csvContent: String) -> (sensorData: [SensorData], logs: [String])? {
         let lines = csvContent.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        
+
         guard !lines.isEmpty else {
-            print("CSV file is empty")
+            Logger.shared.warning("[CSVImportManager] CSV file is empty")
             return nil
         }
         
@@ -39,15 +39,15 @@ class CSVImportManager {
         
         for line in dataLines {
             let fields = parseCSVLine(line)
-            
+
             guard fields.count >= 14 else {
-                print("Invalid CSV line format: \(line)")
+                Logger.shared.warning("[CSVImportManager] Invalid CSV line format: \(line)")
                 continue
             }
-            
+
             // Parse timestamp
             guard let timestamp = dateFormatter.date(from: fields[0]) else {
-                print("Invalid timestamp format: \(fields[0])")
+                Logger.shared.warning("[CSVImportManager] Invalid timestamp format: \(fields[0])")
                 continue
             }
             
@@ -123,27 +123,27 @@ class CSVImportManager {
         guard let ppgIR = Int32(fields[1]),
               let ppgRed = Int32(fields[2]),
               let ppgGreen = Int32(fields[3]) else {
-            print("Invalid PPG data")
+            Logger.shared.warning("[CSVImportManager] Invalid PPG data")
             return nil
         }
-        
+
         // Parse accelerometer data (convert to Int16)
         guard let accelX = Int16(fields[4]),
               let accelY = Int16(fields[5]),
               let accelZ = Int16(fields[6]) else {
-            print("Invalid accelerometer data")
+            Logger.shared.warning("[CSVImportManager] Invalid accelerometer data")
             return nil
         }
-        
+
         // Parse temperature
         guard let tempCelsius = Double(fields[7]) else {
-            print("Invalid temperature data")
+            Logger.shared.warning("[CSVImportManager] Invalid temperature data")
             return nil
         }
-        
+
         // Parse battery
         guard let batteryPercentage = Int(fields[8]) else {
-            print("Invalid battery data")
+            Logger.shared.warning("[CSVImportManager] Invalid battery data")
             return nil
         }
         
@@ -281,7 +281,7 @@ extension CSVImportManager {
             try csvContent.write(to: templateURL, atomically: true, encoding: .utf8)
             return templateURL
         } catch {
-            print("Failed to generate template: \(error)")
+            Logger.shared.error("[CSVImportManager] Failed to generate template: \(error)")
             return nil
         }
     }

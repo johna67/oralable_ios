@@ -85,8 +85,6 @@ class SubscriptionManager: ObservableObject {
 
     // MARK: - Constants
 
-    static let shared = SubscriptionManager()
-
     // Product IDs for Patient App
     private enum ProductIdentifier {
         static let monthlySubscription = "com.jacdental.oralable.premium.monthly"
@@ -104,7 +102,7 @@ class SubscriptionManager: ObservableObject {
 
     // MARK: - Initialization
 
-    private init() {
+    init() {
         loadSubscriptionStatus()
         updateListenerTask = listenForTransactions()
 
@@ -229,7 +227,7 @@ class SubscriptionManager: ObservableObject {
                     break
                 }
             } catch {
-                print("Transaction verification failed: \(error)")
+                Logger.shared.error("[SubscriptionManager] Transaction verification failed: \(error)")
             }
         }
 
@@ -255,7 +253,9 @@ class SubscriptionManager: ObservableObject {
                     await self.updateSubscriptionStatus()
                     await transaction.finish()
                 } catch {
-                    print("Transaction update failed: \(error)")
+                    Task { @MainActor in
+                        Logger.shared.error("[SubscriptionManager] Transaction update failed: \(error)")
+                    }
                 }
             }
         }

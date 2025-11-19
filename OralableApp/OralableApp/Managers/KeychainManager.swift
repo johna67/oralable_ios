@@ -34,7 +34,7 @@ class KeychainManager {
     @discardableResult
     func save(_ value: String, forKey key: KeychainKey) -> Bool {
         guard let data = value.data(using: .utf8) else {
-            print("❌ [KeychainManager] Failed to convert string to data")
+            Logger.shared.error("[KeychainManager] Failed to convert string to data")
             return false
         }
 
@@ -52,10 +52,10 @@ class KeychainManager {
         let status = SecItemAdd(query as CFDictionary, nil)
 
         if status == errSecSuccess {
-            print("✅ [KeychainManager] Successfully saved value for key: \(key.rawValue)")
+            Logger.shared.info("[KeychainManager] Successfully saved value for key: \(key.rawValue)")
             return true
         } else {
-            print("❌ [KeychainManager] Failed to save value for key: \(key.rawValue), status: \(status)")
+            Logger.shared.error("[KeychainManager] Failed to save value for key: \(key.rawValue), status: \(status)")
             return false
         }
     }
@@ -78,7 +78,7 @@ class KeychainManager {
               let data = result as? Data,
               let string = String(data: data, encoding: .utf8) else {
             if status != errSecItemNotFound {
-                print("⚠️ [KeychainManager] Failed to retrieve value for key: \(key.rawValue), status: \(status)")
+                Logger.shared.warning("[KeychainManager] Failed to retrieve value for key: \(key.rawValue), status: \(status)")
             }
             return nil
         }
@@ -102,7 +102,7 @@ class KeychainManager {
         if status == errSecSuccess || status == errSecItemNotFound {
             return true
         } else {
-            print("❌ [KeychainManager] Failed to delete value for key: \(key.rawValue), status: \(status)")
+            Logger.shared.error("[KeychainManager] Failed to delete value for key: \(key.rawValue), status: \(status)")
             return false
         }
     }
@@ -112,7 +112,7 @@ class KeychainManager {
         delete(forKey: .userID)
         delete(forKey: .userEmail)
         delete(forKey: .userFullName)
-        print("🗑️ [KeychainManager] All authentication data deleted")
+        Logger.shared.info("[KeychainManager] All authentication data deleted")
     }
 
     // MARK: - Authentication-Specific Methods
@@ -129,7 +129,7 @@ class KeychainManager {
             save(fullName, forKey: .userFullName)
         }
 
-        print("✅ [KeychainManager] User authentication data saved securely")
+        Logger.shared.info("[KeychainManager] User authentication data saved securely")
     }
 
     /// Retrieve user authentication data
@@ -154,26 +154,26 @@ class KeychainManager {
             save(userID, forKey: .userID)
             userDefaults.removeObject(forKey: "userID")
             migrated = true
-            print("🔄 [KeychainManager] Migrated userID from UserDefaults")
+            Logger.shared.info("[KeychainManager] Migrated userID from UserDefaults")
         }
 
         if let email = userDefaults.string(forKey: "userEmail") {
             save(email, forKey: .userEmail)
             userDefaults.removeObject(forKey: "userEmail")
             migrated = true
-            print("🔄 [KeychainManager] Migrated userEmail from UserDefaults")
+            Logger.shared.info("[KeychainManager] Migrated userEmail from UserDefaults")
         }
 
         if let fullName = userDefaults.string(forKey: "userFullName") {
             save(fullName, forKey: .userFullName)
             userDefaults.removeObject(forKey: "userFullName")
             migrated = true
-            print("🔄 [KeychainManager] Migrated userFullName from UserDefaults")
+            Logger.shared.info("[KeychainManager] Migrated userFullName from UserDefaults")
         }
 
         if migrated {
             userDefaults.synchronize()
-            print("✅ [KeychainManager] Migration from UserDefaults completed")
+            Logger.shared.info("[KeychainManager] Migration from UserDefaults completed")
         }
     }
 }

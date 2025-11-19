@@ -411,23 +411,23 @@ enum HealthKitError: LocalizedError {
 import SwiftUI
 
 struct HealthKitManagerPreview: View {
-    
+    @EnvironmentObject var designSystem: DesignSystem
     @StateObject private var healthKitManager = HealthKitManager()
-    
-    var body: some View {
+
+    var body: some View{
         NavigationView {
             List {
                 Section("HealthKit Status") {
                     StatusRow(
                         label: "Available",
                         value: healthKitManager.isAvailable ? "Yes" : "No",
-                        color: healthKitManager.isAvailable ? DesignSystem.Colors.success : DesignSystem.Colors.error
+                        color: healthKitManager.isAvailable ? designSystem.colors.success : designSystem.colors.error
                     )
                     
                     StatusRow(
                         label: "Authorization",
                         value: healthKitManager.authorizationStatus.displayName,
-                        color: healthKitManager.isAuthorized ? DesignSystem.Colors.success : DesignSystem.Colors.warning
+                        color: healthKitManager.isAuthorized ? designSystem.colors.success : designSystem.colors.warning
                     )
                 }
                 
@@ -437,16 +437,16 @@ struct HealthKitManagerPreview: View {
                             try? await healthKitManager.requestAuthorization()
                         }
                     }
-                    .font(DesignSystem.Typography.bodyLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .font(designSystem.typography.bodyLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
                     
                     Button("Read Latest Weight") {
                         Task {
                             try? await healthKitManager.readLatestWeight()
                         }
                     }
-                    .font(DesignSystem.Typography.bodyLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .font(designSystem.typography.bodyLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
                     .disabled(!healthKitManager.isAuthorized)
                     
                     Button("Read Heart Rate (24h)") {
@@ -455,8 +455,8 @@ struct HealthKitManagerPreview: View {
                             try? await healthKitManager.readHeartRateSamples(from: yesterday, to: Date())
                         }
                     }
-                    .font(DesignSystem.Typography.bodyLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .font(designSystem.typography.bodyLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
                     .disabled(!healthKitManager.isAuthorized)
                     
                     Button("Write Test Heart Rate") {
@@ -464,8 +464,8 @@ struct HealthKitManagerPreview: View {
                             try? await healthKitManager.writeHeartRate(bpm: 72)
                         }
                     }
-                    .font(DesignSystem.Typography.bodyLarge)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .font(designSystem.typography.bodyLarge)
+                    .foregroundColor(designSystem.colors.textPrimary)
                     .disabled(!healthKitManager.isAuthorized)
                 }
                 
@@ -473,16 +473,16 @@ struct HealthKitManagerPreview: View {
                     Section("Latest Weight") {
                         HStack {
                             Image(systemName: "scalemass")
-                                .foregroundColor(DesignSystem.Colors.textPrimary)
+                                .foregroundColor(designSystem.colors.textPrimary)
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(weight.formattedValue)
-                                    .font(DesignSystem.Typography.h3)
-                                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                                    .font(designSystem.typography.h3)
+                                    .foregroundColor(designSystem.colors.textPrimary)
                                 
                                 Text(weight.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                    .font(DesignSystem.Typography.caption)
-                                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                                    .font(designSystem.typography.caption)
+                                    .foregroundColor(designSystem.colors.textTertiary)
                             }
                         }
                     }
@@ -493,13 +493,13 @@ struct HealthKitManagerPreview: View {
                         ForEach(healthKitManager.recentHeartRates.prefix(5)) { reading in
                             HStack {
                                 Text(reading.formattedValue)
-                                    .font(DesignSystem.Typography.bodyMedium)
+                                    .font(designSystem.typography.bodyMedium)
                                 
                                 Spacer()
                                 
                                 Text(reading.timestamp.formatted(date: .omitted, time: .shortened))
-                                    .font(DesignSystem.Typography.caption)
-                                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                                    .font(designSystem.typography.caption)
+                                    .foregroundColor(designSystem.colors.textTertiary)
                             }
                         }
                     }
@@ -508,31 +508,32 @@ struct HealthKitManagerPreview: View {
                 if let error = healthKitManager.error {
                     Section("Error") {
                         Text(error.localizedDescription)
-                            .font(DesignSystem.Typography.bodySmall)
-                            .foregroundColor(DesignSystem.Colors.error)
+                            .font(designSystem.typography.bodySmall)
+                            .foregroundColor(designSystem.colors.error)
                     }
                 }
             }
             .navigationTitle("HealthKit Manager")
-            .background(DesignSystem.Colors.backgroundPrimary)
+            .background(designSystem.colors.backgroundPrimary)
         }
     }
 }
 
 struct StatusRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let label: String
     let value: String
     let color: Color
-    
+
     var body: some View {
         HStack {
             Text(label)
-                .font(DesignSystem.Typography.bodyMedium)
+                .font(designSystem.typography.bodyMedium)
             
             Spacer()
             
             Text(value)
-                .font(DesignSystem.Typography.labelMedium)
+                .font(designSystem.typography.labelMedium)
                 .foregroundColor(color)
         }
     }
@@ -541,6 +542,7 @@ struct StatusRow: View {
 struct HealthKitManager_Previews: PreviewProvider {
     static var previews: some View {
         HealthKitManagerPreview()
+            .environmentObject(DesignSystem())
     }
 }
 

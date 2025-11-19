@@ -3,7 +3,7 @@ import AuthenticationServices
 
 struct AppleIDDebugView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var authManager = AuthenticationManager.shared
+    @StateObject private var authManager = AuthenticationManager()
     @State private var credentialStateText: String = "Unknown"
     @State private var showingAlert = false
     @State private var alertMessage = ""

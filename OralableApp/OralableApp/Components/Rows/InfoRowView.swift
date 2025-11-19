@@ -18,16 +18,17 @@ import SwiftUI
 
 /// Information Row Component
 struct InfoRowView: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let icon: String
     let title: String
     let value: String
-    let iconColor: Color
-    
+    let iconColor: Color?
+
     init(
         icon: String,
         title: String,
         value: String,
-        iconColor: Color = DesignSystem.Colors.textPrimary
+        iconColor: Color? = nil
     ) {
         self.icon = icon
         self.title = title
@@ -36,26 +37,26 @@ struct InfoRowView: View {
     }
     
     var body: some View {
-        HStack(spacing: DesignSystem.Spacing.md) {
+        HStack(spacing: designSystem.spacing.md) {
             // Icon
             Image(systemName: icon)
                 .font(.system(size: DesignSystem.Sizing.Icon.md))
-                .foregroundColor(iconColor)
+                .foregroundColor(iconColor ?? designSystem.colors.textPrimary)
                 .frame(width: 28)
             
             // Title
             Text(title)
-                .font(DesignSystem.Typography.bodyMedium)
-                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .font(designSystem.typography.bodyMedium)
+                .foregroundColor(designSystem.colors.textPrimary)
             
             Spacer()
             
             // Value
             Text(value)
-                .font(DesignSystem.Typography.labelMedium)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
+                .font(designSystem.typography.labelMedium)
+                .foregroundColor(designSystem.colors.textSecondary)
         }
-        .padding(.vertical, DesignSystem.Spacing.xs)
+        .padding(.vertical, designSystem.spacing.xs)
     }
 }
 
@@ -65,35 +66,37 @@ struct InfoRowView: View {
 
 struct InfoRowView_Previews: PreviewProvider {
     static var previews: some View {
-        VStack(spacing: DesignSystem.Spacing.sm) {
+        let designSystem = DesignSystem()
+        VStack(spacing: designSystem.spacing.sm) {
             InfoRowView(
                 icon: "person.fill",
                 title: "Name",
                 value: "John Doe"
             )
-            
+
             InfoRowView(
                 icon: "envelope.fill",
                 title: "Email",
                 value: "john@example.com",
-                iconColor: DesignSystem.Colors.info
+                iconColor: designSystem.colors.info
             )
-            
+
             InfoRowView(
                 icon: "calendar",
                 title: "Member Since",
                 value: "Jan 2025"
             )
-            
+
             InfoRowView(
                 icon: "heart.fill",
                 title: "Heart Rate",
                 value: "72 bpm",
-                iconColor: DesignSystem.Colors.error
+                iconColor: designSystem.colors.error
             )
         }
         .padding()
-        .background(DesignSystem.Colors.backgroundPrimary)
+        .background(designSystem.colors.backgroundPrimary)
+        .environmentObject(designSystem)
     }
 }
 

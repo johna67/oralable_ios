@@ -18,12 +18,16 @@ struct DevicesView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
 
-    init(viewModel: DevicesViewModel? = nil) {
+    init(viewModel: DevicesViewModel? = nil, bleManager: OralableBLE? = nil) {
         if let viewModel = viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
+        } else if let bleManager = bleManager {
+            // Create with provided bleManager
+            _viewModel = StateObject(wrappedValue: DevicesViewModel(bleManager: bleManager))
         } else {
-            // Legacy path - create with default initializer
-            _viewModel = StateObject(wrappedValue: DevicesViewModel())
+            // Default path - requires environment object
+            let bleManager = OralableBLE()
+            _viewModel = StateObject(wrappedValue: DevicesViewModel(bleManager: bleManager))
         }
     }
 
@@ -520,25 +524,25 @@ struct DevicesView: View {
         // Debounce: Prevent rapid repeated calls (within 500ms)
         let now = Date()
         guard now.timeIntervalSince(lastActionTime) > 0.5 else {
-            print("[DevicesView] Ignoring rapid button press (debounced)")
+            Logger.shared.debug("[DevicesView] Ignoring rapid button press (debounced)")
             return
         }
         lastActionTime = now
         
         if bleManager.isConnected {
-            print("[DevicesView] Action: Disconnect")
+            Logger.shared.debug("[DevicesView] Action: Disconnect")
             bleManager.disconnect()
         } else if isScanning {
-            print("[DevicesView] Action: Stop scanning")
+            Logger.shared.debug("[DevicesView] Action: Stop scanning")
             stopScanning()
         } else {
-            print("[DevicesView] Action: Start scanning")
+            Logger.shared.debug("[DevicesView] Action: Start scanning")
             startScanning()
         }
     }
     
     private func startScanning() {
-        print("[DevicesView] Starting scan...")
+        Logger.shared.debug("[DevicesView] Starting scan...")
         isScanning = true
         bleManager.startScanning()
         
@@ -547,7 +551,7 @@ struct DevicesView: View {
             // Check both local and bleManager state to be safe
             if self.isScanning || self.bleManager.isScanning {
                 if !self.bleManager.isConnected {
-                    print("[DevicesView] Auto-stopping scan after 10 seconds")
+                    Logger.shared.debug("[DevicesView] Auto-stopping scan after 10 seconds")
                     self.stopScanning()
                 }
             }
@@ -555,21 +559,21 @@ struct DevicesView: View {
     }
     
     private func stopScanning() {
-        print("[DevicesView] Stopping scan...")
+        Logger.shared.debug("[DevicesView] Stopping scan...")
         isScanning = false
         bleManager.stopScanning()
         
         // Report findings
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if !self.isScanning && !self.bleManager.isScanning {
-                print("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s) (\(self.filteredDevices.count) compatible)")
+                Logger.shared.debug("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s) (\(self.filteredDevices.count) compatible)")
             }
         }
     }
     
     // Connect to discovered device
     private func connectToDevice(peripheral: CBPeripheral) {
-        print("[DevicesView] Connecting to device: \(peripheral.name ?? "Unknown")")
+        Logger.shared.debug("[DevicesView] Connecting to device: \(peripheral.name ?? "Unknown")")
         stopScanning()
         
         // Use BLE manager to connect to the actual peripheral
@@ -590,17 +594,17 @@ struct DevicesView: View {
     
     private func renameDevice() {
         // Placeholder for device renaming
-        print("Renaming device...")
+        Logger.shared.info("[DevicesView] Renaming device...")
     }
     
     private func updateFirmware() {
         // Placeholder for firmware update
-        print("Checking for firmware updates...")
+        Logger.shared.info("[DevicesView] Checking for firmware updates...")
     }
     
     private func calibrateDevice() {
         // Placeholder for calibration
-        print("Starting calibration...")
+        Logger.shared.info("[DevicesView] Starting calibration...")
     }
     
     private func formatConnectionTime() -> String {
@@ -645,6 +649,7 @@ struct DeviceInfoRow: View {
 struct DevicesView_Previews: PreviewProvider {
     static var previews: some View {
         DevicesView()
-            .environmentObject(DesignSystem.shared)
+            .environmentObject(DesignSystem())
+            .environmentObject(OralableBLE())
     }
 }

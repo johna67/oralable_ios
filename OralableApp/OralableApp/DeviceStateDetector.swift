@@ -379,11 +379,11 @@ class DeviceStateDetector: ObservableObject {
         }
         
         // DEBUG: Log motion detection values
-        print("🔍 Motion Detection Debug:")
-        print("   Average Movement: \(metrics.averageMovement) (threshold: \(Thresholds.activeMovementMin))")
-        print("   Movement Variability: \(metrics.movementVariability) (threshold: \(Thresholds.movementVariabilityThreshold))")
-        print("   Is Actively Moving: \(metrics.isActivelyMoving)")
-        print("   Is Stationary: \(metrics.isStationary)")
+        Logger.shared.debug(" Motion Detection Debug:")
+        Logger.shared.debug("   Average Movement: \(metrics.averageMovement) (threshold: \(Thresholds.activeMovementMin))")
+        Logger.shared.debug("   Movement Variability: \(metrics.movementVariability) (threshold: \(Thresholds.movementVariabilityThreshold))")
+        Logger.shared.debug("   Is Actively Moving: \(metrics.isActivelyMoving)")
+        Logger.shared.debug("   Is Stationary: \(metrics.isStationary)")
         
         // Rule 3: In Motion (High movement AND high movement variability)
         // BOTH average movement AND variability must be elevated for motion detection
@@ -399,7 +399,7 @@ class DeviceStateDetector: ObservableObject {
                 "reason": "Active movement and high variability detected"
             ]
             
-            print("🚨 Motion detected: BOTH conditions met")
+            Logger.shared.warning("🚨 Motion detected: BOTH conditions met")
             
             return DeviceStateResult(
                 state: .inMotion,
@@ -421,7 +421,7 @@ class DeviceStateDetector: ObservableObject {
                 "reason": "Very high movement variability detected (device being handled)"
             ]
             
-            print("🚨 Motion detected: Variability ALONE exceeded 3x threshold")
+            Logger.shared.warning("🚨 Motion detected: Variability ALONE exceeded 3x threshold")
             
             return DeviceStateResult(
                 state: .inMotion,

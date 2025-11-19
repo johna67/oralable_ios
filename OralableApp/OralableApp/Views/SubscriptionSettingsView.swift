@@ -12,8 +12,8 @@ import AuthenticationServices
 struct SubscriptionSettingsView: View {
     @ObservedObject var ble: OralableBLE
     @Binding var selectedMode: AppMode?
-    @StateObject private var authManager = AuthenticationManager.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var authManager = AuthenticationManager()
+    @StateObject private var subscriptionManager = SubscriptionManager()
     @State private var showSignOutAlert = false
     @State private var showLogs = false
     @State private var showSubscriptionInfo = false
@@ -62,7 +62,7 @@ struct SubscriptionSettingsView: View {
                         HStack {
                             Text(subscriptionManager.currentTier.displayName)
                                 .font(.headline)
-                            if subscriptionManager.currentTier == .paid {
+                            if subscriptionManager.currentTier == .premium {
                                 Image(systemName: "star.fill")
                                     .foregroundColor(.orange)
                                     .font(.caption)
@@ -276,7 +276,7 @@ struct SubscriptionSettingsView: View {
 
 struct SubscriptionInfoView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager()
     @State private var isUpgrading = false
     @State private var showSuccessAlert = false
     
@@ -284,60 +284,9 @@ struct SubscriptionInfoView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Image(systemName: "star.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.orange)
-                        
-                        Text("Choose Your Plan")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        Text("Unlock premium features and get the most out of your device")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .padding(.top)
-                    
-                    // Subscription Tiers
-                    VStack(spacing: 16) {
-                        // Basic Tier
-                        SubscriptionTierCard(
-                            tier: .basic,
-                            isCurrentTier: subscriptionManager.currentTier == .basic,
-                            action: {
-                                // Already on basic, no action needed
-                            }
-                        )
-                        
-                        // Premium Tier
-                        SubscriptionTierCard(
-                            tier: .paid,
-                            isCurrentTier: subscriptionManager.currentTier == .paid,
-                            action: {
-                                upgradeToPremium()
-                            }
-                        )
-                    }
-                    .padding(.horizontal)
-                    
-                    // Footer
-                    VStack(spacing: 12) {
-                        Text("All plans include:")
-                            .font(.headline)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            FeatureBullet(text: "Secure data encryption")
-                            FeatureBullet(text: "Regular firmware updates")
-                            FeatureBullet(text: "Customer support")
-                        }
-                        .padding(.horizontal, 32)
-                    }
-                    .padding(.top)
-                    
+                    headerSection
+                    subscriptionTiersSection
+                    footerSection
                     Spacer()
                 }
                 .padding()
@@ -361,19 +310,86 @@ struct SubscriptionInfoView: View {
             .disabled(isUpgrading)
             .overlay {
                 if isUpgrading {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    loadingOverlay
                 }
             }
         }
     }
+
+    // MARK: - View Sections
+
+    @ViewBuilder
+    private var headerSection: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "star.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.orange)
+
+            Text("Choose Your Plan")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+
+            Text("Unlock premium features and get the most out of your device")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .padding(.top)
+    }
+
+    @ViewBuilder
+    private var subscriptionTiersSection: some View {
+        VStack(spacing: 16) {
+            // Basic Tier
+            SubscriptionTierCard(
+                tier: .basic,
+                isCurrentTier: subscriptionManager.currentTier == .basic,
+                action: {
+                    // Already on basic, no action needed
+                }
+            )
+
+            // Premium Tier
+            SubscriptionTierCard(
+                tier: .premium,
+                isCurrentTier: subscriptionManager.currentTier == .premium,
+                action: {
+                    upgradeToPremium()
+                }
+            )
+        }
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private var footerSection: some View {
+        VStack(spacing: 12) {
+            Text("All plans include:")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 8) {
+                FeatureBullet(text: "Secure data encryption")
+                FeatureBullet(text: "Regular firmware updates")
+                FeatureBullet(text: "Customer support")
+            }
+            .padding(.horizontal, 32)
+        }
+        .padding(.top)
+    }
+
+    @ViewBuilder
+    private var loadingOverlay: some View {
+        Color.black.opacity(0.3)
+            .ignoresSafeArea()
+
+        ProgressView()
+            .scaleEffect(1.5)
+            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+    }
     
     private func upgradeToPremium() {
-        guard subscriptionManager.currentTier != .paid else { return }
+        guard subscriptionManager.currentTier != .premium else { return }
 
         isUpgrading = true
 
@@ -397,7 +413,7 @@ struct SubscriptionInfoView: View {
                 showSuccessAlert = true
             } catch {
                 isUpgrading = false
-                print("Purchase failed: \(error)")
+                Logger.shared.error("[SubscriptionSettingsView] Purchase failed: \(error)")
             }
         }
         #endif
@@ -419,7 +435,7 @@ struct SubscriptionTierCard: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    if tier == .paid {
+                    if tier == .premium {
                         Text("$9.99/month")
                             .font(.headline)
                             .foregroundColor(.secondary)
@@ -428,7 +444,7 @@ struct SubscriptionTierCard: View {
                 
                 Spacer()
                 
-                if tier == .paid {
+                if tier == .premium {
                     Image(systemName: "star.fill")
                         .foregroundColor(.orange)
                         .font(.title2)
@@ -464,7 +480,7 @@ struct SubscriptionTierCard: View {
                 .padding(.vertical, 12)
                 .background(Color.green.opacity(0.1))
                 .cornerRadius(8)
-            } else if tier == .paid {
+            } else if tier == .premium {
                 Button(action: action) {
                     HStack {
                         Spacer()

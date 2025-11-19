@@ -219,6 +219,6 @@ struct SubscriptionGate_Previews: PreviewProvider {
             feature: .unlimitedExport,
             showUpgradeSheet: .constant(false)
         )
-        .environmentObject(DesignSystem.shared)
+        .environmentObject(DesignSystem())
     }
 }

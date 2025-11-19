@@ -37,13 +37,16 @@ class AuthenticationViewModel: ObservableObject {
     @Published var isAuthenticating: Bool = false
     
     // MARK: - Private Properties
-    
-    private let authenticationManager = AuthenticationManager.shared
+
+    private let authenticationManager: AuthenticationManager
+    private let subscriptionManager: SubscriptionManager
     private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Initialization
-    
-    init() {
+
+    init(authenticationManager: AuthenticationManager, subscriptionManager: SubscriptionManager) {
+        self.authenticationManager = authenticationManager
+        self.subscriptionManager = subscriptionManager
         setupBindings()
     }
     
@@ -158,17 +161,17 @@ class AuthenticationViewModel: ObservableObject {
     
     /// Subscription status
     var subscriptionStatus: String {
-        return SubscriptionManager.shared.isPaidSubscriber ? "Active" : "Free"
+        return subscriptionManager.isPaidSubscriber ? "Active" : "Free"
     }
 
     /// Subscription plan name
     var subscriptionPlan: String {
-        return SubscriptionManager.shared.currentTier.displayName
+        return subscriptionManager.currentTier.displayName
     }
 
     /// Subscription expiry text
     var subscriptionExpiryText: String {
-        if SubscriptionManager.shared.isPaidSubscriber {
+        if subscriptionManager.isPaidSubscriber {
             // In a real implementation, this would come from StoreKit
             return "Renews automatically"
         }
@@ -177,7 +180,7 @@ class AuthenticationViewModel: ObservableObject {
 
     /// Whether user has active subscription
     var hasSubscription: Bool {
-        return SubscriptionManager.shared.isPaidSubscriber
+        return subscriptionManager.isPaidSubscriber
     }
     
     // MARK: - Public Methods
@@ -227,22 +230,22 @@ class AuthenticationViewModel: ObservableObject {
     #if DEBUG
     /// Debug authentication state
     func debugAuthState() {
-        print("=== Authentication Debug ===")
-        print("Is Authenticated: \(isAuthenticated)")
-        print("User ID: \(userID ?? "nil")")
-        print("User Email: \(userEmail ?? "nil")")
-        print("User Full Name: \(userFullName ?? "nil")")
-        print("Has Complete Profile: \(hasCompleteProfile)")
-        print("Profile Completion: \(profileCompletionPercentage)%")
-        print("Subscription Status: \(subscriptionStatus)")
-        print("===========================")
+        Logger.shared.debug("=== Authentication Debug ===")
+        Logger.shared.debug("Is Authenticated: \(isAuthenticated)")
+        Logger.shared.debug("User ID: \(userID ?? "nil")")
+        Logger.shared.debug("User Email: \(userEmail ?? "nil")")
+        Logger.shared.debug("User Full Name: \(userFullName ?? "nil")")
+        Logger.shared.debug("Has Complete Profile: \(hasCompleteProfile)")
+        Logger.shared.debug("Profile Completion: \(profileCompletionPercentage)%")
+        Logger.shared.debug("Subscription Status: \(subscriptionStatus)")
+        Logger.shared.debug("===========================")
     }
     
     /// Reset Apple ID authentication (debug only)
     func resetAppleIDAuth() {
         // This would reset stored Apple ID credentials
         authenticationManager.resetAppleIDAuth()
-        print("Apple ID authentication has been reset")
+        Logger.shared.info("[AuthenticationViewModel] Apple ID authentication has been reset")
     }
     #endif
 }

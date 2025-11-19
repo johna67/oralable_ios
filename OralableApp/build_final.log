@@ -1,0 +1,549 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -scheme OralableApp -destination "platform=iOS Simulator,name=iPhone 17" build
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  swift-collections: https://github.com/apple/swift-collections.git @ 1.3.0
+  swift-async-algorithms: https://github.com/apple/swift-async-algorithms.git @ 1.0.4
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (8 targets)
+    Target 'OralableApp' in project 'OralableApp'
+        ➜ Explicit dependency on target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+    Target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+        ➜ Explicit dependency on target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+    Target 'AsyncAlgorithms' in project 'swift-async-algorithms'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+    Target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'InternalCollectionsUtilities' in project 'swift-collections' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Assets.xcassets
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ReadFileContents /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/share/docc/features.json
+
+Build description signature: 41b4ea9c25c0d3198dc4f61298224160
+Build description path: /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/XCBuildData/41b4ea9c25c0d3198dc4f61298224160.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache
+
+CompileAssetCatalogVariant thinned /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/OralableApp.app /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Assets.xcassets (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    /Applications/Xcode.app/Contents/Developer/usr/bin/actool /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Assets.xcassets --compile /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/assetcatalog_output/thinned --output-format human-readable-text --notices --warnings --export-dependency-info /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/assetcatalog_dependencies_thinned --output-partial-info-plist /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/assetcatalog_generated_info.plist_thinned --app-icon AppIcon --accent-color AccentColor --compress-pngs --enable-on-demand-resources YES --filter-for-thinning-device-configuration iPhone18,3 --filter-for-device-os-version 26.1 --development-region en --target-device iphone --target-device ipad --minimum-deployment-target 18.5 --platform iphonesimulator
+
+SwiftDriver OralableApp normal arm64 com.apple.xcode.tools.swift.compiler (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name OralableApp -Onone -enforce-exclusivity\=checked @/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -target arm64-apple-ios18.5-simulator -g -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/OralableApp-bbqtqzgjthkkwbbxnapmqywzpgkr/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -emit-localized-strings -emit-localized-strings-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64 -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache -output-file-map /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp_const_extract_protocols.json -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-generated-files.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-own-target-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp-278a5c60fc3a80913799e1fb6e20741b-VFS-iphonesimulator/all-product-headers.yaml -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-project-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources-normal/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp-Swift.h -working-directory /Users/johnacogan67/Projects/oralable_ios/OralableApp -experimental-emit-module-separately -disable-cmo
+
+SwiftCompile normal arm64 Compiling\ UserAvatarView.swift,\ ProfileButtonView.swift,\ FeatureRow.swift,\ InfoRowView.swift,\ SettingsRowView.swift,\ ActionCardView.swift,\ SectionHeaderView.swift,\ SubscriptionGate.swift,\ ANRMuscleSenseDevice.swift,\ OralableDevice.swift,\ BioMetricCalculator.swift,\ BLEDataPublisher.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Avatar/UserAvatarView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/ActionCardView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/SectionHeaderView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/SubscriptionGate.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/OralableDevice.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BioMetricCalculator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BLEDataPublisher.swift (in target 'OralableApp' from project 'OralableApp')
+Failed frontend command:
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Avatar/UserAvatarView.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/ActionCardView.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/SectionHeaderView.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/SubscriptionGate.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/OralableDevice.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BioMetricCalculator.swift -primary-file /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BLEDataPublisher.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/HealthKitIntegration.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/SensorDataProcessor.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/DesignSystem/DesignSystem.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AppDependencies.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AppStateManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AuthenticationManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLECentralManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/CSVImportManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/DeviceManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/HealthKitManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/HistoricalDataManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/KeychainManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/LogExportManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/Logger.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/OralableBLE.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/SharedDataManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/SpO2Calculator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/SubscriptionManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/CSVServiceProtocols.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/DeviceInfo.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/DeviceType.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/LoggingService.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/SensorRepository.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Sensors/SensorReading.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Sensors/SensorType.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/DeviceError.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HealthData.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HeartRateCalculator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HistoricalDataModels.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/LogMessage.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/LogModels.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/PPGChannelOrder.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/RecordingSession.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/SensorModels.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Protocols/BLEDeviceProtocol.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/CircularBuffer.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/MockDataGenerator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/MockDataProvider.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/AuthenticationViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/DashboardViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/DevicesViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/HistoricalViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/SettingsViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/ShareViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalAppMode.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalChartView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalDataProcessor.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalDateNavigation.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalMetricType.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalStatisticsCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalTimeRangePicker.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalTooltip.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareClearDataButton.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareDataSummaryCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareDeviceInfoCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareExportButton.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareRecentLogsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareWithDentistSection.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/HealthKitIntegrationCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/AppleIDDebugView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/AuthenticationView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/BLESensorRepository.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/CSVExportManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DashboardView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DevicesView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DeviceTestView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HealthKitPermissionView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HistoricalDetailView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HistoricalView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/LogsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/MainTabView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/OnboardingView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/ProfileView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SettingsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/ShareView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SubscriptionSettingsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/SubscriptionTierSelectionView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/DeviceStateDetector.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Oralable.swift /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources/GeneratedAssetSymbols.swift -supplementary-output-file-map /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/supplementaryOutputs-1 -emit-localized-strings -emit-localized-strings-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64 -target arm64-apple-ios18.5-simulator -module-can-import-version DeveloperToolsSupport 23.0.4 23.0.4 -module-can-import-version SwiftUI 7.1.13.1 7.1.13 -module-can-import-version UIKit 9126.1.12.1 9126.1.12 -disable-cross-import-overlay-search -swift-module-cross-import AuthenticationServices /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Modules/AuthenticationServices.swiftcrossimport/SwiftUI.swiftoverlay -swift-module-cross-import AuthenticationServices /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk/System/Library/Frameworks/AuthenticationServices.framework/Modules/AuthenticationServices.swiftcrossimport/SwiftUI.swiftoverlay -swift-module-cross-import StoreKit /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/StoreKit.framework/Modules/StoreKit.swiftcrossimport/SwiftUI.swiftoverlay -swift-module-cross-import StoreKit /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk/System/Library/Frameworks/StoreKit.framework/Modules/StoreKit.swiftcrossimport/SwiftUI.swiftoverlay -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#FoundationMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libObservationMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#ObservationMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libPreviewsMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#PreviewsMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftMacros -load-resolved-plugin /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib\#/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftUIMacros -disable-implicit-swift-modules -Xcc -fno-implicit-modules -Xcc -fno-implicit-module-maps -explicit-swift-module-map-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp-dependencies-1.json -Xllvm -aarch64-use-tbi -enable-objc-interop -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.1.sdk -I /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator -no-color-diagnostics -Xcc -fno-color-diagnostics -enable-testing -g -debug-info-format\=dwarf -dwarf-version\=5 -module-cache-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -profile-generate -profile-coverage-mapping -swift-version 5 -enforce-exclusivity\=checked -Onone -D DEBUG -serialize-debugging-options -const-gather-protocols-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableApp_const_extract_protocols.json -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -empty-abi-descriptor -validate-clang-modules-once -clang-build-session-file /Users/johnacogan67/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/johnacogan67/Projects/oralable_ios/OralableApp -enable-anonymous-context-mangled-names -file-compilation-dir /Users/johnacogan67/Projects/oralable_ios/OralableApp -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -Xcc -ivfsstatcache -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.1-23B77-3885c01c3e6b6a337905948deab2002e90cf18a4295e390e64c810bc6bd7acbc.sdkstatcache -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/swift-overrides.hmap -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-generated-files.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-own-target-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp-278a5c60fc3a80913799e1fb6e20741b-VFS-iphonesimulator/all-product-headers.yaml -Xcc -iquote -Xcc /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/OralableApp-project-headers.hmap -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources-normal/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources/arm64 -Xcc -I/Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/DerivedSources -Xcc -DDEBUG\=1 -no-auto-bridging-header-chaining -module-name OralableApp -frontend-parseable-output -disable-clang-spi -target-sdk-version 26.1 -target-sdk-name iphonesimulator26.1 -clang-target arm64-apple-ios26.1-simulator -in-process-plugin-server-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/UserAvatarView.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/ProfileButtonView.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/FeatureRow.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/InfoRowView.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/SettingsRowView.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/ActionCardView.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/SectionHeaderView.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/SubscriptionGate.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/ANRMuscleSenseDevice.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableDevice.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/BioMetricCalculator.o -o /Users/johnacogan67/Library/Developer/Xcode/DerivedData/Build/Intermediates.noindex/OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/BLEDataPublisher.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/UserAvatarView.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/ProfileButtonView.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/FeatureRow.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/InfoRowView.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/SettingsRowView.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/ActionCardView.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/SectionHeaderView.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/SubscriptionGate.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/ANRMuscleSenseDevice.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/OralableDevice.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/BioMetricCalculator.o -index-unit-output-path /OralableApp.build/Debug-iphonesimulator/OralableApp.build/Objects-normal/arm64/BLEDataPublisher.o -index-store-path /Users/johnacogan67/Library/Developer/Xcode/DerivedData/OralableApp-bbqtqzgjthkkwbbxnapmqywzpgkr/Index.noindex/DataStore -index-system-modules
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Avatar/UserAvatarView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift:56:41: error: static member 'sizing' cannot be used on instance of type 'DesignSystem'
+                    .font(.system(size: designSystem.sizing.Icon.sm, weight: .semibold))
+                                        ^~~~~~~~~~~~
+                                        DesignSystem
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift:61:48: error: instance member 'CornerRadius' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                                               ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift:86:25: error: cannot find 'designSystem' in scope
+        VStack(spacing: designSystem.spacing.lg) {
+                        ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift:93:21: error: cannot find 'designSystem' in scope
+        .background(designSystem.colors.backgroundPrimary)
+                    ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift:88:52: error: type 'AuthenticationManager' has no member 'shared'
+                authManager: AuthenticationManager.shared,
+                             ~~~~~~~~~~~~~~~~~~~~~ ^~~~~~
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:26:42: error: instance member 'Spacing' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+        HStack(alignment: .top, spacing: DesignSystem.Spacing.md) {
+                                         ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:30:34: error: instance member 'Colors' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+                                 ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:34:50: error: instance member 'Spacing' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xxs) {
+                                                 ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:36:27: error: instance member 'Typography' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+                    .font(DesignSystem.Typography.bodyLarge)
+                          ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:37:38: error: instance member 'Colors' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                                     ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:40:27: error: instance member 'Typography' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+                    .font(DesignSystem.Typography.bodySmall)
+                          ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:41:38: error: instance member 'Colors' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                                     ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:47:29: error: instance member 'Spacing' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+        .padding(.vertical, DesignSystem.Spacing.sm)
+                            ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:57:25: error: instance member 'Spacing' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+        VStack(spacing: DesignSystem.Spacing.md) {
+                        ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift:83:21: error: instance member 'Colors' cannot be used on type 'DesignSystem'; did you mean to use a value of this type instead?
+        .background(DesignSystem.Colors.backgroundPrimary)
+                    ^~~~~~~~~~~~
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift:43:37: error: static member 'sizing' cannot be used on instance of type 'DesignSystem'
+                .font(.system(size: designSystem.sizing.icon.md))
+                                    ^~~~~~~~~~~~
+                                    DesignSystem
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift:43:57: error: value of type 'SizingSystem' has no member 'icon'
+                .font(.system(size: designSystem.sizing.icon.md))
+                                    ~~~~~~~~~~~~~~~~~~~ ^~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift:69:25: error: cannot find 'designSystem' in scope
+        VStack(spacing: designSystem.spacing.sm) {
+                        ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift:80:28: error: cannot find 'designSystem' in scope
+                iconColor: designSystem.colors.info
+                           ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift:93:28: error: cannot find 'designSystem' in scope
+                iconColor: designSystem.colors.error
+                           ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift:97:21: error: cannot find 'designSystem' in scope
+        .background(designSystem.colors.backgroundPrimary)
+                    ^~~~~~~~~~~~
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift:50:41: error: static member 'sizing' cannot be used on instance of type 'DesignSystem'
+                    .font(.system(size: designSystem.sizing.icon.md))
+                                        ^~~~~~~~~~~~
+                                        DesignSystem
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift:50:61: error: value of type 'SizingSystem' has no member 'icon'
+                    .font(.system(size: designSystem.sizing.icon.md))
+                                        ~~~~~~~~~~~~~~~~~~~ ^~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift:88:25: error: cannot find 'designSystem' in scope
+        VStack(spacing: designSystem.spacing.xs) {
+                        ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift:99:28: error: cannot find 'designSystem' in scope
+                iconColor: designSystem.colors.warning,
+                           ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift:113:28: error: cannot find 'designSystem' in scope
+                iconColor: designSystem.colors.info,
+                           ^~~~~~~~~~~~
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift:119:21: error: cannot find 'designSystem' in scope
+        .background(designSystem.colors.backgroundPrimary)
+                    ^~~~~~~~~~~~
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/ActionCardView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/SectionHeaderView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/SubscriptionGate.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:23:39: warning: conformance of 'ANRMuscleSenseDevice' to protocol 'BLEDeviceProtocol' crosses into main actor-isolated code and can cause data races; this is an error in the Swift 6 language mode
+class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
+                                      ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:23:39: note: isolate this conformance to the main actor with '@MainActor'
+class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
+                                      ^
+                                      @MainActor 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:23:7: note: mark all declarations used in the conformance 'nonisolated'
+class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
+      ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:23:39: note: turn data races into runtime errors with '@preconcurrency'
+class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
+                                      ^
+                                      @preconcurrency 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:34:9: note: main actor-isolated property 'deviceInfo' cannot satisfy nonisolated requirement
+    var deviceInfo: DeviceInfo
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:35:9: note: main actor-isolated property 'deviceType' cannot satisfy nonisolated requirement
+    var deviceType: DeviceType { .anr }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:36:9: note: main actor-isolated property 'name' cannot satisfy nonisolated requirement
+    var name: String { deviceInfo.name }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:37:9: note: main actor-isolated property 'peripheral' cannot satisfy nonisolated requirement
+    var peripheral: CBPeripheral?
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:38:9: note: main actor-isolated property 'connectionState' cannot satisfy nonisolated requirement
+    var connectionState: DeviceConnectionState { deviceInfo.connectionState }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:39:9: note: main actor-isolated property 'isConnected' cannot satisfy nonisolated requirement
+    var isConnected: Bool { connectionState == .connected }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:40:9: note: main actor-isolated property 'signalStrength' cannot satisfy nonisolated requirement
+    var signalStrength: Int? { deviceInfo.signalStrength }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:41:9: note: main actor-isolated property 'batteryLevel' cannot satisfy nonisolated requirement
+    var batteryLevel: Int? { deviceInfo.batteryLevel }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:42:9: note: main actor-isolated property 'firmwareVersion' cannot satisfy nonisolated requirement
+    var firmwareVersion: String? { deviceInfo.firmwareVersion }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:43:9: note: main actor-isolated property 'hardwareVersion' cannot satisfy nonisolated requirement
+    var hardwareVersion: String? { deviceInfo.hardwareVersion }
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:46:9: note: main actor-isolated property 'sensorReadings' cannot satisfy nonisolated requirement
+    var sensorReadings: AnyPublisher<SensorReading, Never> {
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:50:9: note: main actor-isolated property 'latestReadings' cannot satisfy nonisolated requirement
+    var latestReadings: [SensorType: SensorReading] = [:]
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:52:9: note: main actor-isolated property 'supportedSensors' cannot satisfy nonisolated requirement
+    var supportedSensors: [SensorType] {
+        ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:94:10: note: main actor-isolated instance method 'isAvailable()' cannot satisfy nonisolated requirement
+    func isAvailable() -> Bool {
+         ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:137:10: note: main actor-isolated instance method 'parseData(_:from:)' cannot satisfy nonisolated requirement
+    func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
+         ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:279:33: warning: conformance of 'ANRMuscleSenseDevice' to protocol 'CBPeripheralDelegate' crosses into main actor-isolated code and can cause data races; this is an error in the Swift 6 language mode
+extension ANRMuscleSenseDevice: CBPeripheralDelegate {
+                                ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:279:33: note: isolate this conformance to the main actor with '@MainActor'
+extension ANRMuscleSenseDevice: CBPeripheralDelegate {
+                                ^
+                                @MainActor 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:279:1: note: mark all declarations used in the conformance 'nonisolated'
+extension ANRMuscleSenseDevice: CBPeripheralDelegate {
+^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:279:33: note: turn data races into runtime errors with '@preconcurrency'
+extension ANRMuscleSenseDevice: CBPeripheralDelegate {
+                                ^
+                                @preconcurrency 
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:281:10: note: main actor-isolated instance method 'peripheral(_:didDiscoverServices:)' cannot satisfy nonisolated requirement
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+         ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:296:10: note: main actor-isolated instance method 'peripheral(_:didDiscoverCharacteristicsFor:error:)' cannot satisfy nonisolated requirement
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+         ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:316:10: note: main actor-isolated instance method 'peripheral(_:didUpdateValueFor:error:)' cannot satisfy nonisolated requirement
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+         ^
+/Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift:328:10: note: main actor-isolated instance method 'peripheral(_:didUpdateNotificationStateFor:error:)' cannot satisfy nonisolated requirement
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+         ^
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/OralableDevice.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BioMetricCalculator.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BLEDataPublisher.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ OralableApp (in target 'OralableApp' from project 'OralableApp')
+EmitSwiftModule normal arm64 (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ HistoricalDateNavigation.swift,\ HistoricalMetricType.swift,\ HistoricalStatisticsCard.swift,\ HistoricalTimeRangePicker.swift,\ HistoricalTooltip.swift,\ ShareClearDataButton.swift,\ ShareDataSummaryCard.swift,\ ShareDeviceInfoCard.swift,\ ShareExportButton.swift,\ ShareRecentLogsView.swift,\ ShareWithDentistSection.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalDateNavigation.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalMetricType.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalStatisticsCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalTimeRangePicker.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalTooltip.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareClearDataButton.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareDataSummaryCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareDeviceInfoCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareExportButton.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareRecentLogsView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareWithDentistSection.swift (in target 'OralableApp' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalDateNavigation.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalMetricType.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalStatisticsCard.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalTimeRangePicker.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalTooltip.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareClearDataButton.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareDataSummaryCard.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareDeviceInfoCard.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareExportButton.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareRecentLogsView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Share/ShareWithDentistSection.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ HealthKitIntegrationCard.swift,\ AppleIDDebugView.swift,\ AuthenticationView.swift,\ BLESensorRepository.swift,\ CSVExportManager.swift,\ DashboardView.swift,\ DevicesView.swift,\ DeviceTestView.swift,\ HealthKitPermissionView.swift,\ HistoricalDetailView.swift,\ HistoricalView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/HealthKitIntegrationCard.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/AppleIDDebugView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/AuthenticationView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/BLESensorRepository.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/CSVExportManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DashboardView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DevicesView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DeviceTestView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HealthKitPermissionView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HistoricalDetailView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HistoricalView.swift (in target 'OralableApp' from project 'OralableApp')
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/HealthKitIntegrationCard.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/AppleIDDebugView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/AuthenticationView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/BLESensorRepository.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/CSVExportManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DashboardView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DevicesView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/DeviceTestView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HealthKitPermissionView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HistoricalDetailView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/HistoricalView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ HealthKitIntegration.swift,\ SensorDataProcessor.swift,\ DesignSystem.swift,\ AppDependencies.swift,\ AppStateManager.swift,\ AuthenticationManager.swift,\ BLECentralManager.swift,\ CSVImportManager.swift,\ DeviceManager.swift,\ HealthKitManager.swift,\ HistoricalDataManager.swift,\ KeychainManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/HealthKitIntegration.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/SensorDataProcessor.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/DesignSystem/DesignSystem.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AppDependencies.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AppStateManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AuthenticationManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLECentralManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/CSVImportManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/DeviceManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/HealthKitManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/HistoricalDataManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/KeychainManager.swift (in target 'OralableApp' from project 'OralableApp')
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/HealthKitIntegration.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/SensorDataProcessor.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/DesignSystem/DesignSystem.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AppDependencies.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AppStateManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/AuthenticationManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLECentralManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/CSVImportManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/DeviceManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/HealthKitManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/HistoricalDataManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/KeychainManager.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ MockDataGenerator.swift,\ MockDataProvider.swift,\ AuthenticationViewModel.swift,\ DashboardViewModel.swift,\ DevicesViewModel.swift,\ HistoricalViewModel.swift,\ SettingsViewModel.swift,\ ShareViewModel.swift,\ HistoricalAppMode.swift,\ HistoricalChartView.swift,\ HistoricalDataProcessor.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/MockDataGenerator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/MockDataProvider.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/AuthenticationViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/DashboardViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/DevicesViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/HistoricalViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/SettingsViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/ShareViewModel.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalAppMode.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalChartView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalDataProcessor.swift (in target 'OralableApp' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/MockDataGenerator.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/MockDataProvider.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/AuthenticationViewModel.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/DashboardViewModel.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/DevicesViewModel.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/HistoricalViewModel.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/SettingsViewModel.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/ViewModels/ShareViewModel.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalAppMode.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalChartView.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Views/Components/Historical/HistoricalDataProcessor.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ SensorType.swift,\ DeviceError.swift,\ HealthData.swift,\ HeartRateCalculator.swift,\ HistoricalDataModels.swift,\ LogMessage.swift,\ LogModels.swift,\ PPGChannelOrder.swift,\ RecordingSession.swift,\ SensorModels.swift,\ BLEDeviceProtocol.swift,\ CircularBuffer.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Sensors/SensorType.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/DeviceError.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HealthData.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HeartRateCalculator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HistoricalDataModels.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/LogMessage.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/LogModels.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/PPGChannelOrder.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/RecordingSession.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/SensorModels.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Protocols/BLEDeviceProtocol.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/CircularBuffer.swift (in target 'OralableApp' from project 'OralableApp')
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Sensors/SensorType.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/DeviceError.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HealthData.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HeartRateCalculator.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/HistoricalDataModels.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/LogMessage.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/LogModels.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/PPGChannelOrder.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/RecordingSession.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/SensorModels.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Protocols/BLEDeviceProtocol.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Utilities/CircularBuffer.swift (in target 'OralableApp' from project 'OralableApp')
+    cd /Users/johnacogan67/Projects/oralable_ios/OralableApp
+    
+
+SwiftCompile normal arm64 Compiling\ LogExportManager.swift,\ Logger.swift,\ OralableBLE.swift,\ SharedDataManager.swift,\ SpO2Calculator.swift,\ SubscriptionManager.swift,\ CSVServiceProtocols.swift,\ DeviceInfo.swift,\ DeviceType.swift,\ LoggingService.swift,\ SensorRepository.swift,\ SensorReading.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/LogExportManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/Logger.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/OralableBLE.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/SharedDataManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/SpO2Calculator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/SubscriptionManager.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/CSVServiceProtocols.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/DeviceInfo.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/DeviceType.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/LoggingService.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Devices/SensorRepository.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Models/Sensors/SensorReading.swift (in target 'OralableApp' from project 'OralableApp')
+
+** BUILD FAILED **
+
+
+The following build commands failed:
+	SwiftCompile normal arm64 Compiling\ UserAvatarView.swift,\ ProfileButtonView.swift,\ FeatureRow.swift,\ InfoRowView.swift,\ SettingsRowView.swift,\ ActionCardView.swift,\ SectionHeaderView.swift,\ SubscriptionGate.swift,\ ANRMuscleSenseDevice.swift,\ OralableDevice.swift,\ BioMetricCalculator.swift,\ BLEDataPublisher.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Avatar/UserAvatarView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/ActionCardView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Sections/SectionHeaderView.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/SubscriptionGate.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/ANRMuscleSenseDevice.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Devices/OralableDevice.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BioMetricCalculator.swift /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Managers/BLE/BLEDataPublisher.swift (in target 'OralableApp' from project 'OralableApp')
+	SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Buttons/ProfileButtonView.swift (in target 'OralableApp' from project 'OralableApp')
+	SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/FeatureRow.swift (in target 'OralableApp' from project 'OralableApp')
+	SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/InfoRowView.swift (in target 'OralableApp' from project 'OralableApp')
+	SwiftCompile normal arm64 /Users/johnacogan67/Projects/oralable_ios/OralableApp/OralableApp/Components/Rows/SettingsRowView.swift (in target 'OralableApp' from project 'OralableApp')
+	Building project OralableApp with scheme OralableApp
+(6 failures)

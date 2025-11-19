@@ -9,7 +9,7 @@
 import Foundation
 
 /// Global logger instance for easy access throughout the application
-@MainActor
+/// Note: This class is nonisolated to allow logging from any context
 final class Logger {
 
     /// Shared singleton instance
@@ -83,30 +83,22 @@ final class Logger {
 
 /// Log debug message (only in DEBUG builds)
 func logDebug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-    Task { @MainActor in
-        Logger.shared.debug(message, file: file, function: function, line: line)
-    }
+    Logger.shared.debug(message, file: file, function: function, line: line)
 }
 
 /// Log info message
 func logInfo(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-    Task { @MainActor in
-        Logger.shared.info(message, file: file, function: function, line: line)
-    }
+    Logger.shared.info(message, file: file, function: function, line: line)
 }
 
 /// Log warning message
 func logWarning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-    Task { @MainActor in
-        Logger.shared.warning(message, file: file, function: function, line: line)
-    }
+    Logger.shared.warning(message, file: file, function: function, line: line)
 }
 
 /// Log error message
 func logError(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-    Task { @MainActor in
-        Logger.shared.error(message, file: file, function: function, line: line)
-    }
+    Logger.shared.error(message, file: file, function: function, line: line)
 }
 
 // MARK: - Backward Compatibility with print()
@@ -116,9 +108,7 @@ func logError(_ message: String, file: String = #file, function: String = #funct
 /// This allows gradual migration from print() to proper logging
 func debugPrint(_ items: Any..., separator: String = " ", file: String = #file, function: String = #function, line: Int = #line) {
     let message = items.map { "\($0)" }.joined(separator: separator)
-    Task { @MainActor in
-        Logger.shared.debug(message, file: file, function: function, line: line)
-    }
+    Logger.shared.debug(message, file: file, function: function, line: line)
 }
 #endif
 

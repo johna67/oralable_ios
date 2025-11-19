@@ -171,7 +171,8 @@ extension Array where Element == SensorReading {
 import SwiftUI
 
 struct SensorReadingPreview: View {
-    
+    @EnvironmentObject var designSystem: DesignSystem
+
     // Create sample readings
     let readings: [SensorReading] = [
         .mock(sensorType: .heartRate),
@@ -191,7 +192,7 @@ struct SensorReadingPreview: View {
                 validationTestsSection
             }
             .navigationTitle("Sensor Readings")
-            .background(DesignSystem.Colors.backgroundPrimary)
+            .background(designSystem.colors.backgroundPrimary)
         }
     }
     
@@ -210,22 +211,22 @@ struct SensorReadingPreview: View {
             if let avgHeartRate = readings.average(for: .heartRate) {
                 HStack {
                     Text("Average Heart Rate")
-                        .font(DesignSystem.Typography.bodyMedium)
+                        .font(designSystem.typography.bodyMedium)
                     Spacer()
                     Text(String(format: "%.0f bpm", avgHeartRate))
-                        .font(DesignSystem.Typography.labelMedium)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .font(designSystem.typography.labelMedium)
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
             }
             
             if let latest = readings.latest(for: .emg) {
                 HStack {
                     Text("Latest EMG Reading")
-                        .font(DesignSystem.Typography.bodyMedium)
+                        .font(designSystem.typography.bodyMedium)
                     Spacer()
                     Text(latest.formattedValue)
-                        .font(DesignSystem.Typography.labelMedium)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .font(designSystem.typography.labelMedium)
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
             }
         }
@@ -252,8 +253,9 @@ struct SensorReadingPreview: View {
 // MARK: - Supporting Views
 
 struct SensorReadingRow: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let reading: SensorReading
-    
+
     var body: some View {
         HStack {
             iconView
@@ -261,55 +263,56 @@ struct SensorReadingRow: View {
             Spacer()
             valueInfoView
         }
-        .padding(.vertical, DesignSystem.Spacing.xs)
+        .padding(.vertical, designSystem.spacing.xs)
     }
     
     private var iconView: some View {
         Image(systemName: reading.sensorType.iconName)
             .font(.system(size: DesignSystem.Sizing.Icon.lg))
-            .foregroundColor(DesignSystem.Colors.textPrimary)
+            .foregroundColor(designSystem.colors.textPrimary)
             .frame(width: 40)
     }
     
     private var deviceInfoView: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(reading.sensorType.displayName)
-                .font(DesignSystem.Typography.bodyLarge)
-                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .font(designSystem.typography.bodyLarge)
+                .foregroundColor(designSystem.colors.textPrimary)
             
             Text("Device: \(reading.deviceId ?? "Unknown")")
-                .font(DesignSystem.Typography.caption)
-                .foregroundColor(DesignSystem.Colors.textTertiary)
+                .font(designSystem.typography.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
         }
     }
     
     private var valueInfoView: some View {
         VStack(alignment: .trailing, spacing: 4) {
             Text(reading.formattedValue)
-                .font(DesignSystem.Typography.labelLarge)
-                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .font(designSystem.typography.labelLarge)
+                .foregroundColor(designSystem.colors.textPrimary)
             
             Text(reading.isValid ? "Valid" : "Invalid")
-                .font(DesignSystem.Typography.caption2)
-                .foregroundColor(reading.isValid ? DesignSystem.Colors.success : DesignSystem.Colors.error)
+                .font(designSystem.typography.caption2)
+                .foregroundColor(reading.isValid ? designSystem.colors.success : designSystem.colors.error)
         }
     }
 }
 
 struct ValidationTest: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let label: String
     let reading: SensorReading
-    
+
     var body: some View {
         HStack {
             Text(label)
-                .font(DesignSystem.Typography.bodyMedium)
+                .font(designSystem.typography.bodyMedium)
             Spacer()
             Image(systemName: reading.isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundColor(reading.isValid ? DesignSystem.Colors.success : DesignSystem.Colors.error)
+                .foregroundColor(reading.isValid ? designSystem.colors.success : designSystem.colors.error)
             Text(reading.formattedValue)
-                .font(DesignSystem.Typography.labelMedium)
-                .foregroundColor(DesignSystem.Colors.textSecondary)
+                .font(designSystem.typography.labelMedium)
+                .foregroundColor(designSystem.colors.textSecondary)
         }
     }
 }
@@ -317,6 +320,7 @@ struct ValidationTest: View {
 struct SensorReading_Previews: PreviewProvider {
     static var previews: some View {
         SensorReadingPreview()
+            .environmentObject(DesignSystem())
     }
 }
 

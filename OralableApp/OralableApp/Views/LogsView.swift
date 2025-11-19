@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct LogsView: View {
-    @StateObject private var logsManager = LogsManager.shared
+    @EnvironmentObject var logsManager: LogsManager
     @EnvironmentObject var designSystem: DesignSystem
     @State private var selectedLogLevel: LogLevel = .all
     @State private var searchText = ""
@@ -174,7 +174,7 @@ struct LogsView: View {
             exportURL = url
             showingExportSheet = true
         } catch {
-            print("Failed to export logs: \(error)")
+            Logger.shared.error("[to export logs: \(error)")
         }
     }
     
@@ -374,7 +374,7 @@ struct LogsView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
             LogsView()
-                .environmentObject(DesignSystem.shared)
+                .environmentObject(DesignSystem())
         }
     }
 }

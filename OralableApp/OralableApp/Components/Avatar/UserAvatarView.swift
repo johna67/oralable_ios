@@ -10,11 +10,10 @@ import SwiftUI
 
 /// User Avatar Component
 struct UserAvatarView: View {
+    @EnvironmentObject var designSystem: DesignSystem
     let initials: String
     let size: CGFloat
     let showOnlineIndicator: Bool
-    
-    @ObservedObject private var designSystem = DesignSystem.shared
     
     init(initials: String, size: CGFloat = 36, showOnlineIndicator: Bool = false) {
         self.initials = initials
@@ -55,8 +54,8 @@ struct UserAvatarView: View {
 
 struct UserAvatarView_Previews: PreviewProvider {
     static var previews: some View {
-        let designSystem = DesignSystem.shared
-        
+        let designSystem = DesignSystem()
+
         VStack(spacing: designSystem.spacing.xl) {
             UserAvatarView(initials: "JD", size: 36, showOnlineIndicator: false)
             UserAvatarView(initials: "SM", size: 48, showOnlineIndicator: true)
@@ -65,6 +64,7 @@ struct UserAvatarView_Previews: PreviewProvider {
         }
         .padding()
         .background(designSystem.colors.backgroundPrimary)
+        .environmentObject(designSystem)
     }
 }
 

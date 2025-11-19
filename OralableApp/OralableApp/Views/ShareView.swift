@@ -2,9 +2,12 @@ import SwiftUI
 import Foundation
 import UniformTypeIdentifiers
 
+// MARK: - Main Share View (Refactored to use components)
 struct ShareView: View {
+    @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var csvImportManager: CSVImportManager
     @ObservedObject var ble: OralableBLE
-    
+
     @State private var showShareSheet = false
     @State private var showDocumentExporter = false
     @State private var exportURL: URL?
@@ -15,9 +18,9 @@ struct ShareView: View {
     @State private var importedCount = 0
     @State private var showImportError = false
     @State private var importErrorMessage = ""
-    
+
     @Environment(\.horizontalSizeClass) var sizeClass
-    
+
     private var columns: [GridItem] {
         let columnCount = DesignSystem.Layout.gridColumns(for: sizeClass)
         return Array(
@@ -25,12 +28,12 @@ struct ShareView: View {
             count: columnCount
         )
     }
-    
+
     var body: some View {
         contentView
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(navigationBarTitleDisplayMode)
-            .background(DesignSystem.Colors.backgroundSecondary.ignoresSafeArea())
+            .background(designSystem.colors.backgroundSecondary.ignoresSafeArea())
             .sheet(isPresented: $showShareSheet) {
                 shareSheetContent
             }
@@ -49,7 +52,7 @@ struct ShareView: View {
             ) { result in
                 handleImport(result: result)
             }
-            .modifier(AlertsModifier(
+            .modifier(ShareAlertsModifier(
                 showImportSuccess: $showImportSuccess,
                 showImportError: $showImportError,
                 showClearConfirmation: $showClearConfirmation,
@@ -58,50 +61,42 @@ struct ShareView: View {
                 ble: ble
             ))
     }
-    
-    // MARK: - Computed Properties for Body
-    
+
+    // MARK: - Computed Properties
+
     private var navigationTitle: String {
         "Share Data"
     }
-    
+
     private var navigationBarTitleDisplayMode: NavigationBarItem.TitleDisplayMode {
         DesignSystem.Layout.isIPad ? .inline : .large
     }
-    
+
     private var defaultExportFilename: String {
         "oralable_data_\(Date().formatted(.iso8601.year().month().day()))"
     }
-    
+
     @ViewBuilder
     private var shareSheetContent: some View {
         if let url = exportURL {
             ShareSheet(items: [url])
         }
     }
-    
-    private var importSuccessMessage: some View {
-        Text("Imported \(importedCount) data points. View them in the Dashboard and History tabs.")
-    }
-    
-    private var clearConfirmationMessage: some View {
-        Text("This will clear all logs and historical data. This action cannot be undone.")
-    }
-    
+
     private var contentView: some View {
         ScrollView {
-            VStack(spacing: DesignSystem.Spacing.lg) {
+            VStack(spacing: designSystem.spacing.lg) {
                 mainContentStack
             }
             .padding(DesignSystem.Layout.edgePadding)
             .frame(maxWidth: .infinity)
         }
     }
-    
+
     @ViewBuilder
     private var mainContentStack: some View {
         // Data Summary Card
-        DataSummaryCard(ble: ble)
+        ShareDataSummaryCard(ble: ble)
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
 
         // Share with Dentist Section
@@ -109,7 +104,7 @@ struct ShareView: View {
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
 
         // Export Button
-        ExportButton(
+        ShareExportButton(
             showShareSheet: $showShareSheet,
             showDocumentExporter: $showDocumentExporter,
             exportURL: $exportURL,
@@ -117,82 +112,72 @@ struct ShareView: View {
             ble: ble
         )
         .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-        
+
         // Recent Logs Preview
-        RecentLogsPreview(ble: ble)
+        ShareRecentLogsView(ble: ble)
             .frame(maxWidth: .infinity)
-        
-        // Device Info Card (collapsed/minimal)
-        DeviceInfoCard()
+
+        // Device Info Card
+        ShareDeviceInfoCard()
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-        
+
         // Clear Data Button
-        ClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
+        ShareClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-        
+
         // Debug Section (only in debug builds)
         #if DEBUG
-        DebugConnectionSection(ble: ble)
+        ShareDebugSection(ble: ble)
             .frame(maxWidth: .infinity)
         #endif
     }
-    
+
     private func handleExportResult(_ result: Result<URL, Error>) {
         switch result {
         case .success(let url):
-            print("✅ File saved successfully to: \(url)")
-            // Clean up the temporary file
+            Logger.shared.info(" File saved successfully to: \(url)")
             if let exportURL = exportURL {
                 try? FileManager.default.removeItem(at: exportURL)
             }
         case .failure(let error):
-            print("❌ File save failed: \(error.localizedDescription)")
+            Logger.shared.error(" File save failed: \(error.localizedDescription)")
         }
     }
-    
+
     private func handleImport(result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            
-            // Request access to security-scoped resource
+
             guard url.startAccessingSecurityScopedResource() else {
                 importErrorMessage = "Unable to access the selected file. Please try again."
                 showImportError = true
                 return
             }
-            
-            // Ensure we stop accessing the resource when done
+
             defer {
                 url.stopAccessingSecurityScopedResource()
             }
-            
-            // Copy file to temporary location to avoid permission issues
+
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
-            
+
             do {
-                // Remove existing file if present
                 if FileManager.default.fileExists(atPath: tempURL.path) {
                     try FileManager.default.removeItem(at: tempURL)
                 }
-                
-                // Copy to temporary directory
+
                 try FileManager.default.copyItem(at: url, to: tempURL)
-                
-                // Validate before importing
-                let validation = CSVImportManager.shared.validateCSVFile(at: tempURL)
-                
+
+                let validation = csvImportManager.validateCSVFile(at: tempURL)
+
                 if !validation.isValid {
                     importErrorMessage = validation.errorMessage ?? "Invalid CSV format"
                     showImportError = true
                     try? FileManager.default.removeItem(at: tempURL)
                     return
                 }
-                
-                // Now import from the copied file
-                if let imported = CSVImportManager.shared.importData(from: tempURL) {
-                    // Calculate time offset to make imported data "recent" for 3-minute window
-                    // Find the most recent timestamp in imported data
+
+                if let imported = csvImportManager.importData(from: tempURL) {
                     guard let oldestTimestamp = imported.sensorData.first?.timestamp,
                           let newestTimestamp = imported.sensorData.last?.timestamp else {
                         importErrorMessage = "No valid sensor data in CSV file."
@@ -200,19 +185,14 @@ struct ShareView: View {
                         try? FileManager.default.removeItem(at: tempURL)
                         return
                     }
-                    
-                    // Calculate offset to bring the newest data point to "now"
+
                     let timeOffset = Date().timeIntervalSince(newestTimestamp)
-                    
-                    // Add imported data to BLE manager with adjusted timestamps
+
                     ble.sensorDataHistory.append(contentsOf: imported.sensorData)
-                    
-                    // IMPORTANT: Populate individual sensor history arrays for dashboard graphs
-                    // with adjusted timestamps so they appear in the 3-minute window
+
                     for sensorData in imported.sensorData {
                         let adjustedTimestamp = sensorData.timestamp.addingTimeInterval(timeOffset)
-                        
-                        // Add PPG data with adjusted timestamp
+
                         var adjustedPPG = sensorData.ppg
                         adjustedPPG = PPGData(
                             red: adjustedPPG.red,
@@ -221,8 +201,7 @@ struct ShareView: View {
                             timestamp: adjustedTimestamp
                         )
                         ble.ppgHistory.append(adjustedPPG)
-                        
-                        // Add accelerometer data with adjusted timestamp
+
                         var adjustedAccel = sensorData.accelerometer
                         adjustedAccel = AccelerometerData(
                             x: adjustedAccel.x,
@@ -231,24 +210,21 @@ struct ShareView: View {
                             timestamp: adjustedTimestamp
                         )
                         ble.accelerometerHistory.append(adjustedAccel)
-                        
-                        // Add temperature data with adjusted timestamp
+
                         var adjustedTemp = sensorData.temperature
                         adjustedTemp = TemperatureData(
                             celsius: adjustedTemp.celsius,
                             timestamp: adjustedTimestamp
                         )
                         ble.temperatureHistory.append(adjustedTemp)
-                        
-                        // Add battery data with adjusted timestamp
+
                         var adjustedBattery = sensorData.battery
                         adjustedBattery = BatteryData(
                             percentage: adjustedBattery.percentage,
                             timestamp: adjustedTimestamp
                         )
                         ble.batteryHistory.append(adjustedBattery)
-                        
-                        // Add heart rate data if available with adjusted timestamp
+
                         if let heartRate = sensorData.heartRate {
                             var adjustedHR = heartRate
                             adjustedHR = HeartRateData(
@@ -258,8 +234,7 @@ struct ShareView: View {
                             )
                             ble.heartRateHistory.append(adjustedHR)
                         }
-                        
-                        // Add SpO2 data if available with adjusted timestamp
+
                         if let spo2 = sensorData.spo2 {
                             var adjustedSpO2 = spo2
                             adjustedSpO2 = SpO2Data(
@@ -270,40 +245,33 @@ struct ShareView: View {
                             ble.spo2History.append(adjustedSpO2)
                         }
                     }
-                    
-                    // Convert imported string logs to LogMessage objects
+
                     for logString in imported.logs {
                         ble.logMessages.append(LogMessage(message: logString))
                     }
-                    
-                    // Sort sensor data history array by timestamp
+
                     ble.sensorDataHistory.sort { $0.timestamp < $1.timestamp }
 
-                    // Note: CircularBuffer history arrays maintain chronological order through append()
-                    // No sorting needed since data is already added in timestamp order
-                    
                     importedCount = imported.sensorData.count
-                    
-                    // Log success with time adjustment info
+
                     let timeAdjustmentMinutes = Int(timeOffset / 60)
                     ble.logMessages.append(LogMessage(
                         message: "✅ Successfully imported \(imported.sensorData.count) sensor data points and \(imported.logs.count) log entries (timestamps adjusted by \(timeAdjustmentMinutes) minutes to current time)"
                     ))
-                    
+
                     showImportSuccess = true
                 } else {
                     importErrorMessage = "Failed to parse CSV file. Please ensure it's in the correct format."
                     showImportError = true
                 }
-                
-                // Clean up temporary file
+
                 try? FileManager.default.removeItem(at: tempURL)
-                
+
             } catch {
                 importErrorMessage = "Failed to access file: \(error.localizedDescription)"
                 showImportError = true
             }
-            
+
         case .failure(let error):
             importErrorMessage = "Failed to import file: \(error.localizedDescription)"
             showImportError = true
@@ -313,6 +281,7 @@ struct ShareView: View {
 
 // MARK: - Import Section (Viewer Mode Only)
 struct ImportSection: View {
+    @EnvironmentObject var csvImportManager: CSVImportManager
     @Binding var showImportPicker: Bool
     @ObservedObject var ble: OralableBLE
     @Binding var showImportSuccess: Bool
@@ -320,7 +289,7 @@ struct ImportSection: View {
     @Binding var showImportError: Bool
     @Binding var importErrorMessage: String
     @State private var showFormatInfo = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -329,19 +298,19 @@ struct ImportSection: View {
                     .foregroundColor(.blue)
                 Text("Import Data")
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 Button(action: { showFormatInfo = true }) {
                     Image(systemName: "info.circle")
                         .foregroundColor(.blue)
                 }
             }
-            
+
             Text("Load previously exported CSV files to view historical data without connecting a device.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             Button(action: {
                 showImportPicker = true
             }) {
@@ -363,7 +332,7 @@ struct ImportSection: View {
                 )
                 .cornerRadius(12)
             }
-            
+
             // Format info
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 8) {
@@ -374,7 +343,7 @@ struct ImportSection: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "checkmark.circle")
                         .foregroundColor(.green)
@@ -392,16 +361,16 @@ struct ImportSection: View {
             NavigationView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(CSVImportManager.shared.expectedFormat)
+                        Text(csvImportManager.expectedFormat)
                             .font(.system(.caption, design: .monospaced))
                             .padding()
                             .background(Color(.systemGray6))
                             .cornerRadius(8)
-                        
+
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Common Issues")
                                 .font(.headline)
-                            
+
                             VStack(alignment: .leading, spacing: 8) {
                                 TroubleshootItem(
                                     icon: "exclamationmark.triangle",
@@ -409,14 +378,14 @@ struct ImportSection: View {
                                     title: "File Permission Error",
                                     description: "After exporting, save the file to Files app or iCloud Drive, then import from there."
                                 )
-                                
+
                                 TroubleshootItem(
                                     icon: "doc.text",
                                     color: .blue,
                                     title: "Wrong Format",
                                     description: "Ensure your CSV has the exact header row shown above."
                                 )
-                                
+
                                 TroubleshootItem(
                                     icon: "calendar",
                                     color: .purple,
@@ -448,14 +417,14 @@ struct TroubleshootItem: View {
     let color: Color
     let title: String
     let description: String
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .foregroundColor(color)
                 .font(.title3)
                 .frame(width: 24)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline)
@@ -468,416 +437,44 @@ struct TroubleshootItem: View {
     }
 }
 
-// MARK: - Device Info Card
-struct DeviceInfoCard: View {
-    @State private var isExpanded = false
-    
-    private var deviceID: String {
-        UIDevice.current.identifierForVendor?.uuidString ?? "Unknown"
-    }
-    
-    private var deviceModel: String {
-        UIDevice.current.model
-    }
-    
-    private var systemVersion: String {
-        UIDevice.current.systemVersion
-    }
-    
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            Button(action: { withAnimation { isExpanded.toggle() } }) {
-                HStack {
-                    Label("Device Information", systemImage: "info.circle")
-                        .font(DesignSystem.Typography.labelMedium)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                    
-                    Spacer()
-                    
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: DesignSystem.Sizing.Icon.xs))
-                        .foregroundColor(DesignSystem.Colors.textTertiary)
-                }
-            }
-            .buttonStyle(.plain)
-            
-            if isExpanded {
-                Divider()
-                
-                VStack(spacing: DesignSystem.Spacing.sm) {
-                    InfoRow(label: "Device", value: deviceModel)
-                    InfoRow(label: "iOS", value: systemVersion)
-                    InfoRow(label: "App Version", value: appVersion)
-                    InfoRow(label: "Device ID", value: String(deviceID.prefix(12)) + "...")
-                }
-            }
-        }
-        .padding(DesignSystem.Spacing.lg)
-        .background(DesignSystem.Colors.backgroundPrimary)
-        .cornerRadius(DesignSystem.CornerRadius.lg)
-        .designShadow(DesignSystem.Shadow.sm)
-    }
-}
-
-// MARK: - Data Summary Card
-struct DataSummaryCard: View {
-    @ObservedObject var ble: OralableBLE
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            Text("Data Summary")
-                .font(DesignSystem.Typography.h3)
-                .foregroundColor(DesignSystem.Colors.textPrimary)
-            
-            Divider()
-            
-            // Metrics Grid
-            HStack(spacing: DesignSystem.Spacing.lg) {
-                MetricBox(
-                    title: "Sensor Data",
-                    value: "\(ble.sensorDataHistory.count)",
-                    subtitle: "points",
-                    icon: "waveform.path.ecg",
-                    color: .blue
-                )
-                
-                MetricBox(
-                    title: "Log Entries",
-                    value: "\(ble.logMessages.count)",
-                    subtitle: "messages",
-                    icon: "doc.text",
-                    color: .green
-                )
-            }
-            
-            if !ble.sensorDataHistory.isEmpty,
-               let first = ble.sensorDataHistory.first,
-               let last = ble.sensorDataHistory.last {
-                Divider()
-                
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                    Label("Recording Period", systemImage: "clock")
-                        .font(DesignSystem.Typography.labelMedium)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                    
-                    HStack {
-                        Text(first.timestamp, style: .date)
-                        Image(systemName: "arrow.right")
-                        Text(last.timestamp, style: .date)
-                    }
-                    .font(DesignSystem.Typography.bodySmall)
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-                }
-            }
-        }
-        .padding(DesignSystem.Spacing.lg)
-        .background(DesignSystem.Colors.backgroundPrimary)
-        .cornerRadius(DesignSystem.CornerRadius.lg)
-        .designShadow(DesignSystem.Shadow.sm)
-    }
-}
-
-struct MetricBox: View {
-    let title: String
-    let value: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-            HStack(spacing: DesignSystem.Spacing.xs) {
-                Image(systemName: icon)
-                    .font(.system(size: DesignSystem.Sizing.Icon.sm))
-                    .foregroundColor(color)
-                
-                Text(title)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
-            }
-            
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .font(DesignSystem.Typography.displaySmall)
-                    .foregroundColor(color)
-                
-                Text(subtitle)
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DesignSystem.Spacing.md)
-        .background(color.opacity(0.1))
-        .cornerRadius(DesignSystem.CornerRadius.md)
-    }
-}
-
-// MARK: - Export Button
-struct ExportButton: View {
-    @Binding var showShareSheet: Bool
-    @Binding var showDocumentExporter: Bool
-    @Binding var exportURL: URL?
-    @Binding var exportDocument: CSVDocument?
-    @ObservedObject var ble: OralableBLE
-    @State private var isExporting = false
-    
-    private var hasData: Bool {
-        !ble.logMessages.isEmpty || !ble.sensorDataHistory.isEmpty
-    }
-    
-    var body: some View {
-        Button(action: exportData) {
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                if isExporting {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: DesignSystem.Sizing.Icon.md))
-                }
-                
-                Text(isExporting ? "Exporting..." : "Export Data as CSV")
-                    .font(DesignSystem.Typography.buttonMedium)
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DesignSystem.Spacing.md)
-            .background(
-                hasData ?
-                    LinearGradient(
-                        colors: [Color.blue, Color.blue.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ) :
-                    LinearGradient(
-                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-            )
-            .cornerRadius(DesignSystem.CornerRadius.lg)
-            .designShadow(hasData ? DesignSystem.Shadow.md : DesignSystem.Shadow.sm)
-        }
-        .disabled(!hasData || isExporting)
-        .animation(DesignSystem.Animation.fast, value: isExporting)
-    }
-    
-    private func exportData() {
-        isExporting = true
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            // Clean up old exports first
-            CSVExportManager.shared.cleanupOldExports()
-            
-            // Perform the export
-            let exportResult = CSVExportManager.shared.exportData(
-                sensorData: ble.sensorDataHistory,
-                logs: ble.logMessages.map { $0.message }
-            )
-            
-            DispatchQueue.main.async {
-                isExporting = false
-                if let url = exportResult {
-                    exportURL = url
-                    
-                    // Try to create a document from the URL
-                    if let csvContent = try? String(contentsOf: url, encoding: .utf8) {
-                        exportDocument = CSVDocument(csvContent: csvContent)
-                        showDocumentExporter = true
-                    } else {
-                        // Fallback to share sheet if document creation fails
-                        showShareSheet = true
-                    }
-                } else {
-                    // Export failed
-                    print("⚠️ Export failed - no URL returned")
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Clear Data Button
-struct ClearDataButton: View {
-    @Binding var showClearConfirmation: Bool
-    @ObservedObject var ble: OralableBLE
-    
-    private var hasData: Bool {
-        !ble.logMessages.isEmpty || !ble.sensorDataHistory.isEmpty
-    }
-    
-    var body: some View {
-        Button(action: { showClearConfirmation = true }) {
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                Image(systemName: "trash")
-                    .font(.system(size: DesignSystem.Sizing.Icon.sm))
-                
-                Text("Clear All Data")
-                    .font(DesignSystem.Typography.buttonMedium)
-            }
-            .foregroundColor(hasData ? .red : DesignSystem.Colors.textDisabled)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DesignSystem.Spacing.md)
-            .background(hasData ? Color.red.opacity(0.1) : DesignSystem.Colors.backgroundTertiary)
-            .cornerRadius(DesignSystem.CornerRadius.lg)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
-                    .stroke(hasData ? Color.red.opacity(0.3) : DesignSystem.Colors.border, lineWidth: 1)
-            )
-        }
-        .disabled(!hasData)
-    }
-}
-
-// MARK: - Recent Logs Preview
-struct RecentLogsPreview: View {
-    @ObservedObject var ble: OralableBLE
-    
-    private var recentLogs: [LogMessage] {
-        Array(ble.logMessages.suffix(10).reversed())
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            HStack {
-                Label("Recent Activity", systemImage: "clock")
-                    .font(DesignSystem.Typography.h3)
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                
-                Spacer()
-                
-                Text("Last \(min(10, ble.logMessages.count))")
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-            }
-            
-            Divider()
-            
-            if ble.logMessages.isEmpty {
-                VStack(spacing: DesignSystem.Spacing.sm) {
-                    Image(systemName: "tray")
-                        .font(.system(size: 40))
-                        .foregroundColor(DesignSystem.Colors.textDisabled)
-                    
-                    Text("No activity yet")
-                        .font(DesignSystem.Typography.bodyMedium)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, DesignSystem.Spacing.xl)
-            } else {
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                    ForEach(recentLogs) { log in
-                        HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
-                            Circle()
-                                .fill(logColor(for: log.message))
-                                .frame(width: 8, height: 8)
-                                .padding(.top, 6)
-                            
-                            Text(log.message)
-                                .font(DesignSystem.Typography.bodySmall)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
-                                .lineLimit(2)
-                            
-                            Spacer()
-                        }
-                        .padding(.vertical, DesignSystem.Spacing.xxs)
-                    }
-                }
-            }
-        }
-        .padding(DesignSystem.Spacing.lg)
-        .background(DesignSystem.Colors.backgroundPrimary)
-        .cornerRadius(DesignSystem.CornerRadius.lg)
-        .designShadow(DesignSystem.Shadow.sm)
-    }
-    
-    private func logColor(for log: String) -> Color {
-        if log.contains("ERROR") || log.contains("Failed") || log.contains("❌") {
-            return .red
-        } else if log.contains("WARNING") || log.contains("Disconnected") || log.contains("⚠️") {
-            return .orange
-        } else if log.contains("Connected") || log.contains("SUCCESS") || log.contains("✅") {
-            return .green
-        } else {
-            return .blue
-        }
-    }
-}
-
-// MARK: - Helper Views
-struct InfoRow: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .font(DesignSystem.Typography.bodySmall)
-                .foregroundColor(DesignSystem.Colors.textTertiary)
-            
-            Spacer()
-            
-            Text(value)
-                .font(DesignSystem.Typography.bodySmall)
-                .foregroundColor(DesignSystem.Colors.textPrimary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-    }
-}
-
 // MARK: - Share Sheet
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
-    
+
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        // Convert URL items to use a proper item provider for file sharing
         var activityItems: [Any] = []
-        
+
         for item in items {
             if let fileURL = item as? URL {
-                // Create an activity item source that properly provides the file
                 let itemSource = FileActivityItemSource(fileURL: fileURL)
                 activityItems.append(itemSource)
             } else {
                 activityItems.append(item)
             }
         }
-        
-        // Create the activity view controller
+
         let controller = UIActivityViewController(
             activityItems: activityItems,
             applicationActivities: nil
         )
-        
-        // Explicitly set completion handler to clean up temporary files
+
         controller.completionWithItemsHandler = { activityType, completed, returnedItems, error in
             if let error = error {
-                print("Share sheet error: \(error.localizedDescription)")
+                Logger.shared.error("[ShareView] Share sheet error: \(error.localizedDescription)")
             }
-            
-            // Clean up any temporary files after sharing (or canceling)
+
             for item in items {
                 if let url = item as? URL {
-                    // Only remove files in the Caches/Exports directory
                     if url.path.contains("/Caches/Exports/") {
-                        // Delay cleanup slightly to ensure sharing is complete
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                             try? FileManager.default.removeItem(at: url)
-                            print("Cleaned up temporary export file: \(url.lastPathComponent)")
+                            Logger.shared.debug("[ShareView] Cleaned up temporary export file: \(url.lastPathComponent)")
                         }
                     }
                 }
             }
         }
-        
-        // iPad support - configure popover presentation
+
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first,
            let rootViewController = window.rootViewController {
@@ -890,10 +487,10 @@ struct ShareSheet: UIViewControllerRepresentable {
             )
             controller.popoverPresentationController?.permittedArrowDirections = []
         }
-        
+
         return controller
     }
-    
+
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
@@ -901,50 +498,43 @@ struct ShareSheet: UIViewControllerRepresentable {
 class FileActivityItemSource: NSObject, UIActivityItemSource {
     private let fileURL: URL
     private let fileName: String
-    
+
     init(fileURL: URL) {
         self.fileURL = fileURL
         self.fileName = fileURL.lastPathComponent
         super.init()
     }
-    
+
     func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
-        // Return the filename as placeholder
         return fileName
     }
-    
+
     func activityViewController(_ activityViewController: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
-        // For file-based activities, we need to copy to a more accessible location
         let tempDir = FileManager.default.temporaryDirectory
         let tempFile = tempDir.appendingPathComponent(fileName)
-        
+
         do {
-            // Remove existing temp file if present
             if FileManager.default.fileExists(atPath: tempFile.path) {
                 try? FileManager.default.removeItem(at: tempFile)
             }
-            
-            // Copy file to temp directory
+
             try FileManager.default.copyItem(at: fileURL, to: tempFile)
-            
-            // For Save to Files activity, we need to return the URL
-            // For other activities, return the data
+
             if activityType == .saveToCameraRoll || activityType == .copyToPasteboard {
                 return try? Data(contentsOf: tempFile)
             }
-            
+
             return tempFile
         } catch {
-            print("Error preparing file for sharing: \(error)")
-            // Fallback to returning the data directly
+            Logger.shared.error("[preparing file for sharing: \(error)")
             return try? Data(contentsOf: fileURL)
         }
     }
-    
+
     func activityViewController(_ activityViewController: UIActivityViewController, dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
         return "public.comma-separated-values-text"
     }
-    
+
     func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
         return fileURL.deletingPathExtension().lastPathComponent
     }
@@ -953,13 +543,13 @@ class FileActivityItemSource: NSObject, UIActivityItemSource {
 // MARK: - CSV Document
 struct CSVDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.commaSeparatedText, .text] }
-    
+
     var csvContent: String
-    
+
     init(csvContent: String) {
         self.csvContent = csvContent
     }
-    
+
     init(configuration: ReadConfiguration) throws {
         guard let data = configuration.file.regularFileContents,
               let string = String(data: data, encoding: .utf8)
@@ -968,7 +558,7 @@ struct CSVDocument: FileDocument {
         }
         csvContent = string
     }
-    
+
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         guard let data = csvContent.data(using: .utf8) else {
             throw CocoaError(.fileWriteUnknown)
@@ -978,14 +568,14 @@ struct CSVDocument: FileDocument {
 }
 
 // MARK: - Alerts Modifier
-struct AlertsModifier: ViewModifier {
+struct ShareAlertsModifier: ViewModifier {
     @Binding var showImportSuccess: Bool
     @Binding var showImportError: Bool
     @Binding var showClearConfirmation: Bool
     let importedCount: Int
     let importErrorMessage: String
     var ble: OralableBLE
-    
+
     func body(content: Content) -> some View {
         content
             .alert("Data Imported Successfully", isPresented: $showImportSuccess) {
@@ -1010,11 +600,12 @@ struct AlertsModifier: ViewModifier {
 }
 
 // MARK: - Debug Connection Section (Temporary)
-struct DebugConnectionSection: View {
+struct ShareDebugSection: View {
+    @EnvironmentObject var designSystem: DesignSystem
     @ObservedObject var ble: OralableBLE
     @State private var showFullLogs = false
     @State private var testDeviceName = ""
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -1030,23 +621,23 @@ struct DebugConnectionSection: View {
                 .font(.caption)
                 .buttonStyle(.bordered)
             }
-            
+
             Divider()
-            
+
             // Connection Status
             VStack(alignment: .leading, spacing: 8) {
-                InfoRow(label: "Status", value: ble.connectionStatus)
-                InfoRow(label: "Connected", value: ble.isConnected ? "Yes" : "No")
-                InfoRow(label: "Scanning", value: ble.isScanning ? "Yes" : "No")
-                InfoRow(label: "Devices Found", value: "\(ble.discoveredDevices.count)")
-                
+                ShareInfoRow(label: "Status", value: ble.connectionStatus)
+                ShareInfoRow(label: "Connected", value: ble.isConnected ? "Yes" : "No")
+                ShareInfoRow(label: "Scanning", value: ble.isScanning ? "Yes" : "No")
+                ShareInfoRow(label: "Devices Found", value: "\(ble.discoveredDevices.count)")
+
                 if ble.isConnected, let device = ble.connectedDevice {
-                    InfoRow(label: "Connected Device", value: device.name ?? "Unknown")
+                    ShareInfoRow(label: "Connected Device", value: device.name ?? "Unknown")
                 }
             }
-            
+
             Divider()
-            
+
             // Quick Actions
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
@@ -1054,26 +645,25 @@ struct DebugConnectionSection: View {
                         ble.refreshScan()
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Button("Reset BLE") {
                         ble.resetBLE()
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Button("Force Disconnect") {
                         ble.disconnect()
                     }
                     .buttonStyle(.bordered)
                 }
-                
+
                 // Test connect by device name
                 HStack {
                     TextField("Device name to connect", text: $testDeviceName)
                         .textFieldStyle(.roundedBorder)
-                    
+
                     Button("Connect") {
                         if !testDeviceName.isEmpty {
-                            // Find device by name in discovered devices
                             if let device = ble.discoveredDevices.first(where: {
                                 $0.name?.contains(testDeviceName) == true
                             }) {
@@ -1086,7 +676,7 @@ struct DebugConnectionSection: View {
                 }
                 .font(.caption)
             }
-            
+
             // Show discovered devices
             if !ble.discoveredDevices.isEmpty {
                 Divider()
@@ -1094,15 +684,15 @@ struct DebugConnectionSection: View {
                     Text("Discovered Devices:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     ForEach(ble.discoveredDevices, id: \.identifier) { device in
                         HStack {
                             Text(device.name ?? "Unknown")
                                 .font(.caption)
                                 .foregroundColor(.primary)
-                            
+
                             Spacer()
-                            
+
                             Button("Connect") {
                                 ble.connect(to: device)
                             }
@@ -1113,15 +703,15 @@ struct DebugConnectionSection: View {
                     }
                 }
             }
-            
-            // Recent logs preview - ✅ FIXED: Use LogMessage.id
+
+            // Recent logs preview
             if !ble.logMessages.isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Recent Logs (last 5):")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     ForEach(Array(ble.logMessages.suffix(5).reversed())) { log in
                         Text(log.message)
                             .font(.system(size: 10, design: .monospaced))
@@ -1137,254 +727,8 @@ struct DebugConnectionSection: View {
         .sheet(isPresented: $showFullLogs) {
             NavigationView {
                 LogsView()
-                    .environmentObject(DesignSystem.shared)
+                    .environmentObject(designSystem)
             }
-        }
-    }
-}
-
-// MARK: - Share with Dentist Section
-
-struct ShareWithDentistSection: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    @EnvironmentObject var sharedDataManager: SharedDataManager
-    @EnvironmentObject var subscriptionManager: SubscriptionManager
-    @State private var shareCode: String = ""
-    @State private var showShareCode = false
-    @State private var showUpgradePrompt = false
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            // Header
-            HStack {
-                Image(systemName: "person.2.fill")
-                    .font(.title2)
-                    .foregroundColor(.black)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Share with Dentist")
-                        .font(designSystem.typography.headline)
-                    
-                    Text("Allow your dentist to view your data")
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                }
-                
-                Spacer()
-            }
-            
-            // Generate Share Code Button
-            Button(action: {
-                if subscriptionManager.currentTier == .basic && sharedDataManager.sharedDentists.count >= 1 {
-                    showUpgradePrompt = true
-                } else {
-                    generateShareCode()
-                }
-            }) {
-                HStack {
-                    Image(systemName: "qrcode")
-                    Text("Generate Share Code")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.black)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-            }
-            
-            // Show generated code
-            if showShareCode {
-                VStack(spacing: 12) {
-                    Text("Share Code:")
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                    
-                    Text(shareCode)
-                        .font(.system(size: 48, weight: .bold, design: .monospaced))
-                        .foregroundColor(.black)
-                        .tracking(8)
-                    
-                    Text("Code expires in 48 hours")
-                        .font(designSystem.typography.caption)
-                        .foregroundColor(designSystem.colors.textSecondary)
-                    
-                    Button("Copy Code") {
-                        UIPasteboard.general.string = shareCode
-                    }
-                    .font(designSystem.typography.buttonSmall)
-                }
-                .padding()
-                .background(designSystem.colors.backgroundSecondary)
-                .cornerRadius(12)
-            }
-            
-            // List of shared dentists
-            if !sharedDataManager.sharedDentists.isEmpty {
-                Divider()
-                    .padding(.vertical, 8)
-                
-                Text("Shared With:")
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textSecondary)
-                
-                ForEach(sharedDataManager.sharedDentists) { dentist in
-                    SharedDentistRow(dentist: dentist)
-                }
-            }
-            
-            // Tier limitation message
-            if subscriptionManager.currentTier == .basic {
-                HStack(spacing: 8) {
-                    Image(systemName: "info.circle")
-                    Text("Basic tier: Share with 1 dentist")
-                        .font(designSystem.typography.caption)
-                }
-                .foregroundColor(designSystem.colors.textSecondary)
-                .padding(.top, 8)
-            }
-        }
-        .padding(designSystem.spacing.md)
-        .background(designSystem.colors.backgroundPrimary)
-        .cornerRadius(designSystem.cornerRadius.md)
-        .sheet(isPresented: $showUpgradePrompt) {
-            UpgradeToShareMoreView()
-        }
-    }
-    
-    private func generateShareCode() {
-        Task {
-            do {
-                shareCode = try await sharedDataManager.createShareInvitation()
-                showShareCode = true
-            } catch {
-                // Handle error
-                print("Error generating share code: \(error)")
-            }
-        }
-    }
-}
-
-struct SharedDentistRow: View {
-    @EnvironmentObject var designSystem: DesignSystem
-    @EnvironmentObject var sharedDataManager: SharedDataManager
-    let dentist: SharedDentist
-    @State private var showRevokeConfirmation = false
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(dentist.dentistName ?? "Dentist")
-                    .font(designSystem.typography.body)
-                
-                Text("Shared: \(dentist.sharedDate.formatted(date: .abbreviated, time: .omitted))")
-                    .font(designSystem.typography.caption)
-                    .foregroundColor(designSystem.colors.textSecondary)
-            }
-            
-            Spacer()
-            
-            Button("Revoke") {
-                showRevokeConfirmation = true
-            }
-            .font(designSystem.typography.caption)
-            .foregroundColor(.red)
-        }
-        .padding()
-        .background(designSystem.colors.backgroundSecondary)
-        .cornerRadius(8)
-        .alert("Revoke Access?", isPresented: $showRevokeConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Revoke", role: .destructive) {
-                revokeAccess()
-            }
-        } message: {
-            Text("This dentist will no longer be able to view your data.")
-        }
-    }
-    
-    private func revokeAccess() {
-        Task {
-            do {
-                try await sharedDataManager.revokeAccessForDentist(dentistID: dentist.dentistID)
-            } catch {
-                print("Error revoking access: \(error)")
-            }
-        }
-    }
-}
-
-struct UpgradeToShareMoreView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var designSystem: DesignSystem
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.black)
-                
-                Text("Share with More Providers")
-                    .font(designSystem.typography.title)
-                
-                Text("Upgrade to Premium to share your data with unlimited healthcare providers.")
-                    .font(designSystem.typography.body)
-                    .foregroundColor(designSystem.colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    FeatureRow(icon: "checkmark.circle.fill", text: "Share with unlimited providers")
-                    FeatureRow(icon: "checkmark.circle.fill", text: "Advanced analytics")
-                    FeatureRow(icon: "checkmark.circle.fill", text: "Unlimited data export")
-                    FeatureRow(icon: "checkmark.circle.fill", text: "Priority support")
-                }
-                .padding()
-                
-                Button("Upgrade to Premium") {
-                    // Navigate to subscription view
-                    dismiss()
-                }
-                .font(designSystem.typography.buttonLarge)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.black)
-                .cornerRadius(12)
-                .padding(.horizontal)
-                
-                Button("Maybe Later") {
-                    dismiss()
-                }
-                .font(designSystem.typography.body)
-                .foregroundColor(designSystem.colors.textSecondary)
-                
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Upgrade")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct FeatureRow: View {
-    let icon: String
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.green)
-            Text(text)
-                .font(.system(size: 15))
         }
     }
 }
