@@ -2,17 +2,27 @@ import SwiftUI
 import StoreKit
 
 struct DentistSettingsView: View {
-    @StateObject private var viewModel: DentistSettingsViewModel
+    @EnvironmentObject var dependencies: DentistAppDependencies
+    @State private var viewModel: DentistSettingsViewModel?
     @State private var showingSignOutAlert = false
 
-    init() {
-        _viewModel = StateObject(wrappedValue: DentistSettingsViewModel(
-            subscriptionManager: DentistSubscriptionManager.shared,
-            authenticationManager: DentistAuthenticationManager.shared
-        ))
+    var body: some View {
+        Group {
+            if let vm = viewModel {
+                settingsContent(viewModel: vm)
+            } else {
+                ProgressView("Loading...")
+                    .task {
+                        if viewModel == nil {
+                            viewModel = dependencies.makeSettingsViewModel()
+                        }
+                    }
+            }
+        }
     }
 
-    var body: some View {
+    @ViewBuilder
+    private func settingsContent(viewModel: DentistSettingsViewModel) -> some View {
         NavigationView {
             List {
                 // Account Section
@@ -204,7 +214,7 @@ struct DentistSettingsView: View {
             } message: {
                 Text("Are you sure you want to sign out?")
             }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            .alert("Error", isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.clearError() } })) {
                 Button("OK") {
                     viewModel.clearError()
                 }
@@ -224,6 +234,5 @@ struct DentistSettingsView: View {
 
 #Preview {
     DentistSettingsView()
-        .environmentObject(DentistSubscriptionManager.shared)
-        .environmentObject(DentistAuthenticationManager.shared)
+        .withDentistDependencies(DentistAppDependencies())
 }

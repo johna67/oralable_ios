@@ -13,20 +13,11 @@ struct DashboardView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var healthKitManager: HealthKitManager
-    // Note: Using @EnvironmentObject instead of plain reference for dependency injection
-    // ViewModel throttles all @Published properties to prevent excessive UI updates
     @EnvironmentObject var bleManager: OralableBLE
-    @StateObject private var viewModel: DashboardViewModel
+    @EnvironmentObject var appStateManager: AppStateManager
 
-    init(viewModel: DashboardViewModel? = nil) {
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else {
-            // This initializer is not used in normal flow since dependencies are injected
-            // Fallback for testing - requires BLE and AppStateManager to be available
-            fatalError("DashboardView requires bleManager and appStateManager via @EnvironmentObject")
-        }
-    }
+    // Create viewModel from dependencies on first appear
+    @State private var viewModel: DashboardViewModel?
 
     // NAVIGATION STATE VARIABLES
     @State private var showingProfile = false
@@ -35,11 +26,28 @@ struct DashboardView: View {
     @State private var showingShare = false
     
     var body: some View {
+        Group {
+            if let vm = viewModel {
+                dashboardContent(viewModel: vm)
+            } else {
+                ProgressView("Loading...")
+                    .task {
+                        // Initialize viewModel from dependencies
+                        if viewModel == nil {
+                            viewModel = dependencies.makeDashboardViewModel()
+                        }
+                    }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func dashboardContent(viewModel: DashboardViewModel) -> some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.lg) {
                     // Connection Status Card
-                    connectionStatusCard
+                    connectionStatusCard(viewModel: viewModel)
 
                     // HealthKit Integration Card
                     if healthKitManager.isAvailable {
@@ -48,15 +56,15 @@ struct DashboardView: View {
 
                     // MAM State Card
                     if viewModel.isConnected {
-                        mamStateCard
+                        mamStateCard(viewModel: viewModel)
                     }
 
                     // Metrics Grid
-                    metricsGrid
+                    metricsGrid(viewModel: viewModel)
 
                     // Waveform Section
                     if viewModel.isConnected {
-                        waveformSection
+                        waveformSection(viewModel: viewModel)
                     }
                 }
                 .padding(designSystem.spacing.md)
@@ -76,12 +84,23 @@ struct DashboardView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: designSystem.spacing.sm) {
+                        // Share button - smart sync with dentist
+                        Button(action: {
+                            Task {
+                                await self.handleSmartShare()
+                            }
+                        }) {
+                            Image(systemName: "arrow.up.doc")
+                                .font(.system(size: 20))
+                                .foregroundColor(designSystem.colors.textPrimary)
+                        }
+
                         Button(action: { showingDevices = true }) {
                             Image(systemName: "cpu")
                                 .font(.system(size: 20))
                                 .foregroundColor(designSystem.colors.textPrimary)
                         }
-                        
+
                         Button(action: { showingSettings = true }) {
                             Image(systemName: "ellipsis.circle")
                                 .font(.system(size: 20))
@@ -122,9 +141,86 @@ struct DashboardView: View {
             viewModel.stopMonitoring()
         }
     }
-    
+
+    // MARK: - Smart Share
+
+    /// Intelligently handles data sharing with dentist
+    /// - If recording: stops, uploads, restarts
+    /// - If not recording: just uploads available data
+    private func handleSmartShare() async {
+        Logger.shared.info("[DashboardView] Smart share initiated")
+
+        let wasRecording = self.bleManager.isRecording
+
+        if wasRecording {
+            Logger.shared.info("[DashboardView] Recording active - stopping to upload")
+            // Stop current recording (this triggers CloudKit upload automatically)
+            self.bleManager.stopRecording()
+
+            // Wait for recording state to actually become false
+            // This is necessary because the state update happens via Combine and might not be immediate
+            var waitCount = 0
+            while self.bleManager.isRecording && waitCount < 10 {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                waitCount += 1
+                Logger.shared.debug("[DashboardView] Waiting for recording to stop... (\(waitCount))")
+            }
+
+            if self.bleManager.isRecording {
+                Logger.shared.error("[DashboardView] Failed to stop recording - state still shows recording")
+                return
+            }
+
+            Logger.shared.info("[DashboardView] Recording stopped successfully")
+
+            // Wait a moment for upload to complete
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+
+            // Restart recording if device is still connected
+            if self.bleManager.isConnected {
+                Logger.shared.info("[DashboardView] Restarting recording after share")
+                self.bleManager.startRecording()
+
+                // Verify recording actually started
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                if self.bleManager.isRecording {
+                    Logger.shared.info("[DashboardView] ✅ Recording restarted successfully")
+                } else {
+                    Logger.shared.warning("[DashboardView] ⚠️ Recording restart may have failed")
+                }
+            }
+        } else {
+            Logger.shared.info("[DashboardView] No active recording - sharing available sessions")
+            // Upload any completed sessions that haven't been uploaded yet
+            await uploadPendingSessions()
+        }
+
+        Logger.shared.info("[DashboardView] Smart share completed")
+    }
+
+    /// Upload any pending recording sessions
+    private func uploadPendingSessions() async {
+        let sessions = RecordingSessionManager.shared.sessions
+        let completedSessions = sessions.filter { $0.status == .completed }
+
+        Logger.shared.info("[DashboardView] Found \(completedSessions.count) completed sessions to potentially upload")
+
+        let sharedDataManager = self.dependencies.sharedDataManager
+
+        // Upload each completed session
+        // Note: The uploadRecordingSession method will handle deduplication
+        for session in completedSessions {
+            do {
+                try await sharedDataManager.uploadRecordingSession(session)
+                Logger.shared.info("[DashboardView] Uploaded session \(session.id)")
+            } catch {
+                Logger.shared.error("[DashboardView] Failed to upload session \(session.id): \(error)")
+            }
+        }
+    }
+
     // MARK: - Connection Status Card
-    private var connectionStatusCard: some View {
+    private func connectionStatusCard(viewModel: DashboardViewModel) -> some View {
         VStack(spacing: designSystem.spacing.md) {
             HStack {
                 // Status Icon
@@ -169,9 +265,9 @@ struct DashboardView: View {
         .background(designSystem.colors.backgroundSecondary)
         .cornerRadius(designSystem.cornerRadius.large)
     }
-    
+
     // MARK: - MAM State Card (NEW)
-    private var mamStateCard: some View {
+    private func mamStateCard(viewModel: DashboardViewModel) -> some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             Text("MAM STATUS")
                 .font(designSystem.typography.caption)
@@ -202,9 +298,9 @@ struct DashboardView: View {
                 
                 // Position Quality
                 VStack(spacing: designSystem.spacing.xs) {
-                    Image(systemName: positionQualityIcon)
+                    Image(systemName: positionQualityIcon(viewModel: viewModel))
                         .font(.system(size: 28))
-                        .foregroundColor(positionQualityColor)
+                        .foregroundColor(positionQualityColor(viewModel: viewModel))
                     Text(viewModel.positionQuality)
                         .font(.system(size: 11))
                         .foregroundColor(designSystem.colors.textSecondary)
@@ -216,25 +312,25 @@ struct DashboardView: View {
         .background(designSystem.colors.backgroundSecondary)
         .cornerRadius(designSystem.cornerRadius.large)
     }
-    
-    private var positionQualityIcon: String {
+
+    private func positionQualityIcon(viewModel: DashboardViewModel) -> String {
         switch viewModel.positionQuality {
         case "Good": return "checkmark.circle.fill"
         case "Adjust": return "exclamationmark.triangle.fill"
         default: return "xmark.circle.fill"
         }
     }
-    
-    private var positionQualityColor: Color {
+
+    private func positionQualityColor(viewModel: DashboardViewModel) -> Color {
         switch viewModel.positionQuality {
         case "Good": return .green
         case "Adjust": return .orange
         default: return .red
         }
     }
-    
+
     // MARK: - Metrics Grid
-    private var metricsGrid: some View {
+    private func metricsGrid(viewModel: DashboardViewModel) -> some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
             // Heart Rate
             MetricCard(
@@ -268,17 +364,17 @@ struct DashboardView: View {
 
             // Battery
             MetricCard(
-                icon: batteryIcon,
+                icon: batteryIcon(viewModel: viewModel),
                 title: "Battery",
                 value: "\(Int(viewModel.batteryLevel))",
                 unit: "%",
-                color: batteryColor,
+                color: batteryColor(viewModel: viewModel),
                 designSystem: designSystem
             )
         }
     }
-    
-    private var batteryIcon: String {
+
+    private func batteryIcon(viewModel: DashboardViewModel) -> String {
         if viewModel.isCharging {
             return "battery.100.bolt"
         }
@@ -289,15 +385,15 @@ struct DashboardView: View {
         return "battery.25"
     }
 
-    private var batteryColor: Color {
+    private func batteryColor(viewModel: DashboardViewModel) -> Color {
         let level = viewModel.batteryLevel
         if level < 20 { return .red }
         if level < 50 { return .orange }
         return .green
     }
-    
+
     // MARK: - Waveform Section
-    private var waveformSection: some View {
+    private func waveformSection(viewModel: DashboardViewModel) -> some View {
         VStack(spacing: designSystem.spacing.md) {
             // PPG Waveform
             WaveformCard(

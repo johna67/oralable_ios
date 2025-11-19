@@ -20,10 +20,10 @@ class DentistAppDependencies: ObservableObject {
     init() {
         Logger.shared.info("[DentistAppDependencies] Initializing dependency container")
 
-        // Initialize managers
-        self.subscriptionManager = DentistSubscriptionManager.shared
-        self.dataManager = DentistDataManager.shared
-        self.authenticationManager = DentistAuthenticationManager.shared
+        // Initialize managers (no more singletons - using dependency injection)
+        self.authenticationManager = DentistAuthenticationManager()
+        self.subscriptionManager = DentistSubscriptionManager.shared  // TODO: Remove singleton
+        self.dataManager = DentistDataManager.shared  // TODO: Remove singleton
 
         Logger.shared.info("[DentistAppDependencies] ✅ Dependency container initialized successfully")
     }

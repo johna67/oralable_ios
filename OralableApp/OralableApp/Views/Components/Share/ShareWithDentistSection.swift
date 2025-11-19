@@ -8,6 +8,8 @@ struct ShareWithDentistSection: View {
     @State private var shareCode: String = ""
     @State private var showShareCode = false
     @State private var showUpgradePrompt = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
@@ -105,6 +107,11 @@ struct ShareWithDentistSection: View {
         .sheet(isPresented: $showUpgradePrompt) {
             UpgradeToShareMoreView()
         }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
     }
 
     private func generateShareCode() {
@@ -113,7 +120,9 @@ struct ShareWithDentistSection: View {
                 shareCode = try await sharedDataManager.createShareInvitation()
                 showShareCode = true
             } catch {
-                Logger.shared.error("[generating share code: \(error)")
+                Logger.shared.error("[ShareWithDentistSection] Error generating share code: \(error)")
+                errorMessage = "Failed to generate share code: \(error.localizedDescription)"
+                showError = true
             }
         }
     }

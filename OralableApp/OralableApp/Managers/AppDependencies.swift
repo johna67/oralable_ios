@@ -65,6 +65,9 @@ class AppDependencies: ObservableObject {
             bleManager: self.bleManager
         )
 
+        // Connect RecordingSessionManager to SharedDataManager for CloudKit uploads
+        RecordingSessionManager.shared.setSharedDataManager(self.sharedDataManager)
+
         // Patient app is always in subscription mode
         self.appStateManager.selectedMode = .subscription
 

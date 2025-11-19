@@ -104,7 +104,10 @@ struct AddPatientView: View {
                     }
                 }
             }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.clearMessages() } }
+            )) {
                 Button("OK") {
                     viewModel.clearMessages()
                 }
@@ -113,7 +116,10 @@ struct AddPatientView: View {
                     Text(error)
                 }
             }
-            .alert("Success", isPresented: .constant(viewModel.successMessage != nil)) {
+            .alert("Success", isPresented: Binding(
+                get: { viewModel.successMessage != nil },
+                set: { if !$0 { viewModel.clearMessages(); dismiss() } }
+            )) {
                 Button("OK") {
                     viewModel.clearMessages()
                     dismiss()

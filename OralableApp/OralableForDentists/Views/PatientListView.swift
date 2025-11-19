@@ -71,7 +71,10 @@ struct PatientListView: View {
             .sheet(item: $viewModel.selectedPatient) { patient in
                 PatientDetailView(patient: patient)
             }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.clearError() } }
+            )) {
                 Button("OK") {
                     viewModel.clearError()
                 }

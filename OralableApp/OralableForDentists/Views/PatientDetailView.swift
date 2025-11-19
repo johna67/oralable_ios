@@ -25,9 +25,8 @@ struct PatientDetailView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
+        ScrollView {
+            VStack(spacing: 24) {
                     // Patient Header
                     PatientHeader(patient: patient)
 
@@ -89,6 +88,22 @@ struct PatientDetailView: View {
                             }
                         }
                     }
+
+                    // Show error inline instead of alert
+                    if let error = errorMessage {
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 40))
+                                .foregroundColor(.red)
+
+                            Text(error)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        .padding(.vertical, 40)
+                    }
                 }
                 .padding(.vertical)
             }
@@ -111,15 +126,6 @@ struct PatientDetailView: View {
                     }
                 }
             }
-            .alert("Error", isPresented: .constant(errorMessage != nil)) {
-                Button("OK") {
-                    errorMessage = nil
-                }
-            } message: {
-                if let error = errorMessage {
-                    Text(error)
-                }
-            }
             .task {
                 await loadData()
             }
@@ -128,7 +134,6 @@ struct PatientDetailView: View {
                     await loadData()
                 }
             }
-        }
     }
 
     // MARK: - Data Loading

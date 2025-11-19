@@ -58,20 +58,46 @@ class DentistDataManager: ObservableObject {
 
     private let container: CKContainer
     private let publicDatabase: CKDatabase
-    private let dentistID: String?
+
+    // Computed property that reads from Keychain (where DentistAuthenticationManager stores it)
+    private var dentistID: String? {
+        // Read from Keychain using the same key as DentistAuthenticationManager
+        let keychainKey = "com.oralable.dentist.userID"
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keychainKey,
+            kSecReturnData as String: true
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecSuccess,
+           let data = result as? Data,
+           let userID = String(data: data, encoding: .utf8) {
+            return userID
+        }
+
+        // Fallback: check UserDefaults for migration (legacy support)
+        return UserDefaults.standard.string(forKey: "dentistAppleID")
+    }
 
     // MARK: - Initialization
 
     private init() {
         // Use same shared container as patient app
         self.container = CKContainer(identifier: "iCloud.com.jacdental.oralable.shared")
+
+        // For development/testing, use private database which auto-creates schemas
+        // In production, switch to publicCloudDatabase after setting up schema
+        #if DEBUG
+        self.publicDatabase = container.privateCloudDatabase
+        #else
         self.publicDatabase = container.publicCloudDatabase
+        #endif
 
-        // Get dentist's Apple ID (from Sign in with Apple)
-        // Inline the call to avoid using 'self' before initialization is complete
-        self.dentistID = UserDefaults.standard.string(forKey: "dentistAppleID")
-
-        // Load existing patients
+        // Load existing patients when initialized
         loadPatients()
     }
 
@@ -209,7 +235,7 @@ class DentistDataManager: ObservableObject {
                             loadedPatients.append(patient)
                         }
                     case .failure(let error):
-                        print("Error loading patient record: \(error)")
+                        Logger.shared.error("[DentistDataManager] Error loading patient record: \(error)")
                     }
                 }
 
@@ -219,9 +245,21 @@ class DentistDataManager: ObservableObject {
                 }
 
             } catch {
-                await MainActor.run {
-                    self.errorMessage = "Failed to load patients: \(error.localizedDescription)"
-                    self.isLoading = false
+                // Check if this is a "record type not found" error
+                // This happens when no patients have been added yet in Development mode
+                let nsError = error as NSError
+                if nsError.domain == CKErrorDomain && nsError.code == CKError.unknownItem.rawValue {
+                    Logger.shared.info("[DentistDataManager] Record type doesn't exist yet - no patients have been added")
+                    await MainActor.run {
+                        self.patients = []
+                        self.isLoading = false
+                    }
+                } else {
+                    Logger.shared.error("[DentistDataManager] Failed to load patients: \(error)")
+                    await MainActor.run {
+                        self.errorMessage = "Failed to load patients: \(error.localizedDescription)"
+                        self.isLoading = false
+                    }
                 }
             }
         }
@@ -297,7 +335,7 @@ class DentistDataManager: ObservableObject {
                         healthSummaries.append(summary)
                     }
                 case .failure(let error):
-                    print("Error loading health record: \(error)")
+                    Logger.shared.error("[DentistDataManager] Error loading health record: \(error)")
                 }
             }
 

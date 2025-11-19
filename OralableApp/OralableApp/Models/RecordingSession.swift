@@ -95,8 +95,16 @@ class RecordingSessionManager: ObservableObject {
     private var sessionDataBuffer: [String] = []
     private let maxBufferSize = 100
 
+    // Reference to SharedDataManager for CloudKit uploads
+    weak var sharedDataManager: SharedDataManager?
+
     private init() {
         loadSessions()
+    }
+
+    /// Set the SharedDataManager for CloudKit uploads
+    func setSharedDataManager(_ manager: SharedDataManager) {
+        self.sharedDataManager = manager
     }
 
     // MARK: - Session Management
@@ -147,6 +155,27 @@ class RecordingSessionManager: ObservableObject {
         currentSession = nil
         Logger.shared.info(" [RecordingSessionManager] Stopped session: \(session.id) - Duration: \(session.formattedDuration)")
         saveSessions()
+
+        // Upload session to CloudKit for dentist access
+        uploadSessionToCloudKit(session)
+    }
+
+    /// Upload completed session to CloudKit in the background
+    private func uploadSessionToCloudKit(_ session: RecordingSession) {
+        guard let sharedDataManager = sharedDataManager else {
+            Logger.shared.warning("[RecordingSessionManager] No SharedDataManager available for CloudKit upload")
+            return
+        }
+
+        Task {
+            do {
+                try await sharedDataManager.uploadRecordingSession(session)
+                Logger.shared.info("[RecordingSessionManager] ✅ Session \(session.id) uploaded to CloudKit")
+            } catch {
+                Logger.shared.error("[RecordingSessionManager] ❌ Failed to upload session to CloudKit: \(error)")
+                // Don't throw - upload failure shouldn't prevent session from being saved locally
+            }
+        }
     }
 
     /// Pause the current recording session

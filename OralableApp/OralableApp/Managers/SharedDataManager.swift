@@ -56,7 +56,10 @@ class SharedDataManager: ObservableObject {
     init(authenticationManager: AuthenticationManager, healthKitManager: HealthKitManager, bleManager: OralableBLE? = nil) {
         // Use shared container for both patient and dentist apps
         self.container = CKContainer(identifier: "iCloud.com.jacdental.oralable.shared")
-        self.publicDatabase = container.publicCloudDatabase
+
+        // For development/testing, use private database which auto-creates schemas
+        // TODO: Switch to publicCloudDatabase in production after setting up schema in CloudKit Dashboard
+        self.publicDatabase = container.privateCloudDatabase
 
         // Store reference to authentication manager
         self.authenticationManager = authenticationManager
@@ -302,6 +305,106 @@ class SharedDataManager: ObservableObject {
             spo2Readings: spo2Readings,
             sleepData: nil
         )
+    }
+
+    // MARK: - Upload Recording Session to CloudKit
+
+    /// Upload a completed recording session to CloudKit for dentist access
+    func uploadRecordingSession(_ session: RecordingSession) async throws {
+        guard let patientID = userID else {
+            throw ShareError.notAuthenticated
+        }
+
+        guard session.status == .completed, let endTime = session.endTime else {
+            Logger.shared.warning("[SharedDataManager] Cannot upload incomplete session")
+            return
+        }
+
+        Logger.shared.info("[SharedDataManager] Uploading session \(session.id) to CloudKit")
+
+        // Get sensor data for the session time range
+        var bruxismEvents = 0
+        var averageIntensity = 0.0
+        var peakIntensity = 0.0
+        var heartRateData: [Double] = []
+        var oxygenSaturation: [Double] = []
+
+        if let ble = bleManager {
+            // Filter sensor data to this session's time range
+            let sessionData = ble.sensorDataHistory.filter {
+                $0.timestamp >= session.startTime && $0.timestamp <= endTime
+            }
+
+            Logger.shared.info("[SharedDataManager] Found \(sessionData.count) sensor readings for session")
+
+            // Calculate bruxism events (simple threshold-based detection)
+            // A bruxism event is detected when accelerometer magnitude exceeds threshold
+            let bruxismThreshold = 2.0 // g-force threshold
+            var isInEvent = false
+
+            for data in sessionData {
+                let magnitude = data.accelerometer.magnitude
+
+                if magnitude > bruxismThreshold {
+                    if !isInEvent {
+                        bruxismEvents += 1
+                        isInEvent = true
+                    }
+                    // Track intensity during events
+                    if magnitude > peakIntensity {
+                        peakIntensity = magnitude
+                    }
+                } else {
+                    isInEvent = false
+                }
+            }
+
+            // Calculate average intensity from all readings
+            if !sessionData.isEmpty {
+                let totalIntensity = sessionData.reduce(0.0) { $0 + $1.accelerometer.magnitude }
+                averageIntensity = totalIntensity / Double(sessionData.count)
+            }
+
+            // Extract heart rate data
+            heartRateData = sessionData.compactMap { $0.heartRate?.bpm }
+
+            // Extract SpO2 data
+            oxygenSaturation = sessionData.compactMap { $0.spo2?.percentage }
+
+            Logger.shared.info("[SharedDataManager] Calculated metrics: \(bruxismEvents) events, peak: \(peakIntensity), avg: \(averageIntensity)")
+        }
+
+        // Create CloudKit record
+        let recordID = CKRecord.ID(recordName: UUID().uuidString)
+        let record = CKRecord(recordType: "HealthDataRecord", recordID: recordID)
+
+        record["patientID"] = patientID as CKRecordValue
+        record["recordingDate"] = session.startTime as CKRecordValue
+        record["sessionDuration"] = session.duration as CKRecordValue
+        record["bruxismEvents"] = bruxismEvents as CKRecordValue
+        record["averageIntensity"] = averageIntensity as CKRecordValue
+        record["peakIntensity"] = peakIntensity as CKRecordValue
+
+        // Store heart rate and SpO2 arrays as JSON data
+        if !heartRateData.isEmpty {
+            if let hrData = try? JSONEncoder().encode(heartRateData) {
+                record["heartRateData"] = hrData as CKRecordValue
+            }
+        }
+
+        if !oxygenSaturation.isEmpty {
+            if let spo2Data = try? JSONEncoder().encode(oxygenSaturation) {
+                record["oxygenSaturation"] = spo2Data as CKRecordValue
+            }
+        }
+
+        do {
+            try await publicDatabase.save(record)
+            Logger.shared.info("[SharedDataManager] ✅ Successfully uploaded session \(session.id) to CloudKit")
+        } catch {
+            Logger.shared.error("[SharedDataManager] ❌ Failed to upload session: \(error)")
+            throw ShareError.cloudKitError(error)
+        }
     }
 }
 

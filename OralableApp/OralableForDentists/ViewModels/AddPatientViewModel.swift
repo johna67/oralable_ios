@@ -62,20 +62,30 @@ class AddPatientViewModel: ObservableObject {
     // MARK: - Actions
 
     func addPatient() {
-        guard canAddPatient else { return }
+        Logger.shared.info("[AddPatientViewModel] addPatient called, shareCode: \(shareCode)")
+        Logger.shared.info("[AddPatientViewModel] canAddPatient: \(canAddPatient)")
+        guard canAddPatient else {
+            Logger.shared.warning("[AddPatientViewModel] canAddPatient is false, returning")
+            return
+        }
 
         // Check subscription limits
         let currentPatientCount = dataManager.patients.count
+        Logger.shared.info("[AddPatientViewModel] Current patient count: \(currentPatientCount)")
         if !subscriptionManager.canAddMorePatients(currentCount: currentPatientCount) {
+            Logger.shared.warning("[AddPatientViewModel] Patient limit reached")
             errorMessage = "You've reached your patient limit. Please upgrade to add more patients."
             return
         }
 
+        Logger.shared.info("[AddPatientViewModel] Starting CloudKit query for share code: \(shareCode)")
         Task {
             do {
                 try await dataManager.addPatientWithShareCode(shareCode)
+                Logger.shared.info("[AddPatientViewModel] Successfully added patient")
                 shareCode = ""
             } catch {
+                Logger.shared.error("[AddPatientViewModel] Error adding patient: \(error)")
                 // Error is handled by subscription to dataManager.$errorMessage
             }
         }

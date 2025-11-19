@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 @main
 struct OralableForDentists: App {
@@ -58,7 +59,6 @@ struct DentistMainTabView: View {
 /// Onboarding view for dentist app
 struct DentistOnboardingView: View {
     @EnvironmentObject var authenticationManager: DentistAuthenticationManager
-    @State private var showingAuthenticationView = false
 
     private let onboardingPages = [
         DentistOnboardingPage(
@@ -108,23 +108,27 @@ struct DentistOnboardingView: View {
 
             Spacer()
 
-            // Sign In Button
-            Button(action: {
-                showingAuthenticationView = true
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.badge.key.fill")
-                    Text("Sign In with Apple")
-                }
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.black)
-                .cornerRadius(12)
-            }
+            // Sign In with Apple Button
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                },
+                onCompletion: authenticationManager.handleSignIn
+            )
+            .frame(height: 50)
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
+            .signInWithAppleButtonStyle(.black)
+
+            if let errorMessage = authenticationManager.authenticationError {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+            }
 
             // Footer
             VStack(spacing: 8) {
@@ -141,9 +145,6 @@ struct DentistOnboardingView: View {
                 .foregroundColor(.secondary)
             }
             .padding(.bottom, 40)
-        }
-        .sheet(isPresented: $showingAuthenticationView) {
-            DentistAuthenticationView()
         }
     }
 }
@@ -204,29 +205,31 @@ struct DentistAuthenticationView: View {
 
                 Spacer()
 
-                Button(action: {
-                    Task {
-                        do {
-                            try await authenticationManager.signInWithApple()
+                // Apple Sign In Button
+                SignInWithAppleButton(
+                    .signIn,
+                    onRequest: { request in
+                        request.requestedScopes = [.fullName, .email]
+                    },
+                    onCompletion: { result in
+                        authenticationManager.handleSignIn(result: result)
+                        if case .success = result {
                             dismiss()
-                        } catch {
-                            // Error handling
                         }
                     }
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "person.badge.key.fill")
-                        Text("Sign In with Apple")
-                    }
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.black)
-                    .cornerRadius(12)
-                }
+                )
+                .frame(height: 50)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
+                .signInWithAppleButtonStyle(.black)
+
+                if let errorMessage = authenticationManager.authenticationError {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -244,5 +247,5 @@ struct DentistAuthenticationView: View {
 
 #Preview {
     DentistOnboardingView()
-        .environmentObject(DentistAuthenticationManager.shared)
+        .environmentObject(DentistAuthenticationManager())
 }

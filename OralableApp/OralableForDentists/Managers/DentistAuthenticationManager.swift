@@ -1,124 +1,85 @@
+//
+//  DentistAuthenticationManager.swift
+//  OralableForDentists
+//
+//  Manages authentication for dentist app using Sign in with Apple
+//  Inherits common Apple Sign In functionality from BaseAuthenticationManager
+//
+
 import Foundation
 import AuthenticationServices
 import SwiftUI
-import Combine
 
-/// Manages authentication for dentist app using Sign in with Apple
+/// Dentist app authentication manager
+/// Inherits common Apple Sign In functionality from BaseAuthenticationManager
 @MainActor
-class DentistAuthenticationManager: NSObject, ObservableObject {
-    static let shared = DentistAuthenticationManager()
+class DentistAuthenticationManager: BaseAuthenticationManager {
 
-    // MARK: - Published Properties
+    // MARK: - Dentist-Specific Properties
 
-    @Published var isAuthenticated: Bool = false
-    @Published var dentistID: String?
-    @Published var dentistName: String?
-    @Published var dentistEmail: String?
-    @Published var authenticationError: String?
+    /// Convenience accessors for dentist-specific naming
+    var dentistID: String? { userID }
+    var dentistName: String? { userFullName }
+    var dentistEmail: String? { userEmail }
 
-    // MARK: - Private Properties
+    // MARK: - Keychain Configuration Override
 
-    private let userIDKey = "dentistAppleID"
-    private let nameKey = "dentistName"
-    private let emailKey = "dentistEmail"
+    /// Override to use dentist-specific keychain keys
+    override var keychainKeys: (userID: String, email: String, fullName: String) {
+        return (
+            "com.oralable.dentist.userID",
+            "com.oralable.dentist.userEmail",
+            "com.oralable.dentist.userFullName"
+        )
+    }
 
     // MARK: - Initialization
 
-    private override init() {
+    override init() {
         super.init()
-        loadAuthenticationState()
+
+        // Migrate any existing UserDefaults data to Keychain
+        migrateFromUserDefaults()
+
+        Logger.shared.info("[DentistAuth] Dentist authentication manager initialized")
     }
 
-    // MARK: - Authentication Methods
+    // MARK: - Migration from UserDefaults
 
-    func signInWithApple() async throws {
-        let provider = ASAuthorizationAppleIDProvider()
-        let request = provider.createRequest()
-        request.requestedScopes = [.fullName, .email]
+    /// Migrate authentication data from UserDefaults to secure Keychain storage
+    private func migrateFromUserDefaults() {
+        let userIDKey = "dentistAppleID"
+        let nameKey = "dentistName"
+        let emailKey = "dentistEmail"
 
-        do {
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            // Note: In production, would use a proper delegate pattern
-            // For now, this is a simplified version
-            authenticationError = nil
-        } catch {
-            authenticationError = "Authentication failed: \(error.localizedDescription)"
-            throw error
+        // Check if there's data in UserDefaults that needs migration
+        if let oldUserID = UserDefaults.standard.string(forKey: userIDKey) {
+            Logger.shared.info("[DentistAuth] Migrating authentication data from UserDefaults to Keychain")
+
+            let oldName = UserDefaults.standard.string(forKey: nameKey)
+            let oldEmail = UserDefaults.standard.string(forKey: emailKey)
+
+            // Save to keychain
+            saveUserAuthentication(userID: oldUserID, email: oldEmail, fullName: oldName)
+
+            // Update published properties
+            self.userID = oldUserID
+            self.userEmail = oldEmail
+            self.userFullName = oldName
+            self.isAuthenticated = true
+
+            // Clear UserDefaults
+            UserDefaults.standard.removeObject(forKey: userIDKey)
+            UserDefaults.standard.removeObject(forKey: nameKey)
+            UserDefaults.standard.removeObject(forKey: emailKey)
+
+            Logger.shared.info("[DentistAuth] Migration complete - data now securely stored in Keychain")
         }
-    }
-
-    func handleSignInWithAppleCompletion(result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let authorization):
-            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                let userID = appleIDCredential.user
-
-                // Extract name if available
-                var fullName: String?
-                if let givenName = appleIDCredential.fullName?.givenName,
-                   let familyName = appleIDCredential.fullName?.familyName {
-                    fullName = "\(givenName) \(familyName)"
-                }
-
-                // Extract email if available
-                let email = appleIDCredential.email
-
-                // Save authentication state
-                self.dentistID = userID
-                self.dentistName = fullName
-                self.dentistEmail = email
-                self.isAuthenticated = true
-
-                saveAuthenticationState()
-
-                Logger.shared.info("[DentistAuth] Successfully authenticated: \(userID)")
-            }
-
-        case .failure(let error):
-            self.authenticationError = "Authentication failed: \(error.localizedDescription)"
-            Logger.shared.error("[DentistAuth] Authentication failed: \(error)")
-        }
-    }
-
-    func signOut() {
-        dentistID = nil
-        dentistName = nil
-        dentistEmail = nil
-        isAuthenticated = false
-
-        clearAuthenticationState()
-
-        Logger.shared.info("[DentistAuth] User signed out")
-    }
-
-    // MARK: - Persistence
-
-    private func saveAuthenticationState() {
-        UserDefaults.standard.set(dentistID, forKey: userIDKey)
-        UserDefaults.standard.set(dentistName, forKey: nameKey)
-        UserDefaults.standard.set(dentistEmail, forKey: emailKey)
-    }
-
-    private func loadAuthenticationState() {
-        dentistID = UserDefaults.standard.string(forKey: userIDKey)
-        dentistName = UserDefaults.standard.string(forKey: nameKey)
-        dentistEmail = UserDefaults.standard.string(forKey: emailKey)
-
-        isAuthenticated = dentistID != nil
-
-        if isAuthenticated {
-            Logger.shared.info("[DentistAuth] Loaded existing authentication state")
-        }
-    }
-
-    private func clearAuthenticationState() {
-        UserDefaults.standard.removeObject(forKey: userIDKey)
-        UserDefaults.standard.removeObject(forKey: nameKey)
-        UserDefaults.standard.removeObject(forKey: emailKey)
     }
 
     // MARK: - Credential State Check
 
+    /// Check if the Apple ID credential is still valid
     func checkCredentialState() async {
         guard let dentistID = dentistID else { return }
 
@@ -131,10 +92,15 @@ class DentistAuthenticationManager: NSObject, ObservableObject {
                 switch state {
                 case .authorized:
                     self.isAuthenticated = true
+                    Logger.shared.info("[DentistAuth] Credential state: authorized")
+
                 case .revoked, .notFound:
+                    Logger.shared.warning("[DentistAuth] Credential state: revoked/not found - signing out")
                     self.signOut()
+
                 case .transferred:
                     Logger.shared.warning("[DentistAuth] Credential transferred")
+
                 @unknown default:
                     Logger.shared.warning("[DentistAuth] Unknown credential state")
                 }
@@ -142,17 +108,5 @@ class DentistAuthenticationManager: NSObject, ObservableObject {
         } catch {
             Logger.shared.error("[DentistAuth] Failed to check credential state: \(error)")
         }
-    }
-}
-
-// MARK: - ASAuthorizationControllerDelegate
-
-extension DentistAuthenticationManager: ASAuthorizationControllerDelegate {
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        handleSignInWithAppleCompletion(result: .success(authorization))
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        handleSignInWithAppleCompletion(result: .failure(error))
     }
 }

@@ -73,11 +73,11 @@ class DentistSettingsViewModel: ObservableObject {
             .assign(to: &$errorMessage)
 
         // Subscribe to authentication manager updates
-        authenticationManager.$dentistName
+        authenticationManager.$userFullName
             .receive(on: DispatchQueue.main)
             .assign(to: &$dentistName)
 
-        authenticationManager.$dentistEmail
+        authenticationManager.$userEmail
             .receive(on: DispatchQueue.main)
             .assign(to: &$dentistEmail)
     }
