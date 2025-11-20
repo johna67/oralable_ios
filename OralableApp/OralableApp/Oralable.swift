@@ -9,19 +9,10 @@ import SwiftUI
 
 @main
 struct Oralable: App {
-    // Initialize the dependency injection container
-    @StateObject private var dependencies: AppDependencies
-
-    init() {
-        // Patient app always uses subscription mode (device + authentication)
-        let deps = AppDependencies(appMode: .subscription)
-        _dependencies = StateObject(wrappedValue: deps)
-    }
-
     var body: some Scene {
         WindowGroup {
             RootView()
-                .withDependencies(dependencies)
+                .withDependencies(AppDependencies.shared)
         }
     }
 }

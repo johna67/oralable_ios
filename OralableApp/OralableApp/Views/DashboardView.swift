@@ -486,9 +486,6 @@ struct WaveformCard: View {
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         DashboardView()
-            .environmentObject(DesignSystem())
-            .environmentObject(AppDependencies())
-            .environmentObject(HealthKitManager())
-            .environmentObject(OralableBLE())
+            .withDependencies(AppDependencies.shared)
     }
 }

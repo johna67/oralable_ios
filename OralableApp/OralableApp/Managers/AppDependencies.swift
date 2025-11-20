@@ -13,10 +13,15 @@ import SwiftUI
 /// Replaces singleton pattern with proper dependency management
 @MainActor
 class AppDependencies: ObservableObject {
-    // MARK: - Singleton Prevention
+    // MARK: - Singleton
+
+    /// Shared singleton instance - use this throughout the app
+    static let shared = AppDependencies(appMode: .subscription)
+
+    // MARK: - Initialization Tracking
 
     private static var initializationCount = 0
-    private static let maxInitializations = 2  // Allow app + cached default only
+    private let instanceId: Int
 
     // MARK: - Core Services
 
@@ -41,16 +46,18 @@ class AppDependencies: ObservableObject {
     // MARK: - Initialization
 
     /// Initializes all dependencies with proper dependency graph
-    init(appMode: AppMode = .subscription) {
-        // CRITICAL: Prevent runaway initialization that causes memory crashes
+    /// - Parameter appMode: The app mode (subscription or viewer)
+    /// - Note: Use AppDependencies.shared in production. Only create new instances for testing.
+    fileprivate init(appMode: AppMode = .subscription) {
+        // Track initialization for debugging
         AppDependencies.initializationCount += 1
-        let count = AppDependencies.initializationCount
+        self.instanceId = AppDependencies.initializationCount
 
-        Logger.shared.info("[AppDependencies] Initializing dependency container #\(count) for mode: \(appMode)")
+        Logger.shared.info("[AppDependencies] Initializing dependency container instance #\(instanceId) for mode: \(appMode)")
 
-        if count > AppDependencies.maxInitializations {
-            Logger.shared.error("[AppDependencies] ⚠️ CRITICAL: Too many initializations (\(count))! This will cause memory crash. Aborting.")
-            fatalError("[AppDependencies] Runaway initialization detected - preventing memory leak crash")
+        // Log warning if creating multiple instances (should only happen in tests/previews)
+        if instanceId > 1 {
+            Logger.shared.warning("[AppDependencies] ⚠️ Creating instance #\(instanceId) - should normally use AppDependencies.shared")
         }
 
         // Initialize managers in correct order (dependency injection - no more singletons!)
@@ -164,13 +171,9 @@ extension AppDependencies {
 /// Environment key for accessing dependencies throughout the app
 struct AppDependenciesKey: EnvironmentKey {
     @MainActor static var defaultValue: AppDependencies {
-        // Use a cached singleton to prevent repeated initialization
-        // This prevents memory leaks from creating new instances on every access
-        _cachedDefaultDependencies
+        // Always use the shared singleton instance
+        AppDependencies.shared
     }
-
-    // Cached instance to prevent repeated initialization
-    @MainActor private static let _cachedDefaultDependencies = AppDependencies()
 }
 
 extension EnvironmentValues {
