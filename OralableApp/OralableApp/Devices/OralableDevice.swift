@@ -265,24 +265,33 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     }
     
     func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
+        // Get next timestamp (ensure it's always increasing)
+        timestampLock.lock()
+        let now = Date()
+        // Ensure timestamp advances by at least 0.02 seconds (50Hz) from last packet
+        let minNextTimestamp = lastTimestamp.addingTimeInterval(0.02)
+        let timestamp = now > minNextTimestamp ? now : minNextTimestamp
+        lastTimestamp = timestamp
+        timestampLock.unlock()
+
         // Route based on known characteristic UUIDs (no logging per packet - too verbose)
         if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
-            return parseSensorData(data)
+            return parseSensorData(data, timestamp: timestamp)
         } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
-            return parsePPGWaveform(data)
+            return parsePPGWaveform(data, timestamp: timestamp)
         } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-            return parseBatteryData(data)
+            return parseBatteryData(data, timestamp: timestamp)
         } else {
             // For unknown characteristics (003-008), use data size to identify type
             switch data.count {
             case 4:
-                return parseBatteryData(data)
+                return parseBatteryData(data, timestamp: timestamp)
             case 8:
-                return parseTemperatureData(data)
+                return parseTemperatureData(data, timestamp: timestamp)
             case 154:
-                return parsePPGWaveform(data)
+                return parsePPGWaveform(data, timestamp: timestamp)
             case 244:
-                return parseSensorData(data)
+                return parseSensorData(data, timestamp: timestamp)
             default:
                 // Only log unknown formats
                 Logger.shared.warning("[OralableDevice] Unknown data format: \(data.count) bytes from \(characteristic.uuid.uuidString)")
@@ -343,17 +352,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
     // MARK: - Data Parsing
     
-    private func parseSensorData(_ data: Data) -> [SensorReading] {
+    private func parseSensorData(_ data: Data, timestamp: Date) -> [SensorReading] {
         var readings: [SensorReading] = []
-
-        // Get next timestamp (ensure it's always increasing)
-        timestampLock.lock()
-        let now = Date()
-        // Ensure timestamp advances by at least 0.02 seconds (50Hz) from last packet
-        let minNextTimestamp = lastTimestamp.addingTimeInterval(0.02)
-        let timestamp = now > minNextTimestamp ? now : minNextTimestamp
-        lastTimestamp = timestamp
-        timestampLock.unlock()
 
         Logger.shared.debug("[OralableDevice] parseSensorData called with timestamp: \(timestamp)")
 
@@ -460,7 +460,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         return readings
     }
     
-    private func parsePPGWaveform(_ data: Data) -> [SensorReading] {
+    private func parsePPGWaveform(_ data: Data, timestamp: Date) -> [SensorReading] {
         // NOTE: Despite the name, characteristic 3A0FF002 is actually ACCELEROMETER data
         // Accelerometer characteristic: tgm_service_acc_data_t structure
         // Bytes 0-3: frame counter (uint32)
@@ -471,7 +471,6 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         // Total: 4 + (25 * 6) = 154 bytes
 
         var readings: [SensorReading] = []
-        let timestamp = Date()
 
         guard data.count >= 154 else {
             Logger.shared.warning("[OralableDevice] Insufficient accelerometer data: \(data.count) bytes (expected 154)")
@@ -577,7 +576,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         return readings
     }
     
-    private func parseBatteryData(_ data: Data) -> [SensorReading] {
+    private func parseBatteryData(_ data: Data, timestamp: Date) -> [SensorReading] {
         // Battery voltage data: 4 bytes as int32 in millivolts (mV)
         guard data.count >= 4 else {
             Logger.shared.warning("[OralableDevice] Insufficient battery data: \(data.count) bytes (expected 4)")
@@ -608,7 +607,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         let reading = SensorReading(
             sensorType: .battery,
             value: batteryPercent,
-            timestamp: Date(),
+            timestamp: timestamp,
             deviceId: peripheral?.identifier.uuidString,
             quality: 1.0
         )
@@ -620,7 +619,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         return [reading]
     }
 
-    private func parseTemperatureData(_ data: Data) -> [SensorReading] {
+    private func parseTemperatureData(_ data: Data, timestamp: Date) -> [SensorReading] {
         // Temperature data: 8 bytes total
         // Bytes 0-3: frame counter (uint32)
         // Bytes 4-5: temperature as signed int16 in centidegree Celsius (1/100th degree)
@@ -646,7 +645,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         let reading = SensorReading(
             sensorType: .temperature,
             value: temperatureCelsius,
-            timestamp: Date(),
+            timestamp: timestamp,
             deviceId: peripheral?.identifier.uuidString,
             quality: 1.0
         )
