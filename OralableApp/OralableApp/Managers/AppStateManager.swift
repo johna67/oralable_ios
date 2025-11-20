@@ -3,6 +3,9 @@ import Combine
 
 @MainActor
 class AppStateManager: ObservableObject {
+    // Singleton for backward compatibility
+    static let shared = AppStateManager()
+
     // Patient app is always in subscription mode
     @Published var selectedMode: AppMode? = .subscription
 

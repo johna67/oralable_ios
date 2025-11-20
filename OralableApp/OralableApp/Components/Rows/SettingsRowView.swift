@@ -47,29 +47,29 @@ struct SettingsRowView: View {
             HStack(spacing: designSystem.spacing.md) {
                 // Icon
                 Image(systemName: icon)
-                    .font(.system(size: DesignSystem.Sizing.Icon.md))
+                    .font(.system(size: 20))
                     .foregroundColor(iconColor ?? designSystem.colors.textPrimary)
                     .frame(width: 28)
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(designSystem.typography.bodyMedium)
                         .foregroundColor(designSystem.colors.textPrimary)
-                    
+
                     if let subtitle = subtitle {
                         Text(subtitle)
                             .font(designSystem.typography.caption)
                             .foregroundColor(designSystem.colors.textTertiary)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Chevron
                 if showChevron {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: DesignSystem.Sizing.Icon.sm))
+                        .font(.system(size: 14))
                         .foregroundColor(designSystem.colors.textTertiary)
                 }
             }
@@ -85,8 +85,8 @@ struct SettingsRowView: View {
 
 struct SettingsRowView_Previews: PreviewProvider {
     static var previews: some View {
-        let designSystem = DesignSystem()
-        VStack(spacing: designSystem.spacing.xs) {
+        let ds = DesignSystem()
+        return VStack(spacing: ds.spacing.xs) {
             SettingsRowView(
                 icon: "person.fill",
                 title: "Account",
@@ -97,7 +97,7 @@ struct SettingsRowView_Previews: PreviewProvider {
             SettingsRowView(
                 icon: "bell.fill",
                 title: "Notifications",
-                iconColor: designSystem.colors.warning,
+                iconColor: .orange,
                 action: {}
             )
 
@@ -111,14 +111,14 @@ struct SettingsRowView_Previews: PreviewProvider {
             SettingsRowView(
                 icon: "info.circle.fill",
                 title: "About",
-                iconColor: designSystem.colors.info,
+                iconColor: .blue,
                 showChevron: false,
                 action: {}
             )
         }
         .padding()
-        .background(designSystem.colors.backgroundPrimary)
-        .environmentObject(designSystem)
+        .background(Color(UIColor.systemBackground))
+        .environmentObject(ds)
     }
 }
 

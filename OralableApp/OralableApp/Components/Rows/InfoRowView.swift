@@ -66,8 +66,8 @@ struct InfoRowView: View {
 
 struct InfoRowView_Previews: PreviewProvider {
     static var previews: some View {
-        let designSystem = DesignSystem()
-        VStack(spacing: designSystem.spacing.sm) {
+        let ds = DesignSystem()
+        return VStack(spacing: ds.spacing.sm) {
             InfoRowView(
                 icon: "person.fill",
                 title: "Name",
@@ -78,7 +78,7 @@ struct InfoRowView_Previews: PreviewProvider {
                 icon: "envelope.fill",
                 title: "Email",
                 value: "john@example.com",
-                iconColor: designSystem.colors.info
+                iconColor: .blue
             )
 
             InfoRowView(
@@ -91,12 +91,12 @@ struct InfoRowView_Previews: PreviewProvider {
                 icon: "heart.fill",
                 title: "Heart Rate",
                 value: "72 bpm",
-                iconColor: designSystem.colors.error
+                iconColor: .red
             )
         }
         .padding()
-        .background(designSystem.colors.backgroundPrimary)
-        .environmentObject(designSystem)
+        .background(Color(UIColor.systemBackground))
+        .environmentObject(ds)
     }
 }
 

@@ -18,6 +18,10 @@ import CoreBluetooth
 
 @MainActor
 class OralableBLE: ObservableObject {
+    // MARK: - Singleton (Backward Compatibility)
+
+    static let shared = OralableBLE()
+
     // MARK: - Type Aliases for Backward Compatibility
 
     typealias DiscoveredDeviceInfo = BLEDataPublisher.DiscoveredDeviceInfo
@@ -33,7 +37,7 @@ class OralableBLE: ObservableObject {
 
     private let deviceManager: DeviceManager
     private let stateDetector: DeviceStateDetector
-    private let healthKitManager: HealthKitManager
+    let healthKitManager: HealthKitManager  // Public for backward compatibility
 
     // MARK: - Published Properties (Forwarded from Components)
 
