@@ -21,28 +21,39 @@ struct HistoricalView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var historicalDataManager: HistoricalDataManager
     @EnvironmentObject var bleManager: OralableBLE
-    @StateObject private var viewModel: HistoricalViewModel
+    @State private var viewModel: HistoricalViewModel?
     @State private var selectedDataPoint: HistoricalDataPoint?
     @State private var showingExportSheet = false
     @State private var showingDatePicker = false
 
     let metricType: String // "Movement", "HeartRate", "SpO2", etc.
 
-    init(metricType: String = "Movement", viewModel: HistoricalViewModel? = nil) {
+    init(metricType: String = "Movement") {
         self.metricType = metricType
-
-        // Use provided viewModel or create with default initializer
-        // The viewModel will get the historicalDataManager from the environment
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else {
-            _viewModel = StateObject(wrappedValue: HistoricalViewModel())
-        }
-
         Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType)")
     }
 
     var body: some View {
+        Group {
+            if let vm = viewModel {
+                historicalContent(viewModel: vm)
+            } else {
+                ProgressView("Loading...")
+                    .task {
+                        // Initialize viewModel from environment's historicalDataManager
+                        if viewModel == nil {
+                            Logger.shared.info("[HistoricalView] Creating ViewModel with historicalDataManager from environment")
+                            viewModel = HistoricalViewModel(historicalDataManager: historicalDataManager)
+                        }
+                    }
+            }
+        }
+        .navigationTitle(metricType)
+        .navigationBarTitleDisplayMode(.large)
+    }
+
+    @ViewBuilder
+    private func historicalContent(viewModel: HistoricalViewModel) -> some View {
         ScrollView {
             VStack(spacing: designSystem.spacing.lg) {
                 // Debug info
@@ -53,19 +64,17 @@ struct HistoricalView: View {
                 }
 
                 // Time Range Selector
-                timeRangeSelector
+                timeRangeSelector(viewModel: viewModel)
 
                 // Chart for selected metric
                 if viewModel.hasCurrentMetrics {
-                    metricChart
+                    metricChart(viewModel: viewModel)
                 } else {
                     emptyStateView
                 }
             }
             .padding(designSystem.spacing.md)
         }
-        .navigationTitle(metricType)
-        .navigationBarTitleDisplayMode(.large)
         .onAppear {
             Logger.shared.debug("[HistoricalView] View appeared for metric: \(metricType)")
 
@@ -99,17 +108,20 @@ struct HistoricalView: View {
 
     // MARK: - Time Range Selector
 
-    private var timeRangeSelector: some View {
+    private func timeRangeSelector(viewModel: HistoricalViewModel) -> some View {
         VStack(spacing: designSystem.spacing.sm) {
-            Picker("Time Range", selection: $viewModel.selectedTimeRange) {
+            Picker("Time Range", selection: Binding(
+                get: { viewModel.selectedTimeRange },
+                set: { newValue in
+                    viewModel.selectedTimeRange = newValue
+                    viewModel.updateCurrentRangeMetrics()
+                }
+            )) {
                 Text("Hour").tag(TimeRange.hour)
                 Text("Day").tag(TimeRange.day)
                 Text("Week").tag(TimeRange.week)
             }
             .pickerStyle(SegmentedPickerStyle())
-            .onChange(of: viewModel.selectedTimeRange) { _ in
-                viewModel.updateCurrentRangeMetrics()
-            }
 
             // Navigation Arrows
             HStack {
@@ -142,9 +154,9 @@ struct HistoricalView: View {
 
     // MARK: - Metric Chart
 
-    private var metricChart: some View {
+    private func metricChart(viewModel: HistoricalViewModel) -> some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            chartForMetric
+            chartForMetric(viewModel: viewModel)
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)
@@ -152,20 +164,20 @@ struct HistoricalView: View {
     }
 
     @ViewBuilder
-    private var chartForMetric: some View {
+    private func chartForMetric(viewModel: HistoricalViewModel) -> some View {
         switch metricType {
         case "Movement":
-            accelerometerChart
+            accelerometerChart(viewModel: viewModel)
         case "Heart Rate":
-            heartRateChart
+            heartRateChart(viewModel: viewModel)
         case "SpO2":
-            spo2Chart
+            spo2Chart(viewModel: viewModel)
         default:
-            accelerometerChart
+            accelerometerChart(viewModel: viewModel)
         }
     }
 
-    private var accelerometerChart: some View {
+    private func accelerometerChart(viewModel: HistoricalViewModel) -> some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             Text("Movement Activity")
                 .font(designSystem.typography.h3)
@@ -204,7 +216,7 @@ struct HistoricalView: View {
         }
     }
 
-    private var heartRateChart: some View {
+    private func heartRateChart(viewModel: HistoricalViewModel) -> some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             Text("Heart Rate")
                 .font(designSystem.typography.h3)
@@ -243,7 +255,7 @@ struct HistoricalView: View {
         }
     }
 
-    private var spo2Chart: some View {
+    private func spo2Chart(viewModel: HistoricalViewModel) -> some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
             Text("Blood Oxygen")
                 .font(designSystem.typography.h3)

@@ -395,11 +395,6 @@ class HistoricalViewModel: ObservableObject {
         Logger.shared.info("[HistoricalViewModel] ✅ HistoricalViewModel initialization complete")
     }
 
-    /// Legacy initializer using shared instance (for views that don't inject dependencies)
-    convenience init() {
-        self.init(historicalDataManager: HistoricalDataManager.shared)
-    }
-    
     // MARK: - Setup
     
     private func setupBindings() {

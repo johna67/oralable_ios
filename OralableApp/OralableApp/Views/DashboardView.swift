@@ -399,8 +399,10 @@ struct DashboardView: View {
             )
 
             // Accelerometer - Tappable to view history
-            NavigationLink(destination: HistoricalView(metricType: "Movement", bleManager: bleManager)
-                .environmentObject(designSystem)) {
+            NavigationLink(destination: HistoricalView(metricType: "Movement")
+                .environmentObject(designSystem)
+                .environmentObject(dependencies.historicalDataManager)
+                .environmentObject(bleManager)) {
                 WaveformCard(
                     title: "Movement",
                     data: viewModel.accelerometerData,

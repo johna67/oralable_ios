@@ -14,7 +14,7 @@ class HistoricalDataManager: ObservableObject {
 
     @Published var isUpdating = false
     @Published var lastUpdateTime: Date?
-    
+
     // MARK: - Private Properties
     private var updateTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
