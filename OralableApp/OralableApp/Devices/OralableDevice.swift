@@ -90,7 +90,11 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
 
     // Packet counter for throttled logging
     private var packetCount = 0
-    
+
+    // Last timestamp used for sensor data (to ensure monotonically increasing timestamps)
+    private var lastTimestamp: Date = Date()
+    private let timestampLock = NSLock()
+
     // MARK: - Initialization
     
     init(peripheral: CBPeripheral, deviceInfo: DeviceInfo? = nil) {
@@ -341,7 +345,17 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     
     private func parseSensorData(_ data: Data) -> [SensorReading] {
         var readings: [SensorReading] = []
-        let timestamp = Date()
+
+        // Get next timestamp (ensure it's always increasing)
+        timestampLock.lock()
+        let now = Date()
+        // Ensure timestamp advances by at least 0.02 seconds (50Hz) from last packet
+        let minNextTimestamp = lastTimestamp.addingTimeInterval(0.02)
+        let timestamp = now > minNextTimestamp ? now : minNextTimestamp
+        lastTimestamp = timestamp
+        timestampLock.unlock()
+
+        Logger.shared.debug("[OralableDevice] parseSensorData called with timestamp: \(timestamp)")
 
         // PPG characteristic 3A0FF001: tgm_service_ppg_data_t structure
         // Bytes 0-3: frame counter (uint32)
