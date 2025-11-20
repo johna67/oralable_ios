@@ -28,12 +28,18 @@ struct HistoricalView: View {
 
     let metricType: String // "Movement", "HeartRate", "SpO2", etc.
 
-    init(metricType: String = "Movement", bleManager: OralableBLE? = nil) {
+    init(metricType: String = "Movement", viewModel: HistoricalViewModel? = nil) {
         self.metricType = metricType
-        // Create HistoricalDataManager with the provided bleManager
-        let manager = HistoricalDataManager(bleManager: bleManager)
-        _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
-        Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType), bleManager: \(bleManager == nil ? "NIL" : "PROVIDED")")
+
+        // Use provided viewModel or create with default initializer
+        // The viewModel will get the historicalDataManager from the environment
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: HistoricalViewModel())
+        }
+
+        Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType)")
     }
 
     var body: some View {

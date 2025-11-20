@@ -384,6 +384,7 @@ class HistoricalViewModel: ObservableObject {
     
     // MARK: - Initialization
 
+    /// Initialize with injected historicalDataManager (preferred)
     init(historicalDataManager: HistoricalDataManager) {
         Logger.shared.info("[HistoricalViewModel] 🚀 Initializing HistoricalViewModel...")
         self.historicalDataManager = historicalDataManager
@@ -392,6 +393,11 @@ class HistoricalViewModel: ObservableObject {
         Logger.shared.info("[HistoricalViewModel] Updating current metrics for initial selectedTimeRange: \(selectedTimeRange)")
         updateCurrentMetrics()
         Logger.shared.info("[HistoricalViewModel] ✅ HistoricalViewModel initialization complete")
+    }
+
+    /// Legacy initializer using shared instance (for views that don't inject dependencies)
+    convenience init() {
+        self.init(historicalDataManager: HistoricalDataManager.shared)
     }
     
     // MARK: - Setup
