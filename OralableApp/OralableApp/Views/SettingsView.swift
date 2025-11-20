@@ -9,7 +9,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @StateObject private var viewModel: SettingsViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var authenticationManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
@@ -17,94 +16,116 @@ struct SettingsView: View {
     @EnvironmentObject var bleManager: OralableBLE
     @EnvironmentObject var healthKitManager: HealthKitManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dependencies) private var dependencies
+
+    // Use lazy wrapper to defer ViewModel creation until after environment is available
+    @State private var _viewModel: SettingsViewModel?
+
+    private var viewModel: SettingsViewModel {
+        get { _viewModel! }
+        set { _viewModel = newValue }
+    }
+
     @State private var showingExportSheet = false
     @State private var showingAuthenticationView = false
     @State private var showingSubscriptionView = false
     @State private var showingSignOutAlert = false
     @State private var showingChangeModeAlert = false
 
-    init(viewModel: SettingsViewModel? = nil) {
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else {
-            // Legacy path - create with new BLE manager instance
-            let bleManager = OralableBLE()
-            _viewModel = StateObject(wrappedValue: SettingsViewModel(bleManager: bleManager))
-        }
+    var body: some View {
+        settingsContent
+            .onAppear {
+                // Initialize viewModel once when view appears
+                if _viewModel == nil {
+                    Logger.shared.info("[SettingsView] Creating ViewModel using factory method")
+                    _viewModel = dependencies.makeSettingsViewModel()
+                }
+            }
     }
 
-    var body: some View {
-        NavigationView {
-            List {
-                accountAndPreferencesGroup
-                deviceAndNotificationsGroup
-                healthIntegrationGroup
-                dataAndPrivacyGroup
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .semibold))
-                            Text("Back")
+    @ViewBuilder
+    private var settingsContent: some View {
+        if _viewModel != nil {
+            NavigationView {
+                List {
+                    accountAndPreferencesGroup(viewModel)
+                    deviceAndNotificationsGroup(viewModel)
+                    healthIntegrationGroup(viewModel)
+                    dataAndPrivacyGroup(viewModel)
+                }
+                .navigationTitle("Settings")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { dismiss() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 17, weight: .semibold))
+                                Text("Back")
+                            }
+                            .foregroundColor(designSystem.colors.primaryBlack)
                         }
-                        .foregroundColor(designSystem.colors.primaryBlack)
                     }
                 }
             }
-        }
-        .alert("Clear All Data?", isPresented: $viewModel.showClearDataConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clear", role: .destructive) {
-                viewModel.clearAllData()
+            .alert("Clear All Data?", isPresented: Binding(
+                get: { viewModel.showClearDataConfirmation },
+                set: { viewModel.showClearDataConfirmation = $0 }
+            )) {
+                Button("Cancel", role: .cancel) {}
+                Button("Clear", role: .destructive) {
+                    viewModel.clearAllData()
+                }
+            } message: {
+                Text("This will permanently delete all historical data. This action cannot be undone.")
             }
-        } message: {
-            Text("This will permanently delete all historical data. This action cannot be undone.")
-        }
-        .alert("Reset Settings?", isPresented: $viewModel.showResetConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Reset", role: .destructive) {
-                viewModel.resetToDefaults()
+            .alert("Reset Settings?", isPresented: Binding(
+                get: { viewModel.showResetConfirmation },
+                set: { viewModel.showResetConfirmation = $0 }
+            )) {
+                Button("Cancel", role: .cancel) {}
+                Button("Reset", role: .destructive) {
+                    viewModel.resetToDefaults()
+                }
+            } message: {
+                Text("This will reset all settings to their default values.")
             }
-        } message: {
-            Text("This will reset all settings to their default values.")
-        }
-        .sheet(isPresented: $showingExportSheet) {
-            ShareView(ble: bleManager)
-        }
-        .sheet(isPresented: $showingAuthenticationView) {
-            NavigationView {
-                AuthenticationView()
+            .sheet(isPresented: $showingExportSheet) {
+                ShareView(ble: bleManager)
             }
-        }
-        .sheet(isPresented: $showingSubscriptionView) {
-            SubscriptionTierSelectionView()
-        }
-        .alert("Sign Out?", isPresented: $showingSignOutAlert) {
+            .sheet(isPresented: $showingAuthenticationView) {
+                NavigationView {
+                    AuthenticationView()
+                }
+            }
+            .sheet(isPresented: $showingSubscriptionView) {
+                SubscriptionTierSelectionView()
+            }
+            .alert("Sign Out?", isPresented: $showingSignOutAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Sign Out", role: .destructive) {
                 authenticationManager.signOut()
             }
-        } message: {
-            Text("Are you sure you want to sign out? You'll need to sign in again to access subscription features.")
-        }
-        .alert("Change Mode?", isPresented: $showingChangeModeAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Change Mode", role: .destructive) {
-                appStateManager.clearMode()
+            } message: {
+                Text("Are you sure you want to sign out? You'll need to sign in again to access subscription features.")
             }
-        } message: {
-            Text("Changing modes will restart the app and may require signing in again. Are you sure?")
+            .alert("Change Mode?", isPresented: $showingChangeModeAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Change Mode", role: .destructive) {
+                    appStateManager.clearMode()
+                }
+            } message: {
+                Text("Changing modes will restart the app and may require signing in again. Are you sure?")
+            }
+        } else {
+            ProgressView("Loading settings...")
         }
     }
 
     // MARK: - View Groups
 
     @ViewBuilder
-    private var accountAndPreferencesGroup: some View {
+    private func accountAndPreferencesGroup(_ viewModel: SettingsViewModel) -> some View {
         // Account Section
         Section {
             if authenticationManager.isAuthenticated {
@@ -264,7 +285,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var deviceAndNotificationsGroup: some View {
+    private func deviceAndNotificationsGroup(_ viewModel: SettingsViewModel) -> some View {
         // Device Settings Section
         Section {
             // PPG Channel Order
@@ -331,7 +352,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var healthIntegrationGroup: some View {
+    private func healthIntegrationGroup(_ viewModel: SettingsViewModel) -> some View {
         // Health Integration Section
         if healthKitManager.isAvailable {
             Section {
@@ -383,7 +404,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var dataAndPrivacyGroup: some View {
+    private func dataAndPrivacyGroup(_ viewModel: SettingsViewModel) -> some View {
         // Data Management Section
         Section {
             Stepper("Retention: \(viewModel.dataRetentionDays) days",
@@ -508,9 +529,6 @@ extension PPGChannelOrder {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
-            .environmentObject(DesignSystem())
-            .environmentObject(AuthenticationManager())
-            .environmentObject(SubscriptionManager())
-            .environmentObject(AppStateManager())
+            .withDependencies(AppDependencies.shared)
     }
 }

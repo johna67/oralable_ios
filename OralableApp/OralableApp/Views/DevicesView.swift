@@ -13,29 +13,15 @@ import SwiftUI
 import CoreBluetooth
 
 struct DevicesView: View {
-    @StateObject private var viewModel: DevicesViewModel
     @EnvironmentObject var bleManager: OralableBLE
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
-
-    init(viewModel: DevicesViewModel? = nil, bleManager: OralableBLE? = nil) {
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else if let bleManager = bleManager {
-            // Create with provided bleManager
-            _viewModel = StateObject(wrappedValue: DevicesViewModel(bleManager: bleManager))
-        } else {
-            // Default path - requires environment object
-            let bleManager = OralableBLE()
-            _viewModel = StateObject(wrappedValue: DevicesViewModel(bleManager: bleManager))
-        }
-    }
 
     @State private var showingSettings = false
     @State private var isScanning = false
     @State private var showingForgetDevice = false
     @State private var lastActionTime: Date = .distantPast
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -661,7 +647,6 @@ struct DeviceInfoRow: View {
 struct DevicesView_Previews: PreviewProvider {
     static var previews: some View {
         DevicesView()
-            .environmentObject(DesignSystem())
-            .environmentObject(OralableBLE())
+            .withDependencies(AppDependencies.shared)
     }
 }
