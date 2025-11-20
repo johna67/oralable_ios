@@ -319,7 +319,7 @@ class DeviceManager: ObservableObject {
     private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType? {
         let lowercaseName = name.lowercased()
 
-        // Check for Oralable (including N02CL model)
+        // Check for Oralable by name
         if lowercaseName.contains("oralable") ||
            lowercaseName.contains("tgm") ||
            lowercaseName.contains("n02cl") {
@@ -327,7 +327,10 @@ class DeviceManager: ObservableObject {
         }
 
         // Check for ANR
-        if lowercaseName.contains("anr") || lowercaseName.contains("muscle") {
+        if lowercaseName.contains("anr") ||
+           lowercaseName.contains("muscle") ||
+           lowercaseName.contains("m40") ||
+           lowercaseName.contains("anr corp") {
             return .anr
         }
 
@@ -346,10 +349,11 @@ class DeviceManager: ObservableObject {
         discoveredDevices.removeAll()
         isScanning = true
 
-        // Scan for ALL BLE devices (filters applied in handleDeviceDiscovered)
+        // Scan for ALL BLE devices - TGM service is not advertised, only discovered after connection
+        // Filters applied in handleDeviceDiscovered based on device name
         bleManager?.startScanning()
 
-        // For production, optionally filter by TGM service UUID:
+        // Note: Service-based filtering won't work because devices don't advertise TGM service UUID
         // let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
         // bleManager?.startScanning(services: [tgmServiceUUID])
     }

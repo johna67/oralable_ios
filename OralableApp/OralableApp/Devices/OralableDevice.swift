@@ -42,7 +42,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     @Published private(set) var deviceInfo: DeviceInfo
     let deviceType: DeviceType = .oralable
     var name: String
-    weak var peripheral: CBPeripheral?
+    var peripheral: CBPeripheral?  // Strong reference to prevent deallocation
     
     @Published private(set) var connectionState: DeviceConnectionState = .disconnected
     @Published private(set) var signalStrength: Int?
