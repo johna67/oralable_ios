@@ -19,9 +19,14 @@ class HistoricalDataManager: ObservableObject {
     private var updateTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private let updateInterval: TimeInterval = 60.0 // Update every 60 seconds
-    
+
     // Reference to the BLE manager (internal for access by ViewModel)
     internal weak var bleManager: OralableBLE?
+
+    // Throttling to prevent excessive updates
+    private var lastMetricsUpdateTime: Date?
+    private let minimumUpdateInterval: TimeInterval = 2.0 // Minimum 2 seconds between updates
+    private var pendingUpdateTask: Task<Void, Never>?
     
     // MARK: - Initialization
     init(bleManager: OralableBLE?) {
@@ -37,8 +42,31 @@ class HistoricalDataManager: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Manually trigger an update of all metrics
+    /// Manually trigger an update of all metrics (with throttling)
     @MainActor func updateAllMetrics() {
+        // THROTTLING: Check if we've updated too recently
+        if let lastUpdate = lastMetricsUpdateTime {
+            let timeSinceLastUpdate = Date().timeIntervalSince(lastUpdate)
+            if timeSinceLastUpdate < minimumUpdateInterval {
+                Logger.shared.debug("[HistoricalDataManager] ⏸️ Throttling update (last update \(String(format: "%.1f", timeSinceLastUpdate))s ago, min interval: \(minimumUpdateInterval)s)")
+
+                // Cancel any pending update and schedule a new one
+                pendingUpdateTask?.cancel()
+                pendingUpdateTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: UInt64(self?.minimumUpdateInterval ?? 2.0) * 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    self?.performMetricsUpdate()
+                }
+                return
+            }
+        }
+
+        // Proceed with immediate update
+        performMetricsUpdate()
+    }
+
+    /// Internal method that performs the actual metrics update
+    @MainActor private func performMetricsUpdate() {
         guard let ble = bleManager else {
             Logger.shared.warning("[HistoricalDataManager] ⚠️ BLE manager is nil, cannot update metrics")
             clearAllMetrics()
@@ -53,39 +81,37 @@ class HistoricalDataManager: ObservableObject {
 
         Logger.shared.info("[HistoricalDataManager] ✅ Starting metrics update | Sensor data count: \(ble.sensorDataHistory.count)")
         isUpdating = true
+        lastMetricsUpdateTime = Date()
 
         // Use Task for proper async handling with main actor isolation
-        Task { @MainActor [weak self] in
-            // Access main-actor isolated BLE methods on main actor
+        // Move heavy computation to background thread
+        Task.detached { [weak self, bleManager] in
+            guard let self = self, let ble = bleManager else { return }
+
+            // Perform expensive aggregation off the main thread
+            let sensorData = await ble.sensorDataHistory  // Access published property
+
             let hourRange = TimeRange.hour
             let dayRange = TimeRange.day
             let weekRange = TimeRange.week
             let monthRange = TimeRange.month
 
-            Logger.shared.debug("[HistoricalDataManager] Calculating metrics for Hour, Day, Week, Month ranges...")
-
-            let hour = ble.getHistoricalMetrics(for: hourRange)
-            let day = ble.getHistoricalMetrics(for: dayRange)
-            let week = ble.getHistoricalMetrics(for: weekRange)
-            let month = ble.getHistoricalMetrics(for: monthRange)
-
-            Logger.shared.info("[HistoricalDataManager] Metrics calculated | Hour: \(hour != nil ? "✓" : "✗") | Day: \(day != nil ? "✓" : "✗") | Week: \(week != nil ? "✓" : "✗") | Month: \(month != nil ? "✓" : "✗")")
-
-            if let day = day {
-                let avgHR = day.dataPoints.compactMap { $0.averageHeartRate }.reduce(0, +) / Double(max(day.dataPoints.count, 1))
-                let avgSpO2 = day.dataPoints.compactMap { $0.averageSpO2 }.reduce(0, +) / Double(max(day.dataPoints.count, 1))
-                Logger.shared.debug("[HistoricalDataManager] Day metrics | Temp avg: \(String(format: "%.1f", day.avgTemperature))°C | Battery avg: \(String(format: "%.0f", day.avgBatteryLevel))% | Total samples: \(day.totalSamples) | Data points: \(day.dataPoints.count)")
-                Logger.shared.debug("[HistoricalDataManager] Day metrics | HR avg: \(String(format: "%.0f", avgHR)) bpm | SpO2 avg: \(String(format: "%.1f", avgSpO2))% (calculated from \(day.dataPoints.count) points)")
-            }
+            // These aggregation calls are now off the main thread
+            let hour = await ble.getHistoricalMetrics(for: hourRange)
+            let day = await ble.getHistoricalMetrics(for: dayRange)
+            let week = await ble.getHistoricalMetrics(for: weekRange)
+            let month = await ble.getHistoricalMetrics(for: monthRange)
 
             // Update published properties on main actor
-            self?.hourMetrics = hour
-            self?.dayMetrics = day
-            self?.weekMetrics = week
-            self?.monthMetrics = month
-            self?.lastUpdateTime = Date()
-            self?.isUpdating = false
-            Logger.shared.info("[HistoricalDataManager] ✅ Metrics update completed and published to UI")
+            await MainActor.run { [weak self] in
+                self?.hourMetrics = hour
+                self?.dayMetrics = day
+                self?.weekMetrics = week
+                self?.monthMetrics = month
+                self?.lastUpdateTime = Date()
+                self?.isUpdating = false
+                Logger.shared.info("[HistoricalDataManager] ✅ Metrics update completed and published to UI")
+            }
         }
     }
     

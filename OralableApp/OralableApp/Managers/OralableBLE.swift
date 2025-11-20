@@ -527,18 +527,12 @@ class OralableBLE: ObservableObject,
     }
 
     func getHistoricalMetrics(for range: TimeRange) -> HistoricalMetrics? {
-        Logger.shared.info("[OralableBLE] getHistoricalMetrics called for range: \(range)")
-        Logger.shared.info("[OralableBLE] sensorDataHistory count: \(sensorDataHistory.count)")
-
+        // Reduced logging for performance
         guard !sensorDataHistory.isEmpty else {
-            Logger.shared.warning("[OralableBLE] ❌ Cannot get metrics - sensorDataHistory is empty")
             return nil
         }
 
-        Logger.shared.info("[OralableBLE] ✅ Aggregating \(sensorDataHistory.count) data points for range: \(range)")
         let metrics = HistoricalDataAggregator.aggregate(data: sensorDataHistory, for: range, endDate: Date())
-
-        Logger.shared.info("[OralableBLE] ✅ Aggregation successful - \(metrics.dataPoints.count) data points in result")
         return metrics
     }
 
