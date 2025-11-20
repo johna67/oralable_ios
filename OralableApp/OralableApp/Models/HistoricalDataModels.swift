@@ -70,13 +70,21 @@ class HistoricalDataAggregator {
 
         let startDate = endDate.addingTimeInterval(-range.seconds)
 
-        // Reduced logging for performance - only log at debug level
-        #if DEBUG
-        Logger.shared.debug("[HistoricalDataAggregator] Aggregating \(data.count) points for \(range)")
-        #endif
+        // Logging to verify timestamp distribution
+        Logger.shared.info("[HistoricalDataAggregator] 🔍 Aggregating \(data.count) points for \(range)")
+
+        // Log timestamp distribution
+        if !data.isEmpty {
+            let timestamps = data.map { $0.timestamp }
+            if let oldest = timestamps.min(), let newest = timestamps.max() {
+                let spanSeconds = newest.timeIntervalSince(oldest)
+                Logger.shared.info("[HistoricalDataAggregator] Data span: \(String(format: "%.1f", spanSeconds))s | Oldest: \(oldest) | Newest: \(newest)")
+            }
+        }
 
         // Filter data to the time range
         let filteredData = data.filter { $0.timestamp >= startDate && $0.timestamp <= endDate }
+        Logger.shared.info("[HistoricalDataAggregator] Filtered: \(filteredData.count)/\(data.count) points in range [\(startDate) to \(endDate)]")
 
         // Only log warnings when there's an issue
         if !data.isEmpty && filteredData.isEmpty {

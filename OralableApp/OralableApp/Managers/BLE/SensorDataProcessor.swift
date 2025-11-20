@@ -156,8 +156,9 @@ class SensorDataProcessor: ObservableObject {
         var irSamples: [UInt32] = []
 
         for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
-            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
-            var current = grouped[roundedTime] ?? (0, 0, 0)
+            // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
+            let timestamp = reading.timestamp
+            var current = grouped[timestamp] ?? (0, 0, 0)
 
             switch reading.sensorType {
             case .ppgRed:
@@ -176,7 +177,7 @@ class SensorDataProcessor: ObservableObject {
                 break
             }
 
-            grouped[roundedTime] = current
+            grouped[timestamp] = current
         }
 
         // Update PPG history on main thread
@@ -210,8 +211,9 @@ class SensorDataProcessor: ObservableObject {
         var grouped: [Date: (x: Int16, y: Int16, z: Int16)] = [:]
 
         for reading in readings where [.accelerometerX, .accelerometerY, .accelerometerZ].contains(reading.sensorType) {
-            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
-            var current = grouped[roundedTime] ?? (0, 0, 0)
+            // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
+            let timestamp = reading.timestamp
+            var current = grouped[timestamp] ?? (0, 0, 0)
 
             switch reading.sensorType {
             case .accelerometerX:
@@ -227,7 +229,7 @@ class SensorDataProcessor: ObservableObject {
                 break
             }
 
-            grouped[roundedTime] = current
+            grouped[timestamp] = current
         }
 
         // Update accelerometer history on main thread
@@ -244,8 +246,9 @@ class SensorDataProcessor: ObservableObject {
         var groupedReadings: [Date: [SensorReading]] = [:]
 
         for reading in readings {
-            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
-            groupedReadings[roundedTime, default: []].append(reading)
+            // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
+            let timestamp = reading.timestamp
+            groupedReadings[timestamp, default: []].append(reading)
         }
 
         await MainActor.run {
@@ -256,7 +259,10 @@ class SensorDataProcessor: ObservableObject {
                 guard let group = groupedReadings[timestamp] else { continue }
                 let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
                 self.sensorDataHistory.append(sensorData)
-                Logger.shared.debug("[SensorDataProcessor] 📊 Added sensor data at \(timestamp), total count now: \(self.sensorDataHistory.count)")
+
+                // DETAILED timestamp logging to verify uniqueness
+                let timestampMs = Int(timestamp.timeIntervalSince1970 * 1000)
+                Logger.shared.info("[SensorDataProcessor] 📊 Added sensor data | Timestamp: \(timestamp) (ms: \(timestampMs)) | Total: \(self.sensorDataHistory.count)")
             }
 
             // Limit history to last 1000 entries
@@ -278,6 +284,7 @@ class SensorDataProcessor: ObservableObject {
 
     /// Clear all history buffers
     func clearHistory() {
+        let priorCount = sensorDataHistory.count
         batteryHistory.removeAll()
         heartRateHistory.removeAll()
         spo2History.removeAll()
@@ -286,7 +293,7 @@ class SensorDataProcessor: ObservableObject {
         ppgHistory.removeAll()
         sensorDataHistory.removeAll()
         ppgIRBuffer.removeAll()
-        Logger.shared.info("[SensorDataProcessor] Cleared all history data")
+        Logger.shared.info("[SensorDataProcessor] ✅ Cleared all history data | Removed \(priorCount) sensor data entries | New count: \(sensorDataHistory.count)")
     }
 
     // MARK: - Private Helper Methods
