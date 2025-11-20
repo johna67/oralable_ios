@@ -123,6 +123,24 @@ struct ShareView: View {
             ble: ble
         )
         .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
+
+        // Clear History Button
+        Button(action: {
+            showClearConfirmation = true
+        }) {
+            HStack {
+                Image(systemName: "trash.circle.fill")
+                    .font(.system(size: 20))
+                Text("Clear All History")
+                    .font(designSystem.typography.button)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.red.opacity(0.1))
+            .foregroundColor(.red)
+            .cornerRadius(designSystem.cornerRadius.medium)
+        }
+        .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
     }
 
     private func handleExportResult(_ result: Result<URL, Error>) {
