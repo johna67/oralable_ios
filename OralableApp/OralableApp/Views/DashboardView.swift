@@ -118,7 +118,8 @@ struct DashboardView: View {
                     .environmentObject(dependencies.deviceManager)
             }
             .sheet(isPresented: $showingSettings) {
-                SettingsView()
+                SettingsView(viewModel: dependencies.makeSettingsViewModel())
+                    .environmentObject(dependencies)
                     .environmentObject(designSystem)
                     .environmentObject(dependencies.authenticationManager)
                     .environmentObject(dependencies.subscriptionManager)
@@ -195,7 +196,7 @@ struct DashboardView: View {
 
     /// Upload any pending recording sessions
     private func uploadPendingSessions() async {
-        let sessions = RecordingSessionManager.shared.sessions
+        let sessions = dependencies.recordingSessionManager.sessions
         let completedSessions = sessions.filter { $0.status == .completed }
 
         Logger.shared.info("[DashboardView] Found \(completedSessions.count) completed sessions to potentially upload")
@@ -241,9 +242,9 @@ struct DashboardView: View {
                 // Connect Button
                 Button(action: {
                     if viewModel.isConnected {
-                        viewModel.bleManagerRef.disconnect()
+                        viewModel.disconnect()
                     } else {
-                        viewModel.bleManagerRef.startScanning()
+                        viewModel.startScanning()
                     }
                 }) {
                     Text(viewModel.isConnected ? "Disconnect" : "Connect")

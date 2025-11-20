@@ -250,7 +250,10 @@ class SensorDataProcessor: ObservableObject {
 
         await MainActor.run {
             let beforeCount = self.sensorDataHistory.count
-            for (timestamp, group) in groupedReadings {
+            // Sort timestamps to maintain chronological order
+            let sortedTimestamps = groupedReadings.keys.sorted()
+            for timestamp in sortedTimestamps {
+                guard let group = groupedReadings[timestamp] else { continue }
                 let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
                 self.sensorDataHistory.append(sensorData)
                 Logger.shared.debug("[SensorDataProcessor] 📊 Added sensor data at \(timestamp), total count now: \(self.sensorDataHistory.count)")

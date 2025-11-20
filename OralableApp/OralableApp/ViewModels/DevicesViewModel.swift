@@ -23,25 +23,27 @@ class DevicesViewModel: ObservableObject {
     var firmwareVersion: String { "1.0.0" }
     var lastSyncTime: String { "Just now" }
 
-    private let bleManager: OralableBLE
+    private let bleManager: BLEManagerProtocol  // ✅ Now uses protocol for dependency injection
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
     /// Initialize with injected dependencies (preferred)
-    init(bleManager: OralableBLE) {
+    /// - Parameter bleManager: BLE manager conforming to protocol (allows mocking for tests)
+    init(bleManager: BLEManagerProtocol) {
         self.bleManager = bleManager
         setupBindings()
     }
 
     private func setupBindings() {
-        bleManager.$isConnected
+        // Using protocol publishers for better testability
+        bleManager.isConnectedPublisher
             .assign(to: &$isConnected)
-        
-        bleManager.$isScanning
+
+        bleManager.isScanningPublisher
             .assign(to: &$isScanning)
-        
-        bleManager.$deviceName
+
+        bleManager.deviceNamePublisher
             .assign(to: &$deviceName)
     }
     

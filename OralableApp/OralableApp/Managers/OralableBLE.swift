@@ -17,10 +17,13 @@ import Combine
 import CoreBluetooth
 
 @MainActor
-class OralableBLE: ObservableObject {
-    // MARK: - Singleton (Backward Compatibility)
-
-    static let shared = OralableBLE()
+class OralableBLE: ObservableObject,
+                   ConnectionStateProvider,
+                   BiometricDataProvider,
+                   DeviceStatusProvider,
+                   RealtimeSensorProvider {
+    // MARK: - Dependency Injection (Phase 4: Singleton Removed)
+    // Note: Use AppDependencies.shared.bleManager instead
 
     // MARK: - Type Aliases for Backward Compatibility
 
@@ -38,6 +41,7 @@ class OralableBLE: ObservableObject {
     private let deviceManager: DeviceManager
     private let stateDetector: DeviceStateDetector
     let healthKitManager: HealthKitManager  // Public for backward compatibility
+    private let recordingSessionManager: RecordingSessionManagerProtocol  // ✅ Injected dependency
 
     // MARK: - Published Properties (Forwarded from Components)
 
@@ -88,16 +92,11 @@ class OralableBLE: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let maxHistoryCount = 100
 
-    // CRITICAL PERFORMANCE: Batching system to process readings in background
-    private let processingQueue = DispatchQueue(label: "com.oralable.processing", qos: .userInitiated)
-    private var readingsBatch: [SensorReading] = []
-    private let batchLock = NSLock()
-    private var batchTimer: Timer?
-    private let batchInterval: TimeInterval = 0.1  // Process batches every 100ms
-
-    // CRITICAL: Sampling to prevent processing millions of readings
+    // Async/await batching
+    private var readingsTask: Task<Void, Never>?
+    private let batchInterval: TimeInterval = 0.1  // 100 ms windows
     private var sampleCounter: Int = 0
-    private let sampleRate: Int = 10  // Only process every 10th reading (90% reduction)
+    private let sampleRate: Int = 10  // process every 10th reading
 
     // MARK: - Computed Properties
 
@@ -121,10 +120,13 @@ class OralableBLE: ObservableObject {
 
     // MARK: - Initialization
 
-    init() {
+    /// Initialize with injected dependencies
+    /// - Parameter recordingSessionManager: Recording session manager conforming to protocol
+    init(recordingSessionManager: RecordingSessionManagerProtocol) {
         self.deviceManager = DeviceManager()
         self.stateDetector = DeviceStateDetector()
         self.healthKitManager = HealthKitManager()
+        self.recordingSessionManager = recordingSessionManager  // ✅ Injected dependency
 
         // Initialize specialized components
         self.dataPublisher = BLEDataPublisher()
@@ -133,9 +135,13 @@ class OralableBLE: ObservableObject {
         self.healthKitIntegration = HealthKitIntegration(healthKitManager: healthKitManager)
 
         setupBindings()
-        setupDirectBLECallbacks()
-        startBatchProcessing()
-        dataPublisher.addLog("OralableBLE initialized")
+        setupDiscoveryBinding()
+        startAsyncBatchProcessing()
+        dataPublisher.addLog("OralableBLE initialized with dependency injection")
+    }
+
+    deinit {
+        readingsTask?.cancel()
     }
 
     // MARK: - Setup
@@ -151,37 +157,7 @@ class OralableBLE: ObservableObject {
         bindSensorProcessor()
         bindBioMetricCalculator()
 
-        // CRITICAL PERFORMANCE: Batch and sample sensor readings
-        deviceManager.$allSensorReadings
-            .sink { [weak self] readings in
-                guard let self = self else { return }
-
-                // Sample readings to reduce data volume
-                var sampledReadings: [SensorReading] = []
-                sampledReadings.reserveCapacity(readings.count / self.sampleRate + 1)
-
-                for reading in readings {
-                    self.sampleCounter += 1
-                    if self.sampleCounter >= self.sampleRate {
-                        sampledReadings.append(reading)
-                        self.sampleCounter = 0
-                    }
-                }
-
-                // Add to batch for background processing
-                guard !sampledReadings.isEmpty else { return }
-                self.batchLock.lock()
-                self.readingsBatch.append(contentsOf: sampledReadings)
-                self.batchLock.unlock()
-            }
-            .store(in: &cancellables)
-
-        // Update device state
-        deviceManager.$latestReadings
-            .sink { [weak self] latestReadings in
-                self?.updateDeviceState(from: latestReadings)
-            }
-            .store(in: &cancellables)
+        // Note: Device state will be driven exclusively by DeviceStateDetector after batch processing
     }
 
     private func bindDataPublisher() {
@@ -224,64 +200,136 @@ class OralableBLE: ObservableObject {
         bioMetricCalculator.$heartRateQuality.assign(to: &$heartRateQuality)
     }
 
-    // MARK: - Direct BLE Callbacks
+    // MARK: - Discovery Binding (Single Source of Truth via DeviceManager)
 
-    private func setupDirectBLECallbacks() {
-        guard let bleManager = deviceManager.bleManager else {
-            Logger.shared.warning("[OralableBLE] BLE manager not available")
-            return
+    private func setupDiscoveryBinding() {
+        deviceManager.$discoveredDevices
+            .sink { [weak self] deviceInfos in
+                guard let self = self else { return }
+                // Map DeviceInfo to BLEDataPublisher.DiscoveredDeviceInfo
+                var infos: [BLEDataPublisher.DiscoveredDeviceInfo] = []
+                var peripherals: [CBPeripheral] = []
+
+                for info in deviceInfos {
+                    if let pid = info.peripheralIdentifier,
+                       let peripheral = self.deviceManager.peripheral(for: pid) {
+                        let d = BLEDataPublisher.DiscoveredDeviceInfo(
+                            id: peripheral.identifier,
+                            name: info.name,
+                            peripheral: peripheral,
+                            rssi: info.signalStrength ?? -50
+                        )
+                        infos.append(d)
+                        peripherals.append(peripheral)
+                    } else {
+                        // If peripheral not available (e.g., mock/demo), skip adding CBPeripheral
+                        // Keep DiscoveredDeviceInfo list accurate where possible
+                        // Optionally, could create a placeholder peripheral wrapper if needed
+                    }
+                }
+
+                self.dataPublisher.discoveredDevicesInfo = infos
+                self.dataPublisher.discoveredDevices = peripherals
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Async/await Batching
+
+    // Actor to accumulate readings safely off the main thread
+    private actor BatchAccumulator {
+        private var buffer: [SensorReading] = []
+
+        func append(_ reading: SensorReading) {
+            buffer.append(reading)
         }
 
-        let originalCallback = bleManager.onDeviceDiscovered
+        func append(contentsOf readings: [SensorReading]) {
+            buffer.append(contentsOf: readings)
+        }
 
-        bleManager.onDeviceDiscovered = { [weak self] peripheral, name, rssi in
-            originalCallback?(peripheral, name, rssi)
+        func flush() -> [SensorReading] {
+            let batch = buffer
+            buffer.removeAll(keepingCapacity: true)
+            return batch
+        }
 
-            Task { @MainActor [weak self] in
-                self?.dataPublisher.handleDeviceDiscovered(peripheral: peripheral, name: name, rssi: rssi)
+        var isEmpty: Bool { buffer.isEmpty }
+    }
+
+    private func startAsyncBatchProcessing() {
+        // Bridge DeviceManager.readingsPublisher into AsyncStream<SensorReading>
+        let stream = AsyncStream<SensorReading> { continuation in
+            let cancellable = deviceManager.readingsPublisher
+                .sink { reading in
+                    continuation.yield(reading)
+                }
+
+            continuation.onTermination = { @Sendable _ in
+                cancellable.cancel()
             }
         }
 
-        Logger.shared.info("[OralableBLE] Direct BLE callbacks configured")
-    }
+        // Create accumulator actor
+        let accumulator = BatchAccumulator()
 
-    // MARK: - Batch Processing
-
-    private func startBatchProcessing() {
-        batchTimer = Timer.scheduledTimer(withTimeInterval: batchInterval, repeats: true) { [weak self] _ in
-            self?.processBatch()
-        }
-    }
-
-    private func processBatch() {
-        // Get batch and clear it atomically
-        batchLock.lock()
-        let batch = readingsBatch
-        readingsBatch.removeAll(keepingCapacity: true)
-        batchLock.unlock()
-
-        guard !batch.isEmpty else { return }
-
-        // Process batch on background queue
-        processingQueue.async { [weak self] in
+        // Spawn a Task to consume the stream, sample, and process batches periodically
+        readingsTask = Task { [weak self] in
             guard let self = self else { return }
 
-            Task {
-                // Process sensor data
-                await self.sensorProcessor.processBatch(batch)
+            var lastFlush = Date()
 
-                // Update legacy sensor data
-                await self.sensorProcessor.updateLegacySensorData(with: batch)
+            for await reading in stream {
+                // Sampling: only keep every Nth reading
+                self.sampleCounter += 1
+                if self.sampleCounter >= self.sampleRate {
+                    await accumulator.append(reading)
+                    self.sampleCounter = 0
+                }
 
-                // Calculate biometrics from PPG data
-                await self.calculateBiometrics(from: batch)
+                // Time-based flush every 100 ms
+                let now = Date()
+                if now.timeIntervalSince(lastFlush) >= self.batchInterval {
+                    let batch = await accumulator.flush()
+                    lastFlush = now
+
+                    if !batch.isEmpty {
+                        await self.processBatchAsync(batch)
+                    }
+                }
+
+                // Cooperative cancellation
+                if Task.isCancelled { break }
             }
+
+            // Final flush on cancellation
+            let remaining = await accumulator.flush()
+            if !remaining.isEmpty {
+                await self.processBatchAsync(remaining)
+            }
+        }
+    }
+
+    private func processBatchAsync(_ batch: [SensorReading]) async {
+        // Process sensor data (MainActor mutations are inside processor methods)
+        await sensorProcessor.processBatch(batch)
+
+        // Update legacy sensor data
+        await sensorProcessor.updateLegacySensorData(with: batch)
+
+        // Calculate biometrics from PPG data
+        await calculateBiometrics(from: batch)
+
+        // Device state: use DeviceStateDetector exclusively
+        let recentData = sensorProcessor.sensorDataHistory
+        if let result = stateDetector.analyzeDeviceState(sensorData: recentData) {
+            dataPublisher.updateDeviceState(result)
         }
     }
 
     private func calculateBiometrics(from readings: [SensorReading]) async {
-        // Check if we have PPG data
-        let hasPPGData = readings.contains { [.ppgRed, .ppgInfrared, .ppgGreen].contains($0.sensorType) }
+        // Check if we have PPG or EMG data (EMG treated as IR-equivalent at higher layers if needed)
+        let hasPPGData = readings.contains { [.ppgRed, .ppgInfrared, .ppgGreen, .emg].contains($0.sensorType) }
         guard hasPPGData else { return }
 
         // Get PPG IR buffer for heart rate calculation
@@ -326,31 +374,6 @@ class OralableBLE: ObservableObject {
                     self?.healthKitIntegration.writeSpO2(percentage: percentage)
                 }
             )
-        }
-    }
-
-    // MARK: - Device State Detection
-
-    private func updateDeviceState(from latestReadings: [SensorType: SensorReading]) {
-        let ppgReading = latestReadings[.ppgInfrared]
-        let accelX = latestReadings[.accelerometerX]
-        let accelY = latestReadings[.accelerometerY]
-        let accelZ = latestReadings[.accelerometerZ]
-        let battery = latestReadings[.battery]
-
-        if let ppg = ppgReading, let ax = accelX, let ay = accelY, let az = accelZ {
-            let ppgValue = ppg.value
-            let motion = sqrt(ax.value * ax.value + ay.value * ay.value + az.value * az.value)
-
-            if motion > 2.0 {
-                deviceState = DeviceStateResult(state: .inMotion, confidence: 0.9, timestamp: Date(), details: ["motion": motion])
-            } else if ppgValue > 1000 {
-                deviceState = DeviceStateResult(state: .onMuscle, confidence: 0.85, timestamp: Date(), details: ["ppg": ppgValue])
-            } else if let bat = battery, bat.value > 95 {
-                deviceState = DeviceStateResult(state: .onChargerIdle, confidence: 0.8, timestamp: Date(), details: ["battery": bat.value])
-            } else {
-                deviceState = DeviceStateResult(state: .offChargerIdle, confidence: 0.7, timestamp: Date(), details: [:])
-            }
         }
     }
 
@@ -465,7 +488,7 @@ class OralableBLE: ObservableObject {
         }
 
         do {
-            let session = try RecordingSessionManager.shared.startSession(
+            let session = try recordingSessionManager.startSession(
                 deviceID: deviceUUID?.uuidString,
                 deviceName: deviceName
             )
@@ -486,7 +509,7 @@ class OralableBLE: ObservableObject {
         }
 
         do {
-            try RecordingSessionManager.shared.stopSession()
+            try recordingSessionManager.stopSession()
             dataPublisher.updateRecordingState(isRecording: false)
             dataPublisher.addLog("Recording session stopped")
             Logger.shared.info("[OralableBLE] Stopped recording session")
@@ -533,7 +556,8 @@ class OralableBLE: ObservableObject {
     // MARK: - Mock
 
     static func mock() -> OralableBLE {
-        let ble = OralableBLE()
+        let mockRecorder = MockRecordingSessionManager()
+        let ble = OralableBLE(recordingSessionManager: mockRecorder)
         for i in 0..<50 {
             let timestamp = Date().addingTimeInterval(TimeInterval(-i * 10))
             ble.batteryHistory.append(BatteryData(percentage: 85 + i % 15, timestamp: timestamp))
@@ -546,3 +570,90 @@ class OralableBLE: ObservableObject {
         return ble
     }
 }
+
+// MARK: - Mock Recording Session Manager
+
+/// Mock implementation of RecordingSessionManagerProtocol for testing/previews
+@MainActor
+class MockRecordingSessionManager: RecordingSessionManagerProtocol, ObservableObject {
+    @Published var currentSession: RecordingSession?
+    @Published var sessions: [RecordingSession] = []
+
+    var currentSessionPublisher: Published<RecordingSession?>.Publisher { $currentSession }
+    var sessionsPublisher: Published<[RecordingSession]>.Publisher { $sessions }
+
+    func startSession(deviceID: String?, deviceName: String?) throws -> RecordingSession {
+        let session = RecordingSession(deviceID: deviceID, deviceName: deviceName)
+        currentSession = session
+        sessions.insert(session, at: 0)
+        return session
+    }
+
+    func stopSession() throws {
+        guard var session = currentSession else {
+            throw DeviceError.recordingNotInProgress
+        }
+        session.endTime = Date()
+        session.status = .completed
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+        }
+        currentSession = nil
+    }
+
+    func pauseSession() throws {
+        guard var session = currentSession else {
+            throw DeviceError.recordingNotInProgress
+        }
+        session.status = .paused
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+        }
+    }
+
+    func resumeSession() throws {
+        guard var session = currentSession else {
+            throw DeviceError.recordingNotInProgress
+        }
+        session.status = .recording
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+        }
+    }
+
+    func recordSensorData(_ data: String) {
+        // Mock implementation - do nothing
+    }
+
+    func deleteSession(_ session: RecordingSession) {
+        sessions.removeAll { $0.id == session.id }
+    }
+}
+
+// MARK: - Protocol Conformance (Additional Publishers)
+
+// MARK: ConnectionStateProvider
+extension OralableBLE {
+    // Note: isConnectedPublisher, isScanningPublisher, deviceNamePublisher already provided by BLEManagerProtocol
+    var deviceUUIDPublisher: Published<UUID?>.Publisher { $deviceUUID }
+    var connectionStatePublisher: Published<String>.Publisher { $connectionState }
+    var discoveredDevicesPublisher: Published<[CBPeripheral]>.Publisher { $discoveredDevices }
+    var rssiPublisher: Published<Int>.Publisher { $rssi }
+}
+
+// MARK: BiometricDataProvider
+// Note: All publishers already provided by BLEManagerProtocol extension
+
+// MARK: DeviceStatusProvider
+extension OralableBLE {
+    // Note: deviceStatePublisher, isRecordingPublisher already provided by BLEManagerProtocol
+    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrder }
+    var discoveredServicesPublisher: Published<[String]>.Publisher { $discoveredServices }
+    var packetsReceivedPublisher: Published<Int>.Publisher { $packetsReceived }
+    var logMessagesPublisher: Published<[LogMessage]>.Publisher { $logMessages }
+    var lastErrorPublisher: Published<String?>.Publisher { $lastError }
+}
+
+// MARK: RealtimeSensorProvider
+// Note: All publishers already provided by BLEManagerProtocol extension
+

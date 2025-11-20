@@ -50,8 +50,8 @@ class HistoricalViewModel: ObservableObject {
     @Published var timeRangeOffset: Int = 0
     
     // MARK: - Private Properties
-    
-    private let historicalDataManager: HistoricalDataManager
+
+    private let historicalDataManager: HistoricalDataManagerProtocol  // ✅ Now uses protocol for dependency injection
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
@@ -390,14 +390,20 @@ class HistoricalViewModel: ObservableObject {
     // MARK: - Initialization
 
     /// Initialize with injected historicalDataManager (preferred)
-    init(historicalDataManager: HistoricalDataManager) {
-        Logger.shared.info("[HistoricalViewModel] 🚀 Initializing HistoricalViewModel...")
+    /// - Parameter historicalDataManager: Historical data manager conforming to protocol (allows mocking for tests)
+    init(historicalDataManager: HistoricalDataManagerProtocol) {
+        Logger.shared.info("[HistoricalViewModel] 🚀 Initializing HistoricalViewModel with protocol-based dependency injection...")
         self.historicalDataManager = historicalDataManager
         Logger.shared.info("[HistoricalViewModel] Setting up bindings...")
         setupBindings()
         Logger.shared.info("[HistoricalViewModel] Updating current metrics for initial selectedTimeRange: \(selectedTimeRange)")
         updateCurrentMetrics()
         Logger.shared.info("[HistoricalViewModel] ✅ HistoricalViewModel initialization complete")
+    }
+
+    /// Convenience initializer for backward compatibility (uses AppDependencies singleton)
+    convenience init() {
+        self.init(historicalDataManager: AppDependencies.shared.historicalDataManager)
     }
 
     // MARK: - Setup
@@ -426,8 +432,8 @@ class HistoricalViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Subscribe to historical data manager's published properties
-        historicalDataManager.$hourMetrics
+        // Subscribe to historical data manager's published properties (using protocol publishers)
+        historicalDataManager.hourMetricsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
                 if let metrics = metrics {
@@ -440,7 +446,7 @@ class HistoricalViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        historicalDataManager.$dayMetrics
+        historicalDataManager.dayMetricsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
                 if let metrics = metrics {
@@ -453,7 +459,7 @@ class HistoricalViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        historicalDataManager.$weekMetrics
+        historicalDataManager.weekMetricsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
                 if let metrics = metrics {
@@ -466,7 +472,7 @@ class HistoricalViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        historicalDataManager.$monthMetrics
+        historicalDataManager.monthMetricsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
                 if let metrics = metrics {
@@ -479,11 +485,11 @@ class HistoricalViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        historicalDataManager.$isUpdating
+        historicalDataManager.isUpdatingPublisher
             .receive(on: DispatchQueue.main)
             .assign(to: &$isUpdating)
 
-        historicalDataManager.$lastUpdateTime
+        historicalDataManager.lastUpdateTimePublisher
             .receive(on: DispatchQueue.main)
             .assign(to: &$lastUpdateTime)
 
@@ -592,33 +598,48 @@ class HistoricalViewModel: ObservableObject {
         // Need at least 2 data points for a meaningful chart
         guard metrics.dataPoints.count >= 2 else { return false }
 
-        // Check if data spans a reasonable portion of the time range
+        // For time-series data with potential gaps (device disconnections),
+        // we should show whatever data is available rather than requiring
+        // data to span a minimum percentage of the time range.
+        // The chart will naturally show gaps where there's no data.
+
+        // Check if data spans at least a minimal absolute time
         guard let firstPoint = metrics.dataPoints.first,
               let lastPoint = metrics.dataPoints.last else { return false }
 
         let dataSpan = lastPoint.timestamp.timeIntervalSince(firstPoint.timestamp)
-        let rangeSeconds = selectedTimeRange.seconds
 
-        // Data should span at least 10% of the time range to be meaningful
-        let minimumSpanRatio = 0.1
-        return dataSpan >= (rangeSeconds * minimumSpanRatio)
+        // Set lenient minimum spans based on time range
+        let minimumSpanSeconds: TimeInterval
+        switch selectedTimeRange {
+        case .hour:
+            minimumSpanSeconds = 30 // 30 seconds minimum
+        case .day:
+            minimumSpanSeconds = 300 // 5 minutes minimum
+        case .week:
+            minimumSpanSeconds = 1800 // 30 minutes minimum
+        case .month:
+            minimumSpanSeconds = 7200 // 2 hours minimum
+        }
+
+        return dataSpan >= minimumSpanSeconds
     }
 
     /// Get a descriptive message about data sufficiency
     var dataSufficiencyMessage: String? {
         guard let metrics = currentMetrics else {
-            return "No data available for this time range"
+            return "No data available for this time range. Connect your device to start collecting data."
         }
 
         if metrics.dataPoints.isEmpty {
-            return "No data points available"
+            return "No data points available for \(selectedTimeRange.rawValue) view"
         }
 
         if metrics.dataPoints.count == 1 {
-            return "Only 1 data point available - need more data for chart"
+            return "Only 1 data point available. Need at least 2 points to show a chart."
         }
 
-        // Check data span
+        // Check if data spans enough time
         if let firstPoint = metrics.dataPoints.first,
            let lastPoint = metrics.dataPoints.last {
             let dataSpan = lastPoint.timestamp.timeIntervalSince(firstPoint.timestamp)
@@ -635,8 +656,26 @@ class HistoricalViewModel: ObservableObject {
                 timeSpanDescription = "\(seconds)s"
             }
 
-            if dataSpan < 60 {  // Less than 1 minute
-                return "Data only spans \(timeSpanDescription) - try viewing a shorter time range"
+            // Check against minimum spans
+            let minimumSpanSeconds: TimeInterval
+            let minimumSpanText: String
+            switch selectedTimeRange {
+            case .hour:
+                minimumSpanSeconds = 30
+                minimumSpanText = "30 seconds"
+            case .day:
+                minimumSpanSeconds = 300
+                minimumSpanText = "5 minutes"
+            case .week:
+                minimumSpanSeconds = 1800
+                minimumSpanText = "30 minutes"
+            case .month:
+                minimumSpanSeconds = 7200
+                minimumSpanText = "2 hours"
+            }
+
+            if dataSpan < minimumSpanSeconds {
+                return "Data only spans \(timeSpanDescription). Need at least \(minimumSpanText) for \(selectedTimeRange.rawValue) view."
             }
         }
 
@@ -644,7 +683,13 @@ class HistoricalViewModel: ObservableObject {
     }
 
     /// Get recommended time range based on available data
+    /// NOTE: Temporarily disabled for Phase 1 refactoring - requires architectural changes
     func getRecommendedTimeRange() -> TimeRange? {
+        // TODO: Phase 2 - Refactor to not access internal bleManager
+        // This violates encapsulation and needs proper protocol-based solution
+        return nil
+
+        /*
         // Check data availability in BLE manager
         guard let bleManager = historicalDataManager.bleManager,
               !bleManager.sensorDataHistory.isEmpty else {
@@ -674,6 +719,7 @@ class HistoricalViewModel: ObservableObject {
         } else {
             return nil  // Not enough data for any meaningful view
         }
+        */
     }
 
     // MARK: - Private Methods

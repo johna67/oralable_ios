@@ -190,7 +190,7 @@ struct HealthKitIntegrationCard: View {
                     isLoading = false
                 }
             } catch {
-                Logger.shared.error("[loading health data: \(error)")
+                Logger.shared.error("[loading health data]: \(error)")
                 await MainActor.run {
                     isLoading = false
                 }
@@ -275,3 +275,4 @@ struct HealthKitIntegrationCard_Previews: PreviewProvider {
         .background(Color.gray.opacity(0.1))
     }
 }
+

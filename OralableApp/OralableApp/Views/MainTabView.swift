@@ -33,7 +33,7 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
-            SettingsView()
+            SettingsView(viewModel: dependencies.makeSettingsViewModel())
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }

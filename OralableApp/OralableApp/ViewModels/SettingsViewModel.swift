@@ -77,16 +77,11 @@ class SettingsViewModel: ObservableObject {
     
     // MARK: - Initialization
 
-    /// Initialize with injected dependencies (preferred)
+    /// Initialize with injected dependencies
     init(bleManager: OralableBLE) {
         self.bleManager = bleManager
         loadSettings()
         setupBindings()
-    }
-
-    /// Legacy initializer for backward compatibility (uses singleton)
-    convenience init() {
-        self.init(bleManager: OralableBLE.shared)
     }
 
     // MARK: - Setup

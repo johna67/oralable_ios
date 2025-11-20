@@ -86,7 +86,8 @@ enum RecordingStatus: String, Codable {
 /// Manages recording sessions
 @MainActor
 class RecordingSessionManager: ObservableObject {
-    static let shared = RecordingSessionManager()
+    // MARK: - Dependency Injection (Phase 4: Singleton Removed)
+    // Note: Use AppDependencies.shared.recordingSessionManager instead
 
     @Published var currentSession: RecordingSession?
     @Published var sessions: [RecordingSession] = []
@@ -98,7 +99,7 @@ class RecordingSessionManager: ObservableObject {
     // Reference to SharedDataManager for CloudKit uploads
     weak var sharedDataManager: SharedDataManager?
 
-    private init() {
+    init() {
         loadSessions()
     }
 

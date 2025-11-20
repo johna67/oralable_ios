@@ -2,7 +2,8 @@ import Foundation
 
 /// Manager for importing sensor data and logs from CSV format
 class CSVImportManager: ObservableObject {
-    static let shared = CSVImportManager()
+    // MARK: - Dependency Injection (Phase 4: Singleton Removed)
+    // Note: Use AppDependencies.shared.csvImportManager instead
 
     init() {}
     

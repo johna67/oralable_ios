@@ -10,6 +10,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
+    @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var authenticationManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
@@ -24,14 +25,9 @@ struct SettingsView: View {
     // Viewer Mode flag - when true, certain settings are read-only
     let isViewerMode: Bool
 
-    init(viewModel: SettingsViewModel? = nil, isViewerMode: Bool = false) {
+    init(viewModel: SettingsViewModel, isViewerMode: Bool = false) {
         self.isViewerMode = isViewerMode
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else {
-            // Legacy path - create with default initializer
-            _viewModel = StateObject(wrappedValue: SettingsViewModel())
-        }
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
 
     var body: some View {
@@ -90,7 +86,7 @@ struct SettingsView: View {
             Text("This will reset all settings to their default values.")
         }
         .sheet(isPresented: $showingExportSheet) {
-            ShareView(ble: OralableBLE.shared)
+            ShareView(ble: dependencies.bleManager)
         }
         .sheet(isPresented: $showingAuthenticationView) {
             NavigationView {
@@ -524,7 +520,8 @@ extension PPGChannelOrder {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView()
-            .withDependencies(AppDependencies.shared)
+        let dependencies = AppDependencies.shared
+        SettingsView(viewModel: dependencies.makeSettingsViewModel())
+            .withDependencies(dependencies)
     }
 }

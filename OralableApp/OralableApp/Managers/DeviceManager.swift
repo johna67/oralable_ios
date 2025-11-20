@@ -55,6 +55,12 @@ class DeviceManager: ObservableObject {
     private let maxReconnectionAttempts = 3
     private var reconnectionTasks: [UUID: Task<Void, Never>] = [:]
     
+    // Per-reading publisher
+    private let readingsSubject = PassthroughSubject<SensorReading, Never>()
+    var readingsPublisher: AnyPublisher<SensorReading, Never> {
+        readingsSubject.eraseToAnyPublisher()
+    }
+    
     // MARK: - Initialization
     
     init() {
@@ -453,6 +459,9 @@ class DeviceManager: ObservableObject {
         // Update latest readings
         latestReadings[reading.sensorType] = reading
         
+        // Emit per-reading for streaming consumers
+        readingsSubject.send(reading)
+        
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
             allSensorReadings.removeFirst(100)
@@ -463,6 +472,11 @@ class DeviceManager: ObservableObject {
     
     func device(withId id: UUID) -> DeviceInfo? {
         return discoveredDevices.first { $0.id == id }
+    }
+
+    /// Read-only helper to fetch the underlying CBPeripheral for a given peripheral identifier
+    func peripheral(for id: UUID) -> CBPeripheral? {
+        return devices[id]?.peripheral
     }
     
     // MARK: - Data Management
@@ -486,3 +500,4 @@ class DeviceManager: ObservableObject {
         primaryDevice = deviceInfo
     }
 }
+

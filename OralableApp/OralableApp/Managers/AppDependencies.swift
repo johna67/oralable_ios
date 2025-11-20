@@ -26,6 +26,7 @@ class AppDependencies: ObservableObject {
     // MARK: - Core Services
 
     let deviceManager: DeviceManager
+    let recordingSessionManager: RecordingSessionManager  // ✅ Managed by DI container
     let bleManager: OralableBLE
     let authenticationManager: AuthenticationManager
     let subscriptionManager: SubscriptionManager
@@ -75,9 +76,12 @@ class AppDependencies: ObservableObject {
         // Health integration - create new instance
         self.healthKitManager = HealthKitManager()
 
-        // BLE Manager (wraps DeviceManager)
+        // Recording session manager - create first since BLE depends on it
+        self.recordingSessionManager = RecordingSessionManager()
+
+        // BLE Manager (wraps DeviceManager) - inject recordingSessionManager
         // Note: BLE permission won't be requested until scan/connect is actually called
-        self.bleManager = OralableBLE()
+        self.bleManager = OralableBLE(recordingSessionManager: self.recordingSessionManager)
 
         // Shared data manager (depends on authentication, healthKit, and bleManager)
         self.sharedDataManager = SharedDataManager(
@@ -87,7 +91,7 @@ class AppDependencies: ObservableObject {
         )
 
         // Connect RecordingSessionManager to SharedDataManager for CloudKit uploads
-        RecordingSessionManager.shared.setSharedDataManager(self.sharedDataManager)
+        self.recordingSessionManager.setSharedDataManager(self.sharedDataManager)
 
         // Patient app is always in subscription mode
         self.appStateManager.selectedMode = .subscription
@@ -111,6 +115,12 @@ class AppDependencies: ObservableObject {
         self.dataProvider = RealBLEDataProvider(deviceManager: deviceManager)
 
         Logger.shared.info("[AppDependencies] ✅ Dependency container initialized successfully")
+
+        // Start auto-update for historical data (after all properties initialized)
+        Task { @MainActor in
+            self.historicalDataManager.startAutoUpdate()
+            Logger.shared.info("[AppDependencies] 🔄 Started historical data auto-update")
+        }
     }
 
     // MARK: - Factory Methods
@@ -191,6 +201,7 @@ extension View {
         self
             .environment(\.dependencies, dependencies)
             .environmentObject(dependencies)
+            .environmentObject(dependencies.recordingSessionManager)
             .environmentObject(dependencies.bleManager)
             .environmentObject(dependencies.deviceManager)
             .environmentObject(dependencies.authenticationManager)
