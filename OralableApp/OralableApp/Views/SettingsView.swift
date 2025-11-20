@@ -9,116 +9,111 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @StateObject private var viewModel: SettingsViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var authenticationManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     @EnvironmentObject var appStateManager: AppStateManager
-    @EnvironmentObject var bleManager: OralableBLE
-    @EnvironmentObject var healthKitManager: HealthKitManager
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.dependencies) private var dependencies
-
-    // Use lazy wrapper to defer ViewModel creation until after environment is available
-    @State private var _viewModel: SettingsViewModel?
-
-    private var viewModel: SettingsViewModel {
-        get { _viewModel! }
-        set { _viewModel = newValue }
-    }
-
     @State private var showingExportSheet = false
     @State private var showingAuthenticationView = false
     @State private var showingSubscriptionView = false
     @State private var showingSignOutAlert = false
     @State private var showingChangeModeAlert = false
 
-    var body: some View {
-        settingsContent
-            .onAppear {
-                // Initialize viewModel once when view appears
-                if _viewModel == nil {
-                    Logger.shared.info("[SettingsView] Creating ViewModel using factory method")
-                    _viewModel = dependencies.makeSettingsViewModel()
-                }
-            }
+    // Viewer Mode flag - when true, certain settings are read-only
+    let isViewerMode: Bool
+
+    init(viewModel: SettingsViewModel? = nil, isViewerMode: Bool = false) {
+        self.isViewerMode = isViewerMode
+        if let viewModel = viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            // Legacy path - create with default initializer
+            _viewModel = StateObject(wrappedValue: SettingsViewModel())
+        }
     }
 
-    @ViewBuilder
-    private var settingsContent: some View {
-        if _viewModel != nil {
-            NavigationView {
-                List {
-                    accountAndPreferencesGroup(viewModel)
-                    deviceAndNotificationsGroup(viewModel)
-                    healthIntegrationGroup(viewModel)
-                    dataAndPrivacyGroup(viewModel)
-                }
-                .navigationTitle("Settings")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: { dismiss() }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 17, weight: .semibold))
-                                Text("Back")
+    var body: some View {
+        NavigationView {
+            List {
+                // Viewer Mode Info (only shown in viewer mode)
+                if isViewerMode {
+                    Section {
+                        HStack(spacing: designSystem.spacing.md) {
+                            Image(systemName: "eye.fill")
+                                .foregroundColor(.blue)
+                                .font(.title2)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Viewer Mode")
+                                    .font(designSystem.typography.body)
+                                    .foregroundColor(designSystem.colors.textPrimary)
+
+                                Text("Settings are read-only in viewer mode")
+                                    .font(designSystem.typography.caption)
+                                    .foregroundColor(designSystem.colors.textSecondary)
                             }
-                            .foregroundColor(designSystem.colors.primaryBlack)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
+
+                accountAndPreferencesGroup(viewModel)
+                deviceAndNotificationsGroup(viewModel)
+                healthIntegrationGroup(viewModel)
+                dataAndPrivacyGroup(viewModel)
             }
-            .alert("Clear All Data?", isPresented: Binding(
-                get: { viewModel.showClearDataConfirmation },
-                set: { viewModel.showClearDataConfirmation = $0 }
-            )) {
-                Button("Cancel", role: .cancel) {}
-                Button("Clear", role: .destructive) {
-                    viewModel.clearAllData()
-                }
-            } message: {
-                Text("This will permanently delete all historical data. This action cannot be undone.")
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
+        }
+        .alert("Clear All Data?", isPresented: Binding(
+            get: { viewModel.showClearDataConfirmation },
+            set: { viewModel.showClearDataConfirmation = $0 }
+        )) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                viewModel.clearAllData()
             }
-            .alert("Reset Settings?", isPresented: Binding(
-                get: { viewModel.showResetConfirmation },
-                set: { viewModel.showResetConfirmation = $0 }
-            )) {
-                Button("Cancel", role: .cancel) {}
-                Button("Reset", role: .destructive) {
-                    viewModel.resetToDefaults()
-                }
-            } message: {
-                Text("This will reset all settings to their default values.")
+        } message: {
+            Text("This will permanently delete all historical data. This action cannot be undone.")
+        }
+        .alert("Reset Settings?", isPresented: Binding(
+            get: { viewModel.showResetConfirmation },
+            set: { viewModel.showResetConfirmation = $0 }
+        )) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) {
+                viewModel.resetToDefaults()
             }
-            .sheet(isPresented: $showingExportSheet) {
-                ShareView(ble: bleManager)
+        } message: {
+            Text("This will reset all settings to their default values.")
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            ShareView(ble: OralableBLE.shared)
+        }
+        .sheet(isPresented: $showingAuthenticationView) {
+            NavigationView {
+                AuthenticationView()
             }
-            .sheet(isPresented: $showingAuthenticationView) {
-                NavigationView {
-                    AuthenticationView()
-                }
-            }
-            .sheet(isPresented: $showingSubscriptionView) {
-                SubscriptionTierSelectionView()
-            }
-            .alert("Sign Out?", isPresented: $showingSignOutAlert) {
+        }
+        .sheet(isPresented: $showingSubscriptionView) {
+            SubscriptionTierSelectionView()
+        }
+        .alert("Sign Out?", isPresented: $showingSignOutAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Sign Out", role: .destructive) {
                 authenticationManager.signOut()
             }
-            } message: {
-                Text("Are you sure you want to sign out? You'll need to sign in again to access subscription features.")
+        } message: {
+            Text("Are you sure you want to sign out? You'll need to sign in again to access subscription features.")
+        }
+        .alert("Change Mode?", isPresented: $showingChangeModeAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Change Mode", role: .destructive) {
+                appStateManager.clearMode()
             }
-            .alert("Change Mode?", isPresented: $showingChangeModeAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Change Mode", role: .destructive) {
-                    appStateManager.clearMode()
-                }
-            } message: {
-                Text("Changing modes will restart the app and may require signing in again. Are you sure?")
-            }
-        } else {
-            ProgressView("Loading settings...")
+        } message: {
+            Text("Changing modes will restart the app and may require signing in again. Are you sure?")
         }
     }
 
