@@ -14,6 +14,7 @@ struct SettingsView: View {
     @EnvironmentObject var authenticationManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     @EnvironmentObject var appStateManager: AppStateManager
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @State private var showingExportSheet = false
     @State private var showingAuthenticationView = false
     @State private var showingSubscriptionView = false
