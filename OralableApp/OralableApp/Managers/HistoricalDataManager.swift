@@ -31,9 +31,12 @@ class HistoricalDataManager: ObservableObject {
     // MARK: - Initialization
     init(bleManager: OralableBLE?) {
         self.bleManager = bleManager
-        if bleManager != nil {
-            setupAutoUpdate()
-        }
+        // DISABLED: Historical view should show static snapshots, not auto-update
+        // Auto-updates would make the view refresh constantly, which is not desired
+        // Updates only happen when:
+        // - User opens the view (manual call from ViewModel)
+        // - User changes time range
+        // - User pulls to refresh (if implemented)
     }
     
     deinit {
@@ -231,7 +234,10 @@ class HistoricalDataManager: ObservableObject {
     }
     
     // MARK: - Private Methods
-    
+
+    // DISABLED: Auto-update functionality removed for static historical snapshots
+    // Historical view should NOT auto-refresh, only Dashboard should have real-time data
+    /*
     private func setupAutoUpdate() {
         // Observe when the app becomes active to refresh data
         NotificationCenter.default.addObserver(
@@ -242,6 +248,7 @@ class HistoricalDataManager: ObservableObject {
             self?.updateAllMetrics()
         }
     }
+    */
 }
 
 // MARK: - Convenience Computed Properties
