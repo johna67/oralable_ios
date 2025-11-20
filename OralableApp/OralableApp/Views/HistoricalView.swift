@@ -67,10 +67,10 @@ struct HistoricalView: View {
                 timeRangeSelector(viewModel: viewModel)
 
                 // Chart for selected metric
-                if viewModel.hasCurrentMetrics {
+                if viewModel.hasCurrentMetrics && viewModel.hasSufficientDataForCurrentRange {
                     metricChart(viewModel: viewModel)
                 } else {
-                    emptyStateView
+                    emptyStateView(viewModel: viewModel)
                 }
             }
             .padding(designSystem.spacing.md)
@@ -296,21 +296,99 @@ struct HistoricalView: View {
 
     // MARK: - Empty State
 
-    private var emptyStateView: some View {
-        VStack(spacing: designSystem.spacing.md) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
+    private func emptyStateView(viewModel: HistoricalViewModel) -> some View {
+        VStack(spacing: designSystem.spacing.lg) {
+            Image(systemName: getEmptyStateIcon(viewModel: viewModel))
                 .font(.system(size: 60))
                 .foregroundColor(designSystem.colors.textTertiary)
 
-            Text("No Data Available")
+            Text(getEmptyStateTitle(viewModel: viewModel))
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            Text("Connect your device to start collecting \(metricType.lowercased()) data")
+            Text(getEmptyStateMessage(viewModel: viewModel))
                 .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            // Show recommended action if available
+            if let recommendedRange = viewModel.getRecommendedTimeRange(),
+               recommendedRange != viewModel.selectedTimeRange {
+                Button(action: {
+                    viewModel.selectTimeRange(recommendedRange)
+                    viewModel.updateCurrentRangeMetrics()
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.right.circle.fill")
+                        Text("View \(recommendedRange.rawValue.capitalized) Instead")
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(designSystem.cornerRadius.medium)
+                }
+                .padding(.top, designSystem.spacing.md)
+            }
+
+            #if DEBUG
+            // Debug mode: Offer to load mock data
+            Button(action: {
+                HistoricalMockDataGenerator.populateMockData(into: bleManager, timeRange: viewModel.selectedTimeRange)
+                // Give time for data to populate then refresh
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    viewModel.updateAllMetrics()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    Text("Load Mock Data (Debug)")
+                }
+                .padding()
+                .background(Color.orange)
+                .foregroundColor(.white)
+                .cornerRadius(designSystem.cornerRadius.medium)
+            }
+            .padding(.top, designSystem.spacing.sm)
+            #endif
         }
         .padding(designSystem.spacing.xl)
+    }
+
+    private func getEmptyStateIcon(viewModel: HistoricalViewModel) -> String {
+        if bleManager.sensorDataHistory.isEmpty {
+            return "chart.line.uptrend.xyaxis.circle"
+        } else if let message = viewModel.dataSufficiencyMessage, message.contains("only spans") {
+            return "clock.badge.exclamationmark"
+        } else {
+            return "chart.line.uptrend.xyaxis"
+        }
+    }
+
+    private func getEmptyStateTitle(viewModel: HistoricalViewModel) -> String {
+        if bleManager.sensorDataHistory.isEmpty {
+            return "No Data Collected Yet"
+        } else if viewModel.dataPoints.isEmpty {
+            return "No Data in This Range"
+        } else if viewModel.dataPoints.count == 1 {
+            return "Insufficient Data Points"
+        } else {
+            return "Data Span Too Short"
+        }
+    }
+
+    private func getEmptyStateMessage(viewModel: HistoricalViewModel) -> String {
+        // Use the sophisticated message from ViewModel if available
+        if let message = viewModel.dataSufficiencyMessage {
+            return message
+        }
+
+        // Fallback messages based on state
+        if bleManager.sensorDataHistory.isEmpty {
+            return "Connect your Oralable device and start collecting data. Historical charts will appear as data accumulates over time."
+        }
+
+        let dataCount = bleManager.sensorDataHistory.count
+        return "Found \(dataCount) sensor readings, but they don't span enough time for a meaningful \(viewModel.selectedTimeRange.rawValue) view. Try a shorter time range or wait for more data to accumulate."
     }
 }

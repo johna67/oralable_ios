@@ -582,7 +582,100 @@ class HistoricalViewModel: ObservableObject {
     func toggleDetailedStats() {
         showDetailedStats.toggle()
     }
-    
+
+    // MARK: - Public Methods - Data Sufficiency
+
+    /// Check if there's sufficient data for the current time range
+    var hasSufficientDataForCurrentRange: Bool {
+        guard let metrics = currentMetrics else { return false }
+
+        // Need at least 2 data points for a meaningful chart
+        guard metrics.dataPoints.count >= 2 else { return false }
+
+        // Check if data spans a reasonable portion of the time range
+        guard let firstPoint = metrics.dataPoints.first,
+              let lastPoint = metrics.dataPoints.last else { return false }
+
+        let dataSpan = lastPoint.timestamp.timeIntervalSince(firstPoint.timestamp)
+        let rangeSeconds = selectedTimeRange.seconds
+
+        // Data should span at least 10% of the time range to be meaningful
+        let minimumSpanRatio = 0.1
+        return dataSpan >= (rangeSeconds * minimumSpanRatio)
+    }
+
+    /// Get a descriptive message about data sufficiency
+    var dataSufficiencyMessage: String? {
+        guard let metrics = currentMetrics else {
+            return "No data available for this time range"
+        }
+
+        if metrics.dataPoints.isEmpty {
+            return "No data points available"
+        }
+
+        if metrics.dataPoints.count == 1 {
+            return "Only 1 data point available - need more data for chart"
+        }
+
+        // Check data span
+        if let firstPoint = metrics.dataPoints.first,
+           let lastPoint = metrics.dataPoints.last {
+            let dataSpan = lastPoint.timestamp.timeIntervalSince(firstPoint.timestamp)
+            let hours = Int(dataSpan / 3600)
+            let minutes = Int((dataSpan.truncatingRemainder(dividingBy: 3600)) / 60)
+            let seconds = Int(dataSpan.truncatingRemainder(dividingBy: 60))
+
+            let timeSpanDescription: String
+            if hours > 0 {
+                timeSpanDescription = "\(hours)h \(minutes)m"
+            } else if minutes > 0 {
+                timeSpanDescription = "\(minutes)m \(seconds)s"
+            } else {
+                timeSpanDescription = "\(seconds)s"
+            }
+
+            if dataSpan < 60 {  // Less than 1 minute
+                return "Data only spans \(timeSpanDescription) - try viewing a shorter time range"
+            }
+        }
+
+        return nil  // Sufficient data
+    }
+
+    /// Get recommended time range based on available data
+    func getRecommendedTimeRange() -> TimeRange? {
+        // Check data availability in BLE manager
+        guard let bleManager = historicalDataManager.bleManager,
+              !bleManager.sensorDataHistory.isEmpty else {
+            return nil
+        }
+
+        let sensorData = bleManager.sensorDataHistory
+
+        guard let oldest = sensorData.first?.timestamp,
+              let newest = sensorData.last?.timestamp else {
+            return nil
+        }
+
+        let dataSpan = newest.timeIntervalSince(oldest)
+
+        Logger.shared.info("[HistoricalViewModel] Data span: \(dataSpan)s (\(dataSpan/3600) hours)")
+
+        // Recommend based on actual data span
+        if dataSpan >= 20 * 24 * 3600 {  // 20+ days
+            return .month
+        } else if dataSpan >= 4 * 24 * 3600 {  // 4+ days
+            return .week
+        } else if dataSpan >= 2 * 3600 {  // 2+ hours
+            return .day
+        } else if dataSpan >= 300 {  // 5+ minutes
+            return .hour
+        } else {
+            return nil  // Not enough data for any meaningful view
+        }
+    }
+
     // MARK: - Private Methods
 
     private func updateCurrentMetrics() {

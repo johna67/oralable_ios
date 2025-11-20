@@ -20,8 +20,8 @@ class HistoricalDataManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let updateInterval: TimeInterval = 60.0 // Update every 60 seconds
     
-    // Reference to the BLE manager
-    private weak var bleManager: OralableBLE?
+    // Reference to the BLE manager (internal for access by ViewModel)
+    internal weak var bleManager: OralableBLE?
     
     // MARK: - Initialization
     init(bleManager: OralableBLE?) {
