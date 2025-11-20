@@ -7,10 +7,11 @@ import UIKit
 /// This prevents recalculating aggregations on every view update
 class HistoricalDataManager: ObservableObject {
     // MARK: - Published Properties
+    @Published var hourMetrics: HistoricalMetrics?
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
     @Published var monthMetrics: HistoricalMetrics?
-    
+
     @Published var isUpdating = false
     @Published var lastUpdateTime: Date?
     
@@ -56,17 +57,19 @@ class HistoricalDataManager: ObservableObject {
         // Use Task for proper async handling with main actor isolation
         Task { @MainActor [weak self] in
             // Access main-actor isolated BLE methods on main actor
+            let hourRange = TimeRange.hour
             let dayRange = TimeRange.day
             let weekRange = TimeRange.week
             let monthRange = TimeRange.month
 
-            Logger.shared.debug("[HistoricalDataManager] Calculating metrics for Day, Week, Month ranges...")
+            Logger.shared.debug("[HistoricalDataManager] Calculating metrics for Hour, Day, Week, Month ranges...")
 
+            let hour = ble.getHistoricalMetrics(for: hourRange)
             let day = ble.getHistoricalMetrics(for: dayRange)
             let week = ble.getHistoricalMetrics(for: weekRange)
             let month = ble.getHistoricalMetrics(for: monthRange)
 
-            Logger.shared.info("[HistoricalDataManager] Metrics calculated | Day: \(day != nil ? "✓" : "✗") | Week: \(week != nil ? "✓" : "✗") | Month: \(month != nil ? "✓" : "✗")")
+            Logger.shared.info("[HistoricalDataManager] Metrics calculated | Hour: \(hour != nil ? "✓" : "✗") | Day: \(day != nil ? "✓" : "✗") | Week: \(week != nil ? "✓" : "✗") | Month: \(month != nil ? "✓" : "✗")")
 
             if let day = day {
                 let avgHR = day.dataPoints.compactMap { $0.averageHeartRate }.reduce(0, +) / Double(max(day.dataPoints.count, 1))
@@ -76,6 +79,7 @@ class HistoricalDataManager: ObservableObject {
             }
 
             // Update published properties on main actor
+            self?.hourMetrics = hour
             self?.dayMetrics = day
             self?.weekMetrics = week
             self?.monthMetrics = month
@@ -112,8 +116,7 @@ class HistoricalDataManager: ObservableObject {
             // Update published properties on main actor
             switch range {
             case TimeRange.hour:
-                // Hour metrics are no longer supported
-                break
+                self?.hourMetrics = metrics
             case TimeRange.day:
                 self?.dayMetrics = metrics
             case TimeRange.week:
@@ -131,7 +134,7 @@ class HistoricalDataManager: ObservableObject {
     /// - Returns: Cached metrics or nil if not available
     func getMetrics(for range: TimeRange) -> HistoricalMetrics? {
         switch range {
-        case TimeRange.hour: return nil // Hour metrics are no longer supported
+        case TimeRange.hour: return hourMetrics
         case TimeRange.day: return dayMetrics
         case TimeRange.week: return weekMetrics
         case TimeRange.month: return monthMetrics
@@ -147,17 +150,18 @@ class HistoricalDataManager: ObservableObject {
     
     /// Clear all cached metrics
     func clearAllMetrics() {
+        hourMetrics = nil
         dayMetrics = nil
         weekMetrics = nil
         monthMetrics = nil
         lastUpdateTime = nil
     }
-    
+
     /// Clear metrics for a specific range
     /// - Parameter range: The time range to clear
     func clearMetrics(for range: TimeRange) {
         switch range {
-        case TimeRange.hour: break // Hour metrics are no longer supported
+        case TimeRange.hour: hourMetrics = nil
         case TimeRange.day: dayMetrics = nil
         case TimeRange.week: weekMetrics = nil
         case TimeRange.month: monthMetrics = nil
@@ -219,17 +223,18 @@ extension HistoricalDataManager {
     
     /// Returns true if any metrics are available
     var hasAnyMetrics: Bool {
-        return dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
+        return hourMetrics != nil || dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
     }
-    
+
     /// Returns a summary string of available metrics
     var availabilityDescription: String {
         var available: [String] = []
-        
+
+        if hourMetrics != nil { available.append("Hour") }
         if dayMetrics != nil { available.append("Day") }
         if weekMetrics != nil { available.append("Week") }
         if monthMetrics != nil { available.append("Month") }
-        
+
         return available.isEmpty ? "No metrics available" : "Available: \(available.joined(separator: ", "))"
     }
     

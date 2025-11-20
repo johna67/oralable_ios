@@ -49,11 +49,6 @@ struct DashboardView: View {
                     // Connection Status Card
                     connectionStatusCard(viewModel: viewModel)
 
-                    // HealthKit Integration Card
-                    if healthKitManager.isAvailable {
-                        HealthKitIntegrationCard()
-                    }
-
                     // MAM State Card
                     if viewModel.isConnected {
                         mamStateCard(viewModel: viewModel)
@@ -336,7 +331,7 @@ struct DashboardView: View {
             MetricCard(
                 icon: "heart.fill",
                 title: "Heart Rate",
-                value: "\(viewModel.heartRate)",
+                value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "N/A",
                 unit: "bpm",
                 color: .red,
                 designSystem: designSystem
@@ -346,7 +341,7 @@ struct DashboardView: View {
             MetricCard(
                 icon: "lungs.fill",
                 title: "SpO2",
-                value: "\(viewModel.spO2)",
+                value: viewModel.spO2 > 0 ? "\(viewModel.spO2)" : "N/A",
                 unit: "%",
                 color: .blue,
                 designSystem: designSystem
@@ -356,7 +351,7 @@ struct DashboardView: View {
             MetricCard(
                 icon: "thermometer",
                 title: "Temperature",
-                value: String(format: "%.1f", viewModel.temperature),
+                value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
                 unit: "°C",
                 color: .orange,
                 designSystem: designSystem
@@ -404,10 +399,8 @@ struct DashboardView: View {
             )
 
             // Accelerometer - Tappable to view history
-            NavigationLink(destination: HistoricalView(metricType: "Movement")
-                .environmentObject(designSystem)
-                .environmentObject(dependencies.historicalDataManager)
-                .environmentObject(bleManager)) {
+            NavigationLink(destination: HistoricalView(metricType: "Movement", bleManager: bleManager)
+                .environmentObject(designSystem)) {
                 WaveformCard(
                     title: "Movement",
                     data: viewModel.accelerometerData,

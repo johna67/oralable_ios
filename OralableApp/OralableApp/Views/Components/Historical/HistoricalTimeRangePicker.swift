@@ -6,7 +6,7 @@ struct HistoricalTimeRangePicker: View {
 
     var body: some View {
         HStack(spacing: 30) {
-            ForEach([TimeRange.day, TimeRange.week, TimeRange.month], id: \.self) { range in
+            ForEach([TimeRange.hour, TimeRange.day, TimeRange.week], id: \.self) { range in
                 Button(action: {
                     selectedRange = range
                 }) {

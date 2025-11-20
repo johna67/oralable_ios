@@ -6,6 +6,11 @@ import Combine
 /// Manages all core services and provides factory methods for ViewModels
 @MainActor
 class DentistAppDependencies: ObservableObject {
+    // MARK: - Singleton Prevention
+
+    private static var initializationCount = 0
+    private static let maxInitializations = 2  // Allow app + cached default only
+
     // MARK: - Core Services
 
     let subscriptionManager: DentistSubscriptionManager
@@ -18,7 +23,16 @@ class DentistAppDependencies: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        Logger.shared.info("[DentistAppDependencies] Initializing dependency container")
+        // CRITICAL: Prevent runaway initialization that causes memory crashes
+        DentistAppDependencies.initializationCount += 1
+        let count = DentistAppDependencies.initializationCount
+
+        Logger.shared.info("[DentistAppDependencies] Initializing dependency container #\(count)")
+
+        if count > DentistAppDependencies.maxInitializations {
+            Logger.shared.error("[DentistAppDependencies] ⚠️ CRITICAL: Too many initializations (\(count))! This will cause memory crash. Aborting.")
+            fatalError("[DentistAppDependencies] Runaway initialization detected - preventing memory leak crash")
+        }
 
         // Initialize managers (no more singletons - using dependency injection)
         self.authenticationManager = DentistAuthenticationManager()
@@ -71,8 +85,13 @@ extension DentistAppDependencies {
 /// Environment key for accessing dependencies throughout the app
 struct DentistAppDependenciesKey: EnvironmentKey {
     @MainActor static var defaultValue: DentistAppDependencies {
-        return DentistAppDependencies()
+        // Use a cached singleton to prevent repeated initialization
+        // This prevents memory leaks from creating new instances on every access
+        _cachedDefaultDependencies
     }
+
+    // Cached instance to prevent repeated initialization
+    @MainActor private static let _cachedDefaultDependencies = DentistAppDependencies()
 }
 
 extension EnvironmentValues {

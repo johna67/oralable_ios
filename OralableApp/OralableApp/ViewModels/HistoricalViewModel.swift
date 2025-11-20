@@ -24,8 +24,9 @@ class HistoricalViewModel: ObservableObject {
     
     /// Selected time range for viewing data
     @Published var selectedTimeRange: TimeRange = .day
-    
+
     /// Metrics for each time range
+    @Published var hourMetrics: HistoricalMetrics?
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
     @Published var monthMetrics: HistoricalMetrics?
@@ -57,7 +58,7 @@ class HistoricalViewModel: ObservableObject {
     
     /// Whether any metrics are available
     var hasAnyMetrics: Bool {
-        dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
+        hourMetrics != nil || dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
     }
     
     /// Whether current metrics are available
@@ -382,17 +383,57 @@ class HistoricalViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    
+
     init(historicalDataManager: HistoricalDataManager) {
+        Logger.shared.info("[HistoricalViewModel] 🚀 Initializing HistoricalViewModel...")
         self.historicalDataManager = historicalDataManager
+        Logger.shared.info("[HistoricalViewModel] Setting up bindings...")
         setupBindings()
+        Logger.shared.info("[HistoricalViewModel] Updating current metrics for initial selectedTimeRange: \(selectedTimeRange)")
         updateCurrentMetrics()
+        Logger.shared.info("[HistoricalViewModel] ✅ HistoricalViewModel initialization complete")
     }
     
     // MARK: - Setup
     
     private func setupBindings() {
+        // Subscribe to selectedTimeRange changes
+        $selectedTimeRange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newRange in
+                Logger.shared.info("[HistoricalViewModel] 📍 Time range changed to: \(newRange)")
+                self?.updateCurrentMetrics()
+                // Trigger update if we don't have metrics for this range
+                let hasMetrics: Bool = {
+                    guard let self = self else { return false }
+                    switch newRange {
+                    case .hour: return self.hourMetrics != nil
+                    case .day: return self.dayMetrics != nil
+                    case .week: return self.weekMetrics != nil
+                    case .month: return self.monthMetrics != nil
+                    }
+                }()
+                if !hasMetrics {
+                    Logger.shared.warning("[HistoricalViewModel] ⚠️ No metrics available for \(newRange), requesting update...")
+                    self?.historicalDataManager.updateMetrics(for: newRange)
+                }
+            }
+            .store(in: &cancellables)
+
         // Subscribe to historical data manager's published properties
+        historicalDataManager.$hourMetrics
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] metrics in
+                if let metrics = metrics {
+                    Logger.shared.info("[HistoricalViewModel] ✅ Received Hour metrics | Data points: \(metrics.dataPoints.count) | Total samples: \(metrics.totalSamples)")
+                } else {
+                    Logger.shared.debug("[HistoricalViewModel] Hour metrics cleared (nil)")
+                }
+                self?.hourMetrics = metrics
+                self?.updateCurrentMetricsIfNeeded()
+            }
+            .store(in: &cancellables)
+
         historicalDataManager.$dayMetrics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
@@ -535,10 +576,22 @@ class HistoricalViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func updateCurrentMetrics() {
+        Logger.shared.info("[HistoricalViewModel] 🔄 updateCurrentMetrics() called for selectedTimeRange: \(selectedTimeRange)")
+
         switch selectedTimeRange {
         case .hour:
-            currentMetrics = nil // Hour range not supported
-            Logger.shared.debug("[HistoricalViewModel] Current metrics set to nil (hour range not supported)")
+            Logger.shared.debug("[HistoricalViewModel] Hour case - hourMetrics state: \(hourMetrics == nil ? "NIL" : "EXISTS with \(hourMetrics!.dataPoints.count) points")")
+            currentMetrics = hourMetrics
+            if let metrics = hourMetrics {
+                Logger.shared.info("[HistoricalViewModel] ✅ Current metrics updated to Hour | Data points: \(metrics.dataPoints.count) | Total samples: \(metrics.totalSamples) | Avg temp: \(String(format: "%.1f", metrics.avgTemperature))°C")
+                if metrics.dataPoints.isEmpty {
+                    Logger.shared.warning("[HistoricalViewModel] ⚠️ Hour metrics exist but dataPoints array is EMPTY!")
+                } else {
+                    Logger.shared.debug("[HistoricalViewModel] First data point: timestamp=\(metrics.dataPoints[0].timestamp), temp=\(String(format: "%.1f", metrics.dataPoints[0].averageTemperature))°C")
+                }
+            } else {
+                Logger.shared.warning("[HistoricalViewModel] ⚠️ Current metrics cleared - hourMetrics is NIL")
+            }
         case .day:
             currentMetrics = dayMetrics
             if let metrics = dayMetrics {

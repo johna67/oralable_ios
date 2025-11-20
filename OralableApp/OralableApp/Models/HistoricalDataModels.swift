@@ -67,37 +67,58 @@ class HistoricalDataAggregator {
     static func aggregate(data: [SensorData],
                          for range: TimeRange,
                          endDate: Date = Date()) -> HistoricalMetrics {
-        
+
         let startDate = endDate.addingTimeInterval(-range.seconds)
-        
+
+        Logger.shared.info("[HistoricalDataAggregator] 🔍 Aggregating for \(range)")
+        Logger.shared.info("[HistoricalDataAggregator] Input: \(data.count) sensor data points")
+        Logger.shared.info("[HistoricalDataAggregator] Time range: \(startDate) to \(endDate)")
+        Logger.shared.info("[HistoricalDataAggregator] Range duration: \(range.seconds) seconds (\(range.seconds/3600) hours)")
+
         // Filter data to the time range
         let filteredData = data.filter { $0.timestamp >= startDate && $0.timestamp <= endDate }
-        
+
+        Logger.shared.info("[HistoricalDataAggregator] Filtered: \(filteredData.count) data points within time range")
+
+        if !data.isEmpty && filteredData.isEmpty {
+            let oldestTimestamp = data.map { $0.timestamp }.min() ?? Date()
+            let newestTimestamp = data.map { $0.timestamp }.max() ?? Date()
+            Logger.shared.warning("[HistoricalDataAggregator] ⚠️ No data in range! Data timestamps: \(oldestTimestamp) to \(newestTimestamp)")
+        }
+
         guard !filteredData.isEmpty else {
+            Logger.shared.warning("[HistoricalDataAggregator] ❌ Returning empty metrics (no data in time range)")
             return createEmptyMetrics(range: range, startDate: startDate, endDate: endDate)
         }
-        
+
         // Create time buckets for aggregation
         let bucketSize = range.seconds / Double(range.idealDataPoints)
         var buckets: [[SensorData]] = Array(repeating: [], count: range.idealDataPoints)
-        
+
+        Logger.shared.debug("[HistoricalDataAggregator] Creating \(range.idealDataPoints) buckets of \(bucketSize) seconds each")
+
         // Distribute data into buckets
         for sensorData in filteredData {
             let timeSinceStart = sensorData.timestamp.timeIntervalSince(startDate)
             let bucketIndex = min(Int(timeSinceStart / bucketSize), range.idealDataPoints - 1)
             buckets[bucketIndex].append(sensorData)
         }
-        
+
+        let nonEmptyBuckets = buckets.filter { !$0.isEmpty }.count
+        Logger.shared.info("[HistoricalDataAggregator] Distributed data into \(nonEmptyBuckets) non-empty buckets")
+
         // Create aggregated data points from buckets
         var dataPoints: [HistoricalDataPoint] = []
-        
+
         for (index, bucket) in buckets.enumerated() {
             guard !bucket.isEmpty else { continue }
-            
+
             let bucketTimestamp = startDate.addingTimeInterval(Double(index) * bucketSize + bucketSize / 2)
             let aggregatedPoint = aggregateBucket(bucket, timestamp: bucketTimestamp)
             dataPoints.append(aggregatedPoint)
         }
+
+        Logger.shared.info("[HistoricalDataAggregator] ✅ Created \(dataPoints.count) aggregated data points")
         
         // Calculate trends
         let temperatureTrend = calculateTrend(dataPoints.map { $0.averageTemperature })

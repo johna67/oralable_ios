@@ -15,6 +15,8 @@ struct SettingsView: View {
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     @EnvironmentObject var appStateManager: AppStateManager
     @EnvironmentObject var bleManager: OralableBLE
+    @EnvironmentObject var healthKitManager: HealthKitManager
+    @Environment(\.dismiss) private var dismiss
     @State private var showingExportSheet = false
     @State private var showingAuthenticationView = false
     @State private var showingSubscriptionView = false
@@ -36,10 +38,23 @@ struct SettingsView: View {
             List {
                 accountAndPreferencesGroup
                 deviceAndNotificationsGroup
+                healthIntegrationGroup
                 dataAndPrivacyGroup
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text("Back")
+                        }
+                        .foregroundColor(designSystem.colors.primaryBlack)
+                    }
+                }
+            }
         }
         .alert("Clear All Data?", isPresented: $viewModel.showClearDataConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -312,6 +327,58 @@ struct SettingsView: View {
             }
         } header: {
             Text("Display")
+        }
+    }
+
+    @ViewBuilder
+    private var healthIntegrationGroup: some View {
+        // Health Integration Section
+        if healthKitManager.isAvailable {
+            Section {
+                // Authorization Status
+                HStack {
+                    Image(systemName: "heart.circle.fill")
+                        .foregroundColor(.red)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Apple Health")
+                            .font(designSystem.typography.body)
+                            .foregroundColor(designSystem.colors.textPrimary)
+
+                        if healthKitManager.isAuthorized {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                Text("Connected")
+                                    .font(designSystem.typography.caption)
+                                    .foregroundColor(designSystem.colors.textSecondary)
+                            }
+                        } else {
+                            Text("Not Connected")
+                                .font(designSystem.typography.caption)
+                                .foregroundColor(designSystem.colors.textSecondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if !healthKitManager.isAuthorized {
+                        Button("Connect") {
+                            Task {
+                                try? await healthKitManager.requestAuthorization()
+                            }
+                        }
+                        .font(designSystem.typography.caption)
+                        .foregroundColor(designSystem.colors.primaryBlack)
+                    }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Health Integration")
+            } footer: {
+                Text("Sync your health data with Apple Health for a complete view of your wellness")
+            }
         }
     }
 

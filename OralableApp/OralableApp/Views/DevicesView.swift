@@ -62,6 +62,18 @@ struct DevicesView: View {
             .background(designSystem.colors.backgroundPrimary)
             .navigationTitle("Devices")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text("Back")
+                        }
+                        .foregroundColor(designSystem.colors.primaryBlack)
+                    }
+                }
+            }
         }
         .alert("Forget Device", isPresented: $showingForgetDevice) {
             Button("Cancel", role: .cancel) { }

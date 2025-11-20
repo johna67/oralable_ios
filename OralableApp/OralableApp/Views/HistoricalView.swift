@@ -28,15 +28,12 @@ struct HistoricalView: View {
 
     let metricType: String // "Movement", "HeartRate", "SpO2", etc.
 
-    init(metricType: String = "Movement", viewModel: HistoricalViewModel? = nil) {
+    init(metricType: String = "Movement", bleManager: OralableBLE? = nil) {
         self.metricType = metricType
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else {
-            // Legacy path - create with new instance (nil bleManager for preview)
-            let manager = HistoricalDataManager(bleManager: nil)
-            _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
-        }
+        // Create HistoricalDataManager with the provided bleManager
+        let manager = HistoricalDataManager(bleManager: bleManager)
+        _viewModel = StateObject(wrappedValue: HistoricalViewModel(historicalDataManager: manager))
+        Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType), bleManager: \(bleManager == nil ? "NIL" : "PROVIDED")")
     }
 
     var body: some View {
@@ -99,9 +96,9 @@ struct HistoricalView: View {
     private var timeRangeSelector: some View {
         VStack(spacing: designSystem.spacing.sm) {
             Picker("Time Range", selection: $viewModel.selectedTimeRange) {
+                Text("Hour").tag(TimeRange.hour)
                 Text("Day").tag(TimeRange.day)
                 Text("Week").tag(TimeRange.week)
-                Text("Month").tag(TimeRange.month)
             }
             .pickerStyle(SegmentedPickerStyle())
             .onChange(of: viewModel.selectedTimeRange) { _ in

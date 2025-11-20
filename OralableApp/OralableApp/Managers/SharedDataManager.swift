@@ -57,9 +57,15 @@ class SharedDataManager: ObservableObject {
         // Use shared container for both patient and dentist apps
         self.container = CKContainer(identifier: "iCloud.com.jacdental.oralable.shared")
 
-        // For development/testing, use private database which auto-creates schemas
-        // TODO: Switch to publicCloudDatabase in production after setting up schema in CloudKit Dashboard
+        // Use public database for data sharing between patient and dentist apps
+        // The public database allows patients to share their data with dentists via share codes
+        // For development, use private database which auto-creates schemas
+        // For production, use public database (schema must be deployed in CloudKit Dashboard)
+        #if DEBUG
         self.publicDatabase = container.privateCloudDatabase
+        #else
+        self.publicDatabase = container.publicCloudDatabase
+        #endif
 
         // Store reference to authentication manager
         self.authenticationManager = authenticationManager

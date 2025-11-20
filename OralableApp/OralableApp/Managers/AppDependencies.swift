@@ -13,6 +13,11 @@ import SwiftUI
 /// Replaces singleton pattern with proper dependency management
 @MainActor
 class AppDependencies: ObservableObject {
+    // MARK: - Singleton Prevention
+
+    private static var initializationCount = 0
+    private static let maxInitializations = 2  // Allow app + cached default only
+
     // MARK: - Core Services
 
     let deviceManager: DeviceManager
@@ -37,7 +42,16 @@ class AppDependencies: ObservableObject {
 
     /// Initializes all dependencies with proper dependency graph
     init(appMode: AppMode = .subscription) {
-        Logger.shared.info("[AppDependencies] Initializing dependency container for mode: \(appMode)")
+        // CRITICAL: Prevent runaway initialization that causes memory crashes
+        AppDependencies.initializationCount += 1
+        let count = AppDependencies.initializationCount
+
+        Logger.shared.info("[AppDependencies] Initializing dependency container #\(count) for mode: \(appMode)")
+
+        if count > AppDependencies.maxInitializations {
+            Logger.shared.error("[AppDependencies] ⚠️ CRITICAL: Too many initializations (\(count))! This will cause memory crash. Aborting.")
+            fatalError("[AppDependencies] Runaway initialization detected - preventing memory leak crash")
+        }
 
         // Initialize managers in correct order (dependency injection - no more singletons!)
         self.appStateManager = AppStateManager()
@@ -150,11 +164,13 @@ extension AppDependencies {
 /// Environment key for accessing dependencies throughout the app
 struct AppDependenciesKey: EnvironmentKey {
     @MainActor static var defaultValue: AppDependencies {
-        // Use lazy initialization to avoid circular dependency issues
-        // This creates a new instance each time, but defaultValue should rarely be used
-        // The app should inject dependencies explicitly via .withDependencies()
-        return AppDependencies()
+        // Use a cached singleton to prevent repeated initialization
+        // This prevents memory leaks from creating new instances on every access
+        _cachedDefaultDependencies
     }
+
+    // Cached instance to prevent repeated initialization
+    @MainActor private static let _cachedDefaultDependencies = AppDependencies()
 }
 
 extension EnvironmentValues {

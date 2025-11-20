@@ -293,6 +293,8 @@ class OralableBLE: ObservableObject {
                         self?.healthKitIntegration.writeHeartRate(bpm: bpm)
                     }
                 )
+                // Clear the buffer after calculation to prevent stale data accumulation
+                self.sensorProcessor.clearPPGIRBuffer()
             }
         }
 

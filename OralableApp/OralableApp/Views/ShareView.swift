@@ -20,6 +20,7 @@ struct ShareView: View {
     @State private var importErrorMessage = ""
 
     @Environment(\.horizontalSizeClass) var sizeClass
+    @Environment(\.dismiss) private var dismiss
 
     private var columns: [GridItem] {
         let columnCount = DesignSystem.Layout.gridColumns(for: sizeClass)
@@ -30,13 +31,27 @@ struct ShareView: View {
     }
 
     var body: some View {
-        contentView
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(navigationBarTitleDisplayMode)
-            .background(designSystem.colors.backgroundSecondary.ignoresSafeArea())
-            .sheet(isPresented: $showShareSheet) {
-                shareSheetContent
-            }
+        NavigationView {
+            contentView
+                .navigationTitle(navigationTitle)
+                .navigationBarTitleDisplayMode(navigationBarTitleDisplayMode)
+                .background(designSystem.colors.backgroundSecondary.ignoresSafeArea())
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { dismiss() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 17, weight: .semibold))
+                                Text("Back")
+                            }
+                            .foregroundColor(designSystem.colors.primaryBlack)
+                        }
+                    }
+                }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            shareSheetContent
+        }
             .fileExporter(
                 isPresented: $showDocumentExporter,
                 document: exportDocument,
@@ -95,10 +110,6 @@ struct ShareView: View {
 
     @ViewBuilder
     private var mainContentStack: some View {
-        // Data Summary Card
-        ShareDataSummaryCard(ble: ble)
-            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-
         // Share with Dentist Section
         ShareWithDentistSection()
             .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
@@ -112,24 +123,6 @@ struct ShareView: View {
             ble: ble
         )
         .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-
-        // Recent Logs Preview
-        ShareRecentLogsView(ble: ble)
-            .frame(maxWidth: .infinity)
-
-        // Device Info Card
-        ShareDeviceInfoCard()
-            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-
-        // Clear Data Button
-        ShareClearDataButton(showClearConfirmation: $showClearConfirmation, ble: ble)
-            .frame(maxWidth: DesignSystem.Layout.isIPad ? DesignSystem.Layout.maxCardWidth * 2 : .infinity)
-
-        // Debug Section (only in debug builds)
-        #if DEBUG
-        ShareDebugSection(ble: ble)
-            .frame(maxWidth: .infinity)
-        #endif
     }
 
     private func handleExportResult(_ result: Result<URL, Error>) {
