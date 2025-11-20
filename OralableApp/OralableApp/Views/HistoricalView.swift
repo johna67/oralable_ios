@@ -21,7 +21,10 @@ struct HistoricalView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var historicalDataManager: HistoricalDataManager
     @EnvironmentObject var bleManager: OralableBLE
-    @State private var viewModel: HistoricalViewModel?
+
+    // Use lazy wrapper to defer ViewModel creation until after environment is available
+    @StateObject private var viewModelWrapper = ViewModelWrapper()
+
     @State private var selectedDataPoint: HistoricalDataPoint?
     @State private var showingExportSheet = false
     @State private var showingDatePicker = false
@@ -34,26 +37,29 @@ struct HistoricalView: View {
     }
 
     var body: some View {
-        Group {
-            if let vm = viewModel {
-                historicalContent(viewModel: vm)
-            } else {
-                ProgressView("Loading...")
-                    .task {
-                        // Initialize viewModel from environment's historicalDataManager
-                        if viewModel == nil {
-                            Logger.shared.info("[HistoricalView] Creating ViewModel with historicalDataManager from environment")
-                            viewModel = HistoricalViewModel(historicalDataManager: historicalDataManager)
-                        }
-                    }
+        historicalContent
+            .navigationTitle(metricType)
+            .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                // Initialize viewModel once when view appears
+                if viewModelWrapper.viewModel == nil {
+                    Logger.shared.info("[HistoricalView] Creating ViewModel with historicalDataManager from environment")
+                    viewModelWrapper.viewModel = HistoricalViewModel(historicalDataManager: historicalDataManager)
+                }
             }
-        }
-        .navigationTitle(metricType)
-        .navigationBarTitleDisplayMode(.large)
     }
 
     @ViewBuilder
-    private func historicalContent(viewModel: HistoricalViewModel) -> some View {
+    private var historicalContent: some View {
+        if let viewModel = viewModelWrapper.viewModel {
+            historicalContentBody(viewModel: viewModel)
+        } else {
+            ProgressView("Initializing...")
+        }
+    }
+
+    @ViewBuilder
+    private func historicalContentBody(viewModel: HistoricalViewModel) -> some View {
         ScrollView {
             VStack(spacing: designSystem.spacing.lg) {
                 // Debug info
@@ -391,4 +397,12 @@ struct HistoricalView: View {
         let dataCount = bleManager.sensorDataHistory.count
         return "Found \(dataCount) sensor readings, but they don't span enough time for a meaningful \(viewModel.selectedTimeRange.rawValue) view. Try a shorter time range or wait for more data to accumulate."
     }
+}
+
+// MARK: - ViewModel Wrapper
+
+/// Wrapper class to hold ViewModel with deferred initialization
+@MainActor
+private class ViewModelWrapper: ObservableObject {
+    var viewModel: HistoricalViewModel?
 }
