@@ -78,7 +78,12 @@ class HistoricalViewModel: ObservableObject {
     
     /// Data points for current range
     var dataPoints: [HistoricalDataPoint] {
-        currentMetrics?.dataPoints ?? []
+        let points = currentMetrics?.dataPoints ?? []
+        Logger.shared.debug("[HistoricalViewModel] 🎯 dataPoints getter called, returning \(points.count) points for range: \(selectedTimeRange)")
+        if points.count > 0 {
+            Logger.shared.debug("[HistoricalViewModel] 📌 First point: \(points[0].timestamp), Last point: \(points[points.count-1].timestamp)")
+        }
+        return points
     }
     
     /// Time range display text
@@ -495,7 +500,11 @@ class HistoricalViewModel: ObservableObject {
 
     /// Update all metrics
     func updateAllMetrics() {
-        Logger.shared.debug("[HistoricalViewModel] Requesting metrics update from HistoricalDataManager")
+        Logger.shared.info("[HistoricalViewModel] 🔄 Requesting metrics update from HistoricalDataManager")
+        Logger.shared.info("[HistoricalViewModel] Current state BEFORE update:")
+        Logger.shared.info("[HistoricalViewModel]   - hourMetrics: \(hourMetrics?.dataPoints.count ?? 0) points")
+        Logger.shared.info("[HistoricalViewModel]   - dayMetrics: \(dayMetrics?.dataPoints.count ?? 0) points")
+        Logger.shared.info("[HistoricalViewModel]   - weekMetrics: \(weekMetrics?.dataPoints.count ?? 0) points")
         historicalDataManager.updateAllMetrics()
     }
 

@@ -249,21 +249,27 @@ class SensorDataProcessor: ObservableObject {
         }
 
         await MainActor.run {
+            let beforeCount = self.sensorDataHistory.count
             for (timestamp, group) in groupedReadings {
                 let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
                 self.sensorDataHistory.append(sensorData)
+                Logger.shared.debug("[SensorDataProcessor] 📊 Added sensor data at \(timestamp), total count now: \(self.sensorDataHistory.count)")
             }
 
             // Limit history to last 1000 entries
             if self.sensorDataHistory.count > 1000 {
                 self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 1000)
+                Logger.shared.info("[SensorDataProcessor] ⚠️ Trimmed history from \(beforeCount) to 1000 entries")
             }
 
-            #if DEBUG
-            if self.sensorDataHistory.count % 50 == 0 {
-                Logger.shared.debug("[SensorDataProcessor] Sensor data history: \(self.sensorDataHistory.count) entries")
+            let addedCount = self.sensorDataHistory.count - beforeCount
+            Logger.shared.info("[SensorDataProcessor] ✅ Added \(addedCount) new sensor data entries, total: \(self.sensorDataHistory.count)")
+
+            // Log timestamp range
+            if let oldest = self.sensorDataHistory.first?.timestamp,
+               let newest = self.sensorDataHistory.last?.timestamp {
+                Logger.shared.info("[SensorDataProcessor] 📅 Data range: \(oldest) to \(newest)")
             }
-            #endif
         }
     }
 
