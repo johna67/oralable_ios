@@ -11,7 +11,7 @@ class HistoricalDataProcessor: ObservableObject {
     private let normalizationService: PPGNormalizationService
     private var cachedData: [String: ProcessedHistoricalData] = [:]
 
-    init(normalizationService: PPGNormalizationService) {
+    init(normalizationService: PPGNormalizationService = .shared) {
         self.normalizationService = normalizationService
     }
 
@@ -43,7 +43,7 @@ class HistoricalDataProcessor: ObservableObject {
     }
 
     struct DeviceContext {
-        let state: PPGDebugCard.DeviceState
+        let state: DeviceState
         let confidence: Double
         let isStabilized: Bool
         let timeInState: TimeInterval
@@ -56,6 +56,7 @@ class HistoricalDataProcessor: ObservableObject {
         selectedDate: Date,
         appMode: HistoricalAppMode
     ) async {
+        // Create normalized cache key based on the actual time period
         let calendar = Calendar.current
         let normalizedDate: Date
 
@@ -72,16 +73,17 @@ class HistoricalDataProcessor: ObservableObject {
 
         let cacheKey = "\(metricType.rawValue)_\(timeRange.rawValue)_\(Int(normalizedDate.timeIntervalSince1970))"
 
-        Logger.shared.debug(" Processing historical data:")
-        Logger.shared.debug("   Metric: \(metricType.title)")
-        Logger.shared.debug("   Time Range: \(timeRange.rawValue)")
-        Logger.shared.debug("   Selected Date: \(selectedDate)")
-        Logger.shared.debug("   Normalized Date: \(normalizedDate)")
-        Logger.shared.debug("   Cache Key: \(cacheKey)")
-        Logger.shared.debug("   Total sensor history count: \(ble.sensorDataHistory.count)")
+        // DEBUG: Log what we're trying to process
+        print("🔄 Processing historical data:")
+        print("   Metric: \(metricType.title)")
+        print("   Time Range: \(timeRange.rawValue)")
+        print("   Selected Date: \(selectedDate)")
+        print("   Normalized Date: \(normalizedDate)")
+        print("   Cache Key: \(cacheKey)")
+        print("   Total sensor history count: \(ble.sensorDataHistory.count)")
 
         if let cached = cachedData[cacheKey] {
-            Logger.shared.info(" Using cached data")
+            print("✅ Using cached data")
             self.processedData = cached
             return
         }
@@ -92,12 +94,12 @@ class HistoricalDataProcessor: ObservableObject {
         let filteredData = filterData(from: ble.sensorDataHistory, timeRange: timeRange, selectedDate: selectedDate)
 
         guard !filteredData.isEmpty else {
-            Logger.shared.error(" No data after filtering")
+            print("❌ No data after filtering")
             processedData = nil
             return
         }
 
-        Logger.shared.debug(" Processing \(filteredData.count) filtered readings")
+        print("📊 Processing \(filteredData.count) filtered readings")
 
         let normalizedData = await processMetricData(filteredData, metricType: metricType, appMode: appMode)
         let statistics = calculateStatistics(from: normalizedData)
@@ -121,7 +123,7 @@ class HistoricalDataProcessor: ObservableObject {
             cachedData.removeValue(forKey: oldestKey)
         }
 
-        Logger.shared.info(" Processed data successfully - \(statistics.sampleCount) samples")
+        print("✅ Processed data successfully - \(statistics.sampleCount) samples")
 
         self.processedData = processed
     }
@@ -129,9 +131,10 @@ class HistoricalDataProcessor: ObservableObject {
     private func filterData(from data: [SensorData], timeRange: TimeRange, selectedDate: Date) -> [SensorData] {
         let calendar = Calendar.current
 
-        Logger.shared.debug(" Filtering \(data.count) total sensor readings")
+        // DEBUG: Log data availability
+        print("📊 Filtering \(data.count) total sensor readings")
         if let earliest = data.first?.timestamp, let latest = data.last?.timestamp {
-            Logger.shared.debug("📅 Data range: \(earliest) to \(latest)")
+            print("📅 Data range: \(earliest) to \(latest)")
         }
 
         var filtered: [SensorData] = []
@@ -140,29 +143,29 @@ class HistoricalDataProcessor: ObservableObject {
         case .hour:
             let startOfHour = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
             let endOfHour = calendar.date(byAdding: .hour, value: 1, to: startOfHour) ?? selectedDate
-            Logger.shared.debug("⏰ Hour filter: \(startOfHour) to \(endOfHour)")
+            print("⏰ Hour filter: \(startOfHour) to \(endOfHour)")
             filtered = data.filter { $0.timestamp >= startOfHour && $0.timestamp < endOfHour }
         case .day:
             let startOfDay = calendar.startOfDay(for: selectedDate)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
-            Logger.shared.debug("📅 Day filter: \(startOfDay) to \(endOfDay)")
+            print("📅 Day filter: \(startOfDay) to \(endOfDay)")
             filtered = data.filter { $0.timestamp >= startOfDay && $0.timestamp < endOfDay }
         case .week:
             let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
             let endOfWeek = calendar.date(byAdding: .weekOfYear, value: 1, to: startOfWeek) ?? selectedDate
-            Logger.shared.debug("📅 Week filter: \(startOfWeek) to \(endOfWeek)")
+            print("📅 Week filter: \(startOfWeek) to \(endOfWeek)")
             filtered = data.filter { $0.timestamp >= startOfWeek && $0.timestamp < endOfWeek }
         case .month:
             let startOfMonth = calendar.dateInterval(of: .month, for: selectedDate)?.start ?? selectedDate
             let endOfMonth = calendar.date(byAdding: .month, value: 1, to: startOfMonth) ?? selectedDate
-            Logger.shared.debug("📅 Month filter: \(startOfMonth) to \(endOfMonth)")
+            print("📅 Month filter: \(startOfMonth) to \(endOfMonth)")
             filtered = data.filter { $0.timestamp >= startOfMonth && $0.timestamp < endOfMonth }
         }
 
-        Logger.shared.info(" Filtered to \(filtered.count) readings for selected period")
+        print("✅ Filtered to \(filtered.count) readings for selected period")
 
         if filtered.isEmpty {
-            Logger.shared.warning(" No data found for selected period")
+            print("⚠️ No data found for selected period")
         }
 
         return filtered
@@ -274,7 +277,7 @@ class HistoricalDataProcessor: ObservableObject {
         let tempChange = (recent.map { $0.temperature.celsius }.max() ?? 0) - (recent.map { $0.temperature.celsius }.min() ?? 0)
         let batteryLevel = recent.last?.battery.percentage ?? 0
 
-        let state: PPGDebugCard.DeviceState
+        let state: DeviceState
         if batteryLevel > 95 && movementVariation < 0.1 {
             state = .onChargerStatic
         } else if movementVariation < 0.1 && tempChange < 0.5 {

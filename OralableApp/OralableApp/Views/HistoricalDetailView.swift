@@ -2,6 +2,115 @@ import SwiftUI
 import Charts
 import Foundation
 
+// MARK: - MetricType Definition (if not defined elsewhere)
+enum MetricType: String, CaseIterable {
+    case battery = "battery"
+    case ppg = "ppg"
+    case heartRate = "heartRate"
+    case spo2 = "spo2"
+    case temperature = "temperature"
+    case accelerometer = "accelerometer"
+
+    var title: String {
+        switch self {
+        case .battery: return "Battery"
+        case .ppg: return "PPG Signals"
+        case .heartRate: return "Heart Rate"
+        case .spo2: return "Blood Oxygen"
+        case .temperature: return "Temperature"
+        case .accelerometer: return "Accelerometer"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .battery: return "battery.100"
+        case .ppg: return "waveform.path.ecg"
+        case .heartRate: return "heart.fill"
+        case .spo2: return "drop.fill"
+        case .temperature: return "thermometer"
+        case .accelerometer: return "gyroscope"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .battery: return .green
+        case .ppg: return .red
+        case .heartRate: return .pink
+        case .spo2: return .blue
+        case .temperature: return .orange
+        case .accelerometer: return .purple
+        }
+    }
+
+    func csvHeader() -> String {
+        switch self {
+        case .battery:
+            return "Timestamp,Battery_Percentage"
+        case .ppg:
+            return "Timestamp,PPG_Red,PPG_IR,PPG_Green"
+        case .heartRate:
+            return "Timestamp,Heart_Rate_BPM,Quality"
+        case .spo2:
+            return "Timestamp,SpO2_Percentage,Quality"
+        case .temperature:
+            return "Timestamp,Temperature_Celsius"
+        case .accelerometer:
+            return "Timestamp,Accel_X,Accel_Y,Accel_Z,Magnitude"
+        }
+    }
+
+    func csvRow(for data: SensorData) -> String {
+        let timestamp = ISO8601DateFormatter().string(from: data.timestamp)
+        switch self {
+        case .battery:
+            return "\(timestamp),\(data.battery.percentage)"
+        case .ppg:
+            return "\(timestamp),\(data.ppg.red),\(data.ppg.ir),\(data.ppg.green)"
+        case .heartRate:
+            if let hr = data.heartRate {
+                return "\(timestamp),\(hr.bpm),\(hr.quality)"
+            } else {
+                return "\(timestamp),0,0"
+            }
+        case .spo2:
+            if let spo2 = data.spo2 {
+                return "\(timestamp),\(spo2.percentage),\(spo2.quality)"
+            } else {
+                return "\(timestamp),0,0"
+            }
+        case .temperature:
+            return "\(timestamp),\(data.temperature.celsius)"
+        case .accelerometer:
+            return "\(timestamp),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.accelerometer.magnitude)"
+        }
+    }
+}
+
+// MARK: - App Mode and Subscription Management
+enum HistoricalAppMode: String, CaseIterable {
+    case viewer = "Viewer"
+    case subscription = "Subscription"
+
+    var description: String {
+        switch self {
+        case .viewer:
+            return "View historical data with basic analysis"
+        case .subscription:
+            return "Full access with advanced analytics and sharing"
+        }
+    }
+
+    var allowsDataSharing: Bool {
+        return self == .subscription
+    }
+
+    var allowsAdvancedAnalytics: Bool {
+        return self == .subscription
+    }
+}
+
 // MARK: - Data Sharing Service
 class DataSharingService: ObservableObject {
     enum ShareFormat: String, CaseIterable {
@@ -161,296 +270,8 @@ struct HistoricalSample: Codable {
     }
 }
 
-// MARK: - PPG Normalization Service (Unified with Persistence)
-class PPGNormalizationService: ObservableObject {
-    static let shared = PPGNormalizationService()
-
-    enum Method: String, CaseIterable {
-        case raw = "Raw Values"
-        case adaptiveBaseline = "Adaptive Baseline"
-        case dynamicRange = "Dynamic Range"
-        case heartRateSimulation = "HR Simulation"
-        case persistent = "Persistent Smart"
-    }
-
-    @Published private var baselineState: BaselineState?
-    @Published private var deviceContext: DeviceContext?
-    private var lastUpdateTime: Date = Date()
-
-    struct BaselineState {
-        let irBaseline: Double
-        let redBaseline: Double
-        let greenBaseline: Double
-        let timestamp: Date
-        let confidence: Double
-        let sampleCount: Int
-
-        var isStale: Bool {
-            Date().timeIntervalSince(timestamp) > 300
-        }
-
-        var isReliable: Bool {
-            confidence > 0.8 && sampleCount >= 20
-        }
-    }
-
-    struct DeviceContext {
-        let isOnBody: Bool
-        let isMoving: Bool
-        let temperatureStable: Bool
-        let batteryCharging: Bool
-        let confidence: Double
-        let timestamp: Date
-
-        var isStable: Bool {
-            !isMoving && temperatureStable && confidence > 0.7
-        }
-
-        var recommendedNormalization: Method {
-            if isOnBody && isStable {
-                return .persistent
-            } else if isStable {
-                return .adaptiveBaseline
-            } else {
-                return .dynamicRange
-            }
-        }
-    }
-
-    func normalizePPGData(
-        _ data: [(timestamp: Date, ir: Double, red: Double, green: Double)],
-        method: Method = .persistent,
-        sensorData: [SensorData] = []
-    ) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-
-        guard !data.isEmpty else { return data }
-
-        if !sensorData.isEmpty {
-            updateDeviceContext(from: sensorData)
-        }
-
-        let actualMethod = method == .persistent ?
-            (deviceContext?.recommendedNormalization ?? .adaptiveBaseline) : method
-
-        switch actualMethod {
-        case .raw:
-            return data
-        case .adaptiveBaseline:
-            return adaptiveBaselineNormalization(data)
-        case .dynamicRange:
-            return dynamicRangeNormalization(data)
-        case .heartRateSimulation:
-            return heartRateSimulationNormalization(data)
-        case .persistent:
-            return persistentSmartNormalization(data)
-        }
-    }
-
-    private func updateDeviceContext(from sensorData: [SensorData]) {
-        guard !sensorData.isEmpty else { return }
-
-        let recentSamples = Array(sensorData.suffix(10))
-        guard recentSamples.count >= 5 else { return }
-
-        let accelerometerVariation = calculateMovementVariation(recentSamples)
-        let temperatureChange = calculateTemperatureChange(recentSamples)
-        let batteryLevel = recentSamples.last?.battery.percentage ?? 0
-        let avgTemperature = recentSamples.map { $0.temperature.celsius }.reduce(0, +) / Double(recentSamples.count)
-
-        let isMoving = accelerometerVariation > 0.3
-        let temperatureStable = temperatureChange < 1.0
-        let batteryCharging = batteryLevel > 95
-        let isOnBody = avgTemperature > 25.0 && !isMoving
-
-        var confidence = 0.5
-        if temperatureStable { confidence += 0.2 }
-        if !isMoving { confidence += 0.2 }
-        if recentSamples.count >= 10 { confidence += 0.1 }
-
-        deviceContext = DeviceContext(
-            isOnBody: isOnBody,
-            isMoving: isMoving,
-            temperatureStable: temperatureStable,
-            batteryCharging: batteryCharging,
-            confidence: confidence,
-            timestamp: Date()
-        )
-    }
-
-    private func persistentSmartNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        let shouldUpdateBaseline = baselineState == nil ||
-                                  baselineState!.isStale ||
-                                  (deviceContext?.isStable == true && !(baselineState?.isReliable ?? false))
-
-        if shouldUpdateBaseline {
-            updatePersistentBaseline(data)
-        }
-
-        guard let baseline = baselineState, baseline.isReliable else {
-            return adaptiveBaselineNormalization(data)
-        }
-
-        return data.map { sample in
-            let correctedIR = sample.ir - baseline.irBaseline
-            let correctedRed = sample.red - baseline.redBaseline
-            let correctedGreen = sample.green - baseline.greenBaseline
-
-            let scalingFactor: Double = deviceContext?.isOnBody == true ? 0.05 : 0.1
-
-            return (
-                timestamp: sample.timestamp,
-                ir: 120 + (correctedIR * scalingFactor),
-                red: 120 + (correctedRed * scalingFactor),
-                green: 120 + (correctedGreen * scalingFactor)
-            )
-        }
-    }
-
-    private func updatePersistentBaseline(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) {
-        guard let context = deviceContext, context.isStable else {
-            return
-        }
-
-        let irValues = data.map { $0.ir }.sorted()
-        let redValues = data.map { $0.red }.sorted()
-        let greenValues = data.map { $0.green }.sorted()
-
-        guard !irValues.isEmpty else { return }
-
-        let medianIndex = irValues.count / 2
-        let irBaseline = irValues[medianIndex]
-        let redBaseline = redValues[medianIndex]
-        let greenBaseline = greenValues[medianIndex]
-
-        let irStd = calculateStandardDeviation(irValues)
-        let coefficientOfVariation = irStd / max(1e-9, abs(irBaseline))
-        let confidence = max(0.0, min(1.0, 1.0 - (coefficientOfVariation / 0.2)))
-
-        baselineState = BaselineState(
-            irBaseline: irBaseline,
-            redBaseline: redBaseline,
-            greenBaseline: greenBaseline,
-            timestamp: Date(),
-            confidence: confidence,
-            sampleCount: data.count
-        )
-    }
-
-    private func calculateMovementVariation(_ samples: [SensorData]) -> Double {
-        let magnitudes = samples.map { $0.accelerometer.magnitude }
-        let mean = magnitudes.reduce(0, +) / Double(magnitudes.count)
-        let variance = magnitudes.map { pow($0 - mean, 2) }.reduce(0, +) / Double(magnitudes.count)
-        return sqrt(variance)
-    }
-
-    private func calculateTemperatureChange(_ samples: [SensorData]) -> Double {
-        let temperatures = samples.map { $0.temperature.celsius }
-        return (temperatures.max() ?? 0) - (temperatures.min() ?? 0)
-    }
-
-    private func calculateStandardDeviation(_ values: [Double]) -> Double {
-        let mean = values.reduce(0, +) / Double(values.count)
-        let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count)
-        return sqrt(variance)
-    }
-
-    private func adaptiveBaselineNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        let windowSize = min(10, max(1, data.count / 3))
-        guard windowSize > 0 else { return data }
-
-        return data.enumerated().map { index, sample in
-            let windowStart = max(0, index - windowSize/2)
-            let windowEnd = min(data.count, windowStart + windowSize)
-            let window = Array(data[windowStart..<windowEnd])
-
-            let irBaseline = window.map { $0.ir }.reduce(0, +) / Double(window.count)
-            let redBaseline = window.map { $0.red }.reduce(0, +) / Double(window.count)
-            let greenBaseline = window.map { $0.green }.reduce(0, +) / Double(window.count)
-
-            return (
-                timestamp: sample.timestamp,
-                ir: 100 + (sample.ir - irBaseline) * 0.1,
-                red: 100 + (sample.red - redBaseline) * 0.1,
-                green: 100 + (sample.green - greenBaseline) * 0.1
-            )
-        }
-    }
-
-    private func dynamicRangeNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        let irValues = data.map { $0.ir }.sorted()
-        let redValues = data.map { $0.red }.sorted()
-        let greenValues = data.map { $0.green }.sorted()
-
-        func percentile(_ values: [Double], _ p: Double) -> Double {
-            let index = Int(Double(values.count - 1) * p)
-            return values[index]
-        }
-
-        let irMin = percentile(irValues, 0.1)
-        let irMax = percentile(irValues, 0.9)
-        let redMin = percentile(redValues, 0.1)
-        let redMax = percentile(redValues, 0.9)
-        let greenMin = percentile(greenValues, 0.1)
-        let greenMax = percentile(greenValues, 0.9)
-
-        return data.map { sample in
-            let irNorm = irMax > irMin ? (sample.ir - irMin) / (irMax - irMin) : 0.5
-            let redNorm = redMax > redMin ? (sample.red - redMin) / (redMax - redMin) : 0.5
-            let greenNorm = greenMax > greenMin ? (sample.green - greenMin) / (greenMax - greenMin) : 0.5
-
-            return (
-                timestamp: sample.timestamp,
-                ir: 50 + irNorm * 100,
-                red: 50 + redNorm * 100,
-                green: 50 + greenNorm * 100
-            )
-        }
-    }
-
-    private func heartRateSimulationNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        let irValues = data.map { $0.ir }
-        let irMean = irValues.reduce(0, +) / Double(irValues.count)
-        let irStd = sqrt(irValues.map { pow($0 - irMean, 2) }.reduce(0, +) / Double(irValues.count))
-
-        return data.map { sample in
-            let irZ = irStd > 0 ? (sample.ir - irMean) / irStd : 0
-            let simulatedHR = 120 + irZ * 20
-
-            return (
-                timestamp: sample.timestamp,
-                ir: max(60, min(180, simulatedHR)),
-                red: sample.red,
-                green: sample.green
-            )
-        }
-    }
-
-    func resetPersistentState() {
-        baselineState = nil
-        deviceContext = nil
-    }
-
-    func getStateInfo() -> String {
-        var info = "PPG Normalization State:\n"
-
-        if let baseline = baselineState {
-            info += "• Baseline: IR=\(String(format: "%.0f", baseline.irBaseline)), "
-            info += "Confidence=\(String(format: "%.1f%%", baseline.confidence * 100)), "
-            info += "Age=\(String(format: "%.0f", Date().timeIntervalSince(baseline.timestamp)))s\n"
-        } else {
-            info += "• No baseline established\n"
-        }
-
-        if let context = deviceContext {
-            info += "• Context: OnBody=\(context.isOnBody), Stable=\(context.isStable), "
-            info += "Confidence=\(String(format: "%.1f%%", context.confidence * 100))\n"
-        } else {
-            info += "• No device context\n"
-        }
-
-        return info
-    }
-}
+// NOTE: PPGNormalizationService has been moved to Services/PPGNormalizationService.swift
+// The view will use the shared service via PPGNormalizationService.shared or via an EnvironmentObject.
 
 // MARK: - Historical Detail View (Refactored to use components)
 struct HistoricalDetailView: View {
@@ -467,6 +288,9 @@ struct HistoricalDetailView: View {
     @State private var appMode: HistoricalAppMode = .subscription
 
     @State private var processor: HistoricalDataProcessor?
+
+    // Debounced reprocess task to avoid invoking processing on every single packet
+    @State private var reprocessTask: Task<Void, Never>?
 
     private var chartHeight: CGFloat {
         DesignSystem.Layout.isIPad ? 400 : 300
@@ -497,6 +321,18 @@ struct HistoricalDetailView: View {
                         .onChange(of: selectedDate) { _, _ in
                             refreshProcessing()
                         }
+
+                    // DEBUG: Quick counters to help trace where data is present
+                    HStack {
+                        Text("Raw samples: \(ble.sensorDataHistory.count)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("Processed: \(getProcessor().processedData?.statistics.sampleCount ?? 0)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
 
                     VStack(spacing: 20) {
                         HistoricalChartView(
@@ -539,6 +375,7 @@ struct HistoricalDetailView: View {
             }
         }
         .task {
+            Logger.shared.info("[HistoricalDetailView] .task starting - sensor count: \(ble.sensorDataHistory.count)")
             await getProcessor().processData(
                 from: ble,
                 metricType: metricType,
@@ -546,6 +383,7 @@ struct HistoricalDetailView: View {
                 selectedDate: selectedDate,
                 appMode: appMode
             )
+            Logger.shared.info("[HistoricalDetailView] .task finished - processed count: \(getProcessor().processedData?.statistics.sampleCount ?? 0)")
         }
         .onChange(of: ble.sensorDataHistory.count) { _, _ in
             refreshProcessing()
@@ -553,7 +391,12 @@ struct HistoricalDetailView: View {
     }
 
     private func refreshProcessing() {
-        Task {
+        // Debounce/cancel previous processing task to avoid running processData for each incoming packet
+        reprocessTask?.cancel()
+        reprocessTask = Task {
+            try? await Task.sleep(nanoseconds: 150_000_000) // 150ms debounce
+            guard !Task.isCancelled else { return }
+            Logger.shared.debug("[HistoricalDetailView] refreshProcessing() - sensor count: \(ble.sensorDataHistory.count)")
             await getProcessor().processData(
                 from: ble,
                 metricType: metricType,
@@ -561,11 +404,12 @@ struct HistoricalDetailView: View {
                 selectedDate: selectedDate,
                 appMode: appMode
             )
+            Logger.shared.debug("[HistoricalDetailView] refreshProcessing() done - processed count: \(getProcessor().processedData?.statistics.sampleCount ?? 0)")
         }
     }
 }
 
-// MARK: - PPG Debug Card (Complex component kept in main file for now)
+// MARK: - PPG Debug Card (uses shared DeviceState)
 struct PPGDebugCard: View {
     @EnvironmentObject var ppgNormalizationService: PPGNormalizationService
     @ObservedObject var ble: OralableBLE
@@ -587,44 +431,6 @@ struct PPGDebugCard: View {
         case baseline = "Baseline Corrected"
         case adaptive = "Adaptive (Auto-Recalibrate)"
         case contextAware = "Context-Aware (Smart)"
-    }
-
-    enum DeviceState: String, CaseIterable {
-        case onChargerStatic = "On Charger (Static)"
-        case offChargerStatic = "Off Charger (Static)"
-        case inMotion = "Being Moved"
-        case onCheek = "On Cheek (Masseter)"
-        case unknown = "Unknown Position"
-
-        var expectedStabilizationTime: TimeInterval {
-            switch self {
-            case .onChargerStatic: return 10.0
-            case .offChargerStatic: return 15.0
-            case .inMotion: return 30.0
-            case .onCheek: return 45.0
-            case .unknown: return 25.0
-            }
-        }
-
-        var color: Color {
-            switch self {
-            case .onChargerStatic: return .green
-            case .offChargerStatic: return .blue
-            case .inMotion: return .orange
-            case .onCheek: return .red
-            case .unknown: return .gray
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .onChargerStatic: return "battery.100.bolt"
-            case .offChargerStatic: return "battery.100"
-            case .inMotion: return "figure.walk"
-            case .onCheek: return "face.smiling"
-            case .unknown: return "questionmark.circle"
-            }
-        }
     }
 
     struct DeviceContext {
@@ -707,7 +513,7 @@ struct PPGDebugCard: View {
                 serviceMethod = .persistent
             }
 
-            return ppgNormalizationService.normalizePPGData(
+            return PPGNormalizationService.shared.normalizePPGData(
                 staticData,
                 method: serviceMethod,
                 sensorData: Array(filteredData)
@@ -961,26 +767,9 @@ struct PPGDebugCard: View {
         }
     }
 
-    private func adaptiveNormalization(_ data: [(timestamp: Date, ir: Double, red: Double, green: Double)]) -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        guard !detectedSegments.isEmpty else {
-            return normalizeSegment(data, using: .minMax)
-        }
-
-        var normalizedData: [(timestamp: Date, ir: Double, red: Double, green: Double)] = []
-
-        for segment in detectedSegments {
-            let segmentData = Array(data[segment.startIndex..<min(segment.endIndex, data.count)])
-            if segment.isStable && segmentData.count >= 5 {
-                normalizedData.append(contentsOf: normalizeSegment(segmentData, using: .minMax))
-            } else {
-                normalizedData.append(contentsOf: normalizeSegment(segmentData, using: .baseline))
-            }
-        }
-        return normalizedData
-    }
-
+    // PPG Debug UI (full layout)
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "waveform.path.ecg")
                     .foregroundColor(.red)
@@ -994,9 +783,13 @@ struct PPGDebugCard: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Normalization Method")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                HStack {
+                    Text("Normalization Method")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    Spacer()
+                }
 
                 Picker("Normalization", selection: $normalizationMethod) {
                     ForEach(NormalizationMethod.allCases, id: \.self) { method in
@@ -1008,282 +801,101 @@ struct PPGDebugCard: View {
                     updateSegmentsIfNeeded()
                 }
 
-                Text(normalizationExplanation)
+                Text(normalizationMethod == .none ? "Raw values only" :
+                        "Use \(normalizationMethod.rawValue) normalization")
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                    .padding(.top, 2)
+            }
 
-                if normalizationMethod == .contextAware {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Persistent Normalization State")
-                                .font(.caption)
-                                .fontWeight(.semibold)
+            Divider()
 
-                            Spacer()
+            // Channel values preview
+            HStack(spacing: 16) {
+                VStack {
+                    Text("IR")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text("\(Int(recentPPGData.last?.ir ?? 0))")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                }
+                VStack {
+                    Text("Red")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text("\(Int(recentPPGData.last?.red ?? 0))")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                }
+                VStack {
+                    Text("Green")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text("\(Int(recentPPGData.last?.green ?? 0))")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                }
+                Spacer()
+            }
 
-                            Button("Reset") {
-                                ppgNormalizationService.resetPersistentState()
-                            }
-                            .font(.caption2)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.orange.opacity(0.2))
-                            .cornerRadius(4)
-                        }
+            Divider()
 
-                        Text(ppgNormalizationService.getStateInfo())
+            // Mini waveform preview using SwiftUI Chart if available
+            Chart {
+                ForEach(Array(recentPPGData.enumerated()), id: \.offset) { idx, sample in
+                    LineMark(x: .value("idx", idx), y: .value("IR", sample.ir))
+                        .foregroundStyle(.red.opacity(0.7))
+                    LineMark(x: .value("idx", idx), y: .value("Red", sample.red))
+                        .foregroundStyle(.pink.opacity(0.6))
+                    LineMark(x: .value("idx", idx), y: .value("Green", sample.green))
+                        .foregroundStyle(.green.opacity(0.6))
+                }
+            }
+            .frame(height: 160)
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+
+            Divider()
+
+            // State / context
+            if let ctx = deviceContext {
+                HStack {
+                    Image(systemName: ctx.state.iconName)
+                        .foregroundColor(ctx.state.color)
+                    VStack(alignment: .leading) {
+                        Text(ctx.state.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text(String(format: "Confidence: %.2f", ctx.confidence))
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                            .padding(8)
-                            .background(Color.blue.opacity(0.05))
+                    }
+                    Spacer()
+                    if ctx.shouldNormalize {
+                        Text("Stable")
+                            .font(.caption)
+                            .padding(6)
+                            .background(Color.green.opacity(0.12))
+                            .cornerRadius(6)
+                    } else {
+                        Text("Unstable")
+                            .font(.caption)
+                            .padding(6)
+                            .background(Color.yellow.opacity(0.12))
                             .cornerRadius(6)
                     }
                 }
-
-                if normalizationMethod == .contextAware, let context = deviceContext {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Image(systemName: context.state.icon)
-                                .foregroundColor(context.state.color)
-                            Text("Device State: \(context.state.rawValue)")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(context.state.color)
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Confidence")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text("\(String(format: "%.0f%%", context.confidence * 100))")
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(context.confidence > 0.7 ? .green : .orange)
-                            }
-
-                            Spacer()
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Time in State")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text("\(String(format: "%.0f", context.timeInState))s")
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                            }
-
-                            Spacer()
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Expected")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text("\(String(format: "%.0f", context.state.expectedStabilizationTime))s")
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                            }
-
-                            Spacer()
-
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(context.isStabilized ? .green : .orange)
-                                    .frame(width: 8, height: 8)
-                                Text(context.isStabilized ? "Ready" : "Wait")
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(context.isStabilized ? .green : .orange)
-                            }
-                        }
-                    }
-                    .padding(8)
-                    .background(context.state.color.opacity(0.1))
-                    .cornerRadius(6)
-                }
-
-                if normalizationMethod == .adaptive && !detectedSegments.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Detected \(detectedSegments.count) data segments:")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.blue)
-
-                        ForEach(Array(detectedSegments.enumerated()), id: \.element.id) { index, segment in
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(segment.isStable ? .green : .orange)
-                                    .frame(width: 6, height: 6)
-
-                                Text("Segment \(index + 1)")
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
-
-                                Text(segment.isStable ? "Stable" : "Movement")
-                                    .font(.caption2)
-                                    .foregroundColor(segment.isStable ? .green : .orange)
-
-                                Spacer()
-
-                                Text("\(segment.endIndex - segment.startIndex) samples")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        if detectedSegments.count > 1 {
-                            HStack {
-                                Text("View segment:")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-
-                                Picker("Segment", selection: $currentSegmentIndex) {
-                                    Text("All").tag(-1)
-                                    ForEach(0..<detectedSegments.count, id: \.self) { index in
-                                        Text("\(index + 1)").tag(index)
-                                    }
-                                }
-                                .pickerStyle(MenuPickerStyle())
-                                .font(.caption2)
-                            }
-                        }
-                    }
-                    .padding(8)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(6)
-                }
-            }
-            .padding(.bottom, 8)
-
-            if recentPPGData.isEmpty {
-                VStack(spacing: 8) {
-                    Text("No PPG data available")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text("Filtered data count: \(filteredData.count)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .opacity(0.7)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .frame(height: 100)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        let displayData = getDisplayData()
-                        ForEach(Array(displayData.enumerated().reversed()), id: \.offset) { _, data in
-                            VStack(spacing: 4) {
-                                Text(timeFormatter.string(from: data.timestamp))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-
-                                VStack(spacing: 2) {
-                                    HStack {
-                                        Circle().fill(.red).frame(width: 6, height: 6)
-                                        Text(formatNormalizedValue(data.ir))
-                                            .font(.caption2)
-                                            .fontWeight(.medium)
-                                    }
-                                    HStack {
-                                        Circle().fill(.pink).frame(width: 6, height: 6)
-                                        Text(formatNormalizedValue(data.red))
-                                            .font(.caption2)
-                                            .fontWeight(.medium)
-                                    }
-                                    HStack {
-                                        Circle().fill(.green).frame(width: 6, height: 6)
-                                        Text(formatNormalizedValue(data.green))
-                                            .font(.caption2)
-                                            .fontWeight(.medium)
-                                    }
-                                }
-                            }
-                            .padding(8)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
+                Text("No device context available")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(radius: 1)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
         .onAppear {
             updateSegmentsIfNeeded()
-            if normalizationMethod == .contextAware {
-                startContextUpdates()
-            }
         }
-        .onDisappear {
-            stopContextUpdates()
-        }
-    }
-
-    private func getDisplayData() -> [(timestamp: Date, ir: Double, red: Double, green: Double)] {
-        if normalizationMethod == .adaptive && currentSegmentIndex >= 0 && currentSegmentIndex < detectedSegments.count {
-            let segment = detectedSegments[currentSegmentIndex]
-            return Array(recentPPGData[segment.startIndex..<min(segment.endIndex, recentPPGData.count)])
-        } else {
-            return Array(recentPPGData.suffix(20))
-        }
-    }
-
-    private func formatNormalizedValue(_ value: Double) -> String {
-        switch normalizationMethod {
-        case .none:
-            return String(format: "%.0f", value)
-        case .zScore:
-            return String(format: "%.2f", value)
-        case .minMax, .adaptive:
-            return String(format: "%.3f", value)
-        case .percentage:
-            return String(format: "%.1f%%", value)
-        case .baseline:
-            return String(format: "%.0f", value)
-        case .contextAware:
-            return String(format: "%.3f", value)
-        }
-    }
-
-    private var normalizationExplanation: String {
-        switch normalizationMethod {
-        case .none:
-            return "Raw sensor values (0-65535)"
-        case .zScore:
-            return "Standardized values (mean=0, std=1)"
-        case .minMax:
-            return "Scaled to 0-1 range"
-        case .percentage:
-            return "Percentage change from mean"
-        case .baseline:
-            return "Relative to first 3 samples"
-        case .adaptive:
-            return "Auto-detects sensor movement and recalibrates normalization for each stable period"
-        case .contextAware:
-            return "PERSISTENT SMART: Remembers baseline across sessions, adapts to device state (charging, on body, moving), preserves physiological signal patterns."
-        }
-    }
-
-    private func startContextUpdates() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            if normalizationMethod == .contextAware {
-                updateDeviceContext()
-            }
-        }
-    }
-
-    private func stopContextUpdates() {
-        // No-op (timer auto-invalidates when view disappears in this scoped use)
-    }
-
-    private var timeFormatter: DateFormatter {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
     }
 }
 
