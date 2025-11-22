@@ -5,11 +5,6 @@
 //  Created: November 7, 2025
 //  Refactored: November 19, 2025
 //  Responsibility: Coordinate BLE operations and delegate to specialized managers
-//  - Device connection coordination
-//  - Characteristic notification setup
-//  - Delegate pattern to specialized processors
-//  - Integration with BLECentralManager
-//  - Facade pattern for backward compatibility
 //
 
 import Foundation
@@ -41,7 +36,7 @@ class OralableBLE: ObservableObject,
     private let deviceManager: DeviceManager
     private let stateDetector: DeviceStateDetector
     let healthKitManager: HealthKitManager  // Public for backward compatibility
-    private let recordingSessionManager: RecordingSessionManagerProtocol  // ✅ Injected dependency
+    private let recordingSessionManager: RecordingSessionManagerProtocol  // Injected dependency
 
     // MARK: - Published Properties (Forwarded from Components)
 
@@ -126,7 +121,7 @@ class OralableBLE: ObservableObject,
         self.deviceManager = DeviceManager()
         self.stateDetector = DeviceStateDetector()
         self.healthKitManager = HealthKitManager()
-        self.recordingSessionManager = recordingSessionManager  // ✅ Injected dependency
+        self.recordingSessionManager = recordingSessionManager
 
         // Initialize specialized components
         self.dataPublisher = BLEDataPublisher()
@@ -137,7 +132,7 @@ class OralableBLE: ObservableObject,
         setupBindings()
         setupDiscoveryBinding()
         startAsyncBatchProcessing()
-        dataPublisher.addLog("OralableBLE initialized with dependency injection")
+        dataPublisher.addLog("OralableBLE initialized")
     }
 
     deinit {
@@ -156,8 +151,6 @@ class OralableBLE: ObservableObject,
         bindDataPublisher()
         bindSensorProcessor()
         bindBioMetricCalculator()
-
-        // Note: Device state will be driven exclusively by DeviceStateDetector after batch processing
     }
 
     private func bindDataPublisher() {
@@ -177,21 +170,86 @@ class OralableBLE: ObservableObject,
     }
 
     private func bindSensorProcessor() {
-        sensorProcessor.$batteryHistory.assign(to: &$batteryHistory)
-        sensorProcessor.$heartRateHistory.assign(to: &$heartRateHistory)
-        sensorProcessor.$spo2History.assign(to: &$spo2History)
-        sensorProcessor.$temperatureHistory.assign(to: &$temperatureHistory)
-        sensorProcessor.$accelerometerHistory.assign(to: &$accelerometerHistory)
-        sensorProcessor.$ppgHistory.assign(to: &$ppgHistory)
-        sensorProcessor.$sensorDataHistory.assign(to: &$sensorDataHistory)
-        sensorProcessor.$accelX.assign(to: &$accelX)
-        sensorProcessor.$accelY.assign(to: &$accelY)
-        sensorProcessor.$accelZ.assign(to: &$accelZ)
-        sensorProcessor.$temperature.assign(to: &$temperature)
-        sensorProcessor.$ppgRedValue.assign(to: &$ppgRedValue)
-        sensorProcessor.$ppgIRValue.assign(to: &$ppgIRValue)
-        sensorProcessor.$ppgGreenValue.assign(to: &$ppgGreenValue)
-        sensorProcessor.$batteryLevel.assign(to: &$batteryLevel)
+        // IMPORTANT: ensure main-thread delivery for UI bound properties
+        sensorProcessor.$batteryHistory
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.batteryHistory, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$heartRateHistory
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.heartRateHistory, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$spo2History
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.spo2History, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$temperatureHistory
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.temperatureHistory, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$accelerometerHistory
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.accelerometerHistory, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$ppgHistory
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.ppgHistory, on: self)
+            .store(in: &cancellables)
+
+        // Ensure sensorDataHistory arrives on main thread and log updates for debugging
+        sensorProcessor.$sensorDataHistory
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newHistory in
+                guard let self = self else { return }
+                self.sensorDataHistory = newHistory
+                Logger.shared.debug("[OralableBLE] sensorDataHistory updated: \(newHistory.count) samples")
+            }
+            .store(in: &cancellables)
+
+        sensorProcessor.$accelX
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.accelX, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$accelY
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.accelY, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$accelZ
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.accelZ, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$temperature
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.temperature, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$ppgRedValue
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.ppgRedValue, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$ppgIRValue
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.ppgIRValue, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$ppgGreenValue
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.ppgGreenValue, on: self)
+            .store(in: &cancellables)
+
+        sensorProcessor.$batteryLevel
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.batteryLevel, on: self)
+            .store(in: &cancellables)
     }
 
     private func bindBioMetricCalculator() {
@@ -200,13 +258,10 @@ class OralableBLE: ObservableObject,
         bioMetricCalculator.$heartRateQuality.assign(to: &$heartRateQuality)
     }
 
-    // MARK: - Discovery Binding (Single Source of Truth via DeviceManager)
-
     private func setupDiscoveryBinding() {
         deviceManager.$discoveredDevices
             .sink { [weak self] deviceInfos in
                 guard let self = self else { return }
-                // Map DeviceInfo to BLEDataPublisher.DiscoveredDeviceInfo
                 var infos: [BLEDataPublisher.DiscoveredDeviceInfo] = []
                 var peripherals: [CBPeripheral] = []
 
@@ -221,10 +276,6 @@ class OralableBLE: ObservableObject,
                         )
                         infos.append(d)
                         peripherals.append(peripheral)
-                    } else {
-                        // If peripheral not available (e.g., mock/demo), skip adding CBPeripheral
-                        // Keep DiscoveredDeviceInfo list accurate where possible
-                        // Optionally, could create a placeholder peripheral wrapper if needed
                     }
                 }
 
@@ -325,6 +376,10 @@ class OralableBLE: ObservableObject,
         if let result = stateDetector.analyzeDeviceState(sensorData: recentData) {
             dataPublisher.updateDeviceState(result)
         }
+
+        // Debug: report counts after processing to help trace pipeline
+        let processorCount = await sensorProcessor.sensorDataHistory.count
+        Logger.shared.debug("[OralableBLE] processBatchAsync completed — sensorProcessorHistory=\(processorCount), oralableHistory=\(sensorDataHistory.count)")
     }
 
     private func calculateBiometrics(from readings: [SensorReading]) async {
@@ -622,69 +677,4 @@ class MockRecordingSessionManager: RecordingSessionManagerProtocol, ObservableOb
     func deleteSession(_ session: RecordingSession) {
         sessions.removeAll { $0.id == session.id }
     }
-}
-
-// MARK: - Protocol Conformance (Additional Publishers)
-
-// MARK: ConnectionStateProvider
-extension OralableBLE {
-    // Note: isConnectedPublisher, isScanningPublisher, deviceNamePublisher already provided by BLEManagerProtocol
-    var deviceUUIDPublisher: Published<UUID?>.Publisher { $deviceUUID }
-    var connectionStatePublisher: Published<String>.Publisher { $connectionState }
-    var discoveredDevicesPublisher: Published<[CBPeripheral]>.Publisher { $discoveredDevices }
-    var rssiPublisher: Published<Int>.Publisher { $rssi }
-}
-
-// MARK: BiometricDataProvider
-// Note: All publishers already provided by BLEManagerProtocol extension
-
-// MARK: DeviceStatusProvider
-extension OralableBLE {
-    // Note: deviceStatePublisher, isRecordingPublisher already provided by BLEManagerProtocol
-    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrder }
-    var discoveredServicesPublisher: Published<[String]>.Publisher { $discoveredServices }
-    var packetsReceivedPublisher: Published<Int>.Publisher { $packetsReceived }
-    var logMessagesPublisher: Published<[LogMessage]>.Publisher { $logMessages }
-    var lastErrorPublisher: Published<String?>.Publisher { $lastError }
-}
-
-// MARK: RealtimeSensorProvider
-// Note: All publishers already provided by BLEManagerProtocol extension
-
-
-
-// Publisher forwarding extension to satisfy protocol requirements.
-// Add or adjust names/types to match the protocol declarations exactly if your protocols differ.
-extension OralableBLE {
-    // ConnectionStateProvider
-    var deviceUUIDPublisher: Published<UUID?>.Publisher { $deviceUUID }
-    var connectionStatePublisher: Published<String>.Publisher { $connectionState }
-    var discoveredDevicesPublisher: Published<[CBPeripheral]>.Publisher { $discoveredDevices }
-    var rssiPublisher: Published<Int>.Publisher { $rssi }
-
-    // DeviceStatusProvider
-    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrder }
-    var discoveredServicesPublisher: Published<[String]>.Publisher { $discoveredServices }
-    var packetsReceivedPublisher: Published<Int>.Publisher { $packetsReceived }
-    var logMessagesPublisher: Published<[LogMessage]>.Publisher { $logMessages }
-    var lastErrorPublisher: Published<String?>.Publisher { $lastError }
-    var isRecordingPublisher: Published<Bool>.Publisher { $isRecording }
-
-    // BiometricDataProvider
-    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
-    var spO2Publisher: Published<Int>.Publisher { $spO2 }
-    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
-    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
-
-    var ppgRedPublisher: Published<Double>.Publisher { $ppgRedValue }
-    var ppgIRPublisher: Published<Double>.Publisher { $ppgIRValue }
-    var ppgGreenPublisher: Published<Double>.Publisher { $ppgGreenValue }
-
-    var accelXPublisher: Published<Double>.Publisher { $accelX }
-    var accelYPublisher: Published<Double>.Publisher { $accelY }
-    var accelZPublisher: Published<Double>.Publisher { $accelZ }
-    var temperaturePublisher: Published<Double>.Publisher { $temperature }
-
-    // RealtimeSensorProvider
-    var sensorDataHistoryPublisher: Published<[SensorData]>.Publisher { $sensorDataHistory }
 }
