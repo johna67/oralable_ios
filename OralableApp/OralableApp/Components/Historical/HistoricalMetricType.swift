@@ -67,4 +67,31 @@ enum MetricType: String, CaseIterable {
             return "Timestamp,Accel_X,Accel_Y,Accel_Z,Magnitude"
         }
     }
+
+    func csvRow(for sample: SensorData) -> String {
+        let timestamp = ISO8601DateFormatter().string(from: sample.timestamp)
+
+        switch self {
+        case .battery:
+            return "\(timestamp),\(sample.battery.percentage)"
+        case .ppg:
+            return "\(timestamp),\(sample.ppg.red),\(sample.ppg.ir),\(sample.ppg.green)"
+        case .heartRate:
+            let bpm = sample.heartRate?.bpm ?? 0.0
+            let quality = sample.heartRate?.quality ?? 0.0
+            return "\(timestamp),\(bpm),\(quality)"
+        case .spo2:
+            let percentage = sample.spo2?.percentage ?? 0.0
+            let quality = sample.spo2?.quality ?? 0.0
+            return "\(timestamp),\(percentage),\(quality)"
+        case .temperature:
+            return "\(timestamp),\(sample.temperature.celsius)"
+        case .accelerometer:
+            let x = sample.accelerometer.x
+            let y = sample.accelerometer.y
+            let z = sample.accelerometer.z
+            let magnitude = sample.accelerometer.magnitude
+            return "\(timestamp),\(x),\(y),\(z),\(magnitude)"
+        }
+    }
 }
