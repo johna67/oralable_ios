@@ -1,24 +1,15 @@
-//
-//  replaces.swift
-//  OralableApp
-//
-//  Created by John A Cogan on 22/11/2025.
-//
-
-
 import Foundation
 import SwiftUI
 
-/// Shared device state used across UI and processors.
-/// This central enum replaces nested UI enums to avoid compile-order issues.
-public enum DeviceState: String, CaseIterable, Codable {
+/// Centralized DeviceState used across the app.
+enum DeviceState: String, CaseIterable {
     case onChargerStatic = "On Charger (Static)"
     case offChargerStatic = "Off Charger (Static)"
     case inMotion = "Being Moved"
     case onCheek = "On Cheek (Masseter)"
     case unknown = "Unknown Position"
 
-    public var expectedStabilizationTime: TimeInterval {
+    var expectedStabilizationTime: TimeInterval {
         switch self {
         case .onChargerStatic: return 10.0
         case .offChargerStatic: return 15.0
@@ -28,7 +19,7 @@ public enum DeviceState: String, CaseIterable, Codable {
         }
     }
 
-    public var color: Color {
+    var color: Color {
         switch self {
         case .onChargerStatic: return .green
         case .offChargerStatic: return .blue
@@ -38,13 +29,31 @@ public enum DeviceState: String, CaseIterable, Codable {
         }
     }
 
-    public var iconName: String {
+    var iconName: String {
         switch self {
         case .onChargerStatic: return "battery.100.bolt"
         case .offChargerStatic: return "battery.100"
         case .inMotion: return "figure.walk"
         case .onCheek: return "face.smiling"
         case .unknown: return "questionmark.circle"
+        }
+    }
+}
+
+/// Result produced by device state detection
+struct DeviceStateResult {
+    let state: DeviceState
+    let confidence: Double // 0.0 to 1.0
+    let timestamp: Date
+    let details: [String: Any]
+
+    var confidenceDescription: String {
+        switch confidence {
+        case 0.9...1.0: return "Very High"
+        case 0.75..<0.9: return "High"
+        case 0.6..<0.75: return "Moderate"
+        case 0.4..<0.6: return "Low"
+        default: return "Very Low"
         }
     }
 }
