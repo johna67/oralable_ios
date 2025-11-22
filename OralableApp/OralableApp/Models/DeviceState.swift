@@ -7,6 +7,7 @@ enum DeviceState: String, CaseIterable {
     case offChargerStatic = "Off Charger (Static)"
     case inMotion = "Being Moved"
     case onCheek = "On Cheek (Masseter)"
+    case onMuscle = "On Muscle"
     case unknown = "Unknown Position"
 
     var expectedStabilizationTime: TimeInterval {
@@ -15,6 +16,7 @@ enum DeviceState: String, CaseIterable {
         case .offChargerStatic: return 15.0
         case .inMotion: return 30.0
         case .onCheek: return 45.0
+        case .onMuscle: return 45.0
         case .unknown: return 25.0
         }
     }
@@ -25,6 +27,7 @@ enum DeviceState: String, CaseIterable {
         case .offChargerStatic: return .blue
         case .inMotion: return .orange
         case .onCheek: return .red
+        case .onMuscle: return .purple
         case .unknown: return .gray
         }
     }
@@ -35,6 +38,7 @@ enum DeviceState: String, CaseIterable {
         case .offChargerStatic: return "battery.100"
         case .inMotion: return "figure.walk"
         case .onCheek: return "face.smiling"
+        case .onMuscle: return "figure.arms.open"
         case .unknown: return "questionmark.circle"
         }
     }
