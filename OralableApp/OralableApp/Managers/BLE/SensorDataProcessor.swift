@@ -114,7 +114,7 @@ class SensorDataProcessor: ObservableObject {
                 self.batteryLevel = Double(value)
                 self.batteryHistory.append(data)
                 if value % 10 == 0 {
-                    Logger.shared.info("[SensorDataProcessor] Battery: \(value)%")
+                    Logger.shared.debug("[SensorDataProcessor] Battery: \(value)%")
                 }
             }
 
@@ -243,41 +243,42 @@ class SensorDataProcessor: ObservableObject {
 
     /// Update legacy sensor data history (for backward compatibility)
     func updateLegacySensorData(with readings: [SensorReading]) async {
+        // Group readings by exact timestamp (preserve offsets)
         var groupedReadings: [Date: [SensorReading]] = [:]
-
         for reading in readings {
-            // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
-            let timestamp = reading.timestamp
-            groupedReadings[timestamp, default: []].append(reading)
+            groupedReadings[reading.timestamp, default: []].append(reading)
         }
 
+        // Build the new SensorData objects off the main actor
+        let sortedTimestamps = groupedReadings.keys.sorted()
+        var newSensorData: [SensorData] = []
+        newSensorData.reserveCapacity(sortedTimestamps.count)
+
+        for timestamp in sortedTimestamps {
+            guard let group = groupedReadings[timestamp] else { continue }
+            let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
+            newSensorData.append(sensorData)
+        }
+
+        // Publish/append to sensorDataHistory in one go on the main actor
         await MainActor.run {
             let beforeCount = self.sensorDataHistory.count
-            // Sort timestamps to maintain chronological order
-            let sortedTimestamps = groupedReadings.keys.sorted()
-            for timestamp in sortedTimestamps {
-                guard let group = groupedReadings[timestamp] else { continue }
-                let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
-                self.sensorDataHistory.append(sensorData)
+            if !newSensorData.isEmpty {
+                // Append all new items once
+                self.sensorDataHistory.append(contentsOf: newSensorData)
 
-                // DETAILED timestamp logging to verify uniqueness
-                let timestampMs = Int(timestamp.timeIntervalSince1970 * 1000)
-                Logger.shared.info("[SensorDataProcessor] 📊 Added sensor data | Timestamp: \(timestamp) (ms: \(timestampMs)) | Total: \(self.sensorDataHistory.count)")
-            }
+                // Trim to cap (keep last 1000)
+                if self.sensorDataHistory.count > 1000 {
+                    self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 1000)
+                }
 
-            // Limit history to last 1000 entries
-            if self.sensorDataHistory.count > 1000 {
-                self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 1000)
-                Logger.shared.info("[SensorDataProcessor] ⚠️ Trimmed history from \(beforeCount) to 1000 entries")
-            }
+                let addedCount = self.sensorDataHistory.count - beforeCount
+                Logger.shared.debug("[SensorDataProcessor] ✅ Bulk added \(addedCount) sensor data entries, total: \(self.sensorDataHistory.count)")
 
-            let addedCount = self.sensorDataHistory.count - beforeCount
-            Logger.shared.info("[SensorDataProcessor] ✅ Added \(addedCount) new sensor data entries, total: \(self.sensorDataHistory.count)")
-
-            // Log timestamp range
-            if let oldest = self.sensorDataHistory.first?.timestamp,
-               let newest = self.sensorDataHistory.last?.timestamp {
-                Logger.shared.info("[SensorDataProcessor] 📅 Data range: \(oldest) to \(newest)")
+                if let oldest = self.sensorDataHistory.first?.timestamp,
+                   let newest = self.sensorDataHistory.last?.timestamp {
+                    Logger.shared.debug("[SensorDataProcessor] 📅 Data range: \(oldest) to \(newest)")
+                }
             }
         }
     }

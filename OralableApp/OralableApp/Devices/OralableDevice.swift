@@ -437,10 +437,15 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             }
         }
 
-        // Send readings to subscribers
+        // Update latestReadings map (keep only the most recent per channel)
         for reading in readings {
             latestReadings[reading.sensorType] = reading
-            sensorReadingsSubject.send(reading)
+        }
+
+        // Send a single representative reading instead of flooding with many sends
+        // This reduces subject.send() overhead from ~60 per frame to 1
+        if let representative = readings.first(where: { $0.sensorType == .ppgInfrared }) ?? readings.first {
+            sensorReadingsSubject.send(representative)
         }
 
         // Throttled summary logging
@@ -448,7 +453,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             let redCount = readings.filter { $0.sensorType == .ppgRed }.count
             let irCount = readings.filter { $0.sensorType == .ppgInfrared }.count
             let greenCount = readings.filter { $0.sensorType == .ppgGreen }.count
-            Logger.shared.info("[OralableDevice] PPG Frame #\(frameCounter): \(readings.count) readings (R:\(redCount), IR:\(irCount), G:\(greenCount))")
+            Logger.shared.debug("[OralableDevice] PPG Frame #\(frameCounter): \(readings.count) readings (R:\(redCount), IR:\(irCount), G:\(greenCount))")
 
             if let firstRed = readings.first(where: { $0.sensorType == .ppgRed }),
                let firstIR = readings.first(where: { $0.sensorType == .ppgInfrared }),
@@ -553,10 +558,15 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             }
         }
 
-        // Send readings to subscribers
+        // Update latestReadings map (keep only the most recent per channel)
         for reading in readings {
             latestReadings[reading.sensorType] = reading
-            sensorReadingsSubject.send(reading)
+        }
+
+        // Send a single representative reading instead of flooding with many sends
+        // This reduces subject.send() overhead from ~60 per frame to 1
+        if let representative = readings.first(where: { $0.sensorType == .ppgInfrared }) ?? readings.first {
+            sensorReadingsSubject.send(representative)
         }
 
         // Throttled summary logging
@@ -564,7 +574,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             let xCount = readings.filter { $0.sensorType == .accelerometerX }.count
             let yCount = readings.filter { $0.sensorType == .accelerometerY }.count
             let zCount = readings.filter { $0.sensorType == .accelerometerZ }.count
-            Logger.shared.info("[OralableDevice] Accel Frame #\(frameCounter): \(readings.count) readings (X:\(xCount), Y:\(yCount), Z:\(zCount))")
+            Logger.shared.debug("[OralableDevice] Accel Frame #\(frameCounter): \(readings.count) readings (X:\(xCount), Y:\(yCount), Z:\(zCount))")
 
             if let firstX = readings.first(where: { $0.sensorType == .accelerometerX }),
                let firstY = readings.first(where: { $0.sensorType == .accelerometerY }),
@@ -615,7 +625,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         latestReadings[.battery] = reading
         sensorReadingsSubject.send(reading)
 
-        Logger.shared.info("[OralableDevice] Battery: \(Int(batteryPercent))% (\(batteryMillivolts)mV)")
+        Logger.shared.debug("[OralableDevice] Battery: \(Int(batteryPercent))% (\(batteryMillivolts)mV)")
         return [reading]
     }
 
@@ -653,7 +663,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         latestReadings[.temperature] = reading
         sensorReadingsSubject.send(reading)
 
-        Logger.shared.info("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
+        Logger.shared.debug("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
         return [reading]
     }
 }

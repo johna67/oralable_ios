@@ -93,9 +93,9 @@ class OralableBLE: ObservableObject,
 
     // Async/await batching
     private var readingsTask: Task<Void, Never>?
-    private let batchInterval: TimeInterval = 0.1  // 100 ms windows
+    private let batchInterval: TimeInterval = 0.2  // 200 ms windows (reduced from 100ms for better performance)
     private var sampleCounter: Int = 0
-    private let sampleRate: Int = 10  // process every 10th reading
+    private let sampleRate: Int = 20  // process every 20th reading (reduced from 10 for better performance)
 
     // MARK: - Computed Properties
 
@@ -216,16 +216,25 @@ class OralableBLE: ObservableObject,
             .store(in: &cancellables)
 
         sensorProcessor.$accelX
+            .receive(on: DispatchQueue.global(qos: .userInteractive))
+            .removeDuplicates()
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .assign(to: \.accelX, on: self)
             .store(in: &cancellables)
 
         sensorProcessor.$accelY
+            .receive(on: DispatchQueue.global(qos: .userInteractive))
+            .removeDuplicates()
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .assign(to: \.accelY, on: self)
             .store(in: &cancellables)
 
         sensorProcessor.$accelZ
+            .receive(on: DispatchQueue.global(qos: .userInteractive))
+            .removeDuplicates()
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .assign(to: \.accelZ, on: self)
             .store(in: &cancellables)
@@ -236,16 +245,25 @@ class OralableBLE: ObservableObject,
             .store(in: &cancellables)
 
         sensorProcessor.$ppgRedValue
+            .receive(on: DispatchQueue.global(qos: .userInteractive))
+            .removeDuplicates()
+            .throttle(for: .milliseconds(150), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .assign(to: \.ppgRedValue, on: self)
             .store(in: &cancellables)
 
         sensorProcessor.$ppgIRValue
+            .receive(on: DispatchQueue.global(qos: .userInteractive))
+            .removeDuplicates()
+            .throttle(for: .milliseconds(150), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .assign(to: \.ppgIRValue, on: self)
             .store(in: &cancellables)
 
         sensorProcessor.$ppgGreenValue
+            .receive(on: DispatchQueue.global(qos: .userInteractive))
+            .removeDuplicates()
+            .throttle(for: .milliseconds(150), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .assign(to: \.ppgGreenValue, on: self)
             .store(in: &cancellables)
