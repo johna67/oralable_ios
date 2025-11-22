@@ -13,6 +13,7 @@ import CoreBluetooth
 
 @MainActor
 class OralableBLE: ObservableObject,
+                   BLEManagerProtocol,
                    ConnectionStateProvider,
                    BiometricDataProvider,
                    DeviceStatusProvider,
