@@ -53,10 +53,16 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
     @Published private(set) var latestReadings: [SensorType: SensorReading] = [:]
     
     // MARK: - Sensor Data
-    
+
     private let sensorReadingsSubject = PassthroughSubject<SensorReading, Never>()
     var sensorReadings: AnyPublisher<SensorReading, Never> {
         sensorReadingsSubject.eraseToAnyPublisher()
+    }
+
+    // Batch subject for efficient multi-reading delivery
+    private let sensorReadingsBatchSubject = PassthroughSubject<[SensorReading], Never>()
+    var sensorReadingsBatch: AnyPublisher<[SensorReading], Never> {
+        sensorReadingsBatchSubject.eraseToAnyPublisher()
     }
     
     let supportedSensors: [SensorType] = [
@@ -442,10 +448,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             latestReadings[reading.sensorType] = reading
         }
 
-        // Send a single representative reading instead of flooding with many sends
-        // This reduces subject.send() overhead from ~60 per frame to 1
-        if let representative = readings.first(where: { $0.sensorType == .ppgInfrared }) ?? readings.first {
-            sensorReadingsSubject.send(representative)
+        // Send entire batch of readings in one publish event
+        // This reduces overhead from ~60 individual sends to 1 batch send per frame
+        if !readings.isEmpty {
+            sensorReadingsBatchSubject.send(readings)
         }
 
         // Throttled summary logging
@@ -563,10 +569,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
             latestReadings[reading.sensorType] = reading
         }
 
-        // Send a single representative reading instead of flooding with many sends
-        // This reduces subject.send() overhead from ~60 per frame to 1
-        if let representative = readings.first(where: { $0.sensorType == .ppgInfrared }) ?? readings.first {
-            sensorReadingsSubject.send(representative)
+        // Send entire batch of readings in one publish event
+        // This reduces overhead from ~60 individual sends to 1 batch send per frame
+        if !readings.isEmpty {
+            sensorReadingsBatchSubject.send(readings)
         }
 
         // Throttled summary logging
@@ -623,7 +629,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         )
 
         latestReadings[.battery] = reading
-        sensorReadingsSubject.send(reading)
+        sensorReadingsBatchSubject.send([reading])
 
         Logger.shared.debug("[OralableDevice] Battery: \(Int(batteryPercent))% (\(batteryMillivolts)mV)")
         return [reading]
@@ -661,7 +667,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
         )
 
         latestReadings[.temperature] = reading
-        sensorReadingsSubject.send(reading)
+        sensorReadingsBatchSubject.send([reading])
 
         Logger.shared.debug("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
         return [reading]

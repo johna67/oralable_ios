@@ -46,7 +46,12 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     var sensorReadings: AnyPublisher<SensorReading, Never> {
         sensorReadingsSubject.eraseToAnyPublisher()
     }
-    
+
+    private let sensorReadingsBatchSubject = PassthroughSubject<[SensorReading], Never>()
+    var sensorReadingsBatch: AnyPublisher<[SensorReading], Never> {
+        sensorReadingsBatchSubject.eraseToAnyPublisher()
+    }
+
     var latestReadings: [SensorType: SensorReading] = [:]
     
     var supportedSensors: [SensorType] {

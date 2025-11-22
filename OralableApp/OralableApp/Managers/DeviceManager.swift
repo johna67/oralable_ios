@@ -55,10 +55,16 @@ class DeviceManager: ObservableObject {
     private let maxReconnectionAttempts = 3
     private var reconnectionTasks: [UUID: Task<Void, Never>] = [:]
     
-    // Per-reading publisher
+    // Per-reading publisher (legacy, prefer batch)
     private let readingsSubject = PassthroughSubject<SensorReading, Never>()
     var readingsPublisher: AnyPublisher<SensorReading, Never> {
         readingsSubject.eraseToAnyPublisher()
+    }
+
+    // Batch publisher for efficient multi-reading delivery
+    private let readingsBatchSubject = PassthroughSubject<[SensorReading], Never>()
+    var readingsBatchPublisher: AnyPublisher<[SensorReading], Never> {
+        readingsBatchSubject.eraseToAnyPublisher()
     }
     
     // MARK: - Initialization
@@ -446,32 +452,52 @@ class DeviceManager: ObservableObject {
         Logger.shared.debug("[DeviceManager] subscribeToDevice")
         Logger.shared.debug("[DeviceManager] Device: \(device.deviceInfo.name)")
 
-        device.sensorReadingsPublisher
+        // Subscribe to batch publisher for efficient multi-reading delivery
+        device.sensorReadingsBatch
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] reading in
-                self?.handleSensorReading(reading, from: device)
+            .sink { [weak self] readings in
+                self?.handleSensorReadingsBatch(readings, from: device)
             }
             .store(in: &cancellables)
 
-        Logger.shared.debug("[DeviceManager] Subscription created")
+        Logger.shared.debug("[DeviceManager] Batch subscription created")
     }
     
     private func handleSensorReading(_ reading: SensorReading, from device: BLEDeviceProtocol) {
         // Add to all readings
         allSensorReadings.append(reading)
-        
+
         // Update latest readings
         latestReadings[reading.sensorType] = reading
-        
+
         // Emit per-reading for streaming consumers
         readingsSubject.send(reading)
-        
+
         // Trim history if needed (keep last 1000)
         if allSensorReadings.count > 1000 {
             allSensorReadings.removeFirst(100)
         }
     }
-    
+
+    private func handleSensorReadingsBatch(_ readings: [SensorReading], from device: BLEDeviceProtocol) {
+        // Add to all readings
+        allSensorReadings.append(contentsOf: readings)
+
+        // Update latest readings
+        for reading in readings {
+            latestReadings[reading.sensorType] = reading
+        }
+
+        // Emit batch for efficient downstream processing
+        readingsBatchSubject.send(readings)
+
+        // Trim history if needed (keep last 1000)
+        if allSensorReadings.count > 1000 {
+            let removeCount = allSensorReadings.count - 1000
+            allSensorReadings.removeFirst(removeCount)
+        }
+    }
+
     // MARK: - Device Info Access
     
     func device(withId id: UUID) -> DeviceInfo? {

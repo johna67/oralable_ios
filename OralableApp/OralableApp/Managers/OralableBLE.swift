@@ -331,11 +331,11 @@ class OralableBLE: ObservableObject,
     }
 
     private func startAsyncBatchProcessing() {
-        // Bridge DeviceManager.readingsPublisher into AsyncStream<SensorReading>
-        let stream = AsyncStream<SensorReading> { continuation in
-            let cancellable = deviceManager.readingsPublisher
-                .sink { reading in
-                    continuation.yield(reading)
+        // Bridge DeviceManager.readingsBatchPublisher into AsyncStream<[SensorReading]>
+        let stream = AsyncStream<[SensorReading]> { continuation in
+            let cancellable = deviceManager.readingsBatchPublisher
+                .sink { batch in
+                    continuation.yield(batch)
                 }
 
             continuation.onTermination = { @Sendable _ in
@@ -346,21 +346,23 @@ class OralableBLE: ObservableObject,
         // Create accumulator actor
         let accumulator = BatchAccumulator()
 
-        // Spawn a Task to consume the stream, sample, and process batches periodically
+        // Spawn a Task to consume the batch stream and process batches periodically
         readingsTask = Task { [weak self] in
             guard let self = self else { return }
 
             var lastFlush = Date()
 
-            for await reading in stream {
-                // Sampling: only keep every Nth reading
-                self.sampleCounter += 1
-                if self.sampleCounter >= self.sampleRate {
-                    await accumulator.append(reading)
-                    self.sampleCounter = 0
+            for await readingsBatch in stream {
+                // Sampling: only keep every Nth reading from the batch
+                for reading in readingsBatch {
+                    self.sampleCounter += 1
+                    if self.sampleCounter >= self.sampleRate {
+                        await accumulator.append(reading)
+                        self.sampleCounter = 0
+                    }
                 }
 
-                // Time-based flush every 100 ms
+                // Time-based flush every 200 ms
                 let now = Date()
                 if now.timeIntervalSince(lastFlush) >= self.batchInterval {
                     let batch = await accumulator.flush()

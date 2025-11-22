@@ -51,13 +51,16 @@ protocol BLEDeviceProtocol: AnyObject {
     var hardwareVersion: String? { get }
     
     // MARK: - Sensor Data
-    
+
     /// Publisher for sensor readings
     var sensorReadings: AnyPublisher<SensorReading, Never> { get }
-    
+
     /// Publisher for sensor readings (legacy compatibility)
     var sensorReadingsPublisher: AnyPublisher<SensorReading, Never> { get }
-    
+
+    /// Batch publisher for efficient multi-reading delivery (preferred)
+    var sensorReadingsBatch: AnyPublisher<[SensorReading], Never> { get }
+
     /// Latest readings by sensor type
     var latestReadings: [SensorType: SensorReading] { get }
     
@@ -252,7 +255,12 @@ class MockBLEDevice: BLEDeviceProtocol {
     var sensorReadings: AnyPublisher<SensorReading, Never> {
         sensorReadingsSubject.eraseToAnyPublisher()
     }
-    
+
+    private let sensorReadingsBatchSubject = PassthroughSubject<[SensorReading], Never>()
+    var sensorReadingsBatch: AnyPublisher<[SensorReading], Never> {
+        sensorReadingsBatchSubject.eraseToAnyPublisher()
+    }
+
     var latestReadings: [SensorType: SensorReading] = [:]
     var supportedSensors: [SensorType]
     
