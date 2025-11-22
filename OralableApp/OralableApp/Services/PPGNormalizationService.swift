@@ -1,20 +1,12 @@
-//
-//  PPGNormalizationService.swift
-//  OralableApp
-//
-//  Created by John A Cogan on 22/11/2025.
-//
-
-
 import Foundation
 
-/// Shared PPG normalization service used by both UI and processors.
-/// The implementation follows the logic present in the project, centralized here.
+/// Shared PPG normalization service used by UI and processors.
+/// Keep this internal (no `public` API that references internal SensorData types).
 @MainActor
-public class PPGNormalizationService: ObservableObject {
-    public static let shared = PPGNormalizationService()
+class PPGNormalizationService: ObservableObject {
+    static let shared = PPGNormalizationService()
 
-    public enum Method: String, CaseIterable {
+    enum Method: String, CaseIterable {
         case raw = "Raw Values"
         case adaptiveBaseline = "Adaptive Baseline"
         case dynamicRange = "Dynamic Range"
@@ -26,7 +18,7 @@ public class PPGNormalizationService: ObservableObject {
     @Published private var deviceContext: DeviceContext?
     private var lastUpdateTime: Date = Date()
 
-    public struct BaselineState {
+    struct BaselineState {
         let irBaseline: Double
         let redBaseline: Double
         let greenBaseline: Double
@@ -43,7 +35,7 @@ public class PPGNormalizationService: ObservableObject {
         }
     }
 
-    public struct DeviceContext {
+    struct DeviceContext {
         let isOnBody: Bool
         let isMoving: Bool
         let temperatureStable: Bool
@@ -66,8 +58,9 @@ public class PPGNormalizationService: ObservableObject {
         }
     }
 
-    // Public method used by HistoricalDataProcessor and views
-    public func normalizePPGData(
+    // Normalize PPG data for downstream processing/visualization.
+    // sensorData is optional context used to decide adaptive/persistent behavior.
+    func normalizePPGData(
         _ data: [(timestamp: Date, ir: Double, red: Double, green: Double)],
         method: Method = .persistent,
         sensorData: [SensorData] = []
@@ -267,16 +260,20 @@ public class PPGNormalizationService: ObservableObject {
         var info = "PPG Normalization State:\n"
 
         if let baseline = baselineState {
-            info += "• Baseline: IR=\(String(format: \"%.0f\", baseline.irBaseline)), "
-            info += "Confidence=\(String(format: \"%.1f%%\", baseline.confidence * 100)), "
-            info += "Age=\(String(format: \"%.0f\", Date().timeIntervalSince(baseline.timestamp)))s\n"
+            let baselineStr = String(format: "%.0f", baseline.irBaseline)
+            let confidencePercent = String(format: "%.1f", baseline.confidence * 100)
+            let ageSeconds = Int(Date().timeIntervalSince(baseline.timestamp))
+            info += "• Baseline: IR=\(baselineStr), "
+            info += "Confidence=\(confidencePercent)% , "
+            info += "Age=\(ageSeconds)s\n"
         } else {
             info += "• No baseline established\n"
         }
 
         if let context = deviceContext {
+            let confidencePercent = String(format: "%.1f", context.confidence * 100)
             info += "• Context: OnBody=\(context.isOnBody), Stable=\(context.isStable), "
-            info += "Confidence=\(String(format: \"%.1f%%\", context.confidence * 100))\n"
+            info += "Confidence=\(confidencePercent)%\n"
         } else {
             info += "• No device context\n"
         }
@@ -287,6 +284,7 @@ public class PPGNormalizationService: ObservableObject {
     // MARK: - Helpers
     private func calculateMovementVariation(_ samples: [SensorData]) -> Double {
         let magnitudes = samples.map { $0.accelerometer.magnitude }
+        guard !magnitudes.isEmpty else { return 0 }
         let mean = magnitudes.reduce(0, +) / Double(magnitudes.count)
         let variance = magnitudes.map { pow($0 - mean, 2) }.reduce(0, +) / Double(magnitudes.count)
         return sqrt(variance)
@@ -294,10 +292,12 @@ public class PPGNormalizationService: ObservableObject {
 
     private func calculateTemperatureChange(_ samples: [SensorData]) -> Double {
         let temperatures = samples.map { $0.temperature.celsius }
+        guard !temperatures.isEmpty else { return 0 }
         return (temperatures.max() ?? 0) - (temperatures.min() ?? 0)
     }
 
     private func calculateStandardDeviation(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
         let mean = values.reduce(0, +) / Double(values.count)
         let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count)
         return sqrt(variance)

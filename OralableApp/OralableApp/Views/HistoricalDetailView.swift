@@ -2,91 +2,9 @@ import SwiftUI
 import Charts
 import Foundation
 
-// MARK: - MetricType Definition (if not defined elsewhere)
-enum MetricType: String, CaseIterable {
-    case battery = "battery"
-    case ppg = "ppg"
-    case heartRate = "heartRate"
-    case spo2 = "spo2"
-    case temperature = "temperature"
-    case accelerometer = "accelerometer"
-
-    var title: String {
-        switch self {
-        case .battery: return "Battery"
-        case .ppg: return "PPG Signals"
-        case .heartRate: return "Heart Rate"
-        case .spo2: return "Blood Oxygen"
-        case .temperature: return "Temperature"
-        case .accelerometer: return "Accelerometer"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .battery: return "battery.100"
-        case .ppg: return "waveform.path.ecg"
-        case .heartRate: return "heart.fill"
-        case .spo2: return "drop.fill"
-        case .temperature: return "thermometer"
-        case .accelerometer: return "gyroscope"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .battery: return .green
-        case .ppg: return .red
-        case .heartRate: return .pink
-        case .spo2: return .blue
-        case .temperature: return .orange
-        case .accelerometer: return .purple
-        }
-    }
-
-    func csvHeader() -> String {
-        switch self {
-        case .battery:
-            return "Timestamp,Battery_Percentage"
-        case .ppg:
-            return "Timestamp,PPG_Red,PPG_IR,PPG_Green"
-        case .heartRate:
-            return "Timestamp,Heart_Rate_BPM,Quality"
-        case .spo2:
-            return "Timestamp,SpO2_Percentage,Quality"
-        case .temperature:
-            return "Timestamp,Temperature_Celsius"
-        case .accelerometer:
-            return "Timestamp,Accel_X,Accel_Y,Accel_Z,Magnitude"
-        }
-    }
-
-    func csvRow(for data: SensorData) -> String {
-        let timestamp = ISO8601DateFormatter().string(from: data.timestamp)
-        switch self {
-        case .battery:
-            return "\(timestamp),\(data.battery.percentage)"
-        case .ppg:
-            return "\(timestamp),\(data.ppg.red),\(data.ppg.ir),\(data.ppg.green)"
-        case .heartRate:
-            if let hr = data.heartRate {
-                return "\(timestamp),\(hr.bpm),\(hr.quality)"
-            } else {
-                return "\(timestamp),0,0"
-            }
-        case .spo2:
-            if let spo2 = data.spo2 {
-                return "\(timestamp),\(spo2.percentage),\(spo2.quality)"
-            } else {
-                return "\(timestamp),0,0"
-            }
-        case .temperature:
-            return "\(timestamp),\(data.temperature.celsius)"
-        case .accelerometer:
-            return "\(timestamp),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.accelerometer.magnitude)"
-        }
-    }
-}
+// NOTE: MetricType enum is centralized in
+// OralableApp/OralableApp/Views/Components/Historical/HistoricalMetricType.swift
+// Do not redeclare it here.
 
 // MARK: - App Mode and Subscription Management
 enum HistoricalAppMode: String, CaseIterable {
@@ -173,7 +91,7 @@ class DataSharingService: ObservableObject {
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
             return saveToFile(content: jsonString, filename: "oralable_\(metricType.rawValue)_\(timeRange.rawValue).json")
         } catch {
-            Logger.shared.error("[creating JSON: \(error)")
+            Logger.shared.error("[HistoricalDetailView] creating JSON: \(error)")
             return nil
         }
     }
@@ -195,7 +113,7 @@ class DataSharingService: ObservableObject {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            Logger.shared.error("[saving file: \(error)")
+            Logger.shared.error("[HistoricalDetailView] saving file: \(error)")
             return nil
         }
     }
@@ -269,9 +187,6 @@ struct HistoricalSample: Codable {
         }
     }
 }
-
-// NOTE: PPGNormalizationService has been moved to Services/PPGNormalizationService.swift
-// The view will use the shared service via PPGNormalizationService.shared or via an EnvironmentObject.
 
 // MARK: - Historical Detail View (Refactored to use components)
 struct HistoricalDetailView: View {
