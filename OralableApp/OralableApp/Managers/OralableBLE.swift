@@ -428,10 +428,11 @@ class OralableBLE: ObservableObject,
         }
 
         // Calculate SpO2 from grouped PPG values
+        // IMPORTANT: Use exact timestamps to preserve 20ms sample offsets from parseSensorData
         var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
         for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
-            let roundedTime = Date(timeIntervalSince1970: round(reading.timestamp.timeIntervalSince1970 * 10) / 10)
-            var current = grouped[roundedTime] ?? (0, 0, 0)
+            let timestamp = reading.timestamp  // Use exact timestamp, DO NOT ROUND
+            var current = grouped[timestamp] ?? (0, 0, 0)
 
             switch reading.sensorType {
             case .ppgRed: current.red = Int32(reading.value)
@@ -440,7 +441,7 @@ class OralableBLE: ObservableObject,
             default: break
             }
 
-            grouped[roundedTime] = current
+            grouped[timestamp] = current
         }
 
         await MainActor.run {
