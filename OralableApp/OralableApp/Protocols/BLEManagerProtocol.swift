@@ -70,23 +70,6 @@ protocol BLEManagerProtocol: AnyObject {
     var deviceStatePublisher: Published<DeviceStateResult?>.Publisher { get }
 }
 
-// MARK: - OralableBLE Conformance
-
-extension OralableBLE: BLEManagerProtocol {
-    var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
-    var isScanningPublisher: Published<Bool>.Publisher { $isScanning }
-    var deviceNamePublisher: Published<String>.Publisher { $deviceName }
-    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
-    var spO2Publisher: Published<Int>.Publisher { $spO2 }
-    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
-    var temperaturePublisher: Published<Double>.Publisher { $temperature }
-    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
-    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
-    var ppgIRValuePublisher: Published<Double>.Publisher { $ppgIRValue }
-    var ppgGreenValuePublisher: Published<Double>.Publisher { $ppgGreenValue }
-    var accelXPublisher: Published<Double>.Publisher { $accelX }
-    var accelYPublisher: Published<Double>.Publisher { $accelY }
-    var accelZPublisher: Published<Double>.Publisher { $accelZ }
-    var isRecordingPublisher: Published<Bool>.Publisher { $isRecording }
-    var deviceStatePublisher: Published<DeviceStateResult?>.Publisher { $deviceState }
-}
+// NOTE: OralableBLE conformance to BLEManagerProtocol is provided via
+// publisher forwarders defined in Managers/OralableBLE+Publishers.swift
+// Do not add extension here to avoid duplicates

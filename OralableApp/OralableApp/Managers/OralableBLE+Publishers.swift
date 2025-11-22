@@ -37,9 +37,10 @@ extension OralableBLE {
     var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
     var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
 
-    var ppgRedPublisher: Published<Double>.Publisher { $ppgRedValue }
-    var ppgIRPublisher: Published<Double>.Publisher { $ppgIRValue }
-    var ppgGreenPublisher: Published<Double>.Publisher { $ppgGreenValue }
+    // PPG Publishers - fixed names to match protocol requirements
+    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
+    var ppgIRValuePublisher: Published<Double>.Publisher { $ppgIRValue }
+    var ppgGreenValuePublisher: Published<Double>.Publisher { $ppgGreenValue }
 
     var accelXPublisher: Published<Double>.Publisher { $accelX }
     var accelYPublisher: Published<Double>.Publisher { $accelY }
