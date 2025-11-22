@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// Centralized DeviceState used across the app.
+/// Central DeviceState used across the app
 enum DeviceState: String, CaseIterable {
     case onChargerStatic = "On Charger (Static)"
     case offChargerStatic = "Off Charger (Static)"
@@ -40,20 +40,3 @@ enum DeviceState: String, CaseIterable {
     }
 }
 
-/// Result produced by device state detection
-struct DeviceStateResult {
-    let state: DeviceState
-    let confidence: Double // 0.0 to 1.0
-    let timestamp: Date
-    let details: [String: Any]
-
-    var confidenceDescription: String {
-        switch confidence {
-        case 0.9...1.0: return "Very High"
-        case 0.75..<0.9: return "High"
-        case 0.6..<0.75: return "Moderate"
-        case 0.4..<0.6: return "Low"
-        default: return "Very Low"
-        }
-    }
-}
