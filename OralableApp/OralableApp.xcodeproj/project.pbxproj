@@ -69,6 +69,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				"Managers/OralableBLE+ConnectionState.swift",
 			);
 			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
 		};
@@ -90,11 +91,22 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		267ADC1E2ED1BA660004EC72 /* Exceptions for "OralableApp" folder in "Copy Bundle Resources" phase from "OralableApp" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 26CAF25C2E781EFB003FE378 /* Resources */;
+			membershipExceptions = (
+				"Managers/OralableBLE+ConnectionState.swift",
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		26B2FED92EB999C100E0F7B1 /* OralableApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				269F12F92EBAF6CC00D8F477 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
+				267ADC1E2ED1BA660004EC72 /* Exceptions for "OralableApp" folder in "Copy Bundle Resources" phase from "OralableApp" target */,
 				26D6C45C2ECD238800C60C3D /* Exceptions for "OralableApp" folder in "OralableForDentists" target */,
 			);
 			path = OralableApp;
