@@ -82,6 +82,41 @@ class OralableBLE: ObservableObject,
     @Published var spO2: Int = 0
     @Published var heartRateQuality: Double = 0.0
 
+    // MARK: - Publisher Forwarders (Protocol Conformance)
+
+    // ConnectionStateProvider publishers
+    var isConnectedPublisher: Published<Bool>.Publisher { $isConnected }
+    var isScanningPublisher: Published<Bool>.Publisher { $isScanning }
+    var deviceNamePublisher: Published<String>.Publisher { $deviceName }
+    var deviceUUIDPublisher: Published<UUID?>.Publisher { $deviceUUID }
+    var connectionStatePublisher: Published<String>.Publisher { $connectionState }
+    var discoveredDevicesPublisher: Published<[CBPeripheral]>.Publisher { $discoveredDevices }
+    var rssiPublisher: Published<Int>.Publisher { $rssi }
+
+    // BiometricDataProvider publishers
+    var heartRatePublisher: Published<Int>.Publisher { $heartRate }
+    var spO2Publisher: Published<Int>.Publisher { $spO2 }
+    var heartRateQualityPublisher: Published<Double>.Publisher { $heartRateQuality }
+
+    // DeviceStatusProvider publishers
+    var deviceStatePublisher: Published<DeviceStateResult?>.Publisher { $deviceState }
+    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { $ppgChannelOrder }
+    var discoveredServicesPublisher: Published<[String]>.Publisher { $discoveredServices }
+    var isRecordingPublisher: Published<Bool>.Publisher { $isRecording }
+    var packetsReceivedPublisher: Published<Int>.Publisher { $packetsReceived }
+    var logMessagesPublisher: Published<[LogMessage]>.Publisher { $logMessages }
+    var lastErrorPublisher: Published<String?>.Publisher { $lastError }
+
+    // RealtimeSensorProvider publishers
+    var accelXPublisher: Published<Double>.Publisher { $accelX }
+    var accelYPublisher: Published<Double>.Publisher { $accelY }
+    var accelZPublisher: Published<Double>.Publisher { $accelZ }
+    var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
+    var ppgIRValuePublisher: Published<Double>.Publisher { $ppgIRValue }
+    var ppgGreenValuePublisher: Published<Double>.Publisher { $ppgGreenValue }
+    var temperaturePublisher: Published<Double>.Publisher { $temperature }
+    var batteryLevelPublisher: Published<Double>.Publisher { $batteryLevel }
+
     // MARK: - Private Properties
 
     private var cancellables = Set<AnyCancellable>()

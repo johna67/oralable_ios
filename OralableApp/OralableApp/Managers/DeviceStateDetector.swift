@@ -8,30 +8,8 @@
 
 import Foundation
 
-
-
-/// Device state detection result with confidence
-struct DeviceStateResult {
-    let state: DeviceState
-    let confidence: Double // 0.0 to 1.0
-    let timestamp: Date
-    let details: [String: Any]
-    
-    var confidenceDescription: String {
-        switch confidence {
-        case 0.9...1.0:
-            return "Very High"
-        case 0.75..<0.9:
-            return "High"
-        case 0.6..<0.75:
-            return "Moderate"
-        case 0.4..<0.6:
-            return "Low"
-        default:
-            return "Very Low"
-        }
-    }
-}
+// MARK: - Imports
+// Using canonical DeviceState and DeviceStateResult from Models/DeviceState.swift
 
 /// Detects device state based on sensor readings
 @MainActor
