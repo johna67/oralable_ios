@@ -531,8 +531,6 @@ struct PPGDebugCard: View {
                 isConsistent = accelVariation > 0.3
             case .onCheek:
                 isConsistent = tempChange > 1.0 && accelVariation < 0.4
-            case .onMuscle:
-                isConsistent = tempChange > 0.8 && accelVariation < 0.5
             case .unknown:
                 isConsistent = true
             }
