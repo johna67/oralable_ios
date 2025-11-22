@@ -229,7 +229,7 @@ class DeviceStateDetector: ObservableObject {
                 ]
                 
                 return DeviceStateResult(
-                    state: .onMuscle,
+                    state: .onCheek,
                     confidence: min(confidence, 1.0),
                     timestamp: Date(),
                     details: details
@@ -261,7 +261,7 @@ class DeviceStateDetector: ObservableObject {
             ]
             
             return DeviceStateResult(
-                state: .onChargerIdle,
+                state: .onChargerStatic,
                 confidence: min(confidence, 1.0),
                 timestamp: Date(),
                 details: details
@@ -295,15 +295,15 @@ class DeviceStateDetector: ObservableObject {
                 "calibrated": false,
                 "reason": "Body temperature, valid PPG signal, stationary"
             ]
-            
+
             return DeviceStateResult(
-                state: .onMuscle,
+                state: .onCheek,
                 confidence: min(confidence, 1.0),
                 timestamp: Date(),
                 details: details
             )
         }
-        
+
         // DEBUG: Log motion detection values
         Logger.shared.debug(" Motion Detection Debug:")
         Logger.shared.debug("   Average Movement: \(metrics.averageMovement) (threshold: \(Thresholds.activeMovementMin))")
@@ -382,7 +382,7 @@ class DeviceStateDetector: ObservableObject {
             ]
             
             return DeviceStateResult(
-                state: .offChargerIdle,
+                state: .offChargerStatic,
                 confidence: min(confidence, 1.0),
                 timestamp: Date(),
                 details: details
