@@ -1,5 +1,4 @@
 import SwiftUI
-import SessionKit
 
 @main
 struct OralableApp: App {
