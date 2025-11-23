@@ -7,7 +7,7 @@ class AppStateManager: ObservableObject {
     // Note: Use AppDependencies.shared.appStateManager instead
 
     // Patient app is always in subscription mode
-    @Published var selectedMode: AppMode? = .subscription
+    @Published var selectedMode: HistoricalAppMode? = .subscription
 
     // Never needs mode selection
     var needsModeSelection: Bool {
@@ -17,7 +17,7 @@ class AppStateManager: ObservableObject {
     init() {}
 
     // Mode management not needed for patient app, but keep for compatibility
-    func setMode(_ mode: AppMode) {
+    func setMode(_ mode: HistoricalAppMode) {
         selectedMode = mode
     }
 

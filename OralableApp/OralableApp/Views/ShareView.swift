@@ -637,7 +637,7 @@ struct ShareDebugSection: View {
 
             // Connection Status
             VStack(alignment: .leading, spacing: 8) {
-                ShareInfoRow(label: "Status", value: ble.connectionStatus)
+                ShareInfoRow(label: "Status", value: ble.connectionState)
                 ShareInfoRow(label: "Connected", value: ble.isConnected ? "Yes" : "No")
                 ShareInfoRow(label: "Scanning", value: ble.isScanning ? "Yes" : "No")
                 ShareInfoRow(label: "Devices Found", value: "\(ble.discoveredDevices.count)")
@@ -653,12 +653,16 @@ struct ShareDebugSection: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Button("Refresh Scan") {
-                        ble.refreshScan()
+                        ble.stopScanning()
+                        ble.startScanning()
                     }
                     .buttonStyle(.bordered)
 
                     Button("Reset BLE") {
-                        ble.resetBLE()
+                        ble.stopScanning()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            ble.startScanning()
+                        }
                     }
                     .buttonStyle(.bordered)
 

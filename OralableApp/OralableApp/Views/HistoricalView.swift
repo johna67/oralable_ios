@@ -4,24 +4,37 @@ import Charts
 struct HistoricalView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var historicalDataManager: HistoricalDataManager
-    @EnvironmentObject var bleManager: OralableBLE
 
     @StateObject private var viewModel: HistoricalViewModel
 
     let metricType: String
 
     init(metricType: String = "Movement",
-         historicalDataManager: HistoricalDataManager,
-         bleManager: OralableBLE) {
+         historicalDataManager: HistoricalDataManager) {
         self.metricType = metricType
         // Create the ViewModel directly here
         _viewModel = StateObject(
             wrappedValue: HistoricalViewModel(
-                historicalDataManager: historicalDataManager,
-                bleManager: bleManager
+                historicalDataManager: historicalDataManager
             )
         )
         Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType)")
+    }
+    
+    // MARK: - Computed Properties
+    
+    /// Date format for x-axis labels based on selected time range
+    private var xAxisDateFormat: Date.FormatStyle {
+        switch viewModel.selectedTimeRange {
+        case .hour:
+            return .dateTime.hour().minute()
+        case .day:
+            return .dateTime.hour()
+        case .week:
+            return .dateTime.month().day()
+        case .month:
+            return .dateTime.month().day()
+        }
     }
 
     var body: some View {
@@ -108,10 +121,94 @@ struct HistoricalView: View {
         }
     }
 
+    // MARK: - Chart Implementations
+    private var accelerometerChart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("Movement Data")
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+            
+            Chart(viewModel.dataPoints) { point in
+                LineMark(
+                    x: .value("Time", point.timestamp),
+                    y: .value("Movement", point.movementIntensity)
+                )
+                .foregroundStyle(designSystem.colors.info)
+            }
+            .frame(height: 250)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: xAxisDateFormat)
+                }
+            }
+        }
+    }
+    
+    private var heartRateChart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("Heart Rate (bpm)")
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+            
+            Chart(viewModel.dataPoints) { point in
+                if let heartRate = point.averageHeartRate {
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("Heart Rate", heartRate)
+                    )
+                    .foregroundStyle(.red)
+                }
+            }
+            .frame(height: 250)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: xAxisDateFormat)
+                }
+            }
+        }
+    }
+    
+    private var spo2Chart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("Blood Oxygen (%)")
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+            
+            Chart(viewModel.dataPoints) { point in
+                if let spo2 = point.averageSpO2 {
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("SpO2", spo2)
+                    )
+                    .foregroundStyle(.blue)
+                }
+            }
+            .frame(height: 250)
+            .chartYScale(domain: 85...100)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: xAxisDateFormat)
+                }
+            }
+        }
+    }
+
     // MARK: - Empty State
     private var emptyStateView: some View {
         VStack(spacing: designSystem.spacing.lg) {
-            Image(systemName: bleManager.sensorDataHistory.isEmpty
+            Image(systemName: viewModel.dataPoints.isEmpty
                   ? "chart.line.uptrend.xyaxis.circle"
                   : "chart.line.uptrend.xyaxis")
                 .font(.system(size: 60))

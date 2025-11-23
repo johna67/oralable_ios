@@ -268,7 +268,7 @@ struct DevicesView: View {
                 DeviceInfoRow(
                     icon: "info.circle",
                     label: "Firmware",
-                    value: bleManager.sensorData.firmwareVersion
+                    value: bleManager.firmwareVersion
                 )
                 
                 Divider().background(designSystem.colors.divider)
@@ -646,7 +646,33 @@ struct DeviceInfoRow: View {
 // MARK: - Preview
 struct DevicesView_Previews: PreviewProvider {
     static var previews: some View {
-        DevicesView()
-            .withDependencies(AppDependencies.shared)
+        let appState = AppStateManager()
+        let ble = OralableBLE()
+        let healthKit = HealthKitManager()
+        let sensorStore = SensorDataStore()
+        let recordingSession = RecordingSessionManager()
+        let historicalData = HistoricalDataManager(bleManager: ble)
+        let authManager = AuthenticationManager()
+        let subscription = SubscriptionManager()
+        let device = DeviceManager()
+        let sharedData = SharedDataManager(authenticationManager: authManager, healthKitManager: healthKit, bleManager: ble)
+        let designSystem = DesignSystem()
+        
+        let dependencies = AppDependencies(
+            authenticationManager: authManager,
+            healthKitManager: healthKit,
+            recordingSessionManager: recordingSession,
+            historicalDataManager: historicalData,
+            bleManager: ble,
+            sensorDataStore: sensorStore,
+            subscriptionManager: subscription,
+            deviceManager: device,
+            appStateManager: appState,
+            sharedDataManager: sharedData,
+            designSystem: designSystem
+        )
+        
+        return DevicesView()
+            .withDependencies(dependencies)
     }
 }

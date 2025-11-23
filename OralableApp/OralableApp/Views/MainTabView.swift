@@ -4,6 +4,7 @@ struct MainTabView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var historicalDataManager: HistoricalDataManager
     @EnvironmentObject var bleManager: OralableBLE
+    @EnvironmentObject var dependencies: AppDependencies
 
     var body: some View {
         TabView {
@@ -18,18 +19,15 @@ struct MainTabView: View {
                 List {
                     NavigationLink("Movement History") {
                         HistoricalView(metricType: "Movement",
-                                       historicalDataManager: historicalDataManager,
-                                       bleManager: bleManager)
+                                       historicalDataManager: historicalDataManager)
                     }
                     NavigationLink("Heart Rate History") {
                         HistoricalView(metricType: "Heart Rate",
-                                       historicalDataManager: historicalDataManager,
-                                       bleManager: bleManager)
+                                       historicalDataManager: historicalDataManager)
                     }
                     NavigationLink("SpO2 History") {
                         HistoricalView(metricType: "SpO2",
-                                       historicalDataManager: historicalDataManager,
-                                       bleManager: bleManager)
+                                       historicalDataManager: historicalDataManager)
                     }
                 }
                 .navigationTitle("History")
@@ -39,7 +37,7 @@ struct MainTabView: View {
             }
 
             // Other tabs (e.g. Settings, Profile)
-            SettingsView()
+            SettingsView(viewModel: dependencies.makeSettingsViewModel())
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }

@@ -132,8 +132,7 @@ struct DashboardView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
                 NavigationLink(destination: HistoricalView(
                     metricType: "Movement",
-                    historicalDataManager: dependencies.historicalDataManager,
-                    bleManager: bleManager
+                    historicalDataManager: dependencies.historicalDataManager
                 )
                 .environmentObject(designSystem)
                 .environmentObject(dependencies.historicalDataManager)
@@ -143,8 +142,7 @@ struct DashboardView: View {
 
                 NavigationLink(destination: HistoricalView(
                     metricType: "Heart Rate",
-                    historicalDataManager: dependencies.historicalDataManager,
-                    bleManager: bleManager
+                    historicalDataManager: dependencies.historicalDataManager
                 )
                 .environmentObject(designSystem)
                 .environmentObject(dependencies.historicalDataManager)
@@ -154,8 +152,7 @@ struct DashboardView: View {
 
                 NavigationLink(destination: HistoricalView(
                     metricType: "SpO2",
-                    historicalDataManager: dependencies.historicalDataManager,
-                    bleManager: bleManager
+                    historicalDataManager: dependencies.historicalDataManager
                 )
                 .environmentObject(designSystem)
                 .environmentObject(dependencies.historicalDataManager)
@@ -399,8 +396,7 @@ struct DashboardView: View {
                 NavigationLink(
                     destination: HistoricalView(
                         metricType: "Movement",
-                        historicalDataManager: dependencies.historicalDataManager,
-                        bleManager: bleManager
+                        historicalDataManager: dependencies.historicalDataManager
                     )
                     .environmentObject(designSystem)
                     .environmentObject(dependencies.historicalDataManager)
@@ -488,11 +484,40 @@ struct DashboardView: View {
 // MARK: - Preview
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
-        DashboardView()
-            .withDependencies(AppDependencies.shared)
-            .environmentObject(DesignSystem())
-            .environmentObject(HealthKitManager())
-            .environmentObject(OralableBLE())
-            .environmentObject(AppStateManager())
+        let designSystem = DesignSystem()
+        let appState = AppStateManager()
+        let ble = OralableBLE()
+        let healthKit = HealthKitManager()
+        let sensorStore = SensorDataStore()
+        let recordingSession = RecordingSessionManager()
+        let historicalData = HistoricalDataManager(bleManager: ble)
+        
+        // Create mock instances for preview (these need to be defined in your project)
+        let authManager = AuthenticationManager()
+        let subscription = SubscriptionManager()
+        let device = DeviceManager()
+        let sharedData = SharedDataManager(
+            authenticationManager: authManager,
+            healthKitManager: healthKit,
+            bleManager: ble
+        )
+        
+        let dependencies = AppDependencies(
+            authenticationManager: authManager,
+            healthKitManager: healthKit,
+            recordingSessionManager: recordingSession,
+            historicalDataManager: historicalData,
+            bleManager: ble,
+            sensorDataStore: sensorStore,
+            subscriptionManager: subscription,
+            deviceManager: device,
+            appStateManager: appState,
+            sharedDataManager: sharedData,
+            designSystem: designSystem
+        )
+        
+        return DashboardView()
+            .withDependencies(dependencies)
+            .environmentObject(designSystem)
     }
 }

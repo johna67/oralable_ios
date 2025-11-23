@@ -250,7 +250,7 @@ struct SettingsView: View {
                         .font(designSystem.typography.caption)
                         .foregroundColor(designSystem.colors.textSecondary)
 
-                    Text(appStateManager.selectedMode?.displayName ?? "Full Access")
+                    Text(appStateManager.selectedMode?.rawValue ?? "Full Access")
                         .font(designSystem.typography.body)
                         .foregroundColor(designSystem.colors.textPrimary)
                 }
@@ -518,10 +518,40 @@ extension PPGChannelOrder {
 
 // MARK: - Preview
 
-struct SettingsView_Previews: PreviewProvider {
-    static var previews: some View {
-        let dependencies = AppDependencies.shared
-        SettingsView(viewModel: dependencies.makeSettingsViewModel())
-            .withDependencies(dependencies)
-    }
+#Preview("Settings View") {
+    let designSystem = DesignSystem()
+    
+    // Create mock/preview dependencies
+    let authManager = AuthenticationManager()
+    let healthKitManager = HealthKitManager()
+    let bleManager = OralableBLE()
+    let recordingSessionManager = RecordingSessionManager()
+    let historicalDataManager = HistoricalDataManager(bleManager: bleManager)
+    let sensorDataStore = SensorDataStore()
+    let subscriptionManager = SubscriptionManager()
+    let deviceManager = DeviceManager()
+    let appStateManager = AppStateManager()
+    let sharedDataManager = SharedDataManager(
+        authenticationManager: authManager,
+        healthKitManager: healthKitManager,
+        bleManager: bleManager
+    )
+    
+    let dependencies = AppDependencies(
+        authenticationManager: authManager,
+        healthKitManager: healthKitManager,
+        recordingSessionManager: recordingSessionManager,
+        historicalDataManager: historicalDataManager,
+        bleManager: bleManager,
+        sensorDataStore: sensorDataStore,
+        subscriptionManager: subscriptionManager,
+        deviceManager: deviceManager,
+        appStateManager: appStateManager,
+        sharedDataManager: sharedDataManager,
+        designSystem: designSystem
+    )
+    
+    SettingsView(viewModel: dependencies.makeSettingsViewModel())
+        .withDependencies(dependencies)
+        .environmentObject(designSystem)
 }

@@ -11,7 +11,7 @@ import AuthenticationServices
 
 struct SubscriptionSettingsView: View {
     @ObservedObject var ble: OralableBLE
-    @Binding var selectedMode: AppMode?
+    @Binding var selectedMode: HistoricalAppMode?
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var subscriptionManager = SubscriptionManager()
     @State private var showSignOutAlert = false
@@ -131,7 +131,7 @@ struct SubscriptionSettingsView: View {
                     HStack {
                         Text("Battery")
                         Spacer()
-                        Text("\(ble.sensorData.batteryLevel)%")
+                        Text("\(Int(ble.batteryLevel))%")
                             .foregroundColor(.secondary)
                     }
                     
@@ -143,7 +143,13 @@ struct SubscriptionSettingsView: View {
                         .foregroundColor(.orange)
                     }
                 } else {
-                    Button(action: { ble.toggleScanning() }) {
+                    Button(action: {
+                        if ble.isScanning {
+                            ble.stopScanning()
+                        } else {
+                            ble.startScanning()
+                        }
+                    }) {
                         HStack {
                             Image(systemName: ble.isScanning ? "stop.circle" : "antenna.radiowaves.left.and.right")
                             Text(ble.isScanning ? "Stop Scanning" : "Start Scanning")
@@ -227,16 +233,18 @@ struct SubscriptionSettingsView: View {
                     HStack {
                         Text("Firmware Version")
                         Spacer()
-                        Text(ble.sensorData.firmwareVersion)
+                        Text(ble.firmwareVersion)
                             .foregroundColor(.secondary)
                     }
                     
-                    HStack {
-                        Text("Device UUID")
-                        Spacer()
-                        Text(String(format: "%016llX", ble.sensorData.deviceUUID))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    if let deviceUUID = ble.deviceUUID {
+                        HStack {
+                            Text("Device UUID")
+                            Spacer()
+                            Text(deviceUUID.uuidString)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 
