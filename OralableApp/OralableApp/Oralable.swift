@@ -1,58 +1,54 @@
-//
-//  Oralable.swift
-//  Oralable
-//
-//  Patient App - Requires Device and Authentication
-//
-
 import SwiftUI
+import SessionKit
 
 @main
-struct Oralable: App {
+struct OralableApp: App {
+    @MainActor @StateObject private var authenticationManager: AuthenticationManager
+    @MainActor @StateObject private var healthKitManager: HealthKitManager
+    @MainActor @StateObject private var sensorDataStore: SensorDataStore
+    @MainActor @StateObject private var bleManager: OralableBLE
+    @MainActor @StateObject private var recordingSessionManager: RecordingSessionManager
+    @MainActor @StateObject private var historicalDataManager: HistoricalDataManager
+
+    init() {
+        let authenticationManager = AuthenticationManager()
+        let healthKitManager = HealthKitManager()
+        let sensorDataStore = SensorDataStore()
+        let bleManager = OralableBLE()
+
+        let recordingSessionManager = RecordingSessionManager(
+            authenticationManager: authenticationManager,
+            healthKitManager: healthKitManager,
+            bleManager: bleManager,
+            sensorDataStore: sensorDataStore
+        )
+
+        let historicalDataManager = HistoricalDataManager(
+            authenticationManager: authenticationManager,
+            healthKitManager: healthKitManager
+        )
+
+        _authenticationManager = StateObject(wrappedValue: authenticationManager)
+        _healthKitManager = StateObject(wrappedValue: healthKitManager)
+        _sensorDataStore = StateObject(wrappedValue: sensorDataStore)
+        _bleManager = StateObject(wrappedValue: bleManager)
+        _recordingSessionManager = StateObject(wrappedValue: recordingSessionManager)
+        _historicalDataManager = StateObject(wrappedValue: historicalDataManager)
+    }
+
     var body: some Scene {
+        let dependencies = AppDependencies(
+            authenticationManager: authenticationManager,
+            healthKitManager: healthKitManager,
+            recordingSessionManager: recordingSessionManager,
+            historicalDataManager: historicalDataManager,
+            bleManager: bleManager,
+            sensorDataStore: sensorDataStore
+        )
+
         WindowGroup {
             RootView()
-                .withDependencies(AppDependencies.shared)
+                .withDependencies(dependencies)
         }
-    }
-}
-
-// MARK: - Root View
-
-struct RootView: View {
-    @EnvironmentObject var authenticationManager: AuthenticationManager
-    @EnvironmentObject var subscriptionManager: SubscriptionManager
-
-    var body: some View {
-        Group {
-            if authenticationManager.isAuthenticated {
-                // Show main app interface
-                MainTabView()
-            } else {
-                // Show onboarding and authentication
-                OnboardingView()
-            }
-        }
-    }
-}
-
-// MARK: - App Configuration
-
-struct AppConfiguration {
-    static let appName = "Oralable"
-    static let appType = "patient"
-    static let appVersion = "1.0.0"
-    static let buildNumber = "2025.11.18"
-    static let minimumOSVersion = "15.0"
-    static let bundleIdentifier = "com.jacdental.oralable"
-}
-
-// MARK: - App Mode (Keep for dependency compatibility)
-
-enum AppMode: String, Codable {
-    case subscription  // Patient app is always subscription mode
-
-    var displayName: String {
-        return "Full Access"
     }
 }

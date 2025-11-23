@@ -7,7 +7,7 @@
 //
 
 import Foundation
-
+import RecordingKit  // or whatever module defines it
 /// Represents a single data recording session
 struct RecordingSession: Identifiable, Codable {
     let id: UUID

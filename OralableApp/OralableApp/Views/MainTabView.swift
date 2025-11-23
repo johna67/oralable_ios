@@ -1,54 +1,48 @@
-//
-//  MainTabView.swift
-//  OralableApp
-//
-//  Fixed version - no duplicate views, correct parameters
-//
-
 import SwiftUI
 
 struct MainTabView: View {
-    @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var historicalDataManager: HistoricalDataManager
     @EnvironmentObject var bleManager: OralableBLE
 
     var body: some View {
         TabView {
-            // Don't pass viewModel - let each view create its own stable @StateObject
+            // Existing tabs
             DashboardView()
                 .tabItem {
-                    Label("Dashboard", systemImage: "house.fill")
+                    Label("Dashboard", systemImage: "house")
                 }
-                .tag(0)
 
-            DevicesView()
-                .tabItem {
-                    Label("Devices", systemImage: "sensor.fill")
+            // History tab
+            NavigationStack {
+                List {
+                    NavigationLink("Movement History") {
+                        HistoricalView(metricType: "Movement",
+                                       historicalDataManager: historicalDataManager,
+                                       bleManager: bleManager)
+                    }
+                    NavigationLink("Heart Rate History") {
+                        HistoricalView(metricType: "Heart Rate",
+                                       historicalDataManager: historicalDataManager,
+                                       bleManager: bleManager)
+                    }
+                    NavigationLink("SpO2 History") {
+                        HistoricalView(metricType: "SpO2",
+                                       historicalDataManager: historicalDataManager,
+                                       bleManager: bleManager)
+                    }
                 }
-                .tag(1)
+                .navigationTitle("History")
+            }
+            .tabItem {
+                Label("History", systemImage: "chart.line.uptrend.xyaxis")
+            }
 
-            ShareView(ble: bleManager)
+            // Other tabs (e.g. Settings, Profile)
+            SettingsView()
                 .tabItem {
-                    Label("Share", systemImage: "square.and.arrow.up")
+                    Label("Settings", systemImage: "gear")
                 }
-                .tag(2)
-
-            SettingsView(viewModel: dependencies.makeSettingsViewModel())
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
-                .tag(3)
         }
-        .accentColor(designSystem.colors.primaryBlack)
-    }
-}
-
-
-// MARK: - Preview
-
-struct MainTabView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainTabView()
-            .environmentObject(DesignSystem())
     }
 }
