@@ -1,0 +1,33 @@
+//
+//  MainDashboardView.swift
+//  OralableApp
+//
+//  Created by John A Cogan on 23/11/2025.
+//
+
+
+import SwiftUI
+
+struct MainDashboardView: View {
+    @EnvironmentObject var historicalDataManager: HistoricalDataManager
+    @EnvironmentObject var recordingSessionManager: RecordingSessionManager
+    @EnvironmentObject var bleManager: OralableBLE
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("Oralable Dashboard")
+                    .font(.largeTitle)
+                    .bold()
+
+                Text("Sessions recorded: \(recordingSessionManager.sessions.count)")
+                Text("BLE Connected: \(bleManager.isConnected ? "Yes" : "No")")
+
+                NavigationLink("Go to Debug Menu") {
+                    DebugMenuView()
+                }
+            }
+            .padding()
+        }
+    }
+}

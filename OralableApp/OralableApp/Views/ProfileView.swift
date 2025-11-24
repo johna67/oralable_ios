@@ -96,12 +96,12 @@ struct ProfileView: View {
             }
             
             // Name
-            Text(authManager.displayName)
+            Text(authManager.userFullName ?? "Guest")
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
             
-            // Email
-            Text(authManager.userEmail ?? "Not signed in")
+            // User ID
+            Text(authManager.userID ?? "Not signed in")
                 .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
         }
@@ -224,7 +224,16 @@ struct ProfileView: View {
                 } else {
                     SignInWithAppleButton(
                         onRequest: { _ in },
-                        onCompletion: authManager.handleSignIn
+                        onCompletion: { result in
+                            switch result {
+                            case .success(let authorization):
+                                if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                                    authManager.handleSignIn(with: credential)
+                                }
+                            case .failure(let error):
+                                print("Sign in failed: \(error.localizedDescription)")
+                            }
+                        }
                     )
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 44)

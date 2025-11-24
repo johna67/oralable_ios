@@ -44,6 +44,58 @@ struct SensorData: Identifiable, Codable {
         self.heartRate = heartRate
         self.spo2 = spo2
     }
+    
+    // MARK: - Mock Data
+    
+    /// Generate a batch of mock sensor data for testing
+    static func mockBatch() -> [[String: Any]] {
+        let now = Date()
+        var batch: [[String: Any]] = []
+        
+        // Generate 10 mock data points
+        for i in 0..<10 {
+            let timestamp = now.addingTimeInterval(TimeInterval(-i * 5))
+            
+            let mockData: [String: Any] = [
+                "id": UUID().uuidString,
+                "timestamp": timestamp,
+                "ppg": [
+                    "red": Int32.random(in: 50000...250000),
+                    "ir": Int32.random(in: 50000...250000),
+                    "green": Int32.random(in: 50000...250000),
+                    "timestamp": timestamp
+                ],
+                "accelerometer": [
+                    "x": Int16.random(in: -100...100),
+                    "y": Int16.random(in: -100...100),
+                    "z": Int16.random(in: -100...100),
+                    "timestamp": timestamp
+                ],
+                "temperature": [
+                    "celsius": Double.random(in: 36.0...37.5),
+                    "timestamp": timestamp
+                ],
+                "battery": [
+                    "percentage": Int.random(in: 50...100),
+                    "timestamp": timestamp
+                ],
+                "heartRate": [
+                    "bpm": Double.random(in: 60...90),
+                    "quality": Double.random(in: 0.7...1.0),
+                    "timestamp": timestamp
+                ],
+                "spo2": [
+                    "percentage": Double.random(in: 95...100),
+                    "quality": Double.random(in: 0.7...1.0),
+                    "timestamp": timestamp
+                ]
+            ]
+            
+            batch.append(mockData)
+        }
+        
+        return batch
+    }
 }
 
 // MARK: - PPG Data

@@ -24,10 +24,8 @@ struct AuthenticationView: View {
         } else {
             // Legacy path - create with new manager instances
             let authManager = AuthenticationManager()
-            let subsManager = SubscriptionManager()
             _viewModel = StateObject(wrappedValue: AuthenticationViewModel(
-                authenticationManager: authManager,
-                subscriptionManager: subsManager
+                authenticationManager: authManager
             ))
         }
     }

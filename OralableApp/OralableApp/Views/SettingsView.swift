@@ -128,12 +128,12 @@ struct SettingsView: View {
                         .foregroundColor(designSystem.colors.primaryBlack)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(authenticationManager.displayName)
+                        Text(authenticationManager.userFullName ?? "User")
                             .font(designSystem.typography.body)
                             .foregroundColor(designSystem.colors.textPrimary)
 
-                        if let email = authenticationManager.userEmail {
-                            Text(email)
+                        if let userID = authenticationManager.userID {
+                            Text("ID: \(userID)")
                                 .font(designSystem.typography.caption)
                                 .foregroundColor(designSystem.colors.textSecondary)
                         }

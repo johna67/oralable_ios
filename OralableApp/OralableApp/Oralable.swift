@@ -65,7 +65,7 @@ struct OralableApp: App {
         )
 
         WindowGroup {
-            RootView()
+            LaunchCoordinator()
                 .withDependencies(dependencies)
         }
     }

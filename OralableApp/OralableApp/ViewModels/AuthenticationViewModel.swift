@@ -1,157 +1,90 @@
-//
-//  AuthenticationViewModel.swift
-//  OralableApp
-//
-//  Created: November 7, 2025
-//  Final Fix: Corrected AuthenticationManager method calls
-//
-
 import Foundation
 import AuthenticationServices
-import Combine
 
 @MainActor
-class AuthenticationViewModel: ObservableObject {
-    
-    // MARK: - Published Properties (Observable by View)
-    
-    /// Whether user is authenticated
+final class AuthenticationViewModel: ObservableObject {
     @Published var isAuthenticated: Bool = false
-    
-    /// User ID from Apple
-    @Published var userID: String?
-    
-    /// User email
-    @Published var userEmail: String?
-    
-    /// User full name
-    @Published var userFullName: String?
-    
-    /// Authentication error message
-    @Published var authenticationError: String?
-    
-    /// Whether to show error alert
+    @Published var userFullName: String? = nil
+    @Published var userGivenName: String? = nil
+    @Published var userFamilyName: String? = nil
+    @Published var userEmail: String? = nil
+    @Published var userID: String? = nil
     @Published var showError: Bool = false
-    
-    /// Whether authentication is in progress
-    @Published var isAuthenticating: Bool = false
-    
-    // MARK: - Private Properties
+    @Published var authenticationError: String? = nil
 
     private let authenticationManager: AuthenticationManager
-    private let subscriptionManager: SubscriptionManager
-    private var cancellables = Set<AnyCancellable>()
+    private var memberSinceDate: Date = Date()
 
-    // MARK: - Initialization
-
-    init(authenticationManager: AuthenticationManager, subscriptionManager: SubscriptionManager) {
+    init(authenticationManager: AuthenticationManager) {
         self.authenticationManager = authenticationManager
-        self.subscriptionManager = subscriptionManager
-        setupBindings()
+        syncState()
     }
-    
-    // MARK: - Setup
-    
-    private func setupBindings() {
-        // Bind to authentication manager state
-        authenticationManager.$isAuthenticated
-            .assign(to: &$isAuthenticated)
-        
-        authenticationManager.$userID
-            .assign(to: &$userID)
-        
-        authenticationManager.$userEmail
-            .assign(to: &$userEmail)
-        
-        authenticationManager.$userFullName
-            .assign(to: &$userFullName)
-    }
-    
+
     // MARK: - Computed Properties
     
-    /// User initials for avatar display
-    var userInitials: String {
-        guard let fullName = userFullName else { return "?" }
-        let components = fullName.components(separatedBy: " ")
-        let initials = components.compactMap { $0.first }.prefix(2)
-        return String(initials).uppercased()
-    }
-    
-    /// Display name with fallback
     var displayName: String {
-        if let fullName = userFullName {
+        if let fullName = userFullName, !fullName.isEmpty {
             return fullName
-        } else if let email = userEmail {
-            return email.components(separatedBy: "@").first ?? "User"
+        } else if let givenName = userGivenName {
+            return givenName
+        } else if isAuthenticated {
+            return "User"
         } else {
             return "Guest"
         }
     }
     
-    /// Whether user has complete profile
-    var hasCompleteProfile: Bool {
-        userID != nil && userEmail != nil && userFullName != nil
-    }
-    
-    /// Profile completion status text
-    var profileStatusText: String {
-        if hasCompleteProfile {
-            return "Profile Complete"
-        } else if userID != nil {
-            return "Profile Incomplete"
-        } else {
-            return "Not Signed In"
-        }
-    }
-    
-    /// Greeting text
     var greetingText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let greeting: String
-        
-        switch hour {
-        case 0..<12:
-            greeting = "Good morning"
-        case 12..<17:
-            greeting = "Good afternoon"
-        case 17..<22:
-            greeting = "Good evening"
-        default:
-            greeting = "Hello"
-        }
-        
-        if let firstName = userFullName?.components(separatedBy: " ").first {
-            return "\(greeting), \(firstName)"
-        } else {
-            return greeting
-        }
-    }
-    
-    /// Profile completion percentage
-    var profileCompletionPercentage: Double {
-        var percentage: Double = 0
-        
-        // Check each profile field
-        if userID != nil { percentage += 25 }
-        if userEmail != nil { percentage += 25 }
-        if userFullName != nil { percentage += 25 }
-        if hasCompleteProfile { percentage += 25 }
-        
-        return min(percentage, 100)
-    }
-    
-    /// Member since date text
-    var memberSinceText: String {
         if isAuthenticated {
-            // In a real app, you'd retrieve the actual registration date
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            return formatter.string(from: Date(timeIntervalSinceNow: -90*24*60*60)) // Example: 90 days ago
+            return "Welcome back!"
+        } else {
+            return "Welcome to Oralable"
         }
-        return "Not a member"
     }
     
-    /// Last profile update text
+    var userInitials: String {
+        if let givenName = userGivenName?.first, let familyName = userFamilyName?.first {
+            return "\(givenName)\(familyName)".uppercased()
+        } else if let fullName = userFullName, !fullName.isEmpty {
+            let components = fullName.split(separator: " ")
+            if components.count >= 2 {
+                return "\(components[0].first ?? "U")\(components[1].first ?? "U")".uppercased()
+            } else {
+                return String(fullName.prefix(2)).uppercased()
+            }
+        }
+        return "U"
+    }
+    
+    var profileStatusText: String {
+        if isAuthenticated {
+            return "Your profile is synced"
+        } else {
+            return "Sign in to sync your data"
+        }
+    }
+    
+    var profileCompletionPercentage: Double {
+        guard isAuthenticated else { return 0 }
+        
+        var completed = 0
+        let total = 5
+        
+        if userFullName != nil { completed += 1 }
+        if userEmail != nil { completed += 1 }
+        if userID != nil { completed += 1 }
+        if userGivenName != nil { completed += 1 }
+        if userFamilyName != nil { completed += 1 }
+        
+        return (Double(completed) / Double(total)) * 100
+    }
+    
+    var memberSinceText: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: memberSinceDate)
+    }
+    
     var lastUpdatedText: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -159,107 +92,103 @@ class AuthenticationViewModel: ObservableObject {
         return formatter.string(from: Date())
     }
     
-    /// Subscription status
     var subscriptionStatus: String {
-        return subscriptionManager.isPaidSubscriber ? "Active" : "Free"
+        // TODO: Integrate with actual subscription system
+        return "Active"
     }
-
-    /// Subscription plan name
+    
     var subscriptionPlan: String {
-        return subscriptionManager.currentTier.displayName
+        // TODO: Integrate with actual subscription system
+        return "Free"
     }
-
-    /// Subscription expiry text
-    var subscriptionExpiryText: String {
-        if subscriptionManager.isPaidSubscriber {
-            // In a real implementation, this would come from StoreKit
-            return "Renews automatically"
-        }
-        return "No active subscription"
-    }
-
-    /// Whether user has active subscription
+    
     var hasSubscription: Bool {
-        return subscriptionManager.isPaidSubscriber
+        // TODO: Integrate with actual subscription system
+        return false
     }
     
-    // MARK: - Public Methods
+    var subscriptionExpiryText: String {
+        // TODO: Integrate with actual subscription system
+        return "N/A"
+    }
+
+    // MARK: - State Management
     
-    /// Check current authentication state
+    func syncState() {
+        isAuthenticated = authenticationManager.isAuthenticated
+        userFullName = authenticationManager.userFullName
+        userGivenName = authenticationManager.userGivenName
+        userFamilyName = authenticationManager.userFamilyName
+        userEmail = authenticationManager.userEmail
+        userID = authenticationManager.userID
+    }
+    
     func checkAuthenticationState() {
-        authenticationManager.checkAuthenticationState()
+        syncState()
     }
-    
-    /// Handle Sign In with Apple - FIXED: Now calls the correct method
+
+    // MARK: - Authentication Actions
+
     func handleSignIn(result: Result<ASAuthorization, Error>) {
-        isAuthenticating = true
-        
-        // FIXED: Call the correct method that exists in AuthenticationManager
-        authenticationManager.handleSignIn(result: result)
-        
-        // Handle completion
-        DispatchQueue.main.async { [weak self] in
-            self?.isAuthenticating = false
-            
-            // Check if there was an error
-            if case .failure(let error) = result {
-                self?.authenticationError = error.localizedDescription
-                self?.showError = true
+        switch result {
+        case .success(let authorization):
+            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                handleAppleIDCredential(appleIDCredential)
             }
+        case .failure(let error):
+            authenticationError = error.localizedDescription
+            showError = true
         }
     }
     
-    /// Sign out
+    func handleAppleIDCredential(_ credential: ASAuthorizationAppleIDCredential) {
+        authenticationManager.handleSignIn(with: credential)
+        syncState()
+    }
+
     func signOut() {
         authenticationManager.signOut()
+        syncState()
+    }
+
+    func continueAsGuest() {
+        authenticationManager.continueAsGuest()
+        syncState()
     }
     
-    /// Refresh profile information
     func refreshProfile() {
-        checkAuthenticationState()
+        syncState()
     }
     
-    /// Dismiss error alert
     func dismissError() {
         showError = false
         authenticationError = nil
     }
-    
+
     // MARK: - Debug Methods
     
     #if DEBUG
-    /// Debug authentication state
     func debugAuthState() {
-        Logger.shared.debug("=== Authentication Debug ===")
-        Logger.shared.debug("Is Authenticated: \(isAuthenticated)")
-        Logger.shared.debug("User ID: \(userID ?? "nil")")
-        Logger.shared.debug("User Email: \(userEmail ?? "nil")")
-        Logger.shared.debug("User Full Name: \(userFullName ?? "nil")")
-        Logger.shared.debug("Has Complete Profile: \(hasCompleteProfile)")
-        Logger.shared.debug("Profile Completion: \(profileCompletionPercentage)%")
-        Logger.shared.debug("Subscription Status: \(subscriptionStatus)")
-        Logger.shared.debug("===========================")
+        print("=== Authentication Debug State ===")
+        print("Authenticated: \(isAuthenticated)")
+        print("User ID: \(userID ?? "nil")")
+        print("Full Name: \(userFullName ?? "nil")")
+        print("Given Name: \(userGivenName ?? "nil")")
+        print("Family Name: \(userFamilyName ?? "nil")")
+        print("Email: \(userEmail ?? "nil")")
+        print("Profile Completion: \(profileCompletionPercentage)%")
+        print("================================")
     }
     
-    /// Reset Apple ID authentication (debug only)
+    func testAppleIDAuth() {
+        authenticationManager.testAppleIDAuth()
+        syncState()
+    }
+    
     func resetAppleIDAuth() {
-        // This would reset stored Apple ID credentials
-        authenticationManager.resetAppleIDAuth()
-        Logger.shared.info("[AuthenticationViewModel] Apple ID authentication has been reset")
+        authenticationManager.signOut()
+        syncState()
+        print("Apple ID authentication has been reset")
     }
     #endif
-}
-
-// MARK: - Extensions for Sign In with Apple
-
-extension AuthenticationViewModel {
-    /// Create Sign In with Apple request
-    func createSignInWithAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
-        request.requestedScopes = [.fullName, .email]
-    }
-    
-    /// Handle Sign In with Apple completion
-    func handleSignInWithAppleCompletion(_ result: Result<ASAuthorization, Error>) {
-        handleSignIn(result: result)
-    }
 }
