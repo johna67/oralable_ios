@@ -8,6 +8,18 @@
 import SwiftUI
 import Charts
 
+// MARK: - LazyView Helper
+// Prevents NavigationLink from eagerly initializing destination views
+struct LazyView<Content: View>: View {
+    let build: () -> Content
+    init(_ build: @autoclosure @escaping () -> Content) {
+        self.build = build
+    }
+    var body: Content {
+        build()
+    }
+}
+
 struct DashboardView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
@@ -19,9 +31,6 @@ struct DashboardView: View {
 
     // NAVIGATION STATE VARIABLES
     @State private var showingProfile = false
-    @State private var showingDevices = false
-    @State private var showingSettings = false
-    @State private var showingShare = false
     
     var body: some View {
         Group {
@@ -64,32 +73,11 @@ struct DashboardView: View {
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingProfile = true }) {
                         Image(systemName: "person.circle")
                             .font(.system(size: 22))
                             .foregroundColor(designSystem.colors.textPrimary)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: designSystem.spacing.sm) {
-                        Button(action: {
-                            Task { await self.handleSmartShare() }
-                        }) {
-                            Image(systemName: "arrow.up.doc")
-                                .font(.system(size: 20))
-                                .foregroundColor(designSystem.colors.textPrimary)
-                        }
-                        Button(action: { showingDevices = true }) {
-                            Image(systemName: "cpu")
-                                .font(.system(size: 20))
-                                .foregroundColor(designSystem.colors.textPrimary)
-                        }
-                        Button(action: { showingSettings = true }) {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 20))
-                                .foregroundColor(designSystem.colors.textPrimary)
-                        }
                     }
                 }
             }
@@ -99,25 +87,8 @@ struct DashboardView: View {
                     .environmentObject(dependencies.authenticationManager)
                     .environmentObject(dependencies.subscriptionManager)
             }
-            .sheet(isPresented: $showingDevices) {
-                DevicesView()
-                    .environmentObject(designSystem)
-                    .environmentObject(bleManager)
-                    .environmentObject(dependencies.deviceManager)
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView(viewModel: dependencies.makeSettingsViewModel())
-                    .environmentObject(dependencies)
-                    .environmentObject(designSystem)
-                    .environmentObject(dependencies.authenticationManager)
-                    .environmentObject(dependencies.subscriptionManager)
-                    .environmentObject(dependencies.appStateManager)
-            }
-            .sheet(isPresented: $showingShare) {
-                ShareView(ble: bleManager)
-                    .environmentObject(designSystem)
-            }
         }
+        .navigationViewStyle(.stack) // Force stack style to show navigation bar
         .onAppear { viewModel.startMonitoring() }
         .onDisappear { viewModel.stopMonitoring() }
     }
@@ -130,33 +101,39 @@ struct DashboardView: View {
                 .foregroundColor(designSystem.colors.textPrimary)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: designSystem.spacing.md) {
-                NavigationLink(destination: HistoricalView(
-                    metricType: "Movement",
-                    historicalDataManager: dependencies.historicalDataManager
-                )
-                .environmentObject(designSystem)
-                .environmentObject(dependencies.historicalDataManager)
-                .environmentObject(bleManager)) {
+                NavigationLink(destination: LazyView(
+                    HistoricalView(
+                        metricType: "Movement",
+                        historicalDataManager: dependencies.historicalDataManager
+                    )
+                    .environmentObject(designSystem)
+                    .environmentObject(dependencies.historicalDataManager)
+                    .environmentObject(bleManager)
+                )) {
                     historyCard(title: "Movement", icon: "figure.walk", color: .blue)
                 }
 
-                NavigationLink(destination: HistoricalView(
-                    metricType: "Heart Rate",
-                    historicalDataManager: dependencies.historicalDataManager
-                )
-                .environmentObject(designSystem)
-                .environmentObject(dependencies.historicalDataManager)
-                .environmentObject(bleManager)) {
+                NavigationLink(destination: LazyView(
+                    HistoricalView(
+                        metricType: "Heart Rate",
+                        historicalDataManager: dependencies.historicalDataManager
+                    )
+                    .environmentObject(designSystem)
+                    .environmentObject(dependencies.historicalDataManager)
+                    .environmentObject(bleManager)
+                )) {
                     historyCard(title: "Heart Rate", icon: "heart.fill", color: .red)
                 }
 
-                NavigationLink(destination: HistoricalView(
-                    metricType: "SpO2",
-                    historicalDataManager: dependencies.historicalDataManager
-                )
-                .environmentObject(designSystem)
-                .environmentObject(dependencies.historicalDataManager)
-                .environmentObject(bleManager)) {
+                NavigationLink(destination: LazyView(
+                    HistoricalView(
+                        metricType: "SpO2",
+                        historicalDataManager: dependencies.historicalDataManager
+                    )
+                    .environmentObject(designSystem)
+                    .environmentObject(dependencies.historicalDataManager)
+                    .environmentObject(bleManager)
+                )) {
                     historyCard(title: "SpO2", icon: "lungs.fill", color: .blue)
                 }
             }
@@ -394,13 +371,15 @@ struct DashboardView: View {
                 )
 
                 NavigationLink(
-                    destination: HistoricalView(
-                        metricType: "Movement",
-                        historicalDataManager: dependencies.historicalDataManager
+                    destination: LazyView(
+                        HistoricalView(
+                            metricType: "Movement",
+                            historicalDataManager: dependencies.historicalDataManager
+                        )
+                        .environmentObject(designSystem)
+                        .environmentObject(dependencies.historicalDataManager)
+                        .environmentObject(bleManager)
                     )
-                    .environmentObject(designSystem)
-                    .environmentObject(dependencies.historicalDataManager)
-                    .environmentObject(bleManager)
                 ) {
                     WaveformCard(
                         title: "Movement",

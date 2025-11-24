@@ -8,36 +8,35 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            // Existing tabs
+            // Dashboard Tab
             DashboardView()
                 .tabItem {
-                    Label("Dashboard", systemImage: "house")
+                    Label("Dashboard", systemImage: "house.fill")
                 }
 
-            // History tab
-            NavigationStack {
-                List {
-                    NavigationLink("Movement History") {
-                        HistoricalView(metricType: "Movement",
-                                       historicalDataManager: historicalDataManager)
-                    }
-                    NavigationLink("Heart Rate History") {
-                        HistoricalView(metricType: "Heart Rate",
-                                       historicalDataManager: historicalDataManager)
-                    }
-                    NavigationLink("SpO2 History") {
-                        HistoricalView(metricType: "SpO2",
-                                       historicalDataManager: historicalDataManager)
-                    }
+            // Devices Tab
+            DevicesView()
+                .environmentObject(designSystem)
+                .environmentObject(bleManager)
+                .environmentObject(dependencies.deviceManager)
+                .tabItem {
+                    Label("Devices", systemImage: "cpu")
                 }
-                .navigationTitle("History")
-            }
-            .tabItem {
-                Label("History", systemImage: "chart.line.uptrend.xyaxis")
-            }
 
-            // Other tabs (e.g. Settings, Profile)
+            // Share Tab
+            ShareView(ble: bleManager)
+                .environmentObject(designSystem)
+                .tabItem {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+
+            // Settings Tab
             SettingsView(viewModel: dependencies.makeSettingsViewModel())
+                .environmentObject(dependencies)
+                .environmentObject(designSystem)
+                .environmentObject(dependencies.authenticationManager)
+                .environmentObject(dependencies.subscriptionManager)
+                .environmentObject(dependencies.appStateManager)
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }

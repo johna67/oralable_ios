@@ -90,7 +90,7 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingAuthenticationView) {
             NavigationView {
-                AuthenticationView()
+                AuthenticationView(sharedAuthManager: authenticationManager)
             }
         }
         .sheet(isPresented: $showingSubscriptionView) {

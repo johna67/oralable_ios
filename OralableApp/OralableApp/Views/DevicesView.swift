@@ -13,14 +13,28 @@ import SwiftUI
 import CoreBluetooth
 
 struct DevicesView: View {
-    @EnvironmentObject var bleManager: OralableBLE
+    @EnvironmentObject var deviceManager: DeviceManager  // Use DeviceManager instead of OralableBLE
     @EnvironmentObject var designSystem: DesignSystem
     @Environment(\.dismiss) var dismiss
 
     @State private var showingSettings = false
-    @State private var isScanning = false
     @State private var showingForgetDevice = false
     @State private var lastActionTime: Date = .distantPast
+
+    // Computed property for connection status
+    private var isConnected: Bool {
+        !deviceManager.connectedDevices.isEmpty
+    }
+
+    // Computed property for scanning status
+    private var isScanning: Bool {
+        deviceManager.isScanning
+    }
+
+    // Computed property for device name
+    private var deviceName: String {
+        deviceManager.primaryDevice?.name ?? "Unknown Device"
+    }
 
     var body: some View {
         NavigationView {
@@ -30,7 +44,7 @@ struct DevicesView: View {
                     connectionCard
 
                     // Device Info (if connected)
-                    if bleManager.isConnected {
+                    if isConnected {
                         deviceInfoCard
                         deviceMetricsCard
                         deviceSettingsCard
@@ -70,7 +84,7 @@ struct DevicesView: View {
             Text("Are you sure you want to forget this device? You'll need to reconnect it later.")
         }
         .onAppear {
-            synchronizeScanningState()
+            // Removed synchronizeScanningState - no longer needed with DeviceManager
         }
     }
     
@@ -130,17 +144,17 @@ struct DevicesView: View {
     private var connectionCard: some View {
         VStack(spacing: designSystem.spacing.md) {
             // Status Icon
-            Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+            Image(systemName: isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(bleManager.isConnected ? .green : .red)
+                .foregroundColor(isConnected ? .green : .red)
 
             // Status Text
-            Text(bleManager.isConnected ? "Connected" : "Disconnected")
+            Text(isConnected ? "Connected" : "Disconnected")
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            if bleManager.isConnected {
-                Text(bleManager.deviceName)
+            if isConnected {
+                Text(deviceName)
                     .font(designSystem.typography.body)
                     .foregroundColor(designSystem.colors.textSecondary)
             }
@@ -199,22 +213,24 @@ struct DevicesView: View {
                                 .font(.system(size: 24))
                                 .foregroundColor(designSystem.colors.textSecondary)
                                 .frame(width: 40)
-                            
+
                             // Device Info
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(deviceInfo.name)
                                     .font(designSystem.typography.body)
                                     .foregroundColor(designSystem.colors.textPrimary)
-                                Text("Signal: \(deviceInfo.rssi) dBm")
-                                    .font(designSystem.typography.caption)
-                                    .foregroundColor(designSystem.colors.textSecondary)
+                                if let rssi = deviceInfo.signalStrength {
+                                    Text("Signal: \(rssi) dBm")
+                                        .font(designSystem.typography.caption)
+                                        .foregroundColor(designSystem.colors.textSecondary)
+                                }
                             }
-                            
+
                             Spacer()
-                            
+
                             // Connect button
                             Button("Connect") {
-                                connectToDevice(peripheral: deviceInfo.peripheral)
+                                connectToDevice(deviceInfo: deviceInfo)
                             }
                             .font(designSystem.typography.button)
                             .foregroundColor(.white)
@@ -260,23 +276,23 @@ struct DevicesView: View {
                 DeviceInfoRow(
                     icon: "number",
                     label: "Serial Number",
-                    value: bleManager.deviceUUID?.uuidString.prefix(8).uppercased() ?? "Unknown"
+                    value: deviceManager.primaryDevice?.peripheralIdentifier?.uuidString.prefix(8).uppercased() ?? "Unknown"
                 )
-                
+
                 Divider().background(designSystem.colors.divider)
-                
+
                 DeviceInfoRow(
                     icon: "info.circle",
                     label: "Firmware",
-                    value: bleManager.firmwareVersion
+                    value: deviceManager.primaryDevice?.firmwareVersion ?? "Unknown"
                 )
-                
+
                 Divider().background(designSystem.colors.divider)
-                
+
                 DeviceInfoRow(
                     icon: "battery.100",
                     label: "Battery",
-                    value: "\(Int(bleManager.batteryLevel))%"
+                    value: deviceManager.primaryDevice?.batteryLevel.map { "\($0)%" } ?? "N/A"
                 )
             }
             .background(designSystem.colors.backgroundSecondary)
@@ -296,7 +312,7 @@ struct DevicesView: View {
                 DeviceInfoRow(
                     icon: "antenna.radiowaves.left.and.right",
                     label: "Signal Strength",
-                    value: "\(bleManager.rssi) dBm"
+                    value: deviceManager.primaryDevice?.signalStrength.map { "\($0) dBm" } ?? "N/A"
                 )
                 
                 Divider().background(designSystem.colors.divider)
@@ -312,7 +328,7 @@ struct DevicesView: View {
                 DeviceInfoRow(
                     icon: "arrow.down.circle",
                     label: "Data Received",
-                    value: "\(bleManager.packetsReceived) packets"
+                    value: "\(deviceManager.allSensorReadings.count) readings"
                 )
             }
             .background(designSystem.colors.backgroundSecondary)
@@ -452,19 +468,17 @@ struct DevicesView: View {
                 .foregroundColor(designSystem.colors.textTertiary)
             
             VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-                Text("State: \(bleManager.connectionState)")
+                Text("State: \(isConnected ? "Connected" : "Disconnected")")
                     .font(.system(.caption, design: .monospaced))
-                Text("UUID: \(bleManager.deviceUUID?.uuidString ?? "None")")
+                Text("UUID: \(deviceManager.primaryDevice?.peripheralIdentifier?.uuidString ?? "None")")
                     .font(.system(.caption, design: .monospaced))
-                Text("Last Error: \(bleManager.lastError ?? "None")")
+                Text("Last Error: \(deviceManager.lastError?.localizedDescription ?? "None")")
                     .font(.system(.caption, design: .monospaced))
-                Text("Services: \(bleManager.discoveredServices.count)")
+                Text("Connected Devices: \(deviceManager.connectedDevices.count)")
                     .font(.system(.caption, design: .monospaced))
-                Text("Local Scanning: \(isScanning ? "Yes" : "No")")
+                Text("Scanning: \(isScanning ? "Yes" : "No")")
                     .font(.system(.caption, design: .monospaced))
-                Text("Manager Scanning: \(bleManager.isScanning ? "Yes" : "No")")
-                    .font(.system(.caption, design: .monospaced))
-                Text("Discovered: \(bleManager.discoveredDevicesInfo.count) device(s) (\(filteredDevices.count) compatible)")
+                Text("Discovered: \(deviceManager.discoveredDevices.count) device(s) (\(filteredDevices.count) compatible)")
                     .font(.system(.caption, design: .monospaced))
             }
             .foregroundColor(designSystem.colors.textSecondary)
@@ -480,15 +494,15 @@ struct DevicesView: View {
     // MARK: - Computed Properties
 
     // Filter to only show Oralable and ANR Muscle Sense devices
-    private var filteredDevices: [OralableBLE.DiscoveredDeviceInfo] {
-        bleManager.discoveredDevicesInfo.filter { deviceInfo in
+    private var filteredDevices: [DeviceInfo] {
+        deviceManager.discoveredDevices.filter { deviceInfo in
             let name = deviceInfo.name.lowercased()
             return name.contains("oralable") || name.contains("anr") || name.contains("n02cl")
         }
     }
 
     private var actionButtonIcon: String {
-        if bleManager.isConnected {
+        if isConnected {
             return "xmark.circle"
         } else if isScanning {
             return "stop.circle"
@@ -496,9 +510,9 @@ struct DevicesView: View {
             return "magnifyingglass"
         }
     }
-    
+
     private var actionButtonText: String {
-        if bleManager.isConnected {
+        if isConnected {
             return "Disconnect"
         } else if isScanning {
             return "Stop Scanning"
@@ -506,9 +520,9 @@ struct DevicesView: View {
             return "Scan for Devices"
         }
     }
-    
+
     private var actionButtonColor: Color {
-        if bleManager.isConnected {
+        if isConnected {
             return .red
         } else if isScanning {
             return .orange
@@ -526,10 +540,10 @@ struct DevicesView: View {
             return
         }
         lastActionTime = now
-        
-        if bleManager.isConnected {
+
+        if isConnected {
             Logger.shared.debug("[DevicesView] Action: Disconnect")
-            bleManager.disconnect()
+            disconnect()
         } else if isScanning {
             Logger.shared.debug("[DevicesView] Action: Stop scanning")
             stopScanning()
@@ -538,54 +552,60 @@ struct DevicesView: View {
             startScanning()
         }
     }
-    
+
     private func startScanning() {
         Logger.shared.debug("[DevicesView] Starting scan...")
-        isScanning = true
-        bleManager.startScanning()
-        
+        Task {
+            await deviceManager.startScanning()
+        }
+
         // Auto-stop after 10 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            // Check both local and bleManager state to be safe
-            if self.isScanning || self.bleManager.isScanning {
-                if !self.bleManager.isConnected {
-                    Logger.shared.debug("[DevicesView] Auto-stopping scan after 10 seconds")
-                    self.stopScanning()
-                }
+            if self.isScanning && !self.isConnected {
+                Logger.shared.debug("[DevicesView] Auto-stopping scan after 10 seconds")
+                self.stopScanning()
             }
         }
     }
-    
+
     private func stopScanning() {
         Logger.shared.debug("[DevicesView] Stopping scan...")
-        isScanning = false
-        bleManager.stopScanning()
+        deviceManager.stopScanning()
         
         // Report findings
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if !self.isScanning && !self.bleManager.isScanning {
-                Logger.shared.debug("[DevicesView] Scan stopped, found \(self.bleManager.discoveredDevicesInfo.count) device(s) (\(self.filteredDevices.count) compatible)")
+            if !self.isScanning {
+                Logger.shared.debug("[DevicesView] Scan stopped, found \(self.deviceManager.discoveredDevices.count) device(s) (\(self.filteredDevices.count) compatible)")
             }
         }
     }
-    
-    // Connect to discovered device
-    private func connectToDevice(peripheral: CBPeripheral) {
-        Logger.shared.debug("[DevicesView] Connecting to device: \(peripheral.name ?? "Unknown")")
+
+    // Connect to discovered device (now using DeviceInfo instead of CBPeripheral)
+    private func connectToDevice(deviceInfo: DeviceInfo) {
+        Logger.shared.debug("[DevicesView] Connecting to device: \(deviceInfo.name)")
         stopScanning()
-        
-        // Use BLE manager to connect to the actual peripheral
-        bleManager.connect(to: peripheral)
+
+        // Use DeviceManager to connect
+        Task {
+            do {
+                try await deviceManager.connect(to: deviceInfo)
+                Logger.shared.info("[DevicesView] Successfully connected to \(deviceInfo.name)")
+            } catch {
+                Logger.shared.error("[DevicesView] Connection failed: \(error.localizedDescription)")
+            }
+        }
     }
-    
-    // Synchronize scanning state with bleManager
-    private func synchronizeScanningState() {
-        // Sync local isScanning with bleManager.isScanning
-        isScanning = bleManager.isScanning
+
+    private func disconnect() {
+        if let primaryDevice = deviceManager.primaryDevice {
+            deviceManager.disconnect(from: primaryDevice)
+        } else {
+            deviceManager.disconnectAll()
+        }
     }
-    
+
     private func forgetDevice() {
-        bleManager.disconnect()
+        disconnect()
         // Clear saved device from UserDefaults
         UserDefaults.standard.removeObject(forKey: "savedDeviceUUID")
     }

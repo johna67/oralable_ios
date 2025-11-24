@@ -93,8 +93,34 @@ struct OnboardingView: View {
             .padding(.bottom, 40)
         }
         .sheet(isPresented: $showingAuthenticationView) {
-            NavigationView {
-                AuthenticationView()
+            // Don't wrap in NavigationView - AuthenticationView already has one
+            // Pass the SAME authenticationManager instance that OnboardingView uses
+            AuthenticationView(sharedAuthManager: authenticationManager)
+                .environmentObject(healthKitManager)
+                .environmentObject(designSystem)
+        }
+        .onChange(of: authenticationManager.isAuthenticated) { oldValue, newValue in
+            Logger.shared.info("🟣 OnboardingView: isAuthenticated changed from \(oldValue) to \(newValue)")
+            // Auto-dismiss authentication sheet after successful sign-in
+            if newValue {
+                // Check if HealthKit is also authorized, or dismiss anyway after a delay
+                Task {
+                    Logger.shared.info("🟣 OnboardingView: Waiting 1 second before auto-dismiss")
+                    // Wait a bit for HealthKit authorization to complete
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    await MainActor.run {
+                        Logger.shared.info("🟣 OnboardingView: Setting showingAuthenticationView = false")
+                        showingAuthenticationView = false
+                    }
+                }
+            }
+        }
+        .onChange(of: healthKitManager.isAuthorized) { oldValue, newValue in
+            Logger.shared.info("🟣 OnboardingView: healthKitManager.isAuthorized changed from \(oldValue) to \(newValue)")
+            // Also dismiss when HealthKit is authorized (if already authenticated)
+            if newValue && authenticationManager.isAuthenticated {
+                Logger.shared.info("🟣 OnboardingView: Both authenticated and HealthKit authorized - dismissing immediately")
+                showingAuthenticationView = false
             }
         }
     }

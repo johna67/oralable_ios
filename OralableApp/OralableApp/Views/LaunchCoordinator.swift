@@ -15,15 +15,28 @@ struct LaunchCoordinator: View {
 
     var body: some View {
         Group {
-            if authenticationManager.isFirstLaunch {
+            // IMPORTANT: Check authentication BEFORE first launch
+            // Once authenticated, always show main tab view regardless of first launch status
+            if authenticationManager.isAuthenticated {
+                // MainTabView has the bottom tab bar with Dashboard, Devices, Share, Settings
+                MainTabView()
+                    .onAppear {
+                        Logger.shared.info("🟢 LaunchCoordinator: Showing MainTabView (authenticated)")
+                    }
+            } else if authenticationManager.isFirstLaunch {
                 OnboardingView()
-            } else if authenticationManager.isAuthenticated {
-                MainDashboardView()
+                    .onAppear {
+                        Logger.shared.info("🟡 LaunchCoordinator: Showing OnboardingView (first launch)")
+                    }
             } else {
                 LoginView()
+                    .onAppear {
+                        Logger.shared.info("🔴 LaunchCoordinator: Showing LoginView (not authenticated)")
+                    }
             }
         }
         .onAppear {
+            Logger.shared.info("🔵 LaunchCoordinator appeared - isAuthenticated: \(authenticationManager.isAuthenticated), isFirstLaunch: \(authenticationManager.isFirstLaunch)")
             bleManager.startScanning()
         }
     }

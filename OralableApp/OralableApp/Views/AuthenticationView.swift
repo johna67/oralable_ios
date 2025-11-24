@@ -10,24 +10,22 @@ import SwiftUI
 import AuthenticationServices
 
 struct AuthenticationView: View {
-    // MVVM: Use ViewModel instead of direct manager access
-    @StateObject private var viewModel: AuthenticationViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @Environment(\.dismiss) private var dismiss
+
+    // Use the SHARED AuthenticationManager passed from parent
+    @StateObject private var viewModel: AuthenticationViewModel
+
     @State private var showingProfileDetails = false
     @State private var showingSignOutConfirmation = false
     @State private var showingHealthKitPermission = false
 
-    init(viewModel: AuthenticationViewModel? = nil) {
-        if let viewModel = viewModel {
-            _viewModel = StateObject(wrappedValue: viewModel)
-        } else {
-            // Legacy path - create with new manager instances
-            let authManager = AuthenticationManager()
-            _viewModel = StateObject(wrappedValue: AuthenticationViewModel(
-                authenticationManager: authManager
-            ))
-        }
+    init(sharedAuthManager: AuthenticationManager) {
+        // Use the SHARED authManager, not a new instance
+        _viewModel = StateObject(wrappedValue: AuthenticationViewModel(
+            authenticationManager: sharedAuthManager
+        ))
     }
     
     var body: some View {
@@ -44,6 +42,24 @@ struct AuthenticationView: View {
                     if viewModel.isAuthenticated {
                         profileInformationSection
                         profileActionsSection
+
+                        // Continue to Dashboard Button
+                        Button(action: {
+                            Logger.shared.info("🔵 Continue to Dashboard button tapped")
+                            Logger.shared.info("🔵 isAuthenticated: \(viewModel.isAuthenticated)")
+                            dismiss()
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.right.circle.fill")
+                                Text("Continue to Dashboard")
+                            }
+                            .font(designSystem.typography.buttonLarge)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(designSystem.colors.primaryBlack)
+                            .cornerRadius(designSystem.cornerRadius.md)
+                        }
                     } else {
                         signInSection
                     }
@@ -525,7 +541,8 @@ struct CircularProgressView<Content: View>: View {
 
 struct AuthenticationView_Previews: PreviewProvider {
     static var previews: some View {
-        AuthenticationView()
+        AuthenticationView(sharedAuthManager: AuthenticationManager())
             .environmentObject(DesignSystem())
+            .environmentObject(HealthKitManager())
     }
 }

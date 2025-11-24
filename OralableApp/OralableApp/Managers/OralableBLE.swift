@@ -75,10 +75,15 @@ final class OralableBLE: NSObject, ObservableObject, BLEManagerProtocol {
     }
 
     func startScanning() {
+        guard centralManager.state == .poweredOn else {
+            Logger.shared.warning("[OralableBLE] Cannot start scanning - Bluetooth not powered on (state: \(centralManager.state.rawValue))")
+            return
+        }
         isScanning = true
         discoveredDevicesInfo.removeAll()
         discoveredDevices.removeAll()
         centralManager.scanForPeripherals(withServices: nil, options: nil)
+        Logger.shared.info("[OralableBLE] Started scanning for devices")
     }
 
     func stopScanning() {
@@ -87,6 +92,7 @@ final class OralableBLE: NSObject, ObservableObject, BLEManagerProtocol {
     }
 
     func connect(to peripheral: CBPeripheral) {
+        Logger.shared.info("[OralableBLE] Connecting to peripheral: \(peripheral.name ?? "Unknown") (\(peripheral.identifier))")
         centralManager.connect(peripheral, options: nil)
     }
 
@@ -129,8 +135,9 @@ final class OralableBLE: NSObject, ObservableObject, BLEManagerProtocol {
 
 extension OralableBLE: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        isConnected = (central.state == .poweredOn)
-        if isConnected { startScanning() }
+        // Only log Bluetooth state changes - do not set isConnected here
+        // isConnected should only be set when a device actually connects/disconnects
+        Logger.shared.info("[OralableBLE] Bluetooth state: \(central.state.rawValue)")
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
@@ -158,10 +165,16 @@ extension OralableBLE: CBCentralManagerDelegate {
         isConnected = true
         connectedPeripheral = peripheral
         deviceName = peripheral.name ?? "Connected Device"
+        Logger.shared.info("[OralableBLE] ✅ Connected to device: \(deviceName) (\(peripheral.identifier))")
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         isConnected = false
         connectedPeripheral = nil
+        if let error = error {
+            Logger.shared.warning("[OralableBLE] ⚠️ Disconnected from device with error: \(error.localizedDescription)")
+        } else {
+            Logger.shared.info("[OralableBLE] Disconnected from device: \(peripheral.name ?? "Unknown")")
+        }
     }
 }
