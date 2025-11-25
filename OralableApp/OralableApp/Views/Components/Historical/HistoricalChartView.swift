@@ -19,6 +19,10 @@ struct HistoricalChartView: View {
         let referenceDate = processed.rawData.first?.timestamp ?? Date()
 
         switch timeRange {
+        case .minute:
+            if let minuteInterval = calendar.dateInterval(of: .minute, for: referenceDate) {
+                return minuteInterval.start...minuteInterval.end
+            }
         case .hour:
             if let hourInterval = calendar.dateInterval(of: .hour, for: referenceDate) {
                 return hourInterval.start...hourInterval.end
@@ -43,6 +47,8 @@ struct HistoricalChartView: View {
     // X-axis stride based on time range
     private var xAxisStride: Calendar.Component {
         switch timeRange {
+        case .minute:
+            return .second
         case .hour:
             return .minute
         case .day:
@@ -57,6 +63,8 @@ struct HistoricalChartView: View {
     // X-axis date format based on time range
     private var xAxisDateFormat: Date.FormatStyle {
         switch timeRange {
+        case .minute:
+            return .dateTime.hour().minute().second()
         case .hour:
             return .dateTime.hour().minute()
         case .day:

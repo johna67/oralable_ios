@@ -10,6 +10,7 @@ struct OralableApp: App {
     @MainActor @StateObject private var historicalDataManager: HistoricalDataManager
     @MainActor @StateObject private var subscriptionManager: SubscriptionManager
     @MainActor @StateObject private var deviceManager: DeviceManager
+    @MainActor @StateObject private var sensorDataProcessor: SensorDataProcessor
     @MainActor @StateObject private var appStateManager: AppStateManager
     @MainActor @StateObject private var sharedDataManager: SharedDataManager
     @MainActor @StateObject private var designSystem: DesignSystem
@@ -21,9 +22,10 @@ struct OralableApp: App {
         let bleManager = OralableBLE()
 
         let recordingSessionManager = RecordingSessionManager()
+        let sensorDataProcessor = SensorDataProcessor.shared
 
         let historicalDataManager = HistoricalDataManager(
-            bleManager: bleManager
+            sensorDataProcessor: sensorDataProcessor
         )
 
         let subscriptionManager = SubscriptionManager()
@@ -32,7 +34,7 @@ struct OralableApp: App {
         let sharedDataManager = SharedDataManager(
             authenticationManager: authenticationManager,
             healthKitManager: healthKitManager,
-            bleManager: bleManager
+            sensorDataProcessor: sensorDataProcessor
         )
         let designSystem = DesignSystem()
 
@@ -44,6 +46,7 @@ struct OralableApp: App {
         _historicalDataManager = StateObject(wrappedValue: historicalDataManager)
         _subscriptionManager = StateObject(wrappedValue: subscriptionManager)
         _deviceManager = StateObject(wrappedValue: deviceManager)
+        _sensorDataProcessor = StateObject(wrappedValue: sensorDataProcessor)
         _appStateManager = StateObject(wrappedValue: appStateManager)
         _sharedDataManager = StateObject(wrappedValue: sharedDataManager)
         _designSystem = StateObject(wrappedValue: designSystem)
@@ -59,6 +62,7 @@ struct OralableApp: App {
             sensorDataStore: sensorDataStore,
             subscriptionManager: subscriptionManager,
             deviceManager: deviceManager,
+            sensorDataProcessor: sensorDataProcessor,
             appStateManager: appStateManager,
             sharedDataManager: sharedDataManager,
             designSystem: designSystem

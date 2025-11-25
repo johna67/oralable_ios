@@ -662,8 +662,7 @@ struct DeviceInfoRow: View {
         .padding(designSystem.spacing.md)
     }
 }
-
-// MARK: - Preview
+/// MARK: - Preview
 struct DevicesView_Previews: PreviewProvider {
     static var previews: some View {
         let appState = AppStateManager()
@@ -671,11 +670,15 @@ struct DevicesView_Previews: PreviewProvider {
         let healthKit = HealthKitManager()
         let sensorStore = SensorDataStore()
         let recordingSession = RecordingSessionManager()
-        let historicalData = HistoricalDataManager(bleManager: ble)
+        let historicalData = HistoricalDataManager(sensorDataProcessor: SensorDataProcessor.shared)
         let authManager = AuthenticationManager()
         let subscription = SubscriptionManager()
         let device = DeviceManager()
-        let sharedData = SharedDataManager(authenticationManager: authManager, healthKitManager: healthKit, bleManager: ble)
+        let sharedData = SharedDataManager(
+            authenticationManager: authManager,
+            healthKitManager: healthKit,
+            sensorDataProcessor: SensorDataProcessor.shared
+        )
         let designSystem = DesignSystem()
         
         let dependencies = AppDependencies(
@@ -687,6 +690,7 @@ struct DevicesView_Previews: PreviewProvider {
             sensorDataStore: sensorStore,
             subscriptionManager: subscription,
             deviceManager: device,
+            sensorDataProcessor: SensorDataProcessor.shared,
             appStateManager: appState,
             sharedDataManager: sharedData,
             designSystem: designSystem

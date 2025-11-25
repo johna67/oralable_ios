@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>OpenSans-Regular.ttf</string>
+		<string>OpenSans-Medium.ttf</string>
+		<string>OpenSans-SemiBold.ttf</string>
+		<string>OpenSans-Bold.ttf</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Oralable would like to save your sleep and heart rate data to HealthKit for health tracking and integration with other health apps.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Oralable would like to read your sleep and heart rate data from HealthKit for comprehensive health correlation and analysis.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Oralable uses Bluetooth to connect to your Oralable device for real-time health monitoring.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Oralable needs Bluetooth to connect to your Oralable device for real-time health monitoring of PPG, heart rate, and accelerometer data.</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>bluetooth-le</string>
+	</array>
+	<key>CFBundleDisplayName</key>
+	<string>Oralable</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.jacdental.oralable</string>
+	<key>CFBundleGetInfoString</key>
+	<string></string>
+	<key>CFBundleSignature</key>
+	<string></string>
+	<key>NSUbiquitousContainer</key>
+	<dict>
+		<key>iCloud.com.jacdental.oralable.shared</key>
+		<dict>
+			<key>NSUbiquitousContainerName</key>
+			<string>Oralable Data</string>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+		</dict>
+	</dict>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+</dict>
+</plist>

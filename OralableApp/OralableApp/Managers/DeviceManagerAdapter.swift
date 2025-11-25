@@ -18,6 +18,8 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
     // MARK: - Dependencies
 
     private let deviceManager: DeviceManager
+    private let sensorDataProcessor: SensorDataProcessor
+    private let bioMetricCalculator = BioMetricCalculator()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Published Properties (conforming to BLEManagerProtocol)
@@ -43,10 +45,11 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
 
     // MARK: - Initialization
 
-    init(deviceManager: DeviceManager) {
+    init(deviceManager: DeviceManager, sensorDataProcessor: SensorDataProcessor) {
         self.deviceManager = deviceManager
+        self.sensorDataProcessor = sensorDataProcessor
         setupBindings()
-        Logger.shared.info("[DeviceManagerAdapter] Initialized with DeviceManager")
+        Logger.shared.info("[DeviceManagerAdapter] Initialized with DeviceManager and SensorDataProcessor")
     }
 
     // MARK: - Setup Bindings
@@ -74,14 +77,42 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
             .map { $0.isEmpty ? "Disconnected" : "Connected" }
             .assign(to: &$connectionState)
 
-        // Bind latest sensor readings to individual properties
+        // Bind latest sensor readings to individual properties (real-time display)
         deviceManager.$latestReadings
             .sink { [weak self] readings in
                 self?.updateSensorValues(from: readings)
             }
             .store(in: &cancellables)
 
-        Logger.shared.info("[DeviceManagerAdapter] Bindings configured")
+        // Subscribe to BATCH publisher for history storage
+        // Throttle to 1 update per second to prevent flooding from multiple subscribers
+        deviceManager.readingsBatchPublisher
+            .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] readings in
+                guard let self = self else { return }
+                if !readings.isEmpty {
+                    Task {
+                        await self.sensorDataProcessor.processBatch(readings)
+                        await self.sensorDataProcessor.updateAccelHistory(from: readings)
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Update legacy sensor data less frequently (every 3 seconds)
+        deviceManager.readingsBatchPublisher
+            .throttle(for: .seconds(3), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] readings in
+                guard let self = self else { return }
+                if !readings.isEmpty {
+                    Task {
+                        await self.sensorDataProcessor.updateLegacySensorData(with: readings)
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        Logger.shared.info("[DeviceManagerAdapter] Bindings configured with throttled batch publisher")
     }
 
     private func updateSensorValues(from readings: [SensorType: SensorReading]) {
@@ -112,6 +143,19 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
 
         if let reading = readings[.ppgInfrared] {
             ppgIRValue = reading.value
+            // Collect IR sample for heart rate calculation
+            Task { @MainActor in
+                let irSamples = self.sensorDataProcessor.getPPGIRBuffer()
+                if irSamples.count >= 50 {  // Need ~1 second of data at 50Hz
+                    if let result = self.bioMetricCalculator.calculateHeartRate(
+                        irSamples: irSamples,
+                        processor: self.sensorDataProcessor
+                    ) {
+                        self.heartRate = Int(result.bpm)
+                    }
+                    self.sensorDataProcessor.clearPPGIRBuffer()
+                }
+            }
         }
 
         if let reading = readings[.ppgGreen] {
@@ -183,6 +227,7 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
 
     func clearHistory() {
         deviceManager.clearReadings()
+        sensorDataProcessor.clearHistory()
     }
 
     // MARK: - Publishers for Reactive UI

@@ -50,7 +50,7 @@ class HistoricalDataProcessor: ObservableObject {
     }
 
     func processData(
-        from ble: OralableBLE,
+        from sensorDataProcessor: SensorDataProcessor,
         metricType: MetricType,
         timeRange: TimeRange,
         selectedDate: Date,
@@ -61,6 +61,8 @@ class HistoricalDataProcessor: ObservableObject {
         let normalizedDate: Date
 
         switch timeRange {
+        case .minute:
+            normalizedDate = calendar.dateInterval(of: .minute, for: selectedDate)?.start ?? selectedDate
         case .hour:
             normalizedDate = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
         case .day:
@@ -80,7 +82,7 @@ class HistoricalDataProcessor: ObservableObject {
         print("   Selected Date: \(selectedDate)")
         print("   Normalized Date: \(normalizedDate)")
         print("   Cache Key: \(cacheKey)")
-        print("   Total sensor history count: \(ble.sensorDataHistory.count)")
+        print("   Total sensor history count: \(sensorDataProcessor.sensorDataHistory.count)")
 
         if let cached = cachedData[cacheKey] {
             print("✅ Using cached data")
@@ -91,7 +93,7 @@ class HistoricalDataProcessor: ObservableObject {
         isProcessing = true
         defer { isProcessing = false }
 
-        let filteredData = filterData(from: ble.sensorDataHistory, timeRange: timeRange, selectedDate: selectedDate)
+        let filteredData = filterData(from: sensorDataProcessor.sensorDataHistory, timeRange: timeRange, selectedDate: selectedDate)
 
         guard !filteredData.isEmpty else {
             print("❌ No data after filtering")
@@ -140,6 +142,11 @@ class HistoricalDataProcessor: ObservableObject {
         var filtered: [SensorData] = []
 
         switch timeRange {
+        case .minute:
+            let startOfMinute = calendar.dateInterval(of: .minute, for: selectedDate)?.start ?? selectedDate
+            let endOfMinute = calendar.date(byAdding: .minute, value: 1, to: startOfMinute) ?? selectedDate
+            print("⏰ Minute filter: \(startOfMinute) to \(endOfMinute)")
+            filtered = data.filter { $0.timestamp >= startOfMinute && $0.timestamp < endOfMinute }
         case .hour:
             let startOfHour = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
             let endOfHour = calendar.date(byAdding: .hour, value: 1, to: startOfHour) ?? selectedDate

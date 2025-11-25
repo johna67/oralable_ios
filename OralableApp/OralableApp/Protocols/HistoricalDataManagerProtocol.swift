@@ -14,6 +14,7 @@ import Combine
 @MainActor
 protocol HistoricalDataManagerProtocol: AnyObject {
     // MARK: - Metrics State
+    var minuteMetrics: HistoricalMetrics? { get }
     var hourMetrics: HistoricalMetrics? { get }
     var dayMetrics: HistoricalMetrics? { get }
     var weekMetrics: HistoricalMetrics? { get }
@@ -42,6 +43,7 @@ protocol HistoricalDataManagerProtocol: AnyObject {
     var timeSinceLastUpdate: TimeInterval? { get }
 
     // MARK: - Publishers for Reactive UI
+    var minuteMetricsPublisher: Published<HistoricalMetrics?>.Publisher { get }
     var hourMetricsPublisher: Published<HistoricalMetrics?>.Publisher { get }
     var dayMetricsPublisher: Published<HistoricalMetrics?>.Publisher { get }
     var weekMetricsPublisher: Published<HistoricalMetrics?>.Publisher { get }
@@ -53,6 +55,7 @@ protocol HistoricalDataManagerProtocol: AnyObject {
 // MARK: - HistoricalDataManager Conformance
 
 extension HistoricalDataManager: HistoricalDataManagerProtocol {
+    var minuteMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $minuteMetrics }
     var hourMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $hourMetrics }
     var dayMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $dayMetrics }
     var weekMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $weekMetrics }

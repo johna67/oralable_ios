@@ -126,12 +126,14 @@ struct HistoricalMockDataGenerator {
 
 #if DEBUG
 extension HistoricalMockDataGenerator {
-    /// Populate an OralableBLE instance with mock historical data
-    static func populateMockData(into bleManager: OralableBLE, timeRange: TimeRange = .day) {
-        Logger.shared.info("[MockDataGenerator] Populating BLE manager with mock data for range: \(timeRange)")
+    /// Populate a SensorDataProcessor instance with mock historical data
+    static func populateMockData(into sensorDataProcessor: SensorDataProcessor, timeRange: TimeRange = .day) {
+        Logger.shared.info("[MockDataGenerator] Populating SensorDataProcessor with mock data for range: \(timeRange)")
 
         let mockData: [SensorData]
         switch timeRange {
+        case .minute:
+            mockData = lastHourMockData() // Use hour data for minute range
         case .hour:
             mockData = lastHourMockData()
         case .day:
@@ -144,8 +146,8 @@ extension HistoricalMockDataGenerator {
 
         // Directly populate sensorDataHistory
         Task { @MainActor in
-            bleManager.sensorDataHistory = mockData
-            Logger.shared.info("[MockDataGenerator] ✅ Populated \(mockData.count) mock data points into BLE manager")
+            sensorDataProcessor.sensorDataHistory = mockData
+            Logger.shared.info("[MockDataGenerator] ✅ Populated \(mockData.count) mock data points into SensorDataProcessor")
         }
     }
 }

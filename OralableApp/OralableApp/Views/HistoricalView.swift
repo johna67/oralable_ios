@@ -26,6 +26,8 @@ struct HistoricalView: View {
     /// Date format for x-axis labels based on selected time range
     private var xAxisDateFormat: Date.FormatStyle {
         switch viewModel.selectedTimeRange {
+        case .minute:
+            return .dateTime.hour().minute().second()
         case .hour:
             return .dateTime.hour().minute()
         case .day:
@@ -68,6 +70,7 @@ struct HistoricalView: View {
     private var timeRangeSelector: some View {
         VStack(spacing: designSystem.spacing.sm) {
             Picker("Time Range", selection: $viewModel.selectedTimeRange) {
+                Text("Min").tag(TimeRange.minute)
                 Text("Hour").tag(TimeRange.hour)
                 Text("Day").tag(TimeRange.day)
                 Text("Week").tag(TimeRange.week)

@@ -18,16 +18,19 @@ import Combine
 @MainActor
 class SensorDataProcessor: ObservableObject {
 
+    // MARK: - Shared Instance
+    static let shared = SensorDataProcessor()
+
     // MARK: - Published History Buffers
 
     @Published var batteryHistory: CircularBuffer<BatteryData> = CircularBuffer(capacity: 100)
     @Published var heartRateHistory: CircularBuffer<HeartRateData> = CircularBuffer(capacity: 100)
     @Published var spo2History: CircularBuffer<SpO2Data> = CircularBuffer(capacity: 100)
     @Published var temperatureHistory: CircularBuffer<TemperatureData> = CircularBuffer(capacity: 100)
-    @Published var accelerometerHistory: CircularBuffer<AccelerometerData> = CircularBuffer(capacity: 100)
+    @Published var accelerometerHistory: CircularBuffer<AccelerometerData> = CircularBuffer(capacity: 5000)
     @Published var ppgHistory: CircularBuffer<PPGData> = CircularBuffer(capacity: 100)
     @Published var sensorDataHistory: [SensorData] = []
-
+    @Published var logMessages: [LogMessage] = []
     // MARK: - Current Sensor Values
 
     @Published var accelX: Double = 0.0
@@ -267,13 +270,13 @@ class SensorDataProcessor: ObservableObject {
                 // Append all new items once
                 self.sensorDataHistory.append(contentsOf: newSensorData)
 
-                // Trim to cap (keep last 1000)
-                if self.sensorDataHistory.count > 1000 {
-                    self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 1000)
+                // Trim to cap (keep last 10000 for ~40 seconds of history at 250Hz)
+                if self.sensorDataHistory.count > 10000 {
+                    self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
                 }
 
-                let addedCount = self.sensorDataHistory.count - beforeCount
-                Logger.shared.debug("[SensorDataProcessor] ✅ Bulk added \(addedCount) sensor data entries, total: \(self.sensorDataHistory.count)")
+                let addedCount = newSensorData.count
+                Logger.shared.debug("[SensorDataProcessor] ✅ Processed \(addedCount) entries, buffer: \(self.sensorDataHistory.count)/10000")
 
                 if let oldest = self.sensorDataHistory.first?.timestamp,
                    let newest = self.sensorDataHistory.last?.timestamp {
@@ -338,5 +341,24 @@ class SensorDataProcessor: ObservableObject {
             heartRate: heartRateData,
             spo2: spo2Data
         )
+        
+        // MARK: - Log Management
+
+        func addLog(_ message: String) {
+            logMessages.append(LogMessage(message: message))
+        }
+
+        func clearHistory() {
+            sensorDataHistory.removeAll()
+            logMessages.removeAll()
+            heartRateHistory = CircularBuffer(capacity: 100)
+            spo2History = CircularBuffer(capacity: 100)
+            temperatureHistory = CircularBuffer(capacity: 100)
+            accelerometerHistory = CircularBuffer(capacity: 5000)
+            batteryHistory = CircularBuffer(capacity: 100)
+            ppgHistory = CircularBuffer(capacity: 100)
+            Logger.shared.info("[SensorDataProcessor] History cleared")
+        }
     }
+    
 }

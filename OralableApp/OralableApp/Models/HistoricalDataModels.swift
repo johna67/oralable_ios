@@ -3,24 +3,27 @@ import Foundation
 // MARK: - Time Range Selection
 /// Represents the time period for viewing historical data
 enum TimeRange: String, CaseIterable, Codable {
+    case minute = "Minute"
     case hour = "Hour"
     case day = "Day"
     case week = "Week"
     case month = "Month"
-    
+
     /// Returns the number of seconds for this time range
     var seconds: TimeInterval {
         switch self {
+        case .minute: return 60 // 1 minute
         case .hour: return 3600 // 1 hour
         case .day: return 86400 // 24 hours
         case .week: return 604800 // 7 days
         case .month: return 2592000 // 30 days
         }
     }
-    
+
     /// Returns the ideal number of data points to display for this range
     var idealDataPoints: Int {
         switch self {
+        case .minute: return 12 // 5-second intervals
         case .hour: return 12 // 5-minute intervals
         case .day: return 24 // hourly
         case .week: return 7 // daily

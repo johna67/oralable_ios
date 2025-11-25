@@ -6,6 +6,7 @@ import UIKit
 /// This prevents recalculating aggregations on every view update
 class HistoricalDataManager: ObservableObject {
     // MARK: - Published Properties
+    @Published var minuteMetrics: HistoricalMetrics?
     @Published var hourMetrics: HistoricalMetrics?
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
@@ -19,8 +20,8 @@ class HistoricalDataManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let updateInterval: TimeInterval = 60.0 // Update every 60 seconds
 
-    // Reference to the BLE manager (internal for access by ViewModel)
-    internal weak var bleManager: OralableBLE?
+    // Reference to the sensor data processor (internal for access by ViewModel)
+    internal weak var sensorDataProcessor: SensorDataProcessor?
 
     // Throttling to prevent excessive updates
     private var lastMetricsUpdateTime: Date?
@@ -28,9 +29,9 @@ class HistoricalDataManager: ObservableObject {
     private var pendingUpdateTask: Task<Void, Never>?
 
     // MARK: - Initialization
-    init(bleManager: OralableBLE?) {
-        self.bleManager = bleManager
-        Logger.shared.info("[HistoricalDataManager] Initialized with bleManager: \(bleManager != nil ? "YES" : "NO")")
+    init(sensorDataProcessor: SensorDataProcessor?) {
+        self.sensorDataProcessor = sensorDataProcessor
+        Logger.shared.info("[HistoricalDataManager] Initialized with sensorDataProcessor: \(sensorDataProcessor != nil ? "YES" : "NO")")
         // Intentionally not starting auto-update by default
     }
 
@@ -66,42 +67,44 @@ class HistoricalDataManager: ObservableObject {
 
     /// Internal method that performs the actual metrics update
     @MainActor private func performMetricsUpdate() {
-        guard let ble = bleManager else {
-            Logger.shared.warning("[HistoricalDataManager] ⚠️ BLE manager is nil, cannot update metrics")
+        guard let processor = sensorDataProcessor else {
+            Logger.shared.warning("[HistoricalDataManager] ⚠️ SensorDataProcessor is nil, cannot update metrics")
             clearAllMetrics()
             return
         }
 
-        if ble.sensorDataHistory.isEmpty {
+        if processor.sensorDataHistory.isEmpty {
             Logger.shared.warning("[HistoricalDataManager] ⚠️ No sensor data available (sensorDataHistory is empty), clearing metrics")
             clearAllMetrics()
             return
         }
 
-        Logger.shared.info("[HistoricalDataManager] ✅ Starting metrics update | Sensor data count: \(ble.sensorDataHistory.count)")
+        Logger.shared.info("[HistoricalDataManager] ✅ Starting metrics update | Sensor data count: \(processor.sensorDataHistory.count)")
         isUpdating = true
         lastMetricsUpdateTime = Date()
 
         // Snapshot data on the main actor to avoid concurrent mutation issues,
         // then perform expensive aggregation off-main, and finally publish results on main actor
-        let sensorSnapshot = ble.sensorDataHistory
+        let sensorSnapshot = processor.sensorDataHistory
 
         Task {
             // Perform aggregation off-main in a detached task to avoid blocking the main actor
-            let aggregates = await Task.detached { () -> (HistoricalMetrics?, HistoricalMetrics?, HistoricalMetrics?, HistoricalMetrics?) in
+            let aggregates = await Task.detached { () -> (HistoricalMetrics?, HistoricalMetrics?, HistoricalMetrics?, HistoricalMetrics?, HistoricalMetrics?) in
+                let minute = HistoricalDataAggregator.aggregate(data: sensorSnapshot, for: .minute, endDate: Date())
                 let hour = HistoricalDataAggregator.aggregate(data: sensorSnapshot, for: .hour, endDate: Date())
                 let day = HistoricalDataAggregator.aggregate(data: sensorSnapshot, for: .day, endDate: Date())
                 let week = HistoricalDataAggregator.aggregate(data: sensorSnapshot, for: .week, endDate: Date())
                 let month = HistoricalDataAggregator.aggregate(data: sensorSnapshot, for: .month, endDate: Date())
-                return (hour, day, week, month)
+                return (minute, hour, day, week, month)
             }.value
 
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
-                self.hourMetrics = aggregates.0
-                self.dayMetrics = aggregates.1
-                self.weekMetrics = aggregates.2
-                self.monthMetrics = aggregates.3
+                self.minuteMetrics = aggregates.0
+                self.hourMetrics = aggregates.1
+                self.dayMetrics = aggregates.2
+                self.weekMetrics = aggregates.3
+                self.monthMetrics = aggregates.4
                 self.lastUpdateTime = Date()
                 self.isUpdating = false
                 Logger.shared.info("[HistoricalDataManager] ✅ Metrics update completed and published to UI")
@@ -112,16 +115,16 @@ class HistoricalDataManager: ObservableObject {
     /// Update metrics for a specific time range only
     /// - Parameter range: The time range to update
     @MainActor func updateMetrics(for range: TimeRange) {
-        guard let ble = bleManager, !ble.sensorDataHistory.isEmpty else {
+        guard let processor = sensorDataProcessor, !processor.sensorDataHistory.isEmpty else {
             Logger.shared.debug("[HistoricalDataManager] No sensor data available for range: \(range), clearing metrics")
             clearMetrics(for: range)
             return
         }
 
-        Logger.shared.debug("[HistoricalDataManager] Updating metrics for range: \(range) | Data count: \(ble.sensorDataHistory.count)")
+        Logger.shared.debug("[HistoricalDataManager] Updating metrics for range: \(range) | Data count: \(processor.sensorDataHistory.count)")
 
         // Snapshot and compute off-main
-        let snapshot = ble.sensorDataHistory
+        let snapshot = processor.sensorDataHistory
 
         Task {
             let metrics = await Task.detached { () -> HistoricalMetrics? in
@@ -130,6 +133,8 @@ class HistoricalDataManager: ObservableObject {
 
             await MainActor.run {
                 switch range {
+                case TimeRange.minute:
+                    self.minuteMetrics = metrics
                 case TimeRange.hour:
                     self.hourMetrics = metrics
                 case TimeRange.day:
@@ -150,6 +155,7 @@ class HistoricalDataManager: ObservableObject {
     /// - Returns: Cached metrics or nil if not available
     func getMetrics(for range: TimeRange) -> HistoricalMetrics? {
         switch range {
+        case TimeRange.minute: return minuteMetrics
         case TimeRange.hour: return hourMetrics
         case TimeRange.day: return dayMetrics
         case TimeRange.week: return weekMetrics
@@ -166,6 +172,7 @@ class HistoricalDataManager: ObservableObject {
 
     /// Clear all cached metrics
     func clearAllMetrics() {
+        minuteMetrics = nil
         hourMetrics = nil
         dayMetrics = nil
         weekMetrics = nil
@@ -177,6 +184,7 @@ class HistoricalDataManager: ObservableObject {
     /// - Parameter range: The time range to clear
     func clearMetrics(for range: TimeRange) {
         switch range {
+        case TimeRange.minute: minuteMetrics = nil
         case TimeRange.hour: hourMetrics = nil
         case TimeRange.day: dayMetrics = nil
         case TimeRange.week: weekMetrics = nil
@@ -230,13 +238,14 @@ class HistoricalDataManager: ObservableObject {
 extension HistoricalDataManager {
     /// Returns true if any metrics are available
     var hasAnyMetrics: Bool {
-        return hourMetrics != nil || dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
+        return minuteMetrics != nil || hourMetrics != nil || dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
     }
 
     /// Returns a summary string of available metrics
     var availabilityDescription: String {
         var available: [String] = []
 
+        if minuteMetrics != nil { available.append("Minute") }
         if hourMetrics != nil { available.append("Hour") }
         if dayMetrics != nil { available.append("Day") }
         if weekMetrics != nil { available.append("Week") }

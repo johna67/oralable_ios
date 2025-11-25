@@ -8,6 +8,8 @@ struct HistoricalDateNavigation: View {
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         switch timeRange {
+        case .minute:
+            formatter.dateFormat = "HH:mm:ss, dd MMM"
         case .hour:
             formatter.dateFormat = "HH:mm, dd MMM"
         case .day:
@@ -22,6 +24,8 @@ struct HistoricalDateNavigation: View {
 
     private var displayText: String {
         switch timeRange {
+        case .minute:
+            return "Minute View"
         case .hour:
             return "Hour View"
         case .day:
@@ -45,6 +49,8 @@ struct HistoricalDateNavigation: View {
     private func navigateBackward() {
         let calendar = Calendar.current
         switch timeRange {
+        case .minute:
+            selectedDate = calendar.date(byAdding: .minute, value: -1, to: selectedDate) ?? selectedDate
         case .hour:
             selectedDate = calendar.date(byAdding: .hour, value: -1, to: selectedDate) ?? selectedDate
         case .day:
@@ -59,6 +65,8 @@ struct HistoricalDateNavigation: View {
     private func navigateForward() {
         let calendar = Calendar.current
         switch timeRange {
+        case .minute:
+            selectedDate = calendar.date(byAdding: .minute, value: 1, to: selectedDate) ?? selectedDate
         case .hour:
             selectedDate = calendar.date(byAdding: .hour, value: 1, to: selectedDate) ?? selectedDate
         case .day:
@@ -75,6 +83,10 @@ struct HistoricalDateNavigation: View {
         let today = Date()
 
         switch timeRange {
+        case .minute:
+            let currentMinuteStart = calendar.dateInterval(of: .minute, for: selectedDate)?.start ?? selectedDate
+            let thisMinuteStart = calendar.dateInterval(of: .minute, for: today)?.start ?? today
+            return currentMinuteStart < thisMinuteStart
         case .hour:
             let currentHourStart = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
             let thisHourStart = calendar.dateInterval(of: .hour, for: today)?.start ?? today
@@ -135,6 +147,12 @@ struct HistoricalDateNavigation: View {
     private var periodInfo: String {
         let calendar = Calendar.current
         switch timeRange {
+        case .minute:
+            guard let interval = calendar.dateInterval(of: .minute, for: selectedDate) else { return "" }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            let endTime = calendar.date(byAdding: .second, value: -1, to: interval.end) ?? interval.end
+            return "\(formatter.string(from: interval.start)) - \(formatter.string(from: endTime))"
         case .hour:
             guard let interval = calendar.dateInterval(of: .hour, for: selectedDate) else { return "" }
             let formatter = DateFormatter()

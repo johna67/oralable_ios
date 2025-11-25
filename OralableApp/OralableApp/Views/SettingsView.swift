@@ -86,7 +86,7 @@ struct SettingsView: View {
             Text("This will reset all settings to their default values.")
         }
         .sheet(isPresented: $showingExportSheet) {
-            ShareView(ble: dependencies.bleManager)
+            ShareView(sensorDataProcessor: dependencies.sensorDataProcessor, deviceManager: dependencies.deviceManager)
         }
         .sheet(isPresented: $showingAuthenticationView) {
             NavigationView {
@@ -514,8 +514,6 @@ extension PPGChannelOrder {
 }
 
 
-
-
 // MARK: - Preview
 
 #Preview("Settings View") {
@@ -526,7 +524,7 @@ extension PPGChannelOrder {
     let healthKitManager = HealthKitManager()
     let bleManager = OralableBLE()
     let recordingSessionManager = RecordingSessionManager()
-    let historicalDataManager = HistoricalDataManager(bleManager: bleManager)
+    let historicalDataManager = HistoricalDataManager(sensorDataProcessor: SensorDataProcessor.shared)
     let sensorDataStore = SensorDataStore()
     let subscriptionManager = SubscriptionManager()
     let deviceManager = DeviceManager()
@@ -534,7 +532,7 @@ extension PPGChannelOrder {
     let sharedDataManager = SharedDataManager(
         authenticationManager: authManager,
         healthKitManager: healthKitManager,
-        bleManager: bleManager
+        sensorDataProcessor: SensorDataProcessor.shared
     )
     
     let dependencies = AppDependencies(
@@ -546,6 +544,7 @@ extension PPGChannelOrder {
         sensorDataStore: sensorDataStore,
         subscriptionManager: subscriptionManager,
         deviceManager: deviceManager,
+        sensorDataProcessor: SensorDataProcessor.shared,
         appStateManager: appStateManager,
         sharedDataManager: sharedDataManager,
         designSystem: designSystem

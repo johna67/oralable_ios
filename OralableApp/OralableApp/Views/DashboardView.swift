@@ -24,7 +24,7 @@ struct DashboardView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var healthKitManager: HealthKitManager
-    @EnvironmentObject var bleManager: OralableBLE
+    @EnvironmentObject var deviceManagerAdapter: DeviceManagerAdapter
     @EnvironmentObject var appStateManager: AppStateManager
 
     @State private var viewModel: DashboardViewModel?
@@ -108,7 +108,7 @@ struct DashboardView: View {
                     )
                     .environmentObject(designSystem)
                     .environmentObject(dependencies.historicalDataManager)
-                    .environmentObject(bleManager)
+                    .environmentObject(dependencies.sensorDataProcessor)
                 )) {
                     historyCard(title: "Movement", icon: "figure.walk", color: .blue)
                 }
@@ -120,7 +120,7 @@ struct DashboardView: View {
                     )
                     .environmentObject(designSystem)
                     .environmentObject(dependencies.historicalDataManager)
-                    .environmentObject(bleManager)
+                    .environmentObject(dependencies.sensorDataProcessor)
                 )) {
                     historyCard(title: "Heart Rate", icon: "heart.fill", color: .red)
                 }
@@ -132,7 +132,7 @@ struct DashboardView: View {
                     )
                     .environmentObject(designSystem)
                     .environmentObject(dependencies.historicalDataManager)
-                    .environmentObject(bleManager)
+                    .environmentObject(dependencies.sensorDataProcessor)
                 )) {
                     historyCard(title: "SpO2", icon: "lungs.fill", color: .blue)
                 }
@@ -166,19 +166,19 @@ struct DashboardView: View {
     // MARK: - Smart Share
     private func handleSmartShare() async {
         Logger.shared.info("[DashboardView] Smart share initiated")
-        let wasRecording = self.bleManager.isRecording
+        let wasRecording = self.deviceManagerAdapter.isRecording
 
         if wasRecording {
-            self.bleManager.stopRecording()
+            self.deviceManagerAdapter.stopRecording()
             var waitCount = 0
-            while self.bleManager.isRecording && waitCount < 10 {
+            while self.deviceManagerAdapter.isRecording && waitCount < 10 {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 waitCount += 1
             }
-            if !self.bleManager.isRecording {
+            if !self.deviceManagerAdapter.isRecording {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
-                if self.bleManager.isConnected {
-                    self.bleManager.startRecording()
+                if self.deviceManagerAdapter.isConnected {
+                    self.deviceManagerAdapter.startRecording()
                 }
             }
         } else {
@@ -378,7 +378,7 @@ struct DashboardView: View {
                         )
                         .environmentObject(designSystem)
                         .environmentObject(dependencies.historicalDataManager)
-                        .environmentObject(bleManager)
+                        .environmentObject(dependencies.sensorDataProcessor)
                     )
                 ) {
                     WaveformCard(
@@ -458,8 +458,8 @@ struct DashboardView: View {
             .background(designSystem.colors.backgroundSecondary)
             .cornerRadius(designSystem.cornerRadius.medium)
         }
+        
     }
-
 // MARK: - Preview
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
@@ -469,16 +469,16 @@ struct DashboardView_Previews: PreviewProvider {
         let healthKit = HealthKitManager()
         let sensorStore = SensorDataStore()
         let recordingSession = RecordingSessionManager()
-        let historicalData = HistoricalDataManager(bleManager: ble)
+        let historicalData = HistoricalDataManager(sensorDataProcessor: SensorDataProcessor.shared)
         
-        // Create mock instances for preview (these need to be defined in your project)
+        // Create mock instances for preview
         let authManager = AuthenticationManager()
         let subscription = SubscriptionManager()
         let device = DeviceManager()
         let sharedData = SharedDataManager(
             authenticationManager: authManager,
             healthKitManager: healthKit,
-            bleManager: ble
+            sensorDataProcessor: SensorDataProcessor.shared
         )
         
         let dependencies = AppDependencies(
@@ -490,6 +490,7 @@ struct DashboardView_Previews: PreviewProvider {
             sensorDataStore: sensorStore,
             subscriptionManager: subscription,
             deviceManager: device,
+            sensorDataProcessor: SensorDataProcessor.shared,
             appStateManager: appState,
             sharedDataManager: sharedData,
             designSystem: designSystem

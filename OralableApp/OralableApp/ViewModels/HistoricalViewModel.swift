@@ -23,9 +23,10 @@ class HistoricalViewModel: ObservableObject {
     // MARK: - Published Properties (Observable by View)
     
     /// Selected time range for viewing data
-    @Published var selectedTimeRange: TimeRange = .day
+    @Published var selectedTimeRange: TimeRange = .minute
 
     /// Metrics for each time range
+    @Published var minuteMetrics: HistoricalMetrics?
     @Published var hourMetrics: HistoricalMetrics?
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
@@ -92,6 +93,7 @@ class HistoricalViewModel: ObservableObject {
     var timeRangeText: String {
         if timeRangeOffset == 0 {
             switch selectedTimeRange {
+            case .minute: return "This Minute"
             case .hour: return "This Hour"
             case .day: return "Today"
             case .week: return "This Week"
@@ -99,6 +101,7 @@ class HistoricalViewModel: ObservableObject {
             }
         } else if timeRangeOffset == -1 {
             switch selectedTimeRange {
+            case .minute: return "Last Minute"
             case .hour: return "Last Hour"
             case .day: return "Yesterday"
             case .week: return "Last Week"
@@ -107,6 +110,7 @@ class HistoricalViewModel: ObservableObject {
         } else {
             let absoluteOffset = abs(timeRangeOffset)
             switch selectedTimeRange {
+            case .minute: return "\(absoluteOffset) Minutes Ago"
             case .hour: return "\(absoluteOffset) Hours Ago"
             case .day: return "\(absoluteOffset) Days Ago"
             case .week: return "\(absoluteOffset) Weeks Ago"
@@ -209,6 +213,7 @@ class HistoricalViewModel: ObservableObject {
                 let hasMetrics: Bool = {
                     guard let self = self else { return false }
                     switch newRange {
+                    case .minute: return self.minuteMetrics != nil
                     case .hour: return self.hourMetrics != nil
                     case .day: return self.dayMetrics != nil
                     case .week: return self.weekMetrics != nil
@@ -223,6 +228,19 @@ class HistoricalViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to historical data manager's published properties (using protocol publishers)
+        historicalDataManager.minuteMetricsPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] metrics in
+                if let metrics = metrics {
+                    Logger.shared.info("[HistoricalViewModel] ✅ Received Minute metrics | Data points: \(metrics.dataPoints.count) | Total samples: \(metrics.totalSamples)")
+                } else {
+                    Logger.shared.debug("[HistoricalViewModel] Minute metrics cleared (nil)")
+                }
+                self?.minuteMetrics = metrics
+                self?.updateCurrentMetricsIfNeeded()
+            }
+            .store(in: &cancellables)
+
         historicalDataManager.hourMetricsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] metrics in
@@ -408,6 +426,8 @@ class HistoricalViewModel: ObservableObject {
         // Set lenient minimum spans based on time range
         let minimumSpanSeconds: TimeInterval
         switch selectedTimeRange {
+        case .minute:
+            minimumSpanSeconds = 5 // 5 seconds minimum
         case .hour:
             minimumSpanSeconds = 30 // 30 seconds minimum
         case .day:
@@ -456,6 +476,9 @@ class HistoricalViewModel: ObservableObject {
             let minimumSpanSeconds: TimeInterval
             let minimumSpanText: String
             switch selectedTimeRange {
+            case .minute:
+                minimumSpanSeconds = 5
+                minimumSpanText = "5 seconds"
             case .hour:
                 minimumSpanSeconds = 30
                 minimumSpanText = "30 seconds"
@@ -484,6 +507,9 @@ class HistoricalViewModel: ObservableObject {
         Logger.shared.info("[HistoricalViewModel] 🔄 updateCurrentMetrics() called for selectedTimeRange: \(selectedTimeRange)")
 
         switch selectedTimeRange {
+        case .minute:
+            Logger.shared.debug("[HistoricalViewModel] Minute case - minuteMetrics state: \(minuteMetrics == nil ? "NIL" : "EXISTS with \(minuteMetrics!.dataPoints.count) points")")
+            currentMetrics = minuteMetrics
         case .hour:
             Logger.shared.debug("[HistoricalViewModel] Hour case - hourMetrics state: \(hourMetrics == nil ? "NIL" : "EXISTS with \(hourMetrics!.dataPoints.count) points")")
             currentMetrics = hourMetrics
@@ -508,6 +534,8 @@ class HistoricalViewModel: ObservableObject {
         let formatter = DateFormatter()
         
         switch selectedTimeRange {
+        case .minute:
+            formatter.dateFormat = "HH:mm:ss"
         case .hour, .day:
             formatter.dateFormat = "HH:mm"
         case .week:
@@ -607,6 +635,7 @@ extension HistoricalViewModel {
 @MainActor
 class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     // MARK: - Metrics State
+    @Published var minuteMetrics: HistoricalMetrics?
     @Published var hourMetrics: HistoricalMetrics?
     @Published var dayMetrics: HistoricalMetrics?
     @Published var weekMetrics: HistoricalMetrics?
@@ -627,6 +656,7 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     
     func getMetrics(for range: TimeRange) -> HistoricalMetrics? {
         switch range {
+        case .minute: return minuteMetrics
         case .hour: return hourMetrics
         case .day: return dayMetrics
         case .week: return weekMetrics
@@ -639,14 +669,16 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     }
     
     func clearAllMetrics() {
+        minuteMetrics = nil
         hourMetrics = nil
         dayMetrics = nil
         weekMetrics = nil
         monthMetrics = nil
     }
-    
+
     func clearMetrics(for range: TimeRange) {
         switch range {
+        case .minute: minuteMetrics = nil
         case .hour: hourMetrics = nil
         case .day: dayMetrics = nil
         case .week: weekMetrics = nil
@@ -680,8 +712,9 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
         guard let lastUpdate = lastUpdateTime else { return nil }
         return Date().timeIntervalSince(lastUpdate)
     }
-    
+
     // MARK: - Publishers
+    var minuteMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $minuteMetrics }
     var hourMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $hourMetrics }
     var dayMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $dayMetrics }
     var weekMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $weekMetrics }

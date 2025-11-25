@@ -172,7 +172,7 @@ struct HistoricalSample: Codable {
 // MARK: - Historical Detail View (Refactored to use components)
 struct HistoricalDetailView: View {
     @EnvironmentObject var ppgNormalizationService: PPGNormalizationService
-    @ObservedObject var ble: OralableBLE
+    @ObservedObject var sensorDataProcessor: SensorDataProcessor
     let metricType: MetricType
 
     @Environment(\.dismiss) var dismiss
@@ -220,7 +220,7 @@ struct HistoricalDetailView: View {
 
                     // DEBUG: Quick counters to help trace where data is present
                     HStack {
-                        Text("Raw samples: \(ble.sensorDataHistory.count)")
+                        Text("Raw samples: \(sensorDataProcessor.sensorDataHistory.count)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -249,7 +249,7 @@ struct HistoricalDetailView: View {
 
                         if metricType == .ppg && appMode.allowsAdvancedAnalytics {
                             PPGDebugCard(
-                                ble: ble,
+                                sensorDataProcessor: sensorDataProcessor,
                                 timeRange: selectedTimeRange,
                                 selectedDate: selectedDate
                             )
@@ -271,9 +271,9 @@ struct HistoricalDetailView: View {
             }
         }
         .task {
-            Logger.shared.info("[HistoricalDetailView] .task starting - sensor count: \(ble.sensorDataHistory.count)")
+            Logger.shared.info("[HistoricalDetailView] .task starting - sensor count: \(sensorDataProcessor.sensorDataHistory.count)")
             await getProcessor().processData(
-                from: ble,
+                from: sensorDataProcessor,
                 metricType: metricType,
                 timeRange: selectedTimeRange,
                 selectedDate: selectedDate,
@@ -281,7 +281,7 @@ struct HistoricalDetailView: View {
             )
             Logger.shared.info("[HistoricalDetailView] .task finished - processed count: \(getProcessor().processedData?.statistics.sampleCount ?? 0)")
         }
-        .onChange(of: ble.sensorDataHistory.count) { _, _ in
+        .onChange(of: sensorDataProcessor.sensorDataHistory.count) { _, _ in
             refreshProcessing()
         }
     }
@@ -292,9 +292,9 @@ struct HistoricalDetailView: View {
         reprocessTask = Task {
             try? await Task.sleep(nanoseconds: 150_000_000) // 150ms debounce
             guard !Task.isCancelled else { return }
-            Logger.shared.debug("[HistoricalDetailView] refreshProcessing() - sensor count: \(ble.sensorDataHistory.count)")
+            Logger.shared.debug("[HistoricalDetailView] refreshProcessing() - sensor count: \(sensorDataProcessor.sensorDataHistory.count)")
             await getProcessor().processData(
-                from: ble,
+                from: sensorDataProcessor,
                 metricType: metricType,
                 timeRange: selectedTimeRange,
                 selectedDate: selectedDate,
@@ -308,7 +308,7 @@ struct HistoricalDetailView: View {
 // MARK: - PPG Debug Card (uses shared DeviceState)
 struct PPGDebugCard: View {
     @EnvironmentObject var ppgNormalizationService: PPGNormalizationService
-    @ObservedObject var ble: OralableBLE
+    @ObservedObject var sensorDataProcessor: SensorDataProcessor
     let timeRange: TimeRange
     let selectedDate: Date
 
@@ -359,28 +359,34 @@ struct PPGDebugCard: View {
         let calendar = Calendar.current
 
         switch timeRange {
+        case .minute:
+            let startOfMinute = calendar.dateInterval(of: .minute, for: selectedDate)?.start ?? selectedDate
+            let endOfMinute = calendar.date(byAdding: .minute, value: 1, to: startOfMinute) ?? selectedDate
+            return Array(sensorDataProcessor.sensorDataHistory.filter {
+                $0.timestamp >= startOfMinute && $0.timestamp < endOfMinute
+            }.suffix(20))
         case .hour:
             let startOfHour = calendar.dateInterval(of: .hour, for: selectedDate)?.start ?? selectedDate
             let endOfHour = calendar.date(byAdding: .hour, value: 1, to: startOfHour) ?? selectedDate
-            return Array(ble.sensorDataHistory.filter {
+            return Array(sensorDataProcessor.sensorDataHistory.filter {
                 $0.timestamp >= startOfHour && $0.timestamp < endOfHour
             }.suffix(20))
         case .day:
             let startOfDay = calendar.startOfDay(for: selectedDate)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
-            return Array(ble.sensorDataHistory.filter {
+            return Array(sensorDataProcessor.sensorDataHistory.filter {
                 $0.timestamp >= startOfDay && $0.timestamp < endOfDay
             }.suffix(20))
         case .week:
             let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
             let endOfWeek = calendar.date(byAdding: .weekOfYear, value: 1, to: startOfWeek) ?? selectedDate
-            return Array(ble.sensorDataHistory.filter {
+            return Array(sensorDataProcessor.sensorDataHistory.filter {
                 $0.timestamp >= startOfWeek && $0.timestamp < endOfWeek
             }.suffix(20))
         case .month:
             let startOfMonth = calendar.dateInterval(of: .month, for: selectedDate)?.start ?? selectedDate
             let endOfMonth = calendar.date(byAdding: .month, value: 1, to: startOfMonth) ?? selectedDate
-            return Array(ble.sensorDataHistory.filter {
+            return Array(sensorDataProcessor.sensorDataHistory.filter {
                 $0.timestamp >= startOfMonth && $0.timestamp < endOfMonth
             }.suffix(20))
         }
