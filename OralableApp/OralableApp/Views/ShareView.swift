@@ -18,22 +18,59 @@ struct ShareView: View {
     @State private var shareCode: String = ""
     @State private var isGeneratingCode = false
     @State private var showCopiedFeedback = false
+    @State private var showingExportSheet = false
+    @State private var exportURL: URL? = nil
 
     var body: some View {
         NavigationView {
             List {
                 shareCodeSection
+                exportSection
                 sharedWithSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Share")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showingExportSheet) {
+                if let url = exportURL {
+                    ShareSheet(items: [url])
+                }
+            }
         }
         .navigationViewStyle(.stack)
         .onAppear {
             if shareCode.isEmpty {
                 shareCode = sharedDataManager.generateShareCode()
             }
+        }
+    }
+
+    // MARK: - Export Section
+    private var exportSection: some View {
+        Section {
+            Button(action: exportCSV) {
+                HStack {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .frame(width: 32)
+
+                    Text("Export Data as CSV")
+                        .font(.system(size: 17))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+        } header: {
+            Text("Export")
+        } footer: {
+            Text("Export your sensor data for use in other applications")
         }
     }
 
@@ -122,6 +159,44 @@ struct ShareView: View {
     private func removeConnection(_ dentist: SharedDentist) {
         Task {
             try? await sharedDataManager.revokeAccessForDentist(dentistID: dentist.dentistID)
+        }
+    }
+
+    // MARK: - Export CSV
+    private func exportCSV() {
+        Task {
+            if let url = await generateCSVFile() {
+                await MainActor.run {
+                    exportURL = url
+                    showingExportSheet = true
+                }
+            }
+        }
+    }
+
+    private func generateCSVFile() async -> URL? {
+        let sensorData = sensorDataProcessor.sensorDataHistory
+        var csvString = "Timestamp,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate\n"
+
+        let dateFormatter = ISO8601DateFormatter()
+
+        for data in sensorData {
+            let timestamp = dateFormatter.string(from: data.timestamp)
+            let heartRate = data.heartRate?.bpm ?? 0
+            let line = "\(timestamp),\(data.ppg.ir),\(data.ppg.red),\(data.ppg.green),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.temperature.celsius),\(data.battery.percentage),\(heartRate)\n"
+            csvString.append(line)
+        }
+
+        let fileName = "oralable_data_\(Int(Date().timeIntervalSince1970)).csv"
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+
+        do {
+            try csvString.write(to: tempURL, atomically: true, encoding: .utf8)
+            Logger.shared.info("[ShareView] CSV file created: \(fileName) with \(sensorData.count) records")
+            return tempURL
+        } catch {
+            Logger.shared.error("[ShareView] Failed to create CSV: \(error.localizedDescription)")
+            return nil
         }
     }
 }
