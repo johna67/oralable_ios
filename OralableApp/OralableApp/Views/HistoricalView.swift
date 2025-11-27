@@ -117,9 +117,11 @@ struct HistoricalView: View {
     @ViewBuilder
     private var chartForMetric: some View {
         switch metricType {
+        case "Muscle Activity": muscleActivityChart
         case "Movement": accelerometerChart
         case "Heart Rate": heartRateChart
         case "SpO2": spo2Chart
+        case "PPG": ppgChart
         default: accelerometerChart
         }
     }
@@ -196,6 +198,62 @@ struct HistoricalView: View {
             }
             .frame(height: 250)
             .chartYScale(domain: 85...100)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: xAxisDateFormat)
+                }
+            }
+        }
+    }
+
+    private var ppgChart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("PPG Signal (IR)")
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+
+            Chart(viewModel.dataPoints) { point in
+                if let ppgIR = point.averagePPGIR {
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("PPG IR", ppgIR)
+                    )
+                    .foregroundStyle(.red)
+                }
+            }
+            .frame(height: 250)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: xAxisDateFormat)
+                }
+            }
+        }
+    }
+
+    private var muscleActivityChart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("Muscle Activity")
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+
+            Chart(viewModel.dataPoints) { point in
+                if let ppgIR = point.averagePPGIR {
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("Activity", ppgIR)
+                    )
+                    .foregroundStyle(.purple)
+                }
+            }
+            .frame(height: 250)
             .chartYAxis {
                 AxisMarks(position: .leading)
             }

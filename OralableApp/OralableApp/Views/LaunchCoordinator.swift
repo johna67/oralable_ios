@@ -37,9 +37,8 @@ struct LaunchCoordinator: View {
         }
         .onAppear {
             Logger.shared.info("🔵 LaunchCoordinator appeared - isAuthenticated: \(authenticationManager.isAuthenticated), isFirstLaunch: \(authenticationManager.isFirstLaunch)")
-            Task {
-                await deviceManager.startScanning()
-            }
+            // Attempt to auto-reconnect to remembered devices on app launch
+            deviceManager.attemptAutoReconnect()
         }
     }
 }

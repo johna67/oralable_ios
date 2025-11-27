@@ -54,6 +54,9 @@ class DeviceManager: ObservableObject {
     private var reconnectionAttempts: [UUID: Int] = [:]
     private let maxReconnectionAttempts = 3
     private var reconnectionTasks: [UUID: Task<Void, Never>] = [:]
+
+    // Device persistence for auto-reconnect
+    private let persistenceManager = DevicePersistenceManager.shared
     
     // Per-reading publisher (legacy, prefer batch)
     private let readingsSubject = PassthroughSubject<SensorReading, Never>()
@@ -214,6 +217,12 @@ class DeviceManager: ObservableObject {
             if primaryDevice == nil {
                 primaryDevice = discoveredDevices[index]
             }
+
+            // Remember this device for auto-reconnect
+            persistenceManager.rememberDevice(
+                id: peripheral.identifier.uuidString,
+                name: discoveredDevices[index].name
+            )
         }
 
         // Start device operations
@@ -528,6 +537,38 @@ class DeviceManager: ObservableObject {
             Logger.shared.info("[DeviceManager] Clearing primary device")
         }
         primaryDevice = deviceInfo
+    }
+
+    // MARK: - Auto-Reconnect to Remembered Devices
+
+    /// Attempt to auto-reconnect to previously remembered devices
+    func attemptAutoReconnect() {
+        let rememberedDevices = persistenceManager.getRememberedDevices()
+        guard !rememberedDevices.isEmpty else {
+            Logger.shared.info("[DeviceManager] No remembered devices for auto-reconnect")
+            return
+        }
+
+        Logger.shared.info("[DeviceManager] Attempting auto-reconnect to \(rememberedDevices.count) remembered device(s)")
+
+        Task {
+            await startScanning()
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds to discover
+
+            for remembered in rememberedDevices {
+                if let discovered = discoveredDevices.first(where: { $0.peripheralIdentifier?.uuidString == remembered.id }) {
+                    do {
+                        try await connect(to: discovered)
+                        Logger.shared.info("[DeviceManager] Auto-reconnected to \(remembered.name)")
+                        break // Successfully connected, stop trying
+                    } catch {
+                        Logger.shared.debug("[DeviceManager] Auto-reconnect failed for \(remembered.name): \(error.localizedDescription)")
+                    }
+                }
+            }
+
+            stopScanning()
+        }
     }
 }
 

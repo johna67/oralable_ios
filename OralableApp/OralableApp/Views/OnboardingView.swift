@@ -1,11 +1,16 @@
+//
+//  OnboardingView.swift
+//  OralableApp
+//
+//  Welcome screen with direct Apple Sign In
+//
+
 import SwiftUI
 import AuthenticationServices
 
 struct OnboardingView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var authenticationManager: AuthenticationManager
-    @EnvironmentObject var healthKitManager: HealthKitManager
-    @State private var showingAuthenticationView = false
     @State private var currentPage = 0
 
     private let onboardingPages = [
@@ -58,21 +63,19 @@ struct OnboardingView: View {
 
             Spacer()
 
-            // Sign In Button
-            Button(action: {
-                showingAuthenticationView = true
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.badge.key.fill")
-                    Text("Sign In with Apple")
+            // Sign In with Apple Button - Direct, no intermediate screen
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                },
+                onCompletion: { result in
+                    handleSignInResult(result)
                 }
-                .font(designSystem.typography.buttonLarge)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.black)
-                .cornerRadius(12)
-            }
+            )
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 50)
+            .cornerRadius(12)
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
 
@@ -92,36 +95,17 @@ struct OnboardingView: View {
             }
             .padding(.bottom, 40)
         }
-        .sheet(isPresented: $showingAuthenticationView) {
-            // Don't wrap in NavigationView - AuthenticationView already has one
-            // Pass the SAME authenticationManager instance that OnboardingView uses
-            AuthenticationView(sharedAuthManager: authenticationManager)
-                .environmentObject(healthKitManager)
-                .environmentObject(designSystem)
-        }
-        .onChange(of: authenticationManager.isAuthenticated) { oldValue, newValue in
-            Logger.shared.info("🟣 OnboardingView: isAuthenticated changed from \(oldValue) to \(newValue)")
-            // Auto-dismiss authentication sheet after successful sign-in
-            if newValue {
-                // Check if HealthKit is also authorized, or dismiss anyway after a delay
-                Task {
-                    Logger.shared.info("🟣 OnboardingView: Waiting 1 second before auto-dismiss")
-                    // Wait a bit for HealthKit authorization to complete
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                    await MainActor.run {
-                        Logger.shared.info("🟣 OnboardingView: Setting showingAuthenticationView = false")
-                        showingAuthenticationView = false
-                    }
-                }
+    }
+
+    private func handleSignInResult(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                authenticationManager.handleSignIn(with: appleIDCredential)
+                Logger.shared.info("🔐 Apple Sign In successful - transitioning to main app")
             }
-        }
-        .onChange(of: healthKitManager.isAuthorized) { oldValue, newValue in
-            Logger.shared.info("🟣 OnboardingView: healthKitManager.isAuthorized changed from \(oldValue) to \(newValue)")
-            // Also dismiss when HealthKit is authorized (if already authenticated)
-            if newValue && authenticationManager.isAuthenticated {
-                Logger.shared.info("🟣 OnboardingView: Both authenticated and HealthKit authorized - dismissing immediately")
-                showingAuthenticationView = false
-            }
+        case .failure(let error):
+            Logger.shared.error("🔐 Apple Sign In failed: \(error.localizedDescription)")
         }
     }
 }

@@ -30,9 +30,17 @@ class DashboardViewModel: ObservableObject {
     @Published var isMoving: Bool = false
     @Published var positionQuality: String = "Good" // "Good", "Adjust", "Off"
 
+    // Device State Detection
+    @Published var deviceStateDescription: String = "Unknown"
+    @Published var deviceStateConfidence: Double = 0.0
+
     // Waveform Data
     @Published var ppgData: [Double] = []
     @Published var accelerometerData: [Double] = []
+
+    // Muscle Activity (derived from PPG IR)
+    @Published var muscleActivity: Double = 0.0
+    @Published var muscleActivityHistory: [Double] = []
 
     // Session Management
     @Published var isRecording: Bool = false
@@ -43,11 +51,6 @@ class DashboardViewModel: ObservableObject {
     private let appStateManager: AppStateManager
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
-
-    // Thresholds for MAM detection
-    private let chargingVoltageThreshold: Double = 4.2  // Voltage above this = charging
-    private let movementThreshold: Double = 0.1         // Accelerometer magnitude
-    private let signalQualityThreshold: Double = 80.0   // Signal quality percentage
 
     // MARK: - Initialization
 
@@ -122,7 +125,14 @@ class DashboardViewModel: ObservableObject {
             .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] level in
                 self?.batteryLevel = level
-                self?.updateChargingState(batteryLevel: level)
+            }
+            .store(in: &cancellables)
+
+        // Device state from DeviceStateDetector
+        bleManager.deviceStatePublisher
+            .sink { [weak self] stateResult in
+                guard let self = self, let stateResult = stateResult else { return }
+                self.updateMAMStates(from: stateResult)
             }
             .store(in: &cancellables)
     }
@@ -190,39 +200,23 @@ class DashboardViewModel: ObservableObject {
             ppgData.removeFirst()
         }
 
-        // Update position quality from PPG amplitude
-        updatePositionQuality(from: value)
+        // Update muscle activity (derived from PPG IR)
+        muscleActivity = value
+        muscleActivityHistory.append(value)
+        if muscleActivityHistory.count > 20 {
+            muscleActivityHistory.removeFirst()
+        }
     }
     
     private func processAccelerometerData(x: Double, y: Double, z: Double) {
         // Calculate magnitude for movement detection
         let magnitude = sqrt(x*x + y*y + z*z)
-        
+
         // Update accelerometer waveform
         accelerometerData.append(magnitude)
         if accelerometerData.count > 100 {
             accelerometerData.removeFirst()
         }
-        
-        // Detect movement (MAM - Movement state)
-        isMoving = magnitude > movementThreshold
-    }
-    
-    private func updatePositionQuality(from ppgValue: Double) {
-        // MAM - Adhesion/Position detection based on signal quality
-        if signalQuality > 80 {
-            positionQuality = "Good"
-        } else if signalQuality > 50 {
-            positionQuality = "Adjust"
-        } else {
-            positionQuality = "Off"
-        }
-    }
-    
-    private func updateChargingState(batteryLevel: Double) {
-        // MAM - Monitoring state (charging detection)
-        // Simple heuristic: if battery is at 100% or increasing rapidly, it's charging
-        isCharging = batteryLevel >= 99.9
     }
     
     private func startSessionTimer() {
@@ -243,6 +237,46 @@ class DashboardViewModel: ObservableObject {
         sessionDuration = String(format: "%02d:%02d", minutes, seconds)
     }
     
+    /// Maps DeviceStateResult to MAM indicator states
+    private func updateMAMStates(from stateResult: DeviceStateResult) {
+        deviceStateDescription = stateResult.state.rawValue
+        deviceStateConfidence = stateResult.confidence
+
+        switch stateResult.state {
+        case .onChargerStatic:
+            isCharging = true
+            isMoving = false
+            positionQuality = "Off"
+
+        case .offChargerStatic:
+            isCharging = false
+            isMoving = false
+            positionQuality = "Off"
+
+        case .inMotion:
+            isCharging = false
+            isMoving = true
+            positionQuality = "Adjust"
+
+        case .onCheek:
+            isCharging = false
+            isMoving = false
+            // Position quality based on confidence
+            if stateResult.confidence >= 0.8 {
+                positionQuality = "Good"
+            } else if stateResult.confidence >= 0.6 {
+                positionQuality = "Adjust"
+            } else {
+                positionQuality = "Off"
+            }
+
+        case .unknown:
+            isCharging = false
+            isMoving = false
+            positionQuality = "Off"
+        }
+    }
+
     private func resetMetrics() {
         heartRate = 0
         spO2 = 0
@@ -250,8 +284,12 @@ class DashboardViewModel: ObservableObject {
         signalQuality = 0
         ppgData = []
         accelerometerData = []
+        muscleActivity = 0.0
+        muscleActivityHistory = []
         isMoving = false
         positionQuality = "Off"
+        deviceStateDescription = "Unknown"
+        deviceStateConfidence = 0.0
     }
     
 }

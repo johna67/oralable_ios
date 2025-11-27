@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		26785D372ED6C96A004BA1A3 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26785D362ED6C96A004BA1A3 /* Algorithms */; };
+		26992C5F2ED6C28A00D9993D /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26992C5E2ED6C28A00D9993D /* AsyncAlgorithms */; };
 		26A0F47C2EBAE8C00054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */; };
 		26A0F47E2EBAE8D80054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47D2EBAE8D80054C5FC /* AsyncAlgorithms */; };
 		26A0F4802EBAE8EE0054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47F2EBAE8EE0054C5FC /* AsyncAlgorithms */; };
@@ -69,45 +71,16 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				"Models/SensorData+Mock.swift",
 			);
 			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
 		};
-		26D6C4452ECD1CC700C60C3D /* Exceptions for "OralableForDentists" folder in "OralableForDentists" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
-		};
-		26D6C45C2ECD238800C60C3D /* Exceptions for "OralableApp" folder in "OralableForDentists" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Managers/Logger.swift,
-				Models/Devices/LoggingService.swift,
-				Models/LogModels.swift,
-			);
-			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		2685FB692ED2FC7800342E86 /* Exceptions for "OralableApp" folder in "Copy Bundle Resources" phase from "OralableApp" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = 26CAF25C2E781EFB003FE378 /* Resources */;
-			membershipExceptions = (
-				"Models/SensorData+Mock.swift",
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		26B2FED92EB999C100E0F7B1 /* OralableApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				269F12F92EBAF6CC00D8F477 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
-				2685FB692ED2FC7800342E86 /* Exceptions for "OralableApp" folder in "Copy Bundle Resources" phase from "OralableApp" target */,
-				26D6C45C2ECD238800C60C3D /* Exceptions for "OralableApp" folder in "OralableForDentists" target */,
 			);
 			path = OralableApp;
 			sourceTree = "<group>";
@@ -124,9 +97,6 @@
 		};
 		26D6C3ED2ECD181900C60C3D /* OralableForDentists */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				26D6C4452ECD1CC700C60C3D /* Exceptions for "OralableForDentists" folder in "OralableForDentists" target */,
-			);
 			path = OralableForDentists;
 			sourceTree = "<group>";
 		};
@@ -152,6 +122,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26785D372ED6C96A004BA1A3 /* Algorithms in Frameworks */,
 				26A0F47C2EBAE8C00054C5FC /* AsyncAlgorithms in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -176,6 +147,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26992C5F2ED6C28A00D9993D /* AsyncAlgorithms in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -265,6 +237,7 @@
 			name = OralableApp;
 			packageProductDependencies = (
 				26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */,
+				26785D362ED6C96A004BA1A3 /* Algorithms */,
 			);
 			productName = OralableApp;
 			productReference = 26CAF25E2E781EFB003FE378 /* OralableApp.app */;
@@ -335,6 +308,7 @@
 			);
 			name = OralableForDentists;
 			packageProductDependencies = (
+				26992C5E2ED6C28A00D9993D /* AsyncAlgorithms */,
 			);
 			productName = OralableForDentists;
 			productReference = 26D6C3EC2ECD181900C60C3D /* OralableForDentists.app */;
@@ -431,6 +405,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */,
+				26785D352ED6C850004BA1A3 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 26CAF25F2E781EFB003FE378 /* Products */;
@@ -571,7 +546,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = THKF822TTP;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OralableApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Oralable;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -608,7 +583,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = THKF822TTP;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OralableApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Oralable;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -1070,6 +1045,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		26785D352ED6C850004BA1A3 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.1;
+			};
+		};
 		268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-async-algorithms.git";
@@ -1081,6 +1064,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		26785D362ED6C96A004BA1A3 /* Algorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 26785D352ED6C850004BA1A3 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
+			productName = Algorithms;
+		};
+		26992C5E2ED6C28A00D9993D /* AsyncAlgorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
+			productName = AsyncAlgorithms;
+		};
 		26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
