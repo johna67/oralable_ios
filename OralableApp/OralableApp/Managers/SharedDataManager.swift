@@ -100,7 +100,9 @@ struct SharedDentist: Identifiable {
 class SharedDataManager: ObservableObject {
     @Published var sharedDentists: [SharedDentist] = []
     @Published var isLoading = false
+    @Published var isSyncing = false
     @Published var errorMessage: String?
+    @Published var lastSyncDate: Date?
 
     private let container: CKContainer
     private let publicDatabase: CKDatabase
@@ -113,14 +115,7 @@ class SharedDataManager: ObservableObject {
         self.container = CKContainer(identifier: "iCloud.com.jacdental.oralable.shared")
 
         // Use public database for data sharing between patient and dentist apps
-        // The public database allows patients to share their data with dentists via share codes
-        // For development, use private database which auto-creates schemas
-        // For production, use public database (schema must be deployed in CloudKit Dashboard)
-#if DEBUG
-self.publicDatabase = container.privateCloudDatabase
-#else
-self.publicDatabase = container.publicCloudDatabase
-#endif
+        self.publicDatabase = container.publicCloudDatabase
 
         // Store reference to authentication manager
         self.authenticationManager = authenticationManager
@@ -156,6 +151,10 @@ self.publicDatabase = container.publicCloudDatabase
         errorMessage = nil
 
         let shareCode = generateShareCode()
+        
+        print("📤 Creating ShareInvitation with code: \(shareCode)")
+        print("📤 Patient ID: \(patientID)")
+        print("📤 Database: \(publicDatabase.databaseScope == .public ? "PUBLIC" : "PRIVATE")")
 
         // Create CloudKit record
         let recordID = CKRecord.ID(recordName: UUID().uuidString)
@@ -166,13 +165,15 @@ self.publicDatabase = container.publicCloudDatabase
         record["createdDate"] = Date() as CKRecordValue
         record["expiryDate"] = Calendar.current.date(byAdding: .hour, value: 48, to: Date()) as CKRecordValue?
         record["isActive"] = 1 as CKRecordValue
-        record["dentistID"] = "" as CKRecordValue  // Will be filled when dentist enters code
+        record["dentistID"] = "" as CKRecordValue
 
         do {
-            try await publicDatabase.save(record)
+            let savedRecord = try await publicDatabase.save(record)
+            print("✅ ShareInvitation saved successfully: \(savedRecord.recordID)")
             isLoading = false
             return shareCode
         } catch {
+            print("❌ Failed to save ShareInvitation: \(error)")
             isLoading = false
             errorMessage = "Failed to create share invitation: \(error.localizedDescription)"
             throw ShareError.cloudKitError(error)
@@ -262,6 +263,188 @@ self.publicDatabase = container.publicCloudDatabase
         }
     }
 
+    // MARK: - Automatic Data Sync (No Sessions Required)
+    
+    /// Upload current sensor data buffer to CloudKit
+    /// This is called when the Share screen appears or when app goes to background
+    func syncSensorDataToCloudKit() async throws {
+        guard let patientID = userID else {
+            Logger.shared.warning("[SharedDataManager] Cannot sync - not authenticated")
+            return
+        }
+        
+        guard let processor = sensorDataProcessor else {
+            Logger.shared.warning("[SharedDataManager] Cannot sync - no sensor data processor")
+            return
+        }
+        
+        let sensorData = processor.sensorDataHistory
+        guard !sensorData.isEmpty else {
+            Logger.shared.info("[SharedDataManager] No sensor data to sync")
+            return
+        }
+        
+        await MainActor.run { self.isSyncing = true }
+        
+        Logger.shared.info("[SharedDataManager] 📤 Syncing \(sensorData.count) sensor readings to CloudKit")
+        
+        // Group data by day for manageable record sizes
+        let calendar = Calendar.current
+        let groupedByDay = Dictionary(grouping: sensorData) { data in
+            calendar.startOfDay(for: data.timestamp)
+        }
+        
+        var successCount = 0
+        var errorCount = 0
+        
+        for (dayStart, dayData) in groupedByDay {
+            do {
+                // Check if we already have a record for this day
+                let existingRecord = try await findExistingRecord(for: patientID, date: dayStart)
+                
+                if let existing = existingRecord {
+                    // Update existing record
+                    try await updateDayRecord(existing, with: dayData, patientID: patientID)
+                } else {
+                    // Create new record
+                    try await createDayRecord(for: dayStart, with: dayData, patientID: patientID)
+                }
+                successCount += 1
+            } catch {
+                Logger.shared.error("[SharedDataManager] Failed to sync day \(dayStart): \(error)")
+                errorCount += 1
+            }
+        }
+        
+        await MainActor.run {
+            self.isSyncing = false
+            self.lastSyncDate = Date()
+        }
+        
+        Logger.shared.info("[SharedDataManager] ✅ Sync complete - \(successCount) days uploaded, \(errorCount) errors")
+    }
+    
+    /// Find existing HealthDataRecord for a specific day
+    private func findExistingRecord(for patientID: String, date: Date) async throws -> CKRecord? {
+        let calendar = Calendar.current
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: date)!
+        
+        let predicate = NSPredicate(
+            format: "patientID == %@ AND recordingDate >= %@ AND recordingDate < %@",
+            patientID,
+            date as NSDate,
+            dayEnd as NSDate
+        )
+        let query = CKQuery(recordType: "HealthDataRecord", predicate: predicate)
+        
+        let (results, _) = try await publicDatabase.records(matching: query, resultsLimit: 1)
+        
+        if let (_, result) = results.first, case .success(let record) = result {
+            return record
+        }
+        return nil
+    }
+    
+    /// Create a new day record
+    private func createDayRecord(for date: Date, with sensorData: [SensorData], patientID: String) async throws {
+        let record = CKRecord(recordType: "HealthDataRecord", recordID: CKRecord.ID(recordName: UUID().uuidString))
+        
+        try await populateRecord(record, with: sensorData, patientID: patientID, date: date)
+        
+        try await publicDatabase.save(record)
+        Logger.shared.info("[SharedDataManager] ✅ Created new day record for \(date)")
+    }
+    
+    /// Update existing day record with new data
+    private func updateDayRecord(_ record: CKRecord, with sensorData: [SensorData], patientID: String) async throws {
+        let date = record["recordingDate"] as? Date ?? Date()
+        
+        try await populateRecord(record, with: sensorData, patientID: patientID, date: date)
+        
+        try await publicDatabase.save(record)
+        Logger.shared.info("[SharedDataManager] ✅ Updated day record for \(date)")
+    }
+    
+    /// Populate a record with sensor data
+    private func populateRecord(_ record: CKRecord, with sensorData: [SensorData], patientID: String, date: Date) async throws {
+        // Calculate metrics
+        var bruxismEvents = 0
+        var peakIntensity = 0.0
+        let bruxismThreshold = 2.0
+        var isInEvent = false
+        
+        for data in sensorData {
+            let magnitude = data.accelerometer.magnitude
+            if magnitude > bruxismThreshold {
+                if !isInEvent {
+                    bruxismEvents += 1
+                    isInEvent = true
+                }
+                if magnitude > peakIntensity {
+                    peakIntensity = magnitude
+                }
+            } else {
+                isInEvent = false
+            }
+        }
+        
+        let averageIntensity = sensorData.isEmpty ? 0.0 :
+            sensorData.reduce(0.0) { $0 + $1.accelerometer.magnitude } / Double(sensorData.count)
+        
+        // Calculate session duration from first to last reading
+        let duration: TimeInterval
+        if let first = sensorData.first?.timestamp, let last = sensorData.last?.timestamp {
+            duration = last.timeIntervalSince(first)
+        } else {
+            duration = 0
+        }
+        
+        // Set record fields
+        record["patientID"] = patientID as CKRecordValue
+        record["recordingDate"] = date as CKRecordValue
+        record["sessionDuration"] = duration as CKRecordValue
+        record["bruxismEvents"] = bruxismEvents as CKRecordValue
+        record["averageIntensity"] = averageIntensity as CKRecordValue
+        record["peakIntensity"] = peakIntensity as CKRecordValue
+        
+        // Heart rate data
+        let heartRateData = sensorData.compactMap { $0.heartRate?.bpm }
+        if !heartRateData.isEmpty, let hrData = try? JSONEncoder().encode(heartRateData) {
+            record["heartRateData"] = hrData as CKRecordValue
+        }
+        
+        // SpO2 data
+        let spo2Data = sensorData.compactMap { $0.spo2?.percentage }
+        if !spo2Data.isEmpty, let spo2JSON = try? JSONEncoder().encode(spo2Data) {
+            record["oxygenSaturation"] = spo2JSON as CKRecordValue
+        }
+        
+        // Compress and store full sensor data for time-series charts
+        let bruxismSessionData = BruxismSessionData(sensorData: sensorData)
+        if let jsonData = try? JSONEncoder().encode(bruxismSessionData) {
+            let uncompressedSize = jsonData.count
+            if let compressed = jsonData.compressed() {
+                record["sensorDataCompressed"] = compressed as CKRecordValue
+                record["sensorDataUncompressedSize"] = uncompressedSize as CKRecordValue
+                
+                let ratio = Double(uncompressedSize) / Double(compressed.count)
+                Logger.shared.info("[SharedDataManager] Compressed \(uncompressedSize) -> \(compressed.count) bytes (ratio: \(String(format: "%.1f", ratio))x)")
+            }
+        }
+    }
+    
+    /// Call this when the Share screen appears or when user wants to sync
+    func uploadCurrentDataForSharing() async {
+        do {
+            try await syncSensorDataToCloudKit()
+        } catch {
+            Logger.shared.error("[SharedDataManager] ❌ Failed to sync data: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to sync data: \(error.localizedDescription)"
+            }
+        }
+    }
+
     // MARK: - Get Patient Health Data for Sharing
 
     func getPatientHealthDataForSharing(from startDate: Date, to endDate: Date) async throws -> [HealthDataRecord] {
@@ -325,7 +508,7 @@ self.publicDatabase = container.publicCloudDatabase
         return sensorRecords
     }
 
-    // MARK: - Upload Recording Session to CloudKit
+    // MARK: - Upload Recording Session to CloudKit (Legacy - kept for compatibility)
 
     /// Upload a completed recording session to CloudKit with full sensor data
     func uploadRecordingSession(_ session: RecordingSession) async throws {
@@ -480,7 +663,7 @@ struct HealthDataRecord: Codable {
     let dataType: String
     let measurements: Data
     let sessionDuration: TimeInterval
-    let healthKitData: HealthKitDataForSharing?  // NEW: Include HealthKit data
+    let healthKitData: HealthKitDataForSharing?
 }
 
 // MARK: - HealthKit Data for Sharing

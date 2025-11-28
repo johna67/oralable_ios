@@ -91,11 +91,7 @@ class DentistDataManager: ObservableObject {
 
         // For development/testing, use private database which auto-creates schemas
         // In production, switch to publicCloudDatabase after setting up schema
-#if DEBUG
-self.publicDatabase = container.privateCloudDatabase
-#else
-self.publicDatabase = container.publicCloudDatabase
-#endif
+        self.publicDatabase = container.publicCloudDatabase
         // Load existing patients when initialized
         loadPatients()
     }

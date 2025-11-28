@@ -20,6 +20,8 @@ struct ShareView: View {
     @State private var showCopiedFeedback = false
     @State private var showingExportSheet = false
     @State private var exportURL: URL? = nil
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     var body: some View {
         NavigationView {
@@ -36,12 +38,22 @@ struct ShareView: View {
                     ShareSheet(items: [url])
                 }
             }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
         }
         .navigationViewStyle(.stack)
-        .onAppear {
+        .task {
             if shareCode.isEmpty {
-                shareCode = sharedDataManager.generateShareCode()
+                await generateAndSaveShareCode()
             }
+            // Refresh shared dentists list
+            sharedDataManager.loadSharedDentists()
+            
+            // Sync current sensor data to CloudKit for dentist access
+            await sharedDataManager.uploadCurrentDataForSharing()
         }
     }
 
@@ -83,9 +95,14 @@ struct ShareView: View {
                     .foregroundColor(.secondary)
 
                 HStack {
-                    Text(shareCode.isEmpty ? "------" : shareCode)
-                        .font(.system(size: 32, weight: .bold, design: .monospaced))
-                        .foregroundColor(.primary)
+                    if isGeneratingCode {
+                        ProgressView()
+                            .frame(height: 38)
+                    } else {
+                        Text(shareCode.isEmpty ? "------" : shareCode)
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(.primary)
+                    }
 
                     Spacer()
 
@@ -95,15 +112,31 @@ struct ShareView: View {
                             .foregroundColor(showCopiedFeedback ? .green : .blue)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .disabled(shareCode.isEmpty)
                 }
 
                 Text("Give this code to your dentist to share your data")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                
+                // Regenerate button
+                Button(action: {
+                    Task { await generateAndSaveShareCode() }
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Generate New Code")
+                    }
+                    .font(.system(size: 15))
+                    .foregroundColor(.blue)
+                }
+                .disabled(isGeneratingCode)
             }
             .padding(.vertical, 8)
         } header: {
             Text("Share with Dentist")
+        } footer: {
+            Text("Code expires in 48 hours")
         }
     }
 
@@ -147,6 +180,27 @@ struct ShareView: View {
     }
 
     // MARK: - Actions
+    
+    private func generateAndSaveShareCode() async {
+        await MainActor.run { isGeneratingCode = true }
+        
+        do {
+            let code = try await sharedDataManager.createShareInvitation()
+            await MainActor.run {
+                shareCode = code
+                isGeneratingCode = false
+            }
+            Logger.shared.info("[ShareView] ✅ Share code created and saved to CloudKit: \(code)")
+        } catch {
+            Logger.shared.error("[ShareView] ❌ Failed to create share invitation: \(error)")
+            await MainActor.run {
+                isGeneratingCode = false
+                errorMessage = "Failed to create share code: \(error.localizedDescription)"
+                showError = true
+            }
+        }
+    }
+
     private func copyShareCode() {
         UIPasteboard.general.string = shareCode
         showCopiedFeedback = true
@@ -235,25 +289,5 @@ struct CSVDocument: FileDocument {
             throw CocoaError(.fileWriteUnknown)
         }
         return FileWrapper(regularFileWithContents: data)
-    }
-}
-
-// MARK: - Preview
-struct ShareView_Previews: PreviewProvider {
-    static var previews: some View {
-        let designSystem = DesignSystem()
-        let authManager = AuthenticationManager()
-        let healthKitManager = HealthKitManager()
-        let sensorDataProcessor = SensorDataProcessor.shared
-        let deviceManager = DeviceManager()
-        let sharedDataManager = SharedDataManager(
-            authenticationManager: authManager,
-            healthKitManager: healthKitManager,
-            sensorDataProcessor: sensorDataProcessor
-        )
-
-        ShareView(sensorDataProcessor: sensorDataProcessor, deviceManager: deviceManager)
-            .environmentObject(designSystem)
-            .environmentObject(sharedDataManager)
     }
 }
