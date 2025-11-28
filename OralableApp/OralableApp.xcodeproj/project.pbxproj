@@ -66,9 +66,29 @@
 		26D6C4062ECD181B00C60C3D /* OralableForDentistsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableForDentistsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		26970D972ED866AA00A3A232 /* Exceptions for "OralableApp" folder in "OralableApp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 26CAF25D2E781EFB003FE378 /* OralableApp */;
+		};
+		26D6C3ED2ECD181900C60C3E /* Exceptions for "OralableForDentists" folder in "OralableForDentists" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 26D6C3EB2ECD181900C60C3D /* OralableForDentists */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		26B2FED92EB999C100E0F7B1 /* OralableApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				26970D972ED866AA00A3A232 /* Exceptions for "OralableApp" folder in "OralableApp" target */,
+			);
 			path = OralableApp;
 			sourceTree = "<group>";
 		};
@@ -84,6 +104,9 @@
 		};
 		26D6C3ED2ECD181900C60C3D /* OralableForDentists */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				26D6C3ED2ECD181900C60C3E /* Exceptions for "OralableForDentists" folder in "OralableForDentists" target */,
+			);
 			path = OralableForDentists;
 			sourceTree = "<group>";
 		};

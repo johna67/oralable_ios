@@ -91,12 +91,11 @@ class DentistDataManager: ObservableObject {
 
         // For development/testing, use private database which auto-creates schemas
         // In production, switch to publicCloudDatabase after setting up schema
-        #if DEBUG
-        self.publicDatabase = container.privateCloudDatabase
-        #else
-        self.publicDatabase = container.publicCloudDatabase
-        #endif
-
+#if DEBUG
+self.publicDatabase = container.privateCloudDatabase
+#else
+self.publicDatabase = container.publicCloudDatabase
+#endif
         // Load existing patients when initialized
         loadPatients()
     }
@@ -349,6 +348,113 @@ class DentistDataManager: ObservableObject {
             await MainActor.run {
                 self.isLoading = false
                 self.errorMessage = "Failed to load patient data: \(error.localizedDescription)"
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Fetch Sensor Time-Series Data
+
+    /// Fetch detailed sensor data for a patient session (for time-series charts)
+    func fetchPatientSensorData(for patient: DentistPatient, sessionDate: Date) async throws -> BruxismSessionData? {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Query for the specific session
+            let calendar = Calendar.current
+            let startOfDay = calendar.startOfDay(for: sessionDate)
+            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+
+            let predicate = NSPredicate(
+                format: "patientID == %@ AND recordingDate >= %@ AND recordingDate < %@",
+                patient.patientID,
+                startOfDay as NSDate,
+                endOfDay as NSDate
+            )
+            let query = CKQuery(recordType: "HealthDataRecord", predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: "recordingDate", ascending: false)]
+
+            let (matchResults, _) = try await publicDatabase.records(matching: query, resultsLimit: 1)
+
+            guard let (_, result) = matchResults.first,
+                  case .success(let record) = result else {
+                await MainActor.run { self.isLoading = false }
+                return nil
+            }
+
+            // Extract and decompress sensor data
+            guard let compressedData = record["sensorDataCompressed"] as? Data,
+                  let uncompressedSize = record["sensorDataUncompressedSize"] as? Int else {
+                await MainActor.run { self.isLoading = false }
+                return nil
+            }
+
+            guard let decompressedData = compressedData.decompressed(expectedSize: uncompressedSize) else {
+                Logger.shared.error("[DentistDataManager] Failed to decompress sensor data")
+                await MainActor.run { self.isLoading = false }
+                return nil
+            }
+
+            let sessionData = try JSONDecoder().decode(BruxismSessionData.self, from: decompressedData)
+
+            await MainActor.run { self.isLoading = false }
+            return sessionData
+
+        } catch {
+            await MainActor.run {
+                self.isLoading = false
+                self.errorMessage = "Failed to load sensor data: \(error.localizedDescription)"
+            }
+            throw error
+        }
+    }
+
+    /// Fetch all sensor data for a patient within a date range (for historical charts)
+    func fetchAllPatientSensorData(for patient: DentistPatient, from startDate: Date, to endDate: Date) async throws -> [SerializableSensorData] {
+        isLoading = true
+        errorMessage = nil
+
+        var allSensorData: [SerializableSensorData] = []
+
+        do {
+            let predicate = NSPredicate(
+                format: "patientID == %@ AND recordingDate >= %@ AND recordingDate <= %@",
+                patient.patientID,
+                startDate as NSDate,
+                endDate as NSDate
+            )
+            let query = CKQuery(recordType: "HealthDataRecord", predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: "recordingDate", ascending: true)]
+
+            let (matchResults, _) = try await publicDatabase.records(matching: query)
+
+            for (_, result) in matchResults {
+                switch result {
+                case .success(let record):
+                    // Extract and decompress sensor data
+                    if let compressedData = record["sensorDataCompressed"] as? Data,
+                       let uncompressedSize = record["sensorDataUncompressedSize"] as? Int,
+                       let decompressedData = compressedData.decompressed(expectedSize: uncompressedSize) {
+
+                        if let sessionData = try? JSONDecoder().decode(BruxismSessionData.self, from: decompressedData) {
+                            allSensorData.append(contentsOf: sessionData.sensorReadings)
+                        }
+                    }
+                case .failure(let error):
+                    Logger.shared.error("[DentistDataManager] Error loading record: \(error)")
+                }
+            }
+
+            await MainActor.run { self.isLoading = false }
+
+            // Sort by timestamp
+            return allSensorData.sorted { $0.timestamp < $1.timestamp }
+
+        } catch {
+            await MainActor.run {
+                self.isLoading = false
+                self.errorMessage = "Failed to load sensor data: \(error.localizedDescription)"
             }
             throw error
         }

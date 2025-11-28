@@ -1,218 +1,183 @@
+//
+//  AddPatientView.swift
+//  OralableForDentists
+//
+//  Apple style - matches OralableApp
+//
+
 import SwiftUI
 
 struct AddPatientView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var viewModel: AddPatientViewModel
-    @FocusState private var isTextFieldFocused: Bool
+    @EnvironmentObject var dataManager: DentistDataManager
+    @EnvironmentObject var designSystem: DesignSystem
 
-    init() {
-        _viewModel = StateObject(wrappedValue: AddPatientViewModel(
-            dataManager: DentistDataManager.shared,
-            subscriptionManager: DentistSubscriptionManager.shared
-        ))
-    }
+    @State private var shareCode = ""
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var showSuccess = false
+
+    @FocusState private var isCodeFieldFocused: Bool
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 32) {
-                // Header
-                VStack(spacing: 16) {
-                    Image(systemName: "qrcode")
-                        .font(.system(size: 60))
-                        .foregroundColor(.black)
-                        .padding(.top, 40)
+            ZStack {
+                Color(UIColor.systemGroupedBackground)
+                    .ignoresSafeArea()
 
-                    Text("Add Patient")
-                        .font(.title.bold())
+                VStack(spacing: 24) {
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.badge.plus")
+                            .font(.system(size: 60))
+                            .foregroundColor(.black)
 
-                    Text("Enter the 6-digit share code provided by your patient")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
+                        Text("Add a Patient")
+                            .font(.title2.bold())
 
-                // Share code input
-                VStack(spacing: 16) {
-                    ShareCodeTextField(text: $viewModel.shareCode)
-                        .focused($isTextFieldFocused)
-                        .onChange(of: viewModel.shareCode) { oldValue, newValue in
-                            viewModel.shareCode = viewModel.formatShareCode(newValue)
-                        }
-
-                    HStack(spacing: 8) {
-                        Image(systemName: viewModel.isShareCodeValid ? "checkmark.circle.fill" : "info.circle")
-                            .foregroundColor(viewModel.isShareCodeValid ? .green : .secondary)
-
-                        Text(viewModel.isShareCodeValid ? "Valid code format" : "Code must be 6 digits")
-                            .font(.caption)
+                        Text("Enter the 6-digit share code provided by your patient")
+                            .font(.body)
                             .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
                     }
-                }
+                    .padding(.top, 40)
 
-                // Instructions
-                VStack(alignment: .leading, spacing: 12) {
-                    InstructionRow(
-                        icon: "1.circle.fill",
-                        text: "Patient generates share code in their Oralable app"
-                    )
+                    VStack(spacing: 16) {
+                        ShareCodeField(code: $shareCode)
+                            .focused($isCodeFieldFocused)
 
-                    InstructionRow(
-                        icon: "2.circle.fill",
-                        text: "Patient shares the 6-digit code with you"
-                    )
-
-                    InstructionRow(
-                        icon: "3.circle.fill",
-                        text: "Enter the code above to access their data"
-                    )
-                }
-                .padding(.horizontal, 24)
-
-                Spacer()
-
-                // Add button
-                Button(action: {
-                    viewModel.addPatient()
-                }) {
-                    if viewModel.isAdding {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.black)
-                            .cornerRadius(12)
-                    } else {
-                        Text("Add Patient")
-                            .font(.body.weight(.semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(viewModel.canAddPatient ? Color.black : Color.gray)
-                            .cornerRadius(12)
+                        if let error = errorMessage {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundColor(.red)
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                        }
                     }
+                    .padding(.horizontal, 24)
+
+                    Spacer()
+
+                    Button(action: addPatient) {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Add Patient")
+                            }
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(isValidCode ? Color.black : Color.gray)
+                        .cornerRadius(12)
+                    }
+                    .disabled(!isValidCode || isLoading)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
                 }
-                .disabled(!viewModel.canAddPatient)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
             }
+            .navigationTitle("Add Patient")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
             }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.clearMessages() } }
-            )) {
-                Button("OK") {
-                    viewModel.clearMessages()
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                }
-            }
-            .alert("Success", isPresented: Binding(
-                get: { viewModel.successMessage != nil },
-                set: { if !$0 { viewModel.clearMessages(); dismiss() } }
-            )) {
-                Button("OK") {
-                    viewModel.clearMessages()
-                    dismiss()
-                }
-            } message: {
-                if let success = viewModel.successMessage {
-                    Text(success)
-                }
-            }
-            .onChange(of: viewModel.shouldDismiss) { _, shouldDismiss in
-                if shouldDismiss {
-                    dismiss()
-                }
-            }
             .onAppear {
-                isTextFieldFocused = true
+                isCodeFieldFocused = true
             }
+            .alert("Patient Added", isPresented: $showSuccess) {
+                Button("Done") {
+                    dismiss()
+                }
+            } message: {
+                Text("You can now view this patient's bruxism data.")
+            }
+        }
+    }
+
+    private var isValidCode: Bool {
+        shareCode.count == 6 && Int(shareCode) != nil
+    }
+
+    private func addPatient() {
+        guard isValidCode else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        Task {
+            do {
+                try await dataManager.addPatientWithShareCode(shareCode)
+                showSuccess = true
+            } catch let error as DentistDataError {
+                errorMessage = error.localizedDescription
+            } catch {
+                errorMessage = "Failed to add patient. Please try again."
+            }
+            isLoading = false
         }
     }
 }
 
-// MARK: - Share Code Text Field
-
-struct ShareCodeTextField: View {
-    @Binding var text: String
+struct ShareCodeField: View {
+    @Binding var code: String
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<6, id: \.self) { index in
-                DigitBox(digit: getDigit(at: index))
+        VStack(spacing: 12) {
+            HStack(spacing: 8) {
+                ForEach(0..<6, id: \.self) { index in
+                    CodeDigitBox(
+                        digit: getDigit(at: index),
+                        isActive: index == code.count
+                    )
+                }
             }
-        }
-        .overlay {
-            // Invisible TextField to capture input
-            TextField("", text: $text)
+
+            TextField("", text: $code)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
-                .foregroundColor(.clear)
-                .accentColor(.clear)
-                .background(Color.clear)
+                .onChange(of: code) { _, newValue in
+                    if newValue.count > 6 {
+                        code = String(newValue.prefix(6))
+                    }
+                    code = newValue.filter { $0.isNumber }
+                }
+                .frame(width: 0, height: 0)
+                .opacity(0)
         }
     }
 
-    private func getDigit(at index: Int) -> String? {
-        guard index < text.count else { return nil }
-        let digitIndex = text.index(text.startIndex, offsetBy: index)
-        return String(text[digitIndex])
+    private func getDigit(at index: Int) -> String {
+        guard index < code.count else { return "" }
+        return String(code[code.index(code.startIndex, offsetBy: index)])
     }
 }
 
-struct DigitBox: View {
-    let digit: String?
+struct CodeDigitBox: View {
+    let digit: String
+    let isActive: Bool
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
-                .stroke(digit != nil ? Color.black : Color.gray.opacity(0.3), lineWidth: 2)
-                .frame(width: 50, height: 60)
+                .stroke(isActive ? Color.black : Color(UIColor.systemGray4), lineWidth: isActive ? 2 : 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(UIColor.systemBackground))
+                )
 
-            if let digit = digit {
-                Text(digit)
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(.black)
-            }
+            Text(digit)
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .foregroundColor(.primary)
         }
+        .frame(width: 48, height: 56)
     }
-}
-
-// MARK: - Instruction Row
-
-struct InstructionRow: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundColor(.black)
-                .frame(width: 24)
-
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.leading)
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Preview
-
-#Preview {
-    AddPatientView()
 }

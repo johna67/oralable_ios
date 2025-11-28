@@ -1,5 +1,60 @@
 import Foundation
 import CloudKit
+import Compression
+
+// MARK: - Data Compression Helpers
+
+extension Data {
+    /// Compress data using LZFSE algorithm
+    func compressed() -> Data? {
+        guard !isEmpty else { return nil }
+
+        let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
+        defer { destinationBuffer.deallocate() }
+
+        let compressedSize = withUnsafeBytes { sourceBuffer -> Int in
+            guard let sourcePointer = sourceBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return 0
+            }
+            return compression_encode_buffer(
+                destinationBuffer,
+                count,
+                sourcePointer,
+                count,
+                nil,
+                COMPRESSION_LZFSE
+            )
+        }
+
+        guard compressedSize > 0 else { return nil }
+        return Data(bytes: destinationBuffer, count: compressedSize)
+    }
+
+    /// Decompress data using LZFSE algorithm
+    func decompressed(expectedSize: Int) -> Data? {
+        guard !isEmpty else { return nil }
+
+        let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: expectedSize)
+        defer { destinationBuffer.deallocate() }
+
+        let decompressedSize = withUnsafeBytes { sourceBuffer -> Int in
+            guard let sourcePointer = sourceBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return 0
+            }
+            return compression_decode_buffer(
+                destinationBuffer,
+                expectedSize,
+                sourcePointer,
+                count,
+                nil,
+                COMPRESSION_LZFSE
+            )
+        }
+
+        guard decompressedSize > 0 else { return nil }
+        return Data(bytes: destinationBuffer, count: decompressedSize)
+    }
+}
 
 // MARK: - Shared Data Models
 
@@ -61,11 +116,11 @@ class SharedDataManager: ObservableObject {
         // The public database allows patients to share their data with dentists via share codes
         // For development, use private database which auto-creates schemas
         // For production, use public database (schema must be deployed in CloudKit Dashboard)
-        #if DEBUG
-        self.publicDatabase = container.privateCloudDatabase
-        #else
-        self.publicDatabase = container.publicCloudDatabase
-        #endif
+#if DEBUG
+self.publicDatabase = container.privateCloudDatabase
+#else
+self.publicDatabase = container.publicCloudDatabase
+#endif
 
         // Store reference to authentication manager
         self.authenticationManager = authenticationManager
@@ -272,8 +327,10 @@ class SharedDataManager: ObservableObject {
 
     // MARK: - Upload Recording Session to CloudKit
 
+    /// Upload a completed recording session to CloudKit with full sensor data
     func uploadRecordingSession(_ session: RecordingSession) async throws {
         guard let patientID = userID else {
+            Logger.shared.warning("[SharedDataManager] Cannot upload session - not authenticated")
             throw ShareError.notAuthenticated
         }
 
@@ -282,7 +339,7 @@ class SharedDataManager: ObservableObject {
             return
         }
 
-        Logger.shared.info("[SharedDataManager] Uploading session \(session.id) to CloudKit")
+        Logger.shared.info("[SharedDataManager] Uploading session \(session.id) to CloudKit with sensor data")
 
         // Get sensor data for the session time range
         var bruxismEvents = 0
@@ -290,6 +347,8 @@ class SharedDataManager: ObservableObject {
         var peakIntensity = 0.0
         var heartRateData: [Double] = []
         var oxygenSaturation: [Double] = []
+        var sensorDataJSON: Data? = nil
+        var uncompressedSize: Int = 0
 
         if let processor = sensorDataProcessor {
             // Filter sensor data to this session's time range
@@ -300,7 +359,6 @@ class SharedDataManager: ObservableObject {
             Logger.shared.info("[SharedDataManager] Found \(sessionData.count) sensor readings for session")
 
             // Calculate bruxism events (simple threshold-based detection)
-            // A bruxism event is detected when accelerometer magnitude exceeds threshold
             let bruxismThreshold = 2.0 // g-force threshold
             var isInEvent = false
 
@@ -312,7 +370,6 @@ class SharedDataManager: ObservableObject {
                         bruxismEvents += 1
                         isInEvent = true
                     }
-                    // Track intensity during events
                     if magnitude > peakIntensity {
                         peakIntensity = magnitude
                     }
@@ -332,6 +389,20 @@ class SharedDataManager: ObservableObject {
 
             // Extract SpO2 data
             oxygenSaturation = sessionData.compactMap { $0.spo2?.percentage }
+
+            // Create serializable sensor data for time-series sharing
+            let bruxismSessionData = BruxismSessionData(sensorData: sessionData)
+
+            // Encode and compress sensor data
+            if let jsonData = try? JSONEncoder().encode(bruxismSessionData) {
+                uncompressedSize = jsonData.count
+                sensorDataJSON = jsonData.compressed()
+
+                let compressionRatio = sensorDataJSON != nil
+                    ? Double(uncompressedSize) / Double(sensorDataJSON!.count)
+                    : 0
+                Logger.shared.info("[SharedDataManager] Sensor data: \(uncompressedSize) bytes -> \(sensorDataJSON?.count ?? 0) bytes (ratio: \(String(format: "%.1f", compressionRatio))x)")
+            }
 
             Logger.shared.info("[SharedDataManager] Calculated metrics: \(bruxismEvents) events, peak: \(peakIntensity), avg: \(averageIntensity)")
         }
@@ -360,9 +431,15 @@ class SharedDataManager: ObservableObject {
             }
         }
 
+        // Store compressed sensor data for time-series charts
+        if let compressedData = sensorDataJSON {
+            record["sensorDataCompressed"] = compressedData as CKRecordValue
+            record["sensorDataUncompressedSize"] = uncompressedSize as CKRecordValue
+        }
+
         do {
             try await publicDatabase.save(record)
-            Logger.shared.info("[SharedDataManager] ✅ Successfully uploaded session \(session.id) to CloudKit")
+            Logger.shared.info("[SharedDataManager] ✅ Successfully uploaded session \(session.id) to CloudKit with \(sensorDataJSON?.count ?? 0) bytes sensor data")
         } catch {
             Logger.shared.error("[SharedDataManager] ❌ Failed to upload session: \(error)")
             throw ShareError.cloudKitError(error)

@@ -1,135 +1,49 @@
+//
+//  DentistSettingsView.swift
+//  OralableForDentists
+//
+//  Apple style settings - matches OralableApp
+//
+
 import SwiftUI
-import StoreKit
 
 struct DentistSettingsView: View {
-    @StateObject private var viewModel: DentistSettingsViewModel
-    @State private var showingSignOutAlert = false
+    @EnvironmentObject var authenticationManager: DentistAuthenticationManager
+    @EnvironmentObject var subscriptionManager: DentistSubscriptionManager
+    @EnvironmentObject var designSystem: DesignSystem
 
-    init() {
-        _viewModel = StateObject(wrappedValue: DentistSettingsViewModel(
-            subscriptionManager: DentistSubscriptionManager.shared,
-            authenticationManager: DentistAuthenticationManager.shared
-        ))
-    }
+    @State private var showingSignOutConfirmation = false
 
     var body: some View {
         NavigationView {
             List {
-                // Account Section
                 Section {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.gray)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let name = viewModel.dentistName {
-                                Text(name)
-                                    .font(.headline)
-                            }
-
-                            if let email = viewModel.dentistEmail {
-                                Text(email)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.leading, 8)
-                    }
-                    .padding(.vertical, 8)
+                    accountRow
                 } header: {
                     Text("Account")
                 }
 
-                // Subscription Section
                 Section {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Current Plan")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                    subscriptionRow
 
-                            Text(viewModel.currentTier.displayName)
-                                .font(.headline)
-                        }
-
-                        Spacer()
-
-                        if viewModel.currentTier != .practice {
-                            NavigationLink(destination: UpgradePromptView()) {
-                                Text("Upgrade")
-                                    .font(.subheadline.weight(.semibold))
+                    if subscriptionManager.currentTier != .enterprise {
+                        NavigationLink(destination: UpgradePromptView()) {
+                            HStack {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text("Upgrade Plan")
                             }
                         }
                     }
-
-                    if viewModel.currentTier.isPaid {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Status")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            Text(viewModel.subscriptionStatus)
-                                .font(.body)
-
-                            if let expiry = viewModel.subscriptionExpiryDate {
-                                Text(viewModel.subscriptionDetails)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-
-                    // Features
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Plan Features")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-
-                        ForEach(viewModel.currentTier.features, id: \.self) { feature in
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.caption)
-
-                                Text(feature)
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
-
                 } header: {
                     Text("Subscription")
                 }
 
-                // Restore Purchases
-                if viewModel.currentTier.isPaid {
-                    Section {
-                        Button(action: {
-                            Task {
-                                await viewModel.restorePurchases()
-                            }
-                        }) {
-                            if viewModel.isPurchasing {
-                                HStack {
-                                    ProgressView()
-                                    Text("Restoring...")
-                                        .foregroundColor(.secondary)
-                                }
-                            } else {
-                                Text("Restore Purchases")
-                            }
-                        }
-                        .disabled(viewModel.isPurchasing)
-                    }
-                }
-
-                // Support Section
                 Section {
-                    Link(destination: URL(string: "https://oralable.com/dentist/support")!) {
+                    Link(destination: URL(string: "https://oralable.com/dentist/help")!) {
                         HStack {
                             Image(systemName: "questionmark.circle")
+                                .foregroundColor(.blue)
                             Text("Help & Support")
                             Spacer()
                             Image(systemName: "arrow.up.right")
@@ -141,6 +55,7 @@ struct DentistSettingsView: View {
                     Link(destination: URL(string: "https://oralable.com/dentist/privacy")!) {
                         HStack {
                             Image(systemName: "hand.raised")
+                                .foregroundColor(.blue)
                             Text("Privacy Policy")
                             Spacer()
                             Image(systemName: "arrow.up.right")
@@ -152,6 +67,7 @@ struct DentistSettingsView: View {
                     Link(destination: URL(string: "https://oralable.com/dentist/terms")!) {
                         HStack {
                             Image(systemName: "doc.text")
+                                .foregroundColor(.blue)
                             Text("Terms of Service")
                             Spacer()
                             Image(systemName: "arrow.up.right")
@@ -163,67 +79,94 @@ struct DentistSettingsView: View {
                     Text("Support")
                 }
 
-                // About Section
                 Section {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Build")
-                        Spacer()
-                        Text("1")
+                        Text(appVersion)
                             .foregroundColor(.secondary)
                     }
                 } header: {
-                    Text("About")
+                    Text("App")
                 }
 
-                // Sign Out
                 Section {
-                    Button(role: .destructive, action: {
-                        showingSignOutAlert = true
+                    Button(action: {
+                        showingSignOutConfirmation = true
                     }) {
                         HStack {
                             Spacer()
                             Text("Sign Out")
+                                .foregroundColor(.red)
                             Spacer()
                         }
                     }
                 }
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("Settings")
-            .alert("Sign Out", isPresented: $showingSignOutAlert) {
-                Button("Cancel", role: .cancel) {}
+            .navigationBarTitleDisplayMode(.large)
+            .confirmationDialog(
+                "Sign Out",
+                isPresented: $showingSignOutConfirmation,
+                titleVisibility: .visible
+            ) {
                 Button("Sign Out", role: .destructive) {
-                    viewModel.signOut()
+                    authenticationManager.signOut()
                 }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Are you sure you want to sign out?")
             }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    viewModel.clearError()
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                }
-            }
-            .task {
-                await viewModel.loadProducts()
+        }
+        .navigationViewStyle(.stack)
+    }
+
+    private var accountRow: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 44))
+                .foregroundColor(.gray)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(authenticationManager.currentUserName ?? "Dentist")
+                    .font(.headline)
+
+                Text(authenticationManager.currentUserEmail ?? "Signed in with Apple")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
+        .padding(.vertical, 8)
     }
-}
 
-// MARK: - Preview
+    private var subscriptionRow: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Current Plan")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
 
-#Preview {
-    DentistSettingsView()
-        .environmentObject(DentistSubscriptionManager.shared)
-        .environmentObject(DentistAuthenticationManager.shared)
+                Text(subscriptionManager.currentTier.displayName)
+                    .font(.headline)
+            }
+
+            Spacer()
+
+            Text("\(subscriptionManager.patientCount)/\(subscriptionManager.currentTier.maxPatients)")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(8)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
 }
