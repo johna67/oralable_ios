@@ -10,6 +10,50 @@ import Foundation
 import CoreBluetooth
 import Combine
 
+/// Detailed connection readiness states
+enum ConnectionReadiness: Equatable {
+    case disconnected
+    case connecting
+    case connected
+    case discoveringServices
+    case servicesDiscovered
+    case discoveringCharacteristics
+    case characteristicsDiscovered
+    case enablingNotifications
+    case ready
+    case failed(String)
+    
+    var isConnected: Bool {
+        switch self {
+        case .connected, .discoveringServices, .servicesDiscovered,
+             .discoveringCharacteristics, .characteristicsDiscovered,
+             .enablingNotifications, .ready:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    var canRecord: Bool {
+        return self == .ready
+    }
+    
+    var displayText: String {
+        switch self {
+        case .disconnected: return "Disconnected"
+        case .connecting: return "Connecting..."
+        case .connected: return "Connected"
+        case .discoveringServices: return "Discovering services..."
+        case .servicesDiscovered: return "Services found"
+        case .discoveringCharacteristics: return "Discovering characteristics..."
+        case .characteristicsDiscovered: return "Characteristics found"
+        case .enablingNotifications: return "Setting up notifications..."
+        case .ready: return "Ready"
+        case .failed(let reason): return "Failed: \(reason)"
+        }
+    }
+}
+
 /// Manager for coordinating multiple BLE devices
 @MainActor
 class DeviceManager: ObservableObject {
@@ -36,6 +80,19 @@ class DeviceManager: ObservableObject {
     
     /// Errors
     @Published var lastError: DeviceError?
+    // MARK: - Connection Readiness Tracking
+        
+        /// Per-device connection readiness tracking
+        @Published var deviceReadiness: [UUID: ConnectionReadiness] = [:]
+        
+        /// Primary device readiness (convenience)
+        var primaryDeviceReadiness: ConnectionReadiness {
+            guard let primary = primaryDevice,
+                  let peripheralId = primary.peripheralIdentifier else {
+                return .disconnected
+            }
+            return deviceReadiness[peripheralId] ?? .disconnected
+        }
     
     // MARK: - Private Properties
 
@@ -200,47 +257,57 @@ class DeviceManager: ObservableObject {
     }
     
     private func handleDeviceConnected(peripheral: CBPeripheral) {
-        Logger.shared.info("[DeviceManager] Device connected: \(peripheral.name ?? "Unknown")")
-
-        isConnecting = false
-
-        // Update device info
-        if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-            discoveredDevices[index].connectionState = .connected
-
-            // Add to connected devices if not already there
-            if !connectedDevices.contains(where: { $0.id == discoveredDevices[index].id }) {
-                connectedDevices.append(discoveredDevices[index])
-            }
-
-            // Set as primary if none set
-            if primaryDevice == nil {
-                primaryDevice = discoveredDevices[index]
-            }
-
-            // Remember this device for auto-reconnect
-            persistenceManager.rememberDevice(
-                id: peripheral.identifier.uuidString,
-                name: discoveredDevices[index].name
-            )
-        }
-
-        // Start device operations
-        if let device = devices[peripheral.identifier] {
-            Task {
-                do {
-                    // First, let the device discover its services
-                    try await device.connect()
-
-                    // Then start data collection
-                    try await device.startDataCollection()
-                    Logger.shared.info("[DeviceManager] Data collection started for \(device.name)")
-                } catch {
-                    Logger.shared.error("[DeviceManager] Error during device setup: \(error.localizedDescription)")
+            Logger.shared.info("[DeviceManager] Device connected: \(peripheral.name ?? "Unknown")")
+            
+            isConnecting = false
+            
+            // Update connection state
+            if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+                discoveredDevices[index].connectionState = .connected
+                
+                // Update readiness to connected (not ready yet!)
+                updateDeviceReadiness(peripheral.identifier, to: .connected)
+                
+                // Add to connected devices if not already there
+                if !connectedDevices.contains(where: { $0.id == discoveredDevices[index].id }) {
+                    connectedDevices.append(discoveredDevices[index])
+                }
+                
+                // Set as primary if none set
+                if primaryDevice == nil {
+                    primaryDevice = discoveredDevices[index]
+                }
+                
+                // Remember this device
+                persistenceManager.rememberDevice(
+                    id: peripheral.identifier.uuidString,
+                    name: peripheral.name ?? "Unknown"
+                )
+                // Start service discovery process
+                Task {
+                    await discoverServicesAndCharacteristics(peripheral: peripheral)
                 }
             }
         }
-    }
+    
+    /// Discover services and characteristics, then enable notifications
+        /// TODO: Implement full discovery sequence tomorrow (Day 2)
+        private func discoverServicesAndCharacteristics(peripheral: CBPeripheral) async {
+            Logger.shared.info("[DeviceManager] Starting service discovery for \(peripheral.name ?? "Unknown")")
+            
+            // Update state to discovering
+            updateDeviceReadiness(peripheral.identifier, to: .discoveringServices)
+            
+            // Simulate discovery process (temporary)
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            
+            // For now, just mark as ready after delay
+            // Tomorrow we'll implement the real discovery logic
+            updateDeviceReadiness(peripheral.identifier, to: .ready)
+            
+            Logger.shared.info("[DeviceManager] Service discovery complete (placeholder) - Device READY")
+        }
+    
     
     private func handleDeviceDisconnected(peripheral: CBPeripheral, error: Error?) {
         let wasUnexpectedDisconnection = error != nil
@@ -570,5 +637,29 @@ class DeviceManager: ObservableObject {
             stopScanning()
         }
     }
+    // MARK: - Readiness State Management
+        
+        /// Helper to update DeviceInfo readiness state across all collections
+        private func updateDeviceReadiness(_ peripheralId: UUID, to readiness: ConnectionReadiness) {
+            // Update tracking dictionary
+            deviceReadiness[peripheralId] = readiness
+            
+            // Update in discovered devices
+            if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheralId }) {
+                discoveredDevices[index].connectionReadiness = readiness
+            }
+            
+            // Update primary device if it's this one
+            if primaryDevice?.peripheralIdentifier == peripheralId {
+                primaryDevice?.connectionReadiness = readiness
+            }
+            
+            // Update in connected devices
+            if let connectedIndex = connectedDevices.firstIndex(where: { $0.peripheralIdentifier == peripheralId }) {
+                connectedDevices[connectedIndex].connectionReadiness = readiness
+            }
+            
+            Logger.shared.debug("[DeviceManager] Readiness updated to: \(readiness.displayText)")
+        }
 }
 

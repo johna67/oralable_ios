@@ -30,6 +30,8 @@ struct DeviceInfo: Identifiable, Codable, Equatable {
     
     /// Connection state
     var connectionState: DeviceConnectionState
+    var connectionReadiness: ConnectionReadiness = .disconnected  // ADD THIS LINE
+
     
     /// Battery level (0-100)
     var batteryLevel: Int?
