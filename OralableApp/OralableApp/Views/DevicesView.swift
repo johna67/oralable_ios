@@ -3,6 +3,8 @@
 //  OralableApp
 //
 //  iOS Bluetooth Settings Style - Shows remembered and discovered devices
+//  Updated: Shows connection readiness state progression
+//  Updated: November 29, 2025 (Day 4) - Smart scan prevention
 //
 
 import SwiftUI
@@ -52,7 +54,10 @@ struct DevicesView: View {
                 }
             }
             .onAppear {
-                startScanning()
+                // Day 4 Fix: Only auto-scan if no devices are connected
+                if deviceManager.connectedDevices.isEmpty {
+                    startScanning()
+                }
             }
             .onDisappear {
                 deviceManager.stopScanning()
@@ -73,9 +78,10 @@ struct DevicesView: View {
                 ForEach(rememberedDevices) { device in
                     DeviceRow(
                         name: device.name,
-                        isConnected: isDeviceConnected(id: device.id),
+                        readinessState: getDeviceReadiness(id: device.id),
                         onTap: {
-                            if isDeviceConnected(id: device.id) {
+                            let readiness = getDeviceReadiness(id: device.id)
+                            if readiness == .ready {
                                 selectedDevice = DeviceRowItem(id: device.id, name: device.name, isConnected: true)
                                 showingDeviceDetail = true
                             } else {
@@ -118,7 +124,7 @@ struct DevicesView: View {
                 ForEach(discoveredDevices, id: \.peripheralIdentifier) { device in
                     DeviceRow(
                         name: device.name,
-                        isConnected: false,
+                        readinessState: getDeviceReadiness(id: device.peripheralIdentifier?.uuidString ?? ""),
                         onTap: {
                             connectToNewDevice(device)
                         },
@@ -138,6 +144,18 @@ struct DevicesView: View {
     }
 
     // MARK: - Helper Methods
+    
+    private func getDeviceReadiness(id: String) -> ConnectionReadiness {
+        // Check if device is connected and get its readiness state
+        if let device = deviceManager.connectedDevices.first(where: { $0.peripheralIdentifier?.uuidString == id }) {
+            // Use UUID directly, not uuidString
+            if let peripheralId = device.peripheralIdentifier {
+                return deviceManager.deviceReadiness[peripheralId] ?? .disconnected
+            }
+        }
+        return .disconnected
+    }
+    
     private func isDeviceConnected(id: String) -> Bool {
         return deviceManager.connectedDevices.contains { $0.peripheralIdentifier?.uuidString == id }
     }
@@ -190,8 +208,11 @@ struct DevicesView: View {
     }
 
     private func disconnectDevice(_ device: DeviceRowItem) {
-        if let connectedDevice = deviceManager.connectedDevices.first(where: { $0.peripheralIdentifier?.uuidString == device.id }) {
-            deviceManager.disconnect(from: connectedDevice)
+        if let connectedDevice = deviceManager.connectedDevices.first(where: {
+            $0.peripheralIdentifier?.uuidString == device.id }) {
+            Task {
+                await deviceManager.disconnect(from: connectedDevice)
+            }
         }
     }
 }
@@ -206,7 +227,7 @@ struct DeviceRowItem: Identifiable {
 // MARK: - Device Row Component
 struct DeviceRow: View {
     let name: String
-    let isConnected: Bool
+    let readinessState: ConnectionReadiness
     let onTap: () -> Void
     let onInfoTap: (() -> Void)?
 
@@ -219,9 +240,16 @@ struct DeviceRow: View {
 
             Spacer()
 
-            Text(isConnected ? "Connected" : "Not Connected")
-                .font(.system(size: 15))
-                .foregroundColor(isConnected ? .blue : .secondary)
+            // Status indicator with color
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                
+                Text(statusText)
+                    .font(.system(size: 15))
+                    .foregroundColor(statusTextColor)
+            }
 
             if let onInfoTap = onInfoTap {
                 Button(action: onInfoTap) {
@@ -235,6 +263,57 @@ struct DeviceRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
+        }
+    }
+    
+    // MARK: - Status Display Logic
+    
+    private var statusText: String {
+        switch readinessState {
+        case .disconnected:
+            return "Not Connected"
+        case .connecting:
+            return "Connecting..."
+        case .connected:
+            return "Connected"
+        case .discoveringServices:
+            return "Discovering..."
+        case .servicesDiscovered:
+            return "Services Found"
+        case .discoveringCharacteristics:
+            return "Setting up..."
+        case .characteristicsDiscovered:
+            return "Almost Ready"
+        case .enablingNotifications:
+            return "Enabling..."
+        case .ready:
+            return "Ready"
+        case .failed:
+            return "Failed"
+        }
+    }
+    
+    private var statusColor: Color {
+        switch readinessState {
+        case .disconnected, .failed:
+            return .gray
+        case .connecting, .connected, .discoveringServices, .servicesDiscovered,
+             .discoveringCharacteristics, .characteristicsDiscovered, .enablingNotifications:
+            return .orange
+        case .ready:
+            return .green
+        }
+    }
+    
+    private var statusTextColor: Color {
+        switch readinessState {
+        case .disconnected, .failed:
+            return .secondary
+        case .connecting, .connected, .discoveringServices, .servicesDiscovered,
+             .discoveringCharacteristics, .characteristicsDiscovered, .enablingNotifications:
+            return .orange
+        case .ready:
+            return .green
         }
     }
 }

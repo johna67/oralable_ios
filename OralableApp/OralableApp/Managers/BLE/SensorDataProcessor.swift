@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Created: November 19, 2025
+//  FIXED: November 28, 2025 - Removed * 1000 multiplication causing Int16 overflow
 //  Responsibility: Process and aggregate raw sensor readings from BLE devices
 //  - PPG data processing (Red, IR, Green channels)
 //  - Accelerometer data aggregation
@@ -31,6 +32,7 @@ class SensorDataProcessor: ObservableObject {
     @Published var ppgHistory: CircularBuffer<PPGData> = CircularBuffer(capacity: 100)
     @Published var sensorDataHistory: [SensorData] = []
     @Published var logMessages: [LogMessage] = []
+    
     // MARK: - Current Sensor Values
 
     @Published var accelX: Double = 0.0
@@ -220,13 +222,16 @@ class SensorDataProcessor: ObservableObject {
 
             switch reading.sensorType {
             case .accelerometerX:
-                current.x = Int16(reading.value * 1000)
+                // ✅ FIXED: Removed * 1000 - raw values are already in correct Int16 range
+                current.x = Int16(reading.value)
                 await MainActor.run { self.accelX = reading.value }
             case .accelerometerY:
-                current.y = Int16(reading.value * 1000)
+                // ✅ FIXED: Removed * 1000 - raw values are already in correct Int16 range
+                current.y = Int16(reading.value)
                 await MainActor.run { self.accelY = reading.value }
             case .accelerometerZ:
-                current.z = Int16(reading.value * 1000)
+                // ✅ FIXED: Removed * 1000 - raw values are already in correct Int16 range
+                current.z = Int16(reading.value)
                 await MainActor.run { self.accelZ = reading.value }
             default:
                 break
@@ -297,6 +302,7 @@ class SensorDataProcessor: ObservableObject {
         ppgHistory.removeAll()
         sensorDataHistory.removeAll()
         ppgIRBuffer.removeAll()
+        logMessages.removeAll()
         Logger.shared.info("[SensorDataProcessor] ✅ Cleared all history data | Removed \(priorCount) sensor data entries | New count: \(sensorDataHistory.count)")
     }
 
@@ -314,9 +320,9 @@ class SensorDataProcessor: ObservableObject {
             case .ppgRed: ppgRed = Int32(reading.value)
             case .ppgInfrared: ppgIR = Int32(reading.value)
             case .ppgGreen: ppgGreen = Int32(reading.value)
-            case .accelerometerX: accelX = Int16(reading.value * 1000)
-            case .accelerometerY: accelY = Int16(reading.value * 1000)
-            case .accelerometerZ: accelZ = Int16(reading.value * 1000)
+            case .accelerometerX: accelX = Int16(reading.value)  // ✅ FIXED: Removed * 1000
+            case .accelerometerY: accelY = Int16(reading.value)  // ✅ FIXED: Removed * 1000
+            case .accelerometerZ: accelZ = Int16(reading.value)  // ✅ FIXED: Removed * 1000
             case .temperature: temperature = reading.value
             case .battery: battery = Int(reading.value)
             case .heartRate: heartRate = reading.value; heartRateQuality = reading.quality ?? 0.8
@@ -341,24 +347,11 @@ class SensorDataProcessor: ObservableObject {
             heartRate: heartRateData,
             spo2: spo2Data
         )
-        
-        // MARK: - Log Management
-
-        func addLog(_ message: String) {
-            logMessages.append(LogMessage(message: message))
-        }
-
-        func clearHistory() {
-            sensorDataHistory.removeAll()
-            logMessages.removeAll()
-            heartRateHistory = CircularBuffer(capacity: 100)
-            spo2History = CircularBuffer(capacity: 100)
-            temperatureHistory = CircularBuffer(capacity: 100)
-            accelerometerHistory = CircularBuffer(capacity: 5000)
-            batteryHistory = CircularBuffer(capacity: 100)
-            ppgHistory = CircularBuffer(capacity: 100)
-            Logger.shared.info("[SensorDataProcessor] History cleared")
-        }
     }
     
+    // MARK: - Log Management
+
+    func addLog(_ message: String) {
+        logMessages.append(LogMessage(message: message))
+    }
 }

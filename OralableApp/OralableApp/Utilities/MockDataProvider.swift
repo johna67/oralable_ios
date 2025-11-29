@@ -86,8 +86,7 @@ class RealBLEDataProvider: SensorDataProvider {
 
     func disconnect() async {
         if let device = deviceManager.primaryDevice {
-            deviceManager.disconnect(from: device)
-        }
+            await deviceManager.disconnect(from: device)        }
     }
 }
 

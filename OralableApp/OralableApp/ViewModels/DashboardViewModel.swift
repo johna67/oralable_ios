@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Complete ViewModel with MAM state detection
+//  Updated: November 28, 2025 - Added DeviceManager integration
 //
 
 import SwiftUI
@@ -47,7 +48,8 @@ class DashboardViewModel: ObservableObject {
     @Published var sessionStartTime: Date?
     
     // MARK: - Private Properties
-    private let bleManager: BLEManagerProtocol  // ✅ Now uses protocol for dependency injection
+    private let bleManager: BLEManagerProtocol
+    private let deviceManager: DeviceManager
     private let appStateManager: AppStateManager
     private var cancellables = Set<AnyCancellable>()
     private var sessionTimer: Timer?
@@ -57,9 +59,11 @@ class DashboardViewModel: ObservableObject {
     /// Initialize with injected dependencies (preferred)
     /// - Parameters:
     ///   - bleManager: BLE manager conforming to protocol (allows mocking for tests)
+    ///   - deviceManager: Device manager for connection state
     ///   - appStateManager: App state manager
-    init(bleManager: BLEManagerProtocol, appStateManager: AppStateManager) {
+    init(bleManager: BLEManagerProtocol, deviceManager: DeviceManager, appStateManager: AppStateManager) {
         self.bleManager = bleManager
+        self.deviceManager = deviceManager
         self.appStateManager = appStateManager
         setupBindings()
         Logger.shared.info("[DashboardViewModel] ✅ Initializing with protocol-based dependency injection")
@@ -89,34 +93,58 @@ class DashboardViewModel: ObservableObject {
     }
 
     func disconnect() {
-        bleManager.disconnect()
+        Task {
+            if let device = deviceManager.primaryDevice,
+               let peripheralId = device.peripheralIdentifier {
+                await deviceManager.disconnect(from: DeviceInfo(
+                    type: device.type,
+                    name: device.name,
+                    peripheralIdentifier: peripheralId,
+                    connectionState: .connected
+                ))
+            }
+        }
     }
 
     func startScanning() {
-        bleManager.startScanning()
+        Task {
+            await deviceManager.startScanning()
+        }
     }
     
     // MARK: - Private Methods
     private func setupBindings() {
         // CRITICAL PERFORMANCE FIX: Throttle connection state updates
-        // Using protocol publishers for better testability
-
-        // Connection state (throttled to prevent excessive UI updates)
-        bleManager.isConnectedPublisher
+        
+        // Connection state from DeviceManager (new readiness-aware state)
+        deviceManager.$connectedDevices
             .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] connected in
-                self?.isConnected = connected
-                if !connected {
-                    self?.resetMetrics()
+            .sink { [weak self] devices in
+                guard let self = self else { return }
+                // Device is truly connected only when readiness state is .ready
+                self.isConnected = !devices.isEmpty && self.deviceManager.primaryDeviceReadiness == .ready
+                if !self.isConnected {
+                    self.resetMetrics()
                 }
             }
             .store(in: &cancellables)
-
-        // Device name (throttled)
-        bleManager.deviceNamePublisher
+        
+        // Also watch readiness state changes
+        deviceManager.$deviceReadiness
             .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] name in
-                self?.deviceName = name
+            .sink { [weak self] readinessDict in
+                guard let self = self else { return }
+                // Update connection state when readiness changes
+                self.isConnected = !self.deviceManager.connectedDevices.isEmpty &&
+                                  self.deviceManager.primaryDeviceReadiness == .ready
+            }
+            .store(in: &cancellables)
+        
+        // Device name from primary device
+        deviceManager.$primaryDevice
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] device in
+                self?.deviceName = device?.name ?? ""
             }
             .store(in: &cancellables)
 

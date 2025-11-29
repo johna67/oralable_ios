@@ -52,7 +52,8 @@ final class AppDependencies: ObservableObject {
     // MARK: - Factory Methods
     func makeDashboardViewModel() -> DashboardViewModel {
         return DashboardViewModel(
-            bleManager: deviceManagerAdapter,  // Use adapter instead of legacy bleManager
+            bleManager: bleManager,
+            deviceManager: deviceManager,
             appStateManager: appStateManager
         )
     }

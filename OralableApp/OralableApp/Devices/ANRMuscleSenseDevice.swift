@@ -344,4 +344,20 @@ extension ANRMuscleSenseDevice: CBPeripheralDelegate {
             Logger.shared.info(" ANR Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid)")
         }
     }
+    // MARK: - Service Discovery Methods (Day 2 - Stub Implementation)
+        
+        func discoverServices() async throws {
+            // TODO: Implement ANR-specific service discovery
+            Logger.shared.debug("[ANRMuscleSenseDevice] Service discovery not yet implemented")
+        }
+        
+        func discoverCharacteristics() async throws {
+            // TODO: Implement ANR-specific characteristic discovery
+            Logger.shared.debug("[ANRMuscleSenseDevice] Characteristic discovery not yet implemented")
+        }
+        
+        func enableNotifications() async throws {
+            // TODO: Implement ANR-specific notification setup
+            Logger.shared.debug("[ANRMuscleSenseDevice] Notification setup not yet implemented")
+        }
 }

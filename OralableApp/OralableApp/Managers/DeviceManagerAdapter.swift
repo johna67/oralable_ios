@@ -4,6 +4,7 @@
 //
 //  Created: November 24, 2025
 //  Purpose: Adapts DeviceManager to BLEManagerProtocol for compatibility with existing ViewModels
+//  Updated: November 29, 2025 - Added diagnostic logging for data flow
 //
 
 import Foundation
@@ -120,33 +121,51 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
     }
 
     private func updateSensorValues(from readings: [SensorType: SensorReading]) {
+        // DIAGNOSTIC: Log what readings we're receiving
+        if !readings.isEmpty {
+            let types = readings.keys.map { "\($0)" }.sorted().joined(separator: ", ")
+            Logger.shared.info("[DeviceManagerAdapter] 📊 Received \(readings.count) reading types: [\(types)]")
+        } else {
+            Logger.shared.warning("[DeviceManagerAdapter] ⚠️ Received empty readings dictionary")
+        }
+        
         // Update heart rate
         if let reading = readings[.heartRate] {
             heartRate = Int(reading.value)
+            Logger.shared.info("[DeviceManagerAdapter] ❤️ Heart Rate: \(heartRate) bpm")
+        } else {
+            Logger.shared.debug("[DeviceManagerAdapter] No heartRate reading in latest")
         }
 
         // Update SpO2
         if let reading = readings[.spo2] {
             spO2 = Int(reading.value)
+            Logger.shared.info("[DeviceManagerAdapter] 🫁 SpO2: \(spO2)%")
+        } else {
+            Logger.shared.debug("[DeviceManagerAdapter] No spO2 reading in latest")
         }
 
         // Update temperature
         if let reading = readings[.temperature] {
             temperature = reading.value
+            Logger.shared.info("[DeviceManagerAdapter] 🌡️ Temperature: \(String(format: "%.1f", temperature))°C")
         }
 
         // Update battery
         if let reading = readings[.battery] {
             batteryLevel = reading.value
+            Logger.shared.info("[DeviceManagerAdapter] 🔋 Battery: \(Int(batteryLevel))%")
         }
 
         // Update PPG values
         if let reading = readings[.ppgRed] {
             ppgRedValue = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] 🔴 PPG Red: \(Int(ppgRedValue))")
         }
 
         if let reading = readings[.ppgInfrared] {
             ppgIRValue = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] 📡 PPG IR: \(Int(ppgIRValue))")
             // Collect IR sample for heart rate calculation
             Task { @MainActor in
                 let irSamples = self.sensorDataProcessor.getPPGIRBuffer()
@@ -156,6 +175,7 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
                         processor: self.sensorDataProcessor
                     ) {
                         self.heartRate = Int(result.bpm)
+                        Logger.shared.info("[DeviceManagerAdapter] 💓 Calculated HR from PPG: \(self.heartRate) bpm")
                     }
                     self.sensorDataProcessor.clearPPGIRBuffer()
                 }
@@ -164,19 +184,23 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
 
         if let reading = readings[.ppgGreen] {
             ppgGreenValue = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] 🟢 PPG Green: \(Int(ppgGreenValue))")
         }
 
         // Update accelerometer values
         if let reading = readings[.accelerometerX] {
             accelX = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] 📊 Accel X: \(Int(accelX))")
         }
 
         if let reading = readings[.accelerometerY] {
             accelY = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] 📊 Accel Y: \(Int(accelY))")
         }
 
         if let reading = readings[.accelerometerZ] {
             accelZ = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] 📊 Accel Z: \(Int(accelZ))")
         }
     }
 
@@ -212,13 +236,13 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
     }
 
     func disconnect() {
-        if let primaryDevice = deviceManager.primaryDevice {
-            deviceManager.disconnect(from: primaryDevice)
-        } else {
-            deviceManager.disconnectAll()
+        Task {
+            if let primaryDevice = deviceManager.primaryDevice {
+                await deviceManager.disconnect(from: primaryDevice)
+            } else {
+                deviceManager.disconnectAll()
+            }
         }
-        sensorDataBuffer.removeAll()
-        deviceState = nil
     }
 
     func startRecording() {

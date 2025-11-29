@@ -108,6 +108,17 @@ protocol BLEDeviceProtocol: AnyObject {
     
     /// Request device information update
     func updateDeviceInfo() async throws
+    
+    // MARK: - Service Discovery (Added Day 2)
+    
+    /// Discover BLE services
+    func discoverServices() async throws
+    
+    /// Discover BLE characteristics
+    func discoverCharacteristics() async throws
+    
+    /// Enable notifications for data streaming
+    func enableNotifications() async throws
 }
 
 // MARK: - Device Command
@@ -319,6 +330,23 @@ class MockBLEDevice: BLEDeviceProtocol {
     
     func updateDeviceInfo() async throws {
         guard isConnected else { throw DeviceError.notConnected }
+    }
+    
+    // MARK: - Service Discovery (Added Day 2)
+    
+    func discoverServices() async throws {
+        // Mock implementation - simulate delay
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+    }
+    
+    func discoverCharacteristics() async throws {
+        // Mock implementation - simulate delay
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+    }
+    
+    func enableNotifications() async throws {
+        // Mock implementation - simulate delay
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
 }
 
