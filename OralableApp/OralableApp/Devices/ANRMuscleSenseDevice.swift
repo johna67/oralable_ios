@@ -80,7 +80,7 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     
     func connect() async throws {
         guard let peripheral = peripheral else {
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("ANR peripheral is nil")
         }
         
         deviceInfo.connectionState = .connecting
@@ -105,11 +105,11 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     
     func startDataStream() async throws {
         guard isConnected else {
-            throw DeviceError.notConnected
+            throw DeviceError.notConnected("ANR device not connected")
         }
-        
+
         guard let peripheral = peripheral else {
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("ANR peripheral is nil")
         }
         
         // Enable notifications for EMG data
@@ -133,9 +133,9 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     
     func requestReading(for sensorType: SensorType) async throws -> SensorReading? {
         guard isConnected else {
-            throw DeviceError.notConnected
+            throw DeviceError.notConnected("ANR device not connected")
         }
-        
+
         return latestReadings[sensorType]
     }
     
@@ -155,12 +155,18 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
             }
         }
         
-        // Update latest readings
+        // PERFORMANCE FIX: Batch update to prevent UI flooding
+        var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
-            latestReadings[reading.sensorType] = reading
+            latestByType[reading.sensorType] = reading
             sensorReadingsSubject.send(reading)
         }
-        
+
+        // Single batch update to latestReadings (triggers publisher only once per type)
+        for (type, reading) in latestByType {
+            latestReadings[type] = reading
+        }
+
         return readings
     }
     
@@ -168,27 +174,27 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
     
     func sendCommand(_ command: DeviceCommand) async throws {
         guard isConnected else {
-            throw DeviceError.notConnected
+            throw DeviceError.notConnected("ANR device not connected")
         }
-        
+
         // Commands not implemented for ANR device
     }
-    
+
     func updateConfiguration(_ config: DeviceConfiguration) async throws {
         guard isConnected else {
-            throw DeviceError.notConnected
+            throw DeviceError.notConnected("ANR device not connected")
         }
-        
+
         // Configuration not implemented for ANR device
     }
-    
+
     func updateDeviceInfo() async throws {
         guard isConnected else {
-            throw DeviceError.notConnected
+            throw DeviceError.notConnected("ANR device not connected")
         }
-        
+
         guard let peripheral = peripheral else {
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("ANR peripheral is nil")
         }
         
         // Read battery

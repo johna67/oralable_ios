@@ -2,10 +2,10 @@ import SwiftUI
 
 @main
 struct OralableApp: App {
+    // Core managers - no legacy OralableBLE
     @StateObject private var authenticationManager: AuthenticationManager
     @StateObject private var healthKitManager: HealthKitManager
     @StateObject private var sensorDataStore: SensorDataStore
-    @StateObject private var bleManager: OralableBLE
     @StateObject private var recordingSessionManager: RecordingSessionManager
     @StateObject private var historicalDataManager: HistoricalDataManager
     @StateObject private var subscriptionManager: SubscriptionManager
@@ -14,13 +14,13 @@ struct OralableApp: App {
     @StateObject private var appStateManager: AppStateManager
     @StateObject private var sharedDataManager: SharedDataManager
     @StateObject private var designSystem: DesignSystem
-    @StateObject private var dependencies: AppDependencies  // ← ADD THIS
-    
+    @StateObject private var dependencies: AppDependencies
+    @StateObject private var recordingStateCoordinator: RecordingStateCoordinator
+
     init() {
         let authenticationManager = AuthenticationManager()
         let healthKitManager = HealthKitManager()
         let sensorDataStore = SensorDataStore()
-        let bleManager = OralableBLE()
         let recordingSessionManager = RecordingSessionManager()
         let sensorDataProcessor = SensorDataProcessor.shared
         let historicalDataManager = HistoricalDataManager(
@@ -35,14 +35,14 @@ struct OralableApp: App {
             sensorDataProcessor: sensorDataProcessor
         )
         let designSystem = DesignSystem()
-        
-        // Create AppDependencies ONCE here
+        let recordingStateCoordinator = RecordingStateCoordinator.shared
+
+        // Create AppDependencies without legacy OralableBLE
         let dependencies = AppDependencies(
             authenticationManager: authenticationManager,
             healthKitManager: healthKitManager,
             recordingSessionManager: recordingSessionManager,
             historicalDataManager: historicalDataManager,
-            bleManager: bleManager,
             sensorDataStore: sensorDataStore,
             subscriptionManager: subscriptionManager,
             deviceManager: deviceManager,
@@ -51,11 +51,10 @@ struct OralableApp: App {
             sharedDataManager: sharedDataManager,
             designSystem: designSystem
         )
-        
+
         _authenticationManager = StateObject(wrappedValue: authenticationManager)
         _healthKitManager = StateObject(wrappedValue: healthKitManager)
         _sensorDataStore = StateObject(wrappedValue: sensorDataStore)
-        _bleManager = StateObject(wrappedValue: bleManager)
         _recordingSessionManager = StateObject(wrappedValue: recordingSessionManager)
         _historicalDataManager = StateObject(wrappedValue: historicalDataManager)
         _subscriptionManager = StateObject(wrappedValue: subscriptionManager)
@@ -64,23 +63,46 @@ struct OralableApp: App {
         _appStateManager = StateObject(wrappedValue: appStateManager)
         _sharedDataManager = StateObject(wrappedValue: sharedDataManager)
         _designSystem = StateObject(wrappedValue: designSystem)
-        _dependencies = StateObject(wrappedValue: dependencies)  // ← ADD THIS
+        _dependencies = StateObject(wrappedValue: dependencies)
+        _recordingStateCoordinator = StateObject(wrappedValue: recordingStateCoordinator)
     }
-    
+
     @Environment(\.scenePhase) private var scenePhase
-    
+
     var body: some Scene {
         WindowGroup {
             LaunchCoordinator()
                 .withDependencies(dependencies)
                 .onChange(of: scenePhase) { oldPhase, newPhase in
-                    if newPhase == .background {
-                        // Sync data when app goes to background
-                        Task {
-                            await sharedDataManager.uploadCurrentDataForSharing()
-                        }
-                    }
+                    handleScenePhaseChange(from: oldPhase, to: newPhase)
                 }
+        }
+    }
+
+    // MARK: - Scene Phase Handling
+
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        switch newPhase {
+        case .background:
+            Logger.shared.info("[OralableApp] App entering background")
+            // Stop recording if active to prevent data loss
+            if recordingStateCoordinator.isRecording {
+                recordingStateCoordinator.stopRecording()
+                Logger.shared.warning("[OralableApp] Recording stopped due to background transition")
+            }
+            // Sync data when app goes to background
+            Task {
+                await sharedDataManager.uploadCurrentDataForSharing()
+            }
+
+        case .inactive:
+            Logger.shared.info("[OralableApp] App becoming inactive")
+
+        case .active:
+            Logger.shared.info("[OralableApp] App becoming active")
+
+        @unknown default:
+            break
         }
     }
 }

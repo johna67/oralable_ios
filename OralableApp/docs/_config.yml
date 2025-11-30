@@ -1,0 +1,14 @@
+# Oralable Legal Pages
+title: Oralable
+description: Smart Bruxism Monitoring - Legal & Support Pages
+baseurl: ""
+url: "https://oralable.com"
+
+# Build settings
+markdown: kramdown
+theme: null
+
+# Exclude files from build
+exclude:
+  - README.md
+  - LICENSE

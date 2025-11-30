@@ -73,7 +73,6 @@ struct SettingsView: View {
 
     let authManager = AuthenticationManager()
     let healthKitManager = HealthKitManager()
-    let bleManager = OralableBLE()
     let recordingSessionManager = RecordingSessionManager()
     let historicalDataManager = HistoricalDataManager(sensorDataProcessor: SensorDataProcessor.shared)
     let sensorDataStore = SensorDataStore()
@@ -91,7 +90,6 @@ struct SettingsView: View {
         healthKitManager: healthKitManager,
         recordingSessionManager: recordingSessionManager,
         historicalDataManager: historicalDataManager,
-        bleManager: bleManager,
         sensorDataStore: sensorDataStore,
         subscriptionManager: subscriptionManager,
         deviceManager: deviceManager,

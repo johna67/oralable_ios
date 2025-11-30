@@ -3,7 +3,8 @@
 //  OralableApp
 //
 //  Complete ViewModel with MAM state detection
-//  Updated: November 28, 2025 - Added DeviceManager integration
+//  Updated: November 29, 2025 - Refactored for RecordingStateCoordinator
+//  Fixed: Timer memory leak, uses single source of truth for recording state
 //
 
 import SwiftUI
@@ -43,53 +44,51 @@ class DashboardViewModel: ObservableObject {
     @Published var muscleActivity: Double = 0.0
     @Published var muscleActivityHistory: [Double] = []
 
-    // Session Management
-    @Published var isRecording: Bool = false
-    @Published var sessionStartTime: Date?
-    
+    // Recording state from coordinator (read-only binding)
+    @Published private(set) var isRecording: Bool = false
+
     // MARK: - Private Properties
-    private let bleManager: BLEManagerProtocol
+    private let deviceManagerAdapter: DeviceManagerAdapter
     private let deviceManager: DeviceManager
     private let appStateManager: AppStateManager
+    private let recordingStateCoordinator: RecordingStateCoordinator
     private var cancellables = Set<AnyCancellable>()
-    private var sessionTimer: Timer?
 
     // MARK: - Initialization
 
-    /// Initialize with injected dependencies (preferred)
-    /// - Parameters:
-    ///   - bleManager: BLE manager conforming to protocol (allows mocking for tests)
-    ///   - deviceManager: Device manager for connection state
-    ///   - appStateManager: App state manager
-    init(bleManager: BLEManagerProtocol, deviceManager: DeviceManager, appStateManager: AppStateManager) {
-        self.bleManager = bleManager
+    init(deviceManagerAdapter: DeviceManagerAdapter,
+         deviceManager: DeviceManager,
+         appStateManager: AppStateManager,
+         recordingStateCoordinator: RecordingStateCoordinator) {
+        self.deviceManagerAdapter = deviceManagerAdapter
         self.deviceManager = deviceManager
         self.appStateManager = appStateManager
+        self.recordingStateCoordinator = recordingStateCoordinator
         setupBindings()
-        Logger.shared.info("[DashboardViewModel] ✅ Initializing with protocol-based dependency injection")
+        Logger.shared.info("[DashboardViewModel] ✅ Initialized with RecordingStateCoordinator")
+    }
+
+    deinit {
+        // Cancellables will be cleaned up automatically
+        Logger.shared.info("[DashboardViewModel] deinit - cleaning up subscriptions")
     }
 
     // MARK: - Public Methods
     func startMonitoring() {
         setupBLESubscriptions()
-        startSessionTimer()
-        Logger.shared.info("[DashboardViewModel] ✅ Mock data DISABLED - waiting for real device data")
+        Logger.shared.info("[DashboardViewModel] ✅ Monitoring started - waiting for real device data")
     }
-    
+
     func stopMonitoring() {
-        sessionTimer?.invalidate()
+        // Subscriptions cleaned up via cancellables
     }
-    
+
     func startRecording() {
-        isRecording = true
-        sessionStartTime = Date()
-        bleManager.startRecording()
+        recordingStateCoordinator.startRecording()
     }
-    
+
     func stopRecording() {
-        isRecording = false
-        sessionStartTime = nil
-        bleManager.stopRecording()
+        recordingStateCoordinator.stopRecording()
     }
 
     func disconnect() {
@@ -111,45 +110,54 @@ class DashboardViewModel: ObservableObject {
             await deviceManager.startScanning()
         }
     }
-    
+
     // MARK: - Private Methods
     private func setupBindings() {
-        // CRITICAL PERFORMANCE FIX: Throttle connection state updates
-        
-        // Connection state from DeviceManager (new readiness-aware state)
+        // Bind recording state from coordinator (single source of truth)
+        recordingStateCoordinator.$isRecording
+            .assign(to: &$isRecording)
+
+        // Bind session duration from coordinator
+        recordingStateCoordinator.$sessionDuration
+            .map { duration -> String in
+                let minutes = Int(duration / 60)
+                let seconds = Int(duration) % 60
+                return String(format: "%02d:%02d", minutes, seconds)
+            }
+            .assign(to: &$sessionDuration)
+
+        // Connection state from DeviceManager (readiness-aware) - reduced throttle
         deviceManager.$connectedDevices
-            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] devices in
                 guard let self = self else { return }
-                // Device is truly connected only when readiness state is .ready
                 self.isConnected = !devices.isEmpty && self.deviceManager.primaryDeviceReadiness == .ready
                 if !self.isConnected {
                     self.resetMetrics()
                 }
             }
             .store(in: &cancellables)
-        
-        // Also watch readiness state changes
+
+        // Also watch readiness state changes - reduced throttle
         deviceManager.$deviceReadiness
-            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] readinessDict in
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in
                 guard let self = self else { return }
-                // Update connection state when readiness changes
                 self.isConnected = !self.deviceManager.connectedDevices.isEmpty &&
                                   self.deviceManager.primaryDeviceReadiness == .ready
             }
             .store(in: &cancellables)
-        
+
         // Device name from primary device
         deviceManager.$primaryDevice
-            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] device in
                 self?.deviceName = device?.name ?? ""
             }
             .store(in: &cancellables)
 
         // Battery level (throttled)
-        bleManager.batteryLevelPublisher
+        deviceManagerAdapter.batteryLevelPublisher
             .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] level in
                 self?.batteryLevel = level
@@ -157,30 +165,25 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Device state from DeviceStateDetector
-        bleManager.deviceStatePublisher
+        deviceManagerAdapter.deviceStatePublisher
             .sink { [weak self] stateResult in
                 guard let self = self, let stateResult = stateResult else { return }
                 self.updateMAMStates(from: stateResult)
             }
             .store(in: &cancellables)
     }
-    
-    private func setupBLESubscriptions() {
-        // CRITICAL PERFORMANCE FIX: Throttle all subscriptions to prevent SwiftUI rendering storm
-        // Sensor data arrives every 10-14ms, but UI only needs to update 1-2x per second
-        // Without throttling: 60-100 view re-renders/sec = iPhone freeze
-        // With throttling: 2 view re-renders/sec = smooth UI
 
-        // Subscribe to Heart Rate (calculated from PPG) - using protocol publisher
-        bleManager.heartRatePublisher
+    private func setupBLESubscriptions() {
+        // Subscribe to Heart Rate
+        deviceManagerAdapter.heartRatePublisher
             .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] hr in
                 self?.heartRate = hr
             }
             .store(in: &cancellables)
 
-        // Subscribe to SpO2 (calculated from PPG) - using protocol publisher
-        bleManager.spO2Publisher
+        // Subscribe to SpO2
+        deviceManagerAdapter.spO2Publisher
             .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] spo2 in
                 self?.spO2 = spo2
@@ -188,7 +191,7 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to PPG data for waveform
-        bleManager.ppgRedValuePublisher
+        deviceManagerAdapter.ppgRedValuePublisher
             .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] value in
                 self?.processPPGData(value)
@@ -196,8 +199,8 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to accelerometer data
-        bleManager.accelXPublisher
-            .combineLatest(bleManager.accelYPublisher, bleManager.accelZPublisher)
+        deviceManagerAdapter.accelXPublisher
+            .combineLatest(deviceManagerAdapter.accelYPublisher, deviceManagerAdapter.accelZPublisher)
             .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] x, y, z in
                 self?.processAccelerometerData(x: x, y: y, z: z)
@@ -205,7 +208,7 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to temperature
-        bleManager.temperaturePublisher
+        deviceManagerAdapter.temperaturePublisher
             .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] temp in
                 self?.temperature = temp
@@ -213,59 +216,36 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to HR quality for signal quality display
-        bleManager.heartRateQualityPublisher
+        deviceManagerAdapter.heartRateQualityPublisher
             .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] quality in
                 self?.signalQuality = Int(quality * 100)
             }
             .store(in: &cancellables)
     }
-    
+
     private func processPPGData(_ value: Double) {
-        // Update PPG waveform
         ppgData.append(value)
         if ppgData.count > 100 {
             ppgData.removeFirst()
         }
 
-        // Update muscle activity (derived from PPG IR)
         muscleActivity = value
         muscleActivityHistory.append(value)
         if muscleActivityHistory.count > 20 {
             muscleActivityHistory.removeFirst()
         }
     }
-    
+
     private func processAccelerometerData(x: Double, y: Double, z: Double) {
-        // Calculate magnitude for movement detection
         let magnitude = sqrt(x*x + y*y + z*z)
 
-        // Update accelerometer waveform
         accelerometerData.append(magnitude)
         if accelerometerData.count > 100 {
             accelerometerData.removeFirst()
         }
     }
-    
-    private func startSessionTimer() {
-        sessionTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateSessionDuration()
-        }
-    }
-    
-    private func updateSessionDuration() {
-        guard let startTime = sessionStartTime else {
-            sessionDuration = "00:00"
-            return
-        }
-        
-        let elapsed = Date().timeIntervalSince(startTime)
-        let minutes = Int(elapsed / 60)
-        let seconds = Int(elapsed) % 60
-        sessionDuration = String(format: "%02d:%02d", minutes, seconds)
-    }
-    
-    /// Maps DeviceStateResult to MAM indicator states
+
     private func updateMAMStates(from stateResult: DeviceStateResult) {
         deviceStateDescription = stateResult.state.rawValue
         deviceStateConfidence = stateResult.confidence
@@ -289,7 +269,6 @@ class DashboardViewModel: ObservableObject {
         case .onCheek:
             isCharging = false
             isMoving = false
-            // Position quality based on confidence
             if stateResult.confidence >= 0.8 {
                 positionQuality = "Good"
             } else if stateResult.confidence >= 0.6 {
@@ -319,17 +298,11 @@ class DashboardViewModel: ObservableObject {
         deviceStateDescription = "Unknown"
         deviceStateConfidence = 0.0
     }
-    
 }
 
 // MARK: - Extensions
 extension DashboardViewModel {
-    // Convenience methods for UI (connection state now comes from throttled @Published properties)
     func toggleRecording() {
-        if isRecording {
-            stopRecording()
-        } else {
-            startRecording()
-        }
+        recordingStateCoordinator.toggleRecording()
     }
 }

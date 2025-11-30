@@ -79,7 +79,7 @@ class RealBLEDataProvider: SensorDataProvider {
 
     func connect() async throws {
         guard let device = deviceManager.discoveredDevices.first else {
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("No discovered devices available")
         }
         try await deviceManager.connect(to: device)
     }

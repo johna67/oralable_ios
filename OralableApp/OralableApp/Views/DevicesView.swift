@@ -161,11 +161,14 @@ struct DevicesView: View {
     }
 
     private func startScanning() {
+        Logger.shared.info("[DevicesView] 🔍 User tapped Scan button")
         isScanning = true
         Task {
+            Logger.shared.info("[DevicesView] 🔍 Calling deviceManager.startScanning()")
             await deviceManager.startScanning()
             try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
             await MainActor.run {
+                Logger.shared.info("[DevicesView] ⏱️ Scan timeout reached (10s), stopping scan")
                 isScanning = false
                 deviceManager.stopScanning()
             }
@@ -173,29 +176,38 @@ struct DevicesView: View {
     }
 
     private func connectToDevice(id: String) {
+        Logger.shared.info("[DevicesView] 🔌 connectToDevice called for id: \(id)")
         if let device = deviceManager.discoveredDevices.first(where: { $0.peripheralIdentifier?.uuidString == id }) {
+            Logger.shared.info("[DevicesView] 🔌 Found device in discoveredDevices: \(device.name)")
             Task {
                 do {
+                    Logger.shared.info("[DevicesView] 🔌 Calling deviceManager.connect(to: \(device.name))")
                     try await deviceManager.connect(to: device)
+                    Logger.shared.info("[DevicesView] ✅ Connection initiated successfully")
                 } catch {
-                    Logger.shared.error("[DevicesView] Failed to connect: \(error.localizedDescription)")
+                    Logger.shared.error("[DevicesView] ❌ Failed to connect: \(error.localizedDescription)")
                 }
             }
         } else {
+            Logger.shared.warning("[DevicesView] ⚠️ Device not in discovered list, starting scan to find it")
             // Device not in discovered list, start scanning to find it
             startScanning()
         }
     }
 
     private func connectToNewDevice(_ device: DeviceInfo) {
+        Logger.shared.info("[DevicesView] 🔌 connectToNewDevice called for: \(device.name)")
         Task {
             do {
+                Logger.shared.info("[DevicesView] 🔌 Calling deviceManager.connect(to: \(device.name))")
                 try await deviceManager.connect(to: device)
+                Logger.shared.info("[DevicesView] ✅ Connection initiated successfully")
                 if let peripheralId = device.peripheralIdentifier {
                     persistenceManager.rememberDevice(id: peripheralId.uuidString, name: device.name)
+                    Logger.shared.info("[DevicesView] 💾 Device remembered: \(device.name)")
                 }
             } catch {
-                Logger.shared.error("[DevicesView] Failed to connect: \(error.localizedDescription)")
+                Logger.shared.error("[DevicesView] ❌ Failed to connect: \(error.localizedDescription)")
             }
         }
     }
@@ -322,7 +334,6 @@ struct DeviceRow: View {
 struct DevicesView_Previews: PreviewProvider {
     static var previews: some View {
         let appState = AppStateManager()
-        let ble = OralableBLE()
         let healthKit = HealthKitManager()
         let sensorStore = SensorDataStore()
         let recordingSession = RecordingSessionManager()
@@ -342,7 +353,6 @@ struct DevicesView_Previews: PreviewProvider {
             healthKitManager: healthKit,
             recordingSessionManager: recordingSession,
             historicalDataManager: historicalData,
-            bleManager: ble,
             sensorDataStore: sensorStore,
             subscriptionManager: subscription,
             deviceManager: device,

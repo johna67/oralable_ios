@@ -2,923 +2,733 @@
 //  OralableDevice.swift
 //  OralableApp
 //
-//  CORRECTED: November 11, 2025
-//  Fixed: SensorReading structure, protocol conformance, init signature
-//  UPDATED: November 28, 2025
-//  Added: Async/await discovery methods for proper notification enabling
+//  Created: November 2024
+//  UPDATED: November 29, 2025 (Day 4)
+//  Fixed: Batch updates to prevent performance flooding (60+ UI updates/sec)
+//  Fixed: Removed PPG validation to allow all values for debugging
 //
 
 import Foundation
 import CoreBluetooth
 import Combine
 
-/// Oralable device implementation
-class OralableDevice: NSObject, BLEDeviceProtocol, ObservableObject {
-    
-    // MARK: - BLE Service & Characteristic UUIDs
-    
-    private struct BLEConstants {
-        // ✅ CORRECTED: TGM Service UUIDs (verified from nRF Connect 11/11/2025)
-        static let serviceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-        
-        // TGM Characteristics (from nRF Connect discovery)
-        static let sensorDataCharacteristicUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let ppgWaveformCharacteristicUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic003UUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic004UUID = CBUUID(string: "3A0FF004-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic005UUID = CBUUID(string: "3A0FF005-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic006UUID = CBUUID(string: "3A0FF006-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic007UUID = CBUUID(string: "3A0FF007-98C4-46B2-94AF-1AEE0FD4C48E")
-        static let characteristic008UUID = CBUUID(string: "3A0FF008-98C4-46B2-94AF-1AEE0FD4C48E")
-        
-        // Standard BLE Services
-        static let batteryServiceUUID = CBUUID(string: "180F")
-        static let batteryLevelCharacteristicUUID = CBUUID(string: "2A19")
-        static let deviceInfoServiceUUID = CBUUID(string: "180A")
-        static let firmwareVersionCharacteristicUUID = CBUUID(string: "2A26")
-        static let hardwareVersionCharacteristicUUID = CBUUID(string: "2A27")
-    }
-    
-    // MARK: - Published Properties
-    
-    @Published private(set) var deviceInfo: DeviceInfo
-    let deviceType: DeviceType = .oralable
-    var name: String
-    var peripheral: CBPeripheral?  // Strong reference to prevent deallocation
-    
-    @Published private(set) var connectionState: DeviceConnectionState = .disconnected
-    @Published private(set) var signalStrength: Int?
-    @Published private(set) var batteryLevel: Int?
-    @Published private(set) var firmwareVersion: String?
-    @Published private(set) var hardwareVersion: String?
-    
-    @Published private(set) var latestReadings: [SensorType: SensorReading] = [:]
-    
-    // MARK: - Sensor Data
+/// Oralable-specific BLE device implementation
+class OralableDevice: NSObject, BLEDeviceProtocol {
+    // MARK: - BLE Protocol Properties
 
-    private let sensorReadingsSubject = PassthroughSubject<SensorReading, Never>()
+    var deviceInfo: DeviceInfo
+    var peripheral: CBPeripheral?
+
+    // MARK: - Protocol Required Properties
+
+    var deviceType: DeviceType { .oralable }
+    var name: String { deviceInfo.name }
+    var connectionState: DeviceConnectionState { deviceInfo.connectionState }
+    var isConnected: Bool { peripheral?.state == .connected }
+    var signalStrength: Int? { deviceInfo.signalStrength }
+    var firmwareVersion: String? { nil }
+    var hardwareVersion: String? { nil }
+
+    var supportedSensors: [SensorType] {
+        [.ppgRed, .ppgInfrared, .ppgGreen, .accelerometerX, .accelerometerY, .accelerometerZ, .temperature, .battery]
+    }
+
+    private let readingsSubject = PassthroughSubject<SensorReading, Never>()
     var sensorReadings: AnyPublisher<SensorReading, Never> {
-        sensorReadingsSubject.eraseToAnyPublisher()
+        readingsSubject.eraseToAnyPublisher()
     }
 
-    // Batch subject for efficient multi-reading delivery
-    private let sensorReadingsBatchSubject = PassthroughSubject<[SensorReading], Never>()
+    private let readingsBatchSubject = PassthroughSubject<[SensorReading], Never>()
     var sensorReadingsBatch: AnyPublisher<[SensorReading], Never> {
-        sensorReadingsBatchSubject.eraseToAnyPublisher()
+        readingsBatchSubject.eraseToAnyPublisher()
     }
-    
-    let supportedSensors: [SensorType] = [
-        .ppgRed,
-        .ppgInfrared,
-        .ppgGreen,
-        .accelerometerX,
-        .accelerometerY,
-        .accelerometerZ,
-        .temperature,
-        .battery
-    ]
-    
-    var isConnected: Bool {
-        connectionState == .connected
-    }
-    
-    // MARK: - Private Properties
 
-    private var configuration: DeviceConfiguration = .defaultOralable
-    private var isStreaming = false
+    @Published var latestReadings: [SensorType: SensorReading] = [:]
+    @Published var batteryLevel: Int?
+    
+    // MARK: - TGM Service & Characteristics
+    
+    private let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
+    private let sensorDataCharUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
+    private let commandCharUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
+    private let ppgWaveformCharUUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")
+    
+    private var tgmService: CBService?
     private var sensorDataCharacteristic: CBCharacteristic?
+    private var commandCharacteristic: CBCharacteristic?
     private var ppgWaveformCharacteristic: CBCharacteristic?
-    private var controlCharacteristic: CBCharacteristic?
-    private var batteryCharacteristic: CBCharacteristic?
-    private var otherCharacteristics: [CBCharacteristic] = []  // For characteristics 003-008
-    private var cancellables = Set<AnyCancellable>()
-
-    // Continuation for waiting until service discovery completes (legacy)
-    private var connectionContinuation: CheckedContinuation<Void, Error>?
-
-    // Day 2: Continuations for async/await discovery methods
+    
+    // MARK: - Data Collection State
+    
+    private var isCollecting = false
+    private var sessionStartTime: Date?
+    
+    // Continuations for async/await flow
     private var serviceDiscoveryContinuation: CheckedContinuation<Void, Error>?
-    private var characteristicsDiscoveryContinuation: CheckedContinuation<Void, Error>?
+    private var characteristicDiscoveryContinuation: CheckedContinuation<Void, Error>?
     private var notificationEnableContinuation: CheckedContinuation<Void, Error>?
-
-    // Packet counter for throttled logging
-    private var packetCount = 0
-
-    // Last timestamp used for sensor data (to ensure monotonically increasing timestamps)
-    private var lastTimestamp: Date = Date()
-    private let timestampLock = NSLock()
-
+    private var accelerometerNotificationContinuation: CheckedContinuation<Void, Error>?
+    
+    // MARK: - Statistics
+    
+    private var packetsReceived: Int = 0
+    private var bytesReceived: Int = 0
+    private var lastPacketTime: Date?
+    private var ppgFrameCount: Int = 0
+    
     // MARK: - Initialization
     
-    init(peripheral: CBPeripheral, deviceInfo: DeviceInfo? = nil) {
+    init(peripheral: CBPeripheral) {
         self.peripheral = peripheral
-        self.name = peripheral.name ?? "Oralable Device"
-        self.deviceInfo = deviceInfo ?? DeviceInfo(
+        
+        // Create device info
+        self.deviceInfo = DeviceInfo(
             type: .oralable,
-            name: peripheral.name ?? "Oralable Device",
+            name: peripheral.name ?? "Oralable",
             peripheralIdentifier: peripheral.identifier,
-            connectionState: .disconnected
+            connectionState: .disconnected,
+            signalStrength: nil
         )
         
         super.init()
+        
+        Logger.shared.info("[OralableDevice] Initialized for '\(deviceInfo.name)'")
+        Logger.shared.info("[OralableDevice] Using TGM Service UUID: \(tgmServiceUUID.uuidString)")
+        
         peripheral.delegate = self
-        
-        Logger.shared.info("[OralableDevice] Initialized for '\(name)'")
-        Logger.shared.info("[OralableDevice] Using TGM Service UUID: \(BLEConstants.serviceUUID.uuidString)")
     }
     
-    // MARK: - Connection Management
-    
-    func connect() async throws {
-        guard let peripheral = peripheral else {
-            Logger.shared.error("[OralableDevice] No peripheral available")
-            throw DeviceError.invalidPeripheral
-        }
-
-        Logger.shared.info("[OralableDevice] connect() called")
-        Logger.shared.info("[OralableDevice] Peripheral state: \(peripheral.state.rawValue)")
-
-        connectionState = .connecting
-        deviceInfo.connectionState = .connecting
-
-        // Wait for service discovery to complete
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            self.connectionContinuation = continuation
-
-            Logger.shared.info("[OralableDevice] Discovering services...")
-            peripheral.discoverServices([
-                BLEConstants.serviceUUID,
-                BLEConstants.batteryServiceUUID,
-                BLEConstants.deviceInfoServiceUUID
-            ])
-        }
-
-        Logger.shared.info("[OralableDevice] connect() completed - services and characteristics discovered")
-    }
-    
-    func disconnect() async {
-        Logger.shared.info("[OralableDevice] disconnect() called")
-        
-        connectionState = .disconnecting
-        deviceInfo.connectionState = .disconnecting
-        isStreaming = false
-
-        if let characteristic = sensorDataCharacteristic {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        if let characteristic = ppgWaveformCharacteristic {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        if let characteristic = batteryCharacteristic {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        for characteristic in otherCharacteristics {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        connectionState = .disconnected
-        deviceInfo.connectionState = .disconnected
-        Logger.shared.info("[OralableDevice] Disconnected")
-    }
-    
-    func isAvailable() -> Bool {
-        guard let peripheral = peripheral else { return false }
-        return peripheral.state == .connected || peripheral.state == .connecting
-    }
-    
-    // MARK: - Day 2: Async/Await Discovery Methods
-    
-    // Convenience UUIDs for findCharacteristic
-    private let TGM_SERVICE_UUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
-    private let SENSOR_DATA_CHARACTERISTIC_UUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
-    private let PPG_WAVEFORM_CHARACTERISTIC_UUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
+    // MARK: - Service Discovery (Day 2: Async/await)
     
     func discoverServices() async throws {
-        Logger.shared.info("[OralableDevice] Discovering services...")
+        guard let peripheral = peripheral else {
+            throw DeviceError.invalidPeripheral("Peripheral is nil")
+        }
+        
+        Logger.shared.info("[OralableDevice] 🔍 Starting service discovery...")
         
         return try await withCheckedThrowingContinuation { continuation in
             self.serviceDiscoveryContinuation = continuation
-            peripheral?.discoverServices([TGM_SERVICE_UUID])
+            peripheral.discoverServices([tgmServiceUUID])
         }
     }
     
     func discoverCharacteristics() async throws {
-        guard let tgmService = peripheral?.services?.first(where: { $0.uuid == TGM_SERVICE_UUID }) else {
-            Logger.shared.error("[OralableDevice] TGM service not found")
-            throw DeviceError.serviceNotFound("TGM Service")        }
+        guard let service = tgmService else {
+            throw DeviceError.serviceNotFound("TGM service not found")
+        }
         
-        Logger.shared.info("[OralableDevice] Discovering characteristics...")
+        Logger.shared.info("[OralableDevice] 🔍 Starting characteristic discovery...")
         
         return try await withCheckedThrowingContinuation { continuation in
-            self.characteristicsDiscoveryContinuation = continuation
-            peripheral?.discoverCharacteristics(nil, for: tgmService)
+            self.characteristicDiscoveryContinuation = continuation
+            peripheral?.discoverCharacteristics([
+                sensorDataCharUUID,
+                commandCharUUID,
+                ppgWaveformCharUUID
+            ], for: service)
         }
     }
     
     func enableNotifications() async throws {
-        Logger.shared.info("[OralableDevice] Enabling notifications on sensor data characteristic...")
+        guard let peripheral = peripheral,
+              let characteristic = sensorDataCharacteristic else {
+            throw DeviceError.characteristicNotFound("Sensor data characteristic not found")
+        }
         
-        // Enable notifications on sensor data characteristic (3A0FF001)
-        guard let sensorChar = findCharacteristic(SENSOR_DATA_CHARACTERISTIC_UUID) else {
-            Logger.shared.error("[OralableDevice] ❌ Sensor data characteristic not found")
-            throw DeviceError.characteristicNotFound("Sensor Data")        }
-        
-        Logger.shared.info("[OralableDevice] Enabling notifications on sensor data characteristic")
+        Logger.shared.info("[OralableDevice] 🔔 Enabling notifications on main characteristic...")
         
         return try await withCheckedThrowingContinuation { continuation in
             self.notificationEnableContinuation = continuation
-            peripheral?.setNotifyValue(true, for: sensorChar)
+            peripheral.setNotifyValue(true, for: characteristic)
         }
-        
-        // Note: The accelerometer characteristic notifications will be enabled separately
-        // after the main continuation is resumed, to avoid blocking the ready state
     }
     
+    // Day 2: Enable accelerometer notifications (non-blocking)
     func enableAccelerometerNotifications() async {
-        // Enable notifications on PPG waveform characteristic (3A0FF002 - actually accelerometer data)
-        if let ppgChar = findCharacteristic(PPG_WAVEFORM_CHARACTERISTIC_UUID) {
-            Logger.shared.info("[OralableDevice] Enabling PPG waveform (accelerometer) notifications")
-            peripheral?.setNotifyValue(true, for: ppgChar)
-        } else {
-            Logger.shared.warning("[OralableDevice] PPG waveform characteristic not available - accelerometer data will not stream")
+        guard let peripheral = peripheral,
+              let characteristic = ppgWaveformCharacteristic else {
+            Logger.shared.warning("[OralableDevice] ⚠️ PPG Waveform characteristic not found for accelerometer")
+            return
         }
-    }
-    
-    private func findCharacteristic(_ uuid: CBUUID) -> CBCharacteristic? {
-        guard let services = peripheral?.services else { return nil }
-        for service in services {
-            if let characteristics = service.characteristics {
-                if let char = characteristics.first(where: { $0.uuid == uuid }) {
-                    return char
-                }
+
+        Logger.shared.info("[OralableDevice] 🔔 Enabling notifications on accelerometer characteristic...")
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                self.accelerometerNotificationContinuation = continuation
+                peripheral.setNotifyValue(true, for: characteristic)
             }
+            Logger.shared.info("[OralableDevice] ✅ Accelerometer notifications enabled")
+        } catch {
+            Logger.shared.warning("[OralableDevice] ⚠️ Failed to enable accelerometer notifications: \(error.localizedDescription)")
         }
-        return nil
+    }
+
+    // MARK: - LED Configuration
+
+    /// Configure PPG LED pulse amplitudes after connection
+    func configurePPGLEDs() async throws {
+        guard let peripheral = peripheral,
+              let commandChar = commandCharacteristic else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Command characteristic not available for LED config")
+            return
+        }
+
+        Logger.shared.info("[OralableDevice] 💡 Configuring PPG LEDs...")
+
+        // LED pulse amplitude values (0x00 = off, 0xFF = max)
+        // Start with moderate values to avoid saturation
+        let irAmplitude: UInt8 = 0x60      // IR LED (register 0x24)
+        let redAmplitude: UInt8 = 0x60     // Red LED (register 0x25)
+        let greenAmplitude: UInt8 = 0x30   // Green LED (register 0x23)
+
+        // Configure Green LED (LED1)
+        let greenCommand = Data([0x23, greenAmplitude])
+        peripheral.writeValue(greenCommand, for: commandChar, type: .withResponse)
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
+
+        // Configure IR LED (LED2)
+        let irCommand = Data([0x24, irAmplitude])
+        peripheral.writeValue(irCommand, for: commandChar, type: .withResponse)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Configure Red LED (LED3)
+        let redCommand = Data([0x25, redAmplitude])
+        peripheral.writeValue(redCommand, for: commandChar, type: .withResponse)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        Logger.shared.info("[OralableDevice] ✅ PPG LEDs configured - IR:0x\(String(format: "%02X", irAmplitude)), Red:0x\(String(format: "%02X", redAmplitude)), Green:0x\(String(format: "%02X", greenAmplitude))")
+    }
+
+    // MARK: - Continuation Cleanup
+
+    /// Cancel any pending continuations to prevent hangs on disconnect
+    func cancelPendingContinuations() {
+        if let continuation = serviceDiscoveryContinuation {
+            continuation.resume(throwing: DeviceError.connectionLost)
+            serviceDiscoveryContinuation = nil
+            Logger.shared.info("[OralableDevice] Cancelled pending service discovery continuation")
+        }
+        if let continuation = characteristicDiscoveryContinuation {
+            continuation.resume(throwing: DeviceError.connectionLost)
+            characteristicDiscoveryContinuation = nil
+            Logger.shared.info("[OralableDevice] Cancelled pending characteristic discovery continuation")
+        }
+        if let continuation = notificationEnableContinuation {
+            continuation.resume(throwing: DeviceError.connectionLost)
+            notificationEnableContinuation = nil
+            Logger.shared.info("[OralableDevice] Cancelled pending notification enable continuation")
+        }
+        if let continuation = accelerometerNotificationContinuation {
+            continuation.resume(throwing: DeviceError.connectionLost)
+            accelerometerNotificationContinuation = nil
+            Logger.shared.info("[OralableDevice] Cancelled pending accelerometer notification continuation")
+        }
+    }
+
+    // MARK: - Data Collection Control
+
+    func startDataCollection() async throws {
+        guard let peripheral = peripheral else {
+            throw DeviceError.invalidPeripheral("Peripheral is nil")
+        }
+
+        guard peripheral.state == .connected else {
+            throw DeviceError.notConnected("Peripheral not connected")
+        }
+        
+        Logger.shared.info("[OralableDevice] Starting data collection...")
+        
+        isCollecting = true
+        sessionStartTime = Date()
+        packetsReceived = 0
+        bytesReceived = 0
+        ppgFrameCount = 0
+        
+        Logger.shared.info("[OralableDevice] ✅ Data collection started")
     }
     
-    // MARK: - Data Operations
-    
+    func stopDataCollection() async throws {
+        Logger.shared.info("[OralableDevice] Stopping data collection...")
+        
+        isCollecting = false
+        
+        if let startTime = sessionStartTime {
+            let duration = Date().timeIntervalSince(startTime)
+            Logger.shared.info("[OralableDevice] Session duration: \(String(format: "%.1f", duration))s")
+            Logger.shared.info("[OralableDevice] Packets received: \(packetsReceived)")
+            Logger.shared.info("[OralableDevice] Bytes received: \(bytesReceived)")
+            Logger.shared.info("[OralableDevice] PPG frames: \(ppgFrameCount)")
+        }
+        
+        sessionStartTime = nil
+        
+        Logger.shared.info("[OralableDevice] ✅ Data collection stopped")
+    }
+
+    // MARK: - Protocol Required Methods
+
+    func connect() async throws {
+        // Connection is handled by DeviceManager/BLECentralManager
+        Logger.shared.info("[OralableDevice] Connect called - handled by BLE manager")
+    }
+
+    func disconnect() async {
+        Logger.shared.info("[OralableDevice] Disconnect called")
+    }
+
+    func isAvailable() -> Bool {
+        peripheral != nil
+    }
+
     func startDataStream() async throws {
-        Logger.shared.debug("[OralableDevice] startDataStream() called")
-        Logger.shared.debug("[OralableDevice] isConnected: \(isConnected)")
-        Logger.shared.debug("[OralableDevice] connectionState: \(connectionState)")
-        Logger.shared.debug("[OralableDevice] sensorDataCharacteristic: \(sensorDataCharacteristic != nil ? "✓" : "✗")")
-        Logger.shared.debug("[OralableDevice] ppgWaveformCharacteristic: \(ppgWaveformCharacteristic != nil ? "✓" : "✗")")
-
-        guard isConnected else {
-            Logger.shared.error("[OralableDevice] Not connected - cannot start data stream")
-            throw DeviceError.notConnected
-        }
-
-        guard let characteristic = sensorDataCharacteristic else {
-            Logger.shared.error("[OralableDevice] Sensor data characteristic not found")
-            throw DeviceError.characteristicNotFound("Sensor Data")
-        }
-
-        Logger.shared.debug("[OralableDevice] Enabling sensor data notifications on characteristic \(characteristic.uuid.uuidString)")
-        peripheral?.setNotifyValue(true, for: characteristic)
-        isStreaming = true
-        Logger.shared.info("[OralableDevice] Sensor data notifications enabled")
-
-        if let ppgChar = ppgWaveformCharacteristic {
-            Logger.shared.debug("[OralableDevice] Enabling PPG waveform notifications on characteristic \(ppgChar.uuid.uuidString)")
-            peripheral?.setNotifyValue(true, for: ppgChar)
-            Logger.shared.info("[OralableDevice] PPG waveform notifications enabled")
-        } else {
-            Logger.shared.warning("[OralableDevice] PPG waveform characteristic not available - skipping")
-        }
-
-        // Enable notifications on battery characteristic
-        if let batteryChar = batteryCharacteristic {
-            Logger.shared.info("[OralableDevice] Enabling battery notifications on characteristic \(batteryChar.uuid.uuidString)")
-            peripheral?.setNotifyValue(true, for: batteryChar)
-            Logger.shared.info("[OralableDevice] Battery notifications enabled")
-        } else {
-            Logger.shared.warning("[OralableDevice] Battery characteristic not available - skipping")
-        }
-
-        // Enable notifications on other TGM characteristics (may contain temperature, etc.)
-        for char in otherCharacteristics {
-            Logger.shared.debug("[OralableDevice] Enabling notifications on characteristic \(char.uuid.uuidString)")
-            peripheral?.setNotifyValue(true, for: char)
-        }
-        if !otherCharacteristics.isEmpty {
-            Logger.shared.info("[OralableDevice] Enabled notifications on \(otherCharacteristics.count) additional TGM characteristics")
-        }
-
-        Logger.shared.info("[OralableDevice] Data stream started successfully")
+        try await startDataCollection()
     }
-    
+
     func stopDataStream() async {
-        Logger.shared.debug("[OralableDevice] stopDataStream() called")
-
-        if let characteristic = sensorDataCharacteristic {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        if let characteristic = ppgWaveformCharacteristic {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        if let characteristic = batteryCharacteristic {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        for characteristic in otherCharacteristics {
-            peripheral?.setNotifyValue(false, for: characteristic)
-        }
-
-        isStreaming = false
-        Logger.shared.info("[OralableDevice] Data streaming stopped")
+        try? await stopDataCollection()
     }
-    
+
     func requestReading(for sensorType: SensorType) async throws -> SensorReading? {
-        guard isConnected else {
-            throw DeviceError.notConnected
-        }
-        
-        guard supportedSensors.contains(sensorType) else {
-            throw DeviceError.operationNotSupported
-        }
-        
-        return latestReadings[sensorType]
+        latestReadings[sensorType]
     }
-    
-    func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
-        // Get next timestamp (ensure it's always increasing)
-        timestampLock.lock()
-        let now = Date()
-        // Ensure timestamp advances by at least 0.02 seconds (50Hz) from last packet
-        let minNextTimestamp = lastTimestamp.addingTimeInterval(0.02)
-        let timestamp = now > minNextTimestamp ? now : minNextTimestamp
-        lastTimestamp = timestamp
-        timestampLock.unlock()
 
-        // Route based on known characteristic UUIDs (no logging per packet - too verbose)
-        if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
-            return parseSensorData(data, timestamp: timestamp)
-        } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
-            return parsePPGWaveform(data, timestamp: timestamp)
-        } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-            return parseBatteryData(data, timestamp: timestamp)
-        } else {
-            // For unknown characteristics (003-008), use data size to identify type
-            switch data.count {
-            case 4:
-                return parseBatteryData(data, timestamp: timestamp)
-            case 8:
-                return parseTemperatureData(data, timestamp: timestamp)
-            case 154:
-                return parsePPGWaveform(data, timestamp: timestamp)
-            case 244:
-                return parseSensorData(data, timestamp: timestamp)
-            default:
-                // Only log unknown formats
-                Logger.shared.warning("[OralableDevice] Unknown data format: \(data.count) bytes from \(characteristic.uuid.uuidString)")
-                let hexPreview = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
-                Logger.shared.debug("   First 32 bytes: \(hexPreview)")
-                return []
-            }
-        }
+    func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
+        // Parsing is handled internally by delegate methods
+        []
     }
-    
-    // MARK: - Device Control
-    
+
     func sendCommand(_ command: DeviceCommand) async throws {
-        guard isConnected else {
-            throw DeviceError.notConnected
+        guard let peripheral = peripheral,
+              let characteristic = commandCharacteristic else {
+            throw DeviceError.characteristicNotFound("Command characteristic not found")
         }
-        
-        guard let characteristic = controlCharacteristic else {
-            throw DeviceError.characteristicNotFound("Control")
-        }
-        
+
         let commandData = command.rawValue.data(using: .utf8) ?? Data()
-        peripheral?.writeValue(commandData, for: characteristic, type: .withResponse)
+        peripheral.writeValue(commandData, for: characteristic, type: .withResponse)
     }
-    
+
     func updateConfiguration(_ config: DeviceConfiguration) async throws {
-        guard isConnected else {
-            throw DeviceError.notConnected
-        }
-        
-        if config.samplingRate != configuration.samplingRate {
-            try await sendCommand(.setSamplingRate(Hz: config.samplingRate))
-        }
-        
-        let toEnable = config.enabledSensors.subtracting(configuration.enabledSensors)
-        let toDisable = configuration.enabledSensors.subtracting(config.enabledSensors)
-        
-        for sensor in toEnable {
-            try await sendCommand(.enableSensor(sensor))
-        }
-        
-        for sensor in toDisable {
-            try await sendCommand(.disableSensor(sensor))
-        }
-        
-        self.configuration = config
+        // Configuration updates handled via commands
+        Logger.shared.info("[OralableDevice] Configuration update requested")
     }
-    
+
     func updateDeviceInfo() async throws {
-        guard isConnected else {
-            throw DeviceError.notConnected
-        }
-        
-        // Request battery level and firmware version
-        try await sendCommand(.requestBatteryLevel)
-        try await sendCommand(.requestFirmwareVersion)
+        Logger.shared.info("[OralableDevice] Device info update requested")
     }
-    
+
     // MARK: - Data Parsing
     
-    private func parseSensorData(_ data: Data, timestamp: Date) -> [SensorReading] {
-        var readings: [SensorReading] = []
+    private func parseSensorData(_ data: Data) {
+        let now = Date()
 
-        Logger.shared.debug("[OralableDevice] parseSensorData called with timestamp: \(timestamp)")
+        // Update packet statistics
+        packetsReceived += 1
+        bytesReceived += data.count
 
-        // PPG characteristic 3A0FF001: tgm_service_ppg_data_t structure
-        // Bytes 0-3: frame counter (uint32)
-        // Then CONFIG_PPG_SAMPLES_PER_FRAME (20) samples, each sample is 12 bytes:
-        //   - Bytes 0-3: Red (uint32)
-        //   - Bytes 4-7: IR (uint32)
-        //   - Bytes 8-11: Green (uint32)
-        // Total: 4 + (20 * 12) = 244 bytes
-
-        guard data.count >= 244 else {
-            Logger.shared.warning("[OralableDevice] Insufficient PPG data: \(data.count) bytes (expected 244)")
-            return readings
+        if let lastTime = lastPacketTime {
+            let interval = now.timeIntervalSince(lastTime)
+            #if DEBUG
+            if interval > 0.2 {
+                Logger.shared.debug("[OralableDevice] ⚠️ Large packet interval: \(String(format: "%.3f", interval))s")
+            }
+            #endif
         }
-
-        // Log first packet for debugging (throttled)
-        packetCount += 1
-        if packetCount % 20 == 1 {
-            let hexPreview = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
-            Logger.shared.debug("[OralableDevice] PPG Packet #\(packetCount) first 32 bytes: \(hexPreview)")
-        }
+        lastPacketTime = now
 
         // Helper to read UInt32 little-endian
         func readUInt32(at offset: Int) -> UInt32? {
             guard offset + 3 < data.count else { return nil }
-            return UInt32(data[offset]) |
-                   (UInt32(data[offset + 1]) << 8) |
-                   (UInt32(data[offset + 2]) << 16) |
-                   (UInt32(data[offset + 3]) << 24)
+            return data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
+            }
         }
 
-        // Read frame counter
+        // PPG packet format (from firmware docs):
+        // Bytes 0-3: Frame counter (uint32_t)
+        // Bytes 4+: 20 samples, each 12 bytes (Red, IR, Green as uint32_t)
         let frameCounter = readUInt32(at: 0) ?? 0
+        let samplesPerFrame = 20  // CONFIG_PPG_SAMPLES_PER_FRAME (hardcoded)
+        let sampleSizeBytes = 12  // 3 × uint32_t per sample
 
-        // Parse 20 PPG samples (interleaved R, IR, G per sample)
-        let samplesPerFrame = 20
-        let bytesPerSample = 12  // 4 bytes Red + 4 bytes IR + 4 bytes Green
+        #if DEBUG
+        Logger.shared.debug("[OralableDevice] 📊 Frame #\(frameCounter) | Samples: \(samplesPerFrame) | Size: \(data.count) bytes")
+        #endif
+
+        // Verify packet size
+        let expectedSize = 4 + (samplesPerFrame * sampleSizeBytes)  // 4 + 240 = 244
+        guard data.count >= expectedSize else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Packet size mismatch: got \(data.count), expected \(expectedSize)")
+            return
+        }
+
+        // Parse samples (start at byte 4, after frame counter)
+        var readings: [SensorReading] = []
+        let sampleDataStart = 4
 
         for i in 0..<samplesPerFrame {
-            let sampleOffset = 4 + (i * bytesPerSample)  // Skip 4-byte frame counter
-            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02)  // 50Hz = 0.02s
+            let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
 
-            // Read Red (bytes 0-3 of sample)
+            guard sampleOffset + sampleSizeBytes <= data.count else {
+                Logger.shared.warning("[OralableDevice] ⚠️ Sample \(i) exceeds data bounds")
+                break
+            }
+
+            let sampleTimestamp = Date()
+
+            // PPG Red (bytes 0-3 of sample)
             if let ppgRed = readUInt32(at: sampleOffset) {
-                if ppgRed > 1000 && ppgRed < 500000 {  // Valid range check
-                    readings.append(SensorReading(
-                        sensorType: .ppgRed,
-                        value: Double(ppgRed),
-                        timestamp: sampleTimestamp,
-                        deviceId: peripheral?.identifier.uuidString,
-                        quality: 0.9
-                    ))
-                }
+                readings.append(SensorReading(
+                    sensorType: .ppgRed,
+                    value: Double(ppgRed),
+                    timestamp: sampleTimestamp,
+                    deviceId: peripheral?.identifier.uuidString,
+                    quality: ppgRed > 10000 ? 0.9 : 0.1
+                ))
             }
 
-            // Read IR (bytes 4-7 of sample)
+            // PPG IR (bytes 4-7 of sample)
             if let ppgIR = readUInt32(at: sampleOffset + 4) {
-                if ppgIR > 1000 && ppgIR < 500000 {
-                    readings.append(SensorReading(
-                        sensorType: .ppgInfrared,
-                        value: Double(ppgIR),
-                        timestamp: sampleTimestamp,
-                        deviceId: peripheral?.identifier.uuidString,
-                        quality: 0.9
-                    ))
-                }
+                readings.append(SensorReading(
+                    sensorType: .ppgInfrared,
+                    value: Double(ppgIR),
+                    timestamp: sampleTimestamp,
+                    deviceId: peripheral?.identifier.uuidString,
+                    quality: ppgIR > 10000 ? 0.9 : 0.1
+                ))
             }
 
-            // Read Green (bytes 8-11 of sample)
+            // PPG Green (bytes 8-11 of sample)
             if let ppgGreen = readUInt32(at: sampleOffset + 8) {
-                if ppgGreen > 1000 && ppgGreen < 500000 {
-                    readings.append(SensorReading(
-                        sensorType: .ppgGreen,
-                        value: Double(ppgGreen),
-                        timestamp: sampleTimestamp,
-                        deviceId: peripheral?.identifier.uuidString,
-                        quality: 0.9
-                    ))
-                }
+                readings.append(SensorReading(
+                    sensorType: .ppgGreen,
+                    value: Double(ppgGreen),
+                    timestamp: sampleTimestamp,
+                    deviceId: peripheral?.identifier.uuidString,
+                    quality: ppgGreen > 10000 ? 0.9 : 0.1
+                ))
             }
+
+            // NOTE: Temperature comes in separate 8-byte packets, not in PPG packets
         }
 
-        // Update latestReadings map (keep only the most recent per channel)
+        // Batch update latestReadings ONCE after loop
+        var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
-            latestReadings[reading.sensorType] = reading
+            latestByType[reading.sensorType] = reading
         }
 
-        // Throttled log every 20 packets to show we're receiving data
-        if packetCount % 20 == 1 {
-            Logger.shared.debug("[OralableDevice] PPG Frame #\(frameCounter): \(readings.count) readings (R:\(readings.filter { $0.sensorType == .ppgRed }.count), IR:\(readings.filter { $0.sensorType == .ppgInfrared }.count), G:\(readings.filter { $0.sensorType == .ppgGreen }.count))")
-            if let firstRed = readings.first(where: { $0.sensorType == .ppgRed }),
-               let firstIR = readings.first(where: { $0.sensorType == .ppgInfrared }),
-               let firstGreen = readings.first(where: { $0.sensorType == .ppgGreen }) {
-                Logger.shared.debug("   Sample values - R:\(Int(firstRed.value)) IR:\(Int(firstIR.value)) G:\(Int(firstGreen.value))")
-            }
+        for (type, reading) in latestByType {
+            latestReadings[type] = reading
         }
 
-        // Emit batch
+        // Emit batch for downstream consumers
         if !readings.isEmpty {
-            sensorReadingsBatchSubject.send(readings)
-        }
+            readingsBatchSubject.send(readings)
+            Logger.shared.info("[OralableDevice] 📤 Emitted batch: \(readings.count) readings, \(latestByType.count) unique types")
 
-        return readings
+            ppgFrameCount += 1
+
+            #if DEBUG
+            if ppgFrameCount % 100 == 0 {
+                Logger.shared.debug("[OralableDevice] 📊 PPG Frame #\(ppgFrameCount): \(readings.count) readings")
+            }
+            #endif
+        }
     }
 
-    private func parsePPGWaveform(_ data: Data, timestamp: Date) -> [SensorReading] {
-        var readings: [SensorReading] = []
+    // MARK: - Temperature Parsing (separate 8-byte packets)
 
-        // Accelerometer characteristic 3A0FF002: tgm_service_accel_data_t structure
-        // Bytes 0-3: frame counter (uint32)
-        // Then CONFIG_ACCEL_SAMPLES_PER_FRAME (25) samples, each sample is 6 bytes:
-        //   - Bytes 0-1: x-axis (int16)
-        //   - Bytes 2-3: y-axis (int16)
-        //   - Bytes 4-5: z-axis (int16)
-        // Total: 4 + (25 * 6) = 154 bytes
-
-        guard data.count >= 154 else {
-            Logger.shared.warning("[OralableDevice] Insufficient accel data: \(data.count) bytes (expected 154)")
-            return readings
+    private func parseTemperature(_ data: Data) {
+        // Temperature packet format (8 bytes):
+        // Bytes 0-3: Frame counter
+        // Bytes 4-5: Temperature (int16, centidegrees Celsius)
+        guard data.count >= 6 else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Temperature packet too small: \(data.count) bytes")
+            return
         }
 
+        func readInt16(at offset: Int) -> Int16? {
+            guard offset + 1 < data.count else { return nil }
+            return data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: Int16.self)
+            }
+        }
+
+        let frameCounter = data.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(fromByteOffset: 0, as: UInt32.self)
+        }
+
+        if let tempRaw = readInt16(at: 4) {
+            let tempCelsius = Double(tempRaw) / 100.0
+
+            if tempCelsius > -40 && tempCelsius < 85 {
+                let reading = SensorReading(
+                    sensorType: .temperature,
+                    value: tempCelsius,
+                    timestamp: Date(),
+                    deviceId: peripheral?.identifier.uuidString
+                )
+
+                latestReadings[.temperature] = reading
+                readingsBatchSubject.send([reading])
+
+                Logger.shared.debug("[OralableDevice] 🌡️ Temperature: \(String(format: "%.2f", tempCelsius))°C (frame #\(frameCounter))")
+            }
+        }
+    }
+    
+    private func parsePPGWaveform(_ data: Data) {
+        let now = Date()
+        
+        #if DEBUG
+        Logger.shared.debug("[OralableDevice] 🌊 PPG Waveform packet | Size: \(data.count) bytes")
+        #endif
+        
+        guard data.count >= 8 else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Waveform packet too small: \(data.count) bytes")
+            return
+        }
+        
         // Helper to read Int16 little-endian
         func readInt16(at offset: Int) -> Int16? {
             guard offset + 1 < data.count else { return nil }
-            let unsigned = UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
-            return Int16(bitPattern: unsigned)
+            return data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: Int16.self)
+            }
         }
-
-        // Helper to read UInt32 little-endian
-        func readUInt32(at offset: Int) -> UInt32? {
-            guard offset + 3 < data.count else { return nil }
-            return UInt32(data[offset]) |
-                   (UInt32(data[offset + 1]) << 8) |
-                   (UInt32(data[offset + 2]) << 16) |
-                   (UInt32(data[offset + 3]) << 24)
-        }
-
-        // Read frame counter
-        let frameCounter = readUInt32(at: 0) ?? 0
-
-        // Parse 25 accelerometer samples
-        let samplesPerFrame = 25
-        let bytesPerSample = 6  // 2 bytes X + 2 bytes Y + 2 bytes Z
-
+        
+        // Header parsing
+        let headerBytes = data.prefix(8)
+        let samplesPerFrame = Int(data[2])
+        let sampleSizeBytes = Int(data[3])
+        
+        #if DEBUG
+        Logger.shared.debug("[OralableDevice] 🌊 Waveform samples: \(samplesPerFrame), size: \(sampleSizeBytes) bytes")
+        #endif
+        
+        var readings: [SensorReading] = []
+        let sampleDataStart = 8
+        
         for i in 0..<samplesPerFrame {
-            let sampleOffset = 4 + (i * bytesPerSample)
-            let sampleTimestamp = timestamp.addingTimeInterval(Double(i) * 0.02)  // 50Hz = 0.02s
-
-            // Read X (bytes 0-1)
-            if let x = readInt16(at: sampleOffset) {
+            let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
+            
+            guard sampleOffset + sampleSizeBytes <= data.count else {
+                Logger.shared.warning("[OralableDevice] ⚠️ Waveform sample \(i) exceeds bounds")
+                break
+            }
+            
+            let sampleTimestamp = Date()
+            
+            // Accelerometer X (bytes 0-1)
+            if let accelX = readInt16(at: sampleOffset) {
                 readings.append(SensorReading(
                     sensorType: .accelerometerX,
-                    value: Double(x),
+                    value: Double(accelX),
                     timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: 1.0
+                    deviceId: peripheral?.identifier.uuidString
                 ))
             }
-
-            // Read Y (bytes 2-3)
-            if let y = readInt16(at: sampleOffset + 2) {
+            
+            // Accelerometer Y (bytes 2-3)
+            if let accelY = readInt16(at: sampleOffset + 2) {
                 readings.append(SensorReading(
                     sensorType: .accelerometerY,
-                    value: Double(y),
+                    value: Double(accelY),
                     timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: 1.0
+                    deviceId: peripheral?.identifier.uuidString
                 ))
             }
-
-            // Read Z (bytes 4-5)
-            if let z = readInt16(at: sampleOffset + 4) {
+            
+            // Accelerometer Z (bytes 4-5)
+            if let accelZ = readInt16(at: sampleOffset + 4) {
                 readings.append(SensorReading(
                     sensorType: .accelerometerZ,
-                    value: Double(z),
+                    value: Double(accelZ),
                     timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: 1.0
+                    deviceId: peripheral?.identifier.uuidString
                 ))
             }
         }
-
-        // Update latest readings
+        
+        // DAY 4 PERFORMANCE FIX: Same batch update pattern as parseSensorData
+        var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
-            latestReadings[reading.sensorType] = reading
+            latestByType[reading.sensorType] = reading
         }
-
-        // Throttled log every 50 packets
-        packetCount += 1
-        if packetCount % 50 == 1 {
-            Logger.shared.debug("[OralableDevice] Accel Packet #\(frameCounter): \(readings.count) readings")
-            if let firstX = readings.first(where: { $0.sensorType == .accelerometerX }),
-               let firstY = readings.first(where: { $0.sensorType == .accelerometerY }),
-               let firstZ = readings.first(where: { $0.sensorType == .accelerometerZ }) {
-                Logger.shared.debug("   Sample values - X:\(Int(firstX.value)) Y:\(Int(firstY.value)) Z:\(Int(firstZ.value))")
-            }
+        
+        // Single batch update
+        for (type, reading) in latestByType {
+            latestReadings[type] = reading
         }
-
+        
         // Emit batch
         if !readings.isEmpty {
-            sensorReadingsBatchSubject.send(readings)
+            readingsBatchSubject.send(readings)
+            
+            #if DEBUG
+            let accelCount = readings.filter { $0.sensorType == .accelerometerX || $0.sensorType == .accelerometerY || $0.sensorType == .accelerometerZ }.count
+            if accelCount > 0 {
+                Logger.shared.debug("[OralableDevice] 🌊 Accelerometer readings: \(accelCount) (X:\(readings.filter { $0.sensorType == .accelerometerX }.count), Y:\(readings.filter { $0.sensorType == .accelerometerY }.count), Z:\(readings.filter { $0.sensorType == .accelerometerZ }.count))")
+            }
+            #endif
         }
-
-        return readings
-    }
-
-    private func parseBatteryData(_ data: Data, timestamp: Date) -> [SensorReading] {
-        // Battery data: 4 bytes (uint32 millivolts)
-        guard data.count >= 4 else {
-            Logger.shared.warning("[OralableDevice] Insufficient battery data: \(data.count) bytes")
-            return []
-        }
-
-        // Helper to read UInt32 little-endian
-        func readUInt32(at offset: Int) -> UInt32? {
-            guard offset + 3 < data.count else { return nil }
-            return UInt32(data[offset]) |
-                   (UInt32(data[offset + 1]) << 8) |
-                   (UInt32(data[offset + 2]) << 16) |
-                   (UInt32(data[offset + 3]) << 24)
-        }
-
-        guard let batteryMillivolts = readUInt32(at: 0) else {
-            return []
-        }
-
-        // Convert to percentage (3.0V = 0%, 4.2V = 100%)
-        let minVoltage: Double = 3000  // 3.0V
-        let maxVoltage: Double = 4200  // 4.2V
-        let batteryPercent = min(max((Double(batteryMillivolts) - minVoltage) / (maxVoltage - minVoltage) * 100.0, 0.0), 100.0)
-
-        let reading = SensorReading(
-            sensorType: .battery,
-            value: batteryPercent,
-            timestamp: timestamp,
-            deviceId: peripheral?.identifier.uuidString,
-            quality: 1.0
-        )
-
-        latestReadings[.battery] = reading
-        sensorReadingsBatchSubject.send([reading])
-
-        Logger.shared.debug("[OralableDevice] Battery: \(Int(batteryPercent))% (\(batteryMillivolts)mV)")
-        return [reading]
-    }
-
-    private func parseTemperatureData(_ data: Data, timestamp: Date) -> [SensorReading] {
-        // Temperature data: 8 bytes total
-        // Bytes 0-3: frame counter (uint32)
-        // Bytes 4-5: temperature as signed int16 in centidegree Celsius (1/100th degree)
-        guard data.count >= 8 else {
-            Logger.shared.warning("[OralableDevice] Insufficient temperature data: \(data.count) bytes (expected 8)")
-            return []
-        }
-
-        // Helper to read Int16 little-endian
-        func readInt16(at offset: Int) -> Int16? {
-            guard offset + 1 < data.count else { return nil }
-            let unsigned = UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
-            return Int16(bitPattern: unsigned)
-        }
-
-        guard let tempCentiDegrees = readInt16(at: 4) else {
-            return []
-        }
-
-        // Convert centidegrees to degrees Celsius
-        let temperatureCelsius = Double(tempCentiDegrees) / 100.0
-
-        let reading = SensorReading(
-            sensorType: .temperature,
-            value: temperatureCelsius,
-            timestamp: timestamp,
-            deviceId: peripheral?.identifier.uuidString,
-            quality: 1.0
-        )
-
-        latestReadings[.temperature] = reading
-        sensorReadingsBatchSubject.send([reading])
-
-        Logger.shared.debug("[OralableDevice] Temperature: \(String(format: "%.2f", temperatureCelsius))°C")
-        return [reading]
     }
 }
 
 // MARK: - CBPeripheralDelegate
 
 extension OralableDevice: CBPeripheralDelegate {
-    
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        Logger.shared.debug("[OralableDevice] didDiscoverServices")
-
         if let error = error {
-            Logger.shared.error("[OralableDevice] ❌ Service discovery error: \(error.localizedDescription)")
-            
-            // Resume Day 2 continuation if present
-            if let continuation = serviceDiscoveryContinuation {
-                serviceDiscoveryContinuation = nil
-                continuation.resume(throwing: DeviceError.connectionFailed(error.localizedDescription))
-            }
-            
-            // Resume legacy continuation if present
-            if let continuation = connectionContinuation {
-                connectionContinuation = nil
-                continuation.resume(throwing: DeviceError.connectionFailed(error.localizedDescription))
-            }
+            Logger.shared.error("[OralableDevice] ❌ Service discovery failed: \(error.localizedDescription)")
+            serviceDiscoveryContinuation?.resume(throwing: DeviceError.serviceNotFound("Service discovery failed: \(error.localizedDescription)"))
+            serviceDiscoveryContinuation = nil
             return
         }
 
         guard let services = peripheral.services else {
-            Logger.shared.warning("[OralableDevice] ❌ No services found")
-            let error = DeviceError.characteristicNotFound("No services")
-            
-            // Resume Day 2 continuation if present
-            if let continuation = serviceDiscoveryContinuation {
-                serviceDiscoveryContinuation = nil
-                continuation.resume(throwing: error)
-            }
-            
-            // Resume legacy continuation if present
-            if let continuation = connectionContinuation {
-                connectionContinuation = nil
-                continuation.resume(throwing: error)
-            }
+            Logger.shared.error("[OralableDevice] ❌ No services found")
+            serviceDiscoveryContinuation?.resume(throwing: DeviceError.serviceNotFound("No services found on peripheral"))
+            serviceDiscoveryContinuation = nil
             return
         }
         
-        Logger.shared.info("[OralableDevice] ✅ Discovered \(services.count) services")
+        Logger.shared.info("[OralableDevice] ✅ Discovered \(services.count) service(s)")
         
-        // Resume Day 2 continuation if present
-        if let continuation = serviceDiscoveryContinuation {
+        // Find TGM service
+        if let tgmSvc = services.first(where: { $0.uuid == tgmServiceUUID }) {
+            self.tgmService = tgmSvc
+            Logger.shared.info("[OralableDevice] ✅ TGM Service found: \(tgmSvc.uuid.uuidString)")
+            serviceDiscoveryContinuation?.resume()
             serviceDiscoveryContinuation = nil
-            continuation.resume()
-            Logger.shared.info("[OralableDevice] ✅ Services discovered - resuming continuation")
-        }
-        
-        // Legacy behavior: discover characteristics for all services
-        for service in services {
-            Logger.shared.debug("   - \(service.uuid.uuidString)")
-            
-            if service.uuid == BLEConstants.serviceUUID {
-                Logger.shared.debug("[OralableDevice] Discovering characteristics for TGM Service...")
-                peripheral.discoverCharacteristics(nil, for: service)
-            } else if service.uuid == BLEConstants.batteryServiceUUID {
-                Logger.shared.debug("[OralableDevice] Discovering characteristics for Battery Service...")
-                peripheral.discoverCharacteristics([BLEConstants.batteryLevelCharacteristicUUID], for: service)
-            } else if service.uuid == BLEConstants.deviceInfoServiceUUID {
-                Logger.shared.debug("[OralableDevice] Discovering characteristics for Device Info Service...")
-                peripheral.discoverCharacteristics(nil, for: service)
-            }
+        } else {
+            Logger.shared.error("[OralableDevice] ❌ TGM Service not found")
+            serviceDiscoveryContinuation?.resume(throwing: DeviceError.serviceNotFound("TGM service UUID not found in discovered services"))
+            serviceDiscoveryContinuation = nil
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        Logger.shared.debug("[OralableDevice] didDiscoverCharacteristicsFor service: \(service.uuid.uuidString)")
-
         if let error = error {
-            Logger.shared.error("[OralableDevice] ❌ Characteristic discovery error: \(error.localizedDescription)")
-            
-            // Resume Day 2 continuation if present
-            if let continuation = characteristicsDiscoveryContinuation {
-                characteristicsDiscoveryContinuation = nil
-                continuation.resume(throwing: DeviceError.characteristicNotFound(error.localizedDescription))
-            }
-            
-            // Resume legacy continuation if present
-            if let continuation = connectionContinuation {
-                connectionContinuation = nil
-                continuation.resume(throwing: DeviceError.characteristicNotFound(error.localizedDescription))
-            }
+            Logger.shared.error("[OralableDevice] ❌ Characteristic discovery failed: \(error.localizedDescription)")
+            characteristicDiscoveryContinuation?.resume(throwing: DeviceError.characteristicNotFound("Characteristic discovery failed: \(error.localizedDescription)"))
+            characteristicDiscoveryContinuation = nil
             return
         }
 
         guard let characteristics = service.characteristics else {
-            Logger.shared.warning("[OralableDevice] ❌ No characteristics found")
-            // Don't fail - other services might have characteristics
+            Logger.shared.error("[OralableDevice] ❌ No characteristics found")
+            characteristicDiscoveryContinuation?.resume(throwing: DeviceError.characteristicNotFound("No characteristics found in service"))
+            characteristicDiscoveryContinuation = nil
             return
         }
         
-        Logger.shared.info("[OralableDevice] ✅ Discovered \(characteristics.count) characteristics")
+        Logger.shared.info("[OralableDevice] ✅ Discovered \(characteristics.count) characteristic(s)")
         
-        // Store ALL the characteristics we need
+        var foundCount = 0
+        
         for characteristic in characteristics {
-            Logger.shared.debug("   - \(characteristic.uuid.uuidString)")
-            Logger.shared.debug("     Properties: \(characteristic.properties)")
-            
-            if characteristic.uuid == BLEConstants.sensorDataCharacteristicUUID {
+            switch characteristic.uuid {
+            case sensorDataCharUUID:
                 sensorDataCharacteristic = characteristic
-                Logger.shared.info("[OralableDevice] ✅ Found sensor data characteristic")
-            } else if characteristic.uuid == BLEConstants.ppgWaveformCharacteristicUUID {
+                Logger.shared.info("[OralableDevice] ✅ Sensor Data characteristic found")
+                foundCount += 1
+                
+            case commandCharUUID:
+                commandCharacteristic = characteristic
+                Logger.shared.info("[OralableDevice] ✅ Command characteristic found")
+                foundCount += 1
+                
+            case ppgWaveformCharUUID:
                 ppgWaveformCharacteristic = characteristic
-                Logger.shared.info("[OralableDevice] ✅ Found PPG waveform characteristic (accelerometer)")
-            } else if characteristic.uuid == BLEConstants.characteristic005UUID ||
-                      characteristic.uuid == BLEConstants.characteristic006UUID {
-                controlCharacteristic = characteristic
-                Logger.shared.info("[OralableDevice] ✅ Found control characteristic")
-            } else if characteristic.uuid == BLEConstants.batteryLevelCharacteristicUUID {
-                batteryCharacteristic = characteristic
-                Logger.shared.info("[OralableDevice] ✅ Found battery characteristic")
-            } else if characteristic.uuid == BLEConstants.characteristic003UUID ||
-                      characteristic.uuid == BLEConstants.characteristic004UUID ||
-                      characteristic.uuid == BLEConstants.characteristic007UUID ||
-                      characteristic.uuid == BLEConstants.characteristic008UUID {
-                otherCharacteristics.append(characteristic)
-                Logger.shared.debug("[OralableDevice] ✅ Found TGM characteristic \(characteristic.uuid.uuidString)")
-            } else if characteristic.uuid == BLEConstants.firmwareVersionCharacteristicUUID {
-                Logger.shared.debug("[OralableDevice] Reading firmware version...")
-                peripheral.readValue(for: characteristic)
+                Logger.shared.info("[OralableDevice] ✅ PPG Waveform characteristic found")
+                foundCount += 1
+                
+            default:
+                Logger.shared.debug("[OralableDevice] Other characteristic: \(characteristic.uuid.uuidString)")
             }
         }
         
-        // Resume Day 2 continuation if we found the main sensor data characteristic
-        if let _ = sensorDataCharacteristic, let continuation = characteristicsDiscoveryContinuation {
-            characteristicsDiscoveryContinuation = nil
-            continuation.resume()
-            Logger.shared.info("[OralableDevice] ✅ Characteristics discovered - resuming continuation")
-        }
-        
-        // Legacy behavior: resume connection continuation when sensor data characteristic found
-        if sensorDataCharacteristic != nil && connectionContinuation != nil {
-            connectionState = .connected
-            deviceInfo.connectionState = .connected
-            Logger.shared.info("[OralableDevice] Device fully connected and ready (legacy path)")
-
-            if let continuation = connectionContinuation {
-                connectionContinuation = nil
-                continuation.resume()
-                Logger.shared.info("[OralableDevice] ✅ Connection continuation resumed (legacy)")
-            }
-        }
-    }
-    
-    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        if let error = error {
-            Logger.shared.error("[OralableDevice] Value update error: \(error.localizedDescription)")
-            return
-        }
-
-        guard let data = characteristic.value else {
-            return  // No log spam for normal operation
-        }
-
-        // Parse data (logging happens inside parsers at throttled rate)
-        let readings = parseData(data, from: characteristic)
-
-        for reading in readings {
-            latestReadings[reading.sensorType] = reading
+        if foundCount >= 1 {  // At minimum need sensor data characteristic
+            Logger.shared.info("[OralableDevice] ✅ Found \(foundCount)/3 expected characteristics")
+            characteristicDiscoveryContinuation?.resume()
+            characteristicDiscoveryContinuation = nil
+        } else {
+            Logger.shared.error("[OralableDevice] ❌ Required characteristics not found")
+            characteristicDiscoveryContinuation?.resume(throwing: DeviceError.characteristicNotFound("Required characteristics not found (found \(foundCount)/3)"))
+            characteristicDiscoveryContinuation = nil
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            Logger.shared.error("[OralableDevice] ❌ Notification state error: \(error.localizedDescription)")
-            
-            // Resume Day 2 continuation if present
-            if let continuation = notificationEnableContinuation {
+            Logger.shared.error("[OralableDevice] ❌ Notification state update failed: \(error.localizedDescription)")
+
+            // Resume appropriate continuation
+            if characteristic.uuid == sensorDataCharUUID {
+                notificationEnableContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable sensor data notifications: \(error.localizedDescription)"))
                 notificationEnableContinuation = nil
-                continuation.resume(throwing: DeviceError.connectionFailed(error.localizedDescription))
+            } else if characteristic.uuid == ppgWaveformCharUUID {
+                accelerometerNotificationContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable accelerometer notifications: \(error.localizedDescription)"))
+                accelerometerNotificationContinuation = nil
             }
             return
         }
         
-        Logger.shared.debug("[OralableDevice] Notification state changed for \(characteristic.uuid.uuidString)")
-        Logger.shared.debug("[OralableDevice] Is notifying: \(characteristic.isNotifying)")
-        
-        // Resume Day 2 continuation when notifications enabled on sensor data characteristic
-        if characteristic.uuid == SENSOR_DATA_CHARACTERISTIC_UUID && characteristic.isNotifying {
-            if let continuation = notificationEnableContinuation {
+        if characteristic.isNotifying {
+            Logger.shared.info("[OralableDevice] ✅ Notifications enabled for \(characteristic.uuid.uuidString)")
+            
+            // Resume appropriate continuation
+            if characteristic.uuid == sensorDataCharUUID {
+                notificationEnableContinuation?.resume()
                 notificationEnableContinuation = nil
-                continuation.resume()
-                Logger.shared.info("[OralableDevice] ✅ Notifications enabled - resuming continuation")
+            } else if characteristic.uuid == ppgWaveformCharUUID {
+                accelerometerNotificationContinuation?.resume()
+                accelerometerNotificationContinuation = nil
             }
+        } else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Notifications disabled for \(characteristic.uuid.uuidString)")
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            Logger.shared.error("[OralableDevice] Write error: \(error.localizedDescription)")
+            Logger.shared.error("[OralableDevice] ❌ Value update error: \(error.localizedDescription)")
             return
         }
-        
-        Logger.shared.info("[OralableDevice] Write successful for \(characteristic.uuid.uuidString)")
+
+        guard let data = characteristic.value, !data.isEmpty else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Empty data received")
+            return
+        }
+
+        // Route to appropriate parser based on characteristic AND packet size
+        switch characteristic.uuid {
+        case sensorDataCharUUID:
+            // Sensor data characteristic can have different packet types by size
+            switch data.count {
+            case 244:  // PPG packet: 4-byte frame counter + 20×12 bytes samples
+                parseSensorData(data)
+
+            case 6...8:  // Temperature packet: 4-byte frame counter + 2-byte temp (+ padding)
+                parseTemperature(data)
+
+            default:
+                Logger.shared.debug("[OralableDevice] 📦 Unknown sensor packet size: \(data.count) bytes")
+                // Try to parse as PPG if large enough
+                if data.count > 100 {
+                    parseSensorData(data)
+                }
+            }
+
+        case ppgWaveformCharUUID:
+            // Accelerometer data (misnamed as PPG waveform)
+            parsePPGWaveform(data)
+
+        default:
+            Logger.shared.debug("[OralableDevice] Data from unknown characteristic: \(characteristic.uuid.uuidString)")
+        }
     }
 }

@@ -6,7 +6,7 @@
 //  Fixed: connect() method now uses correct UUID key
 //  UPDATED: November 28, 2025 (Day 1 & Day 2)
 //  Added: ConnectionReadiness state machine and async discovery methods
-//  UPDATED: November 29, 2025 (Day 4 - Memory Fix)
+//  UPDATED: November 29, 2025 (Day 4 - Memory Fix + Diagnostic Logging)
 //  Fixed: Auto-stop scanning when ready, prevent duplicate device instances, smart scan restart prevention
 //
 
@@ -219,16 +219,17 @@ class DeviceManager: ObservableObject {
             if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
                 discoveredDevices[index].signalStrength = rssi
             }
+            Logger.shared.debug("[DeviceManager] ⏭️ Device already exists - updating RSSI only")
             return  // Don't create duplicate instances
         }
 
         // Detect device type
         guard let deviceType = detectDeviceType(from: name, peripheral: peripheral) else {
-            Logger.shared.debug("[DeviceManager] Unknown device type '\(name)' - rejected")
+            Logger.shared.debug("[DeviceManager] ❌ Unknown device type '\(name)' - rejected")
             return
         }
 
-        Logger.shared.info("[DeviceManager] New device discovered: \(name) (\(deviceType))")
+        Logger.shared.info("[DeviceManager] ✅ New device discovered: \(name) (\(deviceType))")
 
         // Create device info
         let deviceInfo = DeviceInfo(
@@ -241,6 +242,7 @@ class DeviceManager: ObservableObject {
 
         // Add to discovered list
         discoveredDevices.append(deviceInfo)
+        Logger.shared.info("[DeviceManager] 📝 Device added to list. Total discovered: \(discoveredDevices.count)")
         
         // Initialize readiness state
         deviceReadiness[peripheral.identifier] = .disconnected
@@ -263,12 +265,15 @@ class DeviceManager: ObservableObject {
 
         // Store device - KEY POINT: Using peripheral.identifier as the key
         devices[peripheral.identifier] = device
+        Logger.shared.debug("[DeviceManager] 💾 Device stored in devices dictionary")
 
         // Subscribe to device sensor readings
         subscribeToDevice(device)
 
         #if DEBUG
-        Logger.shared.debug("[DeviceManager] Total devices discovered: \(discoveredDevices.count)")
+        Logger.shared.debug("[DeviceManager] 📊 Total devices in system:")
+        Logger.shared.debug("[DeviceManager]    - discoveredDevices: \(discoveredDevices.count)")
+        Logger.shared.debug("[DeviceManager]    - devices dictionary: \(devices.count)")
         #endif
     }
     
@@ -339,11 +344,18 @@ class DeviceManager: ObservableObject {
             // Step 4: Enable accelerometer notifications (non-blocking, no timeout)
             if let oralableDevice = device as? OralableDevice {
                 await oralableDevice.enableAccelerometerNotifications()
+
+                // Step 5: Configure PPG LEDs to turn them on
+                do {
+                    try await oralableDevice.configurePPGLEDs()
+                } catch {
+                    Logger.shared.warning("[DeviceManager] ⚠️ LED configuration failed (non-critical): \(error.localizedDescription)")
+                }
             }
-            
+
             // Device is now ready!
             updateDeviceReadiness(peripheral.identifier, to: .ready)
-            Logger.shared.info("[DeviceManager] ✅ Device fully ready - all notifications enabled")
+            Logger.shared.info("[DeviceManager] ✅ Device fully ready - all notifications enabled, LEDs configured")
             
         } catch {
             Logger.shared.error("[DeviceManager] ❌ Discovery failed: \(error.localizedDescription)")
@@ -379,22 +391,24 @@ class DeviceManager: ObservableObject {
         }
     }
     
-    // Day 2: Timeout helper for async operations
+    // Day 2: Timeout helper for async operations (safe unwrap fix)
     private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
         return try await withThrowingTaskGroup(of: T.self) { group in
             // Add the actual operation
             group.addTask {
                 try await operation()
             }
-            
+
             // Add a timeout task
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
                 throw DeviceError.timeout
             }
-            
-            // Return the first one to complete (will throw if timeout wins)
-            let result = try await group.next()!
+
+            // Return the first one to complete (safe unwrap)
+            guard let result = try await group.next() else {
+                throw DeviceError.timeout
+            }
             group.cancelAll()
             return result
         }
@@ -518,6 +532,9 @@ class DeviceManager: ObservableObject {
     
     /// Start scanning for devices
     func startScanning() async {
+        Logger.shared.info("[DeviceManager] 🔍 startScanning() called")
+        Logger.shared.info("[DeviceManager] Current state - discoveredDevices: \(discoveredDevices.count), devices: \(devices.count)")
+        
         // Day 4 Fix: Don't scan if we already have a ready device
         if deviceReadiness.values.contains(.ready) {
             Logger.shared.info("[DeviceManager] 🛑 Already have ready device - skipping scan")
@@ -537,12 +554,17 @@ class DeviceManager: ObservableObject {
         discoveredDevices.removeAll()
         deviceReadiness.removeAll()
         isScanning = true
+        
+        Logger.shared.info("[DeviceManager] ✅ Scan started - discoveredDevices cleared, isScanning = true")
 
         bleManager?.startScanning()
     }
 
     /// Stop scanning for devices
     func stopScanning() {
+        Logger.shared.info("[DeviceManager] 🛑 stopScanning() called")
+        Logger.shared.info("[DeviceManager] Discovered devices at stop time: \(discoveredDevices.count)")
+        
         #if DEBUG
         if let scanStart = scanStartTime {
             let elapsed = Date().timeIntervalSince(scanStart)
@@ -553,6 +575,8 @@ class DeviceManager: ObservableObject {
         isScanning = false
         bleManager?.stopScanning()
         scanStartTime = nil
+        
+        Logger.shared.info("[DeviceManager] ✅ Scan stopped - isScanning = false")
     }
     
     // MARK: - Connection Management
@@ -561,18 +585,18 @@ class DeviceManager: ObservableObject {
     func connect(to deviceInfo: DeviceInfo) async throws {
         Logger.shared.info("[DeviceManager] Connecting to device: \(deviceInfo.name)")
 
-        // ✅ CRITICAL FIX: Use peripheralIdentifier, not deviceInfo.id
+        // CRITICAL FIX: Use peripheralIdentifier, not deviceInfo.id
         guard let peripheralId = deviceInfo.peripheralIdentifier else {
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("Device has no peripheral identifier")
         }
 
         guard let device = devices[peripheralId] else {
             Logger.shared.error("[DeviceManager] Device not found in registry")
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("Device not found in registry")
         }
 
         guard let peripheral = device.peripheral else {
-            throw DeviceError.invalidPeripheral
+            throw DeviceError.invalidPeripheral("Device has no peripheral")
         }
 
         isConnecting = true
@@ -605,6 +629,11 @@ class DeviceManager: ObservableObject {
         reconnectionTasks[peripheralId]?.cancel()
         reconnectionTasks[peripheralId] = nil
         reconnectionAttempts[peripheralId] = nil
+
+        // Cancel pending continuations to prevent hangs
+        if let oralableDevice = device as? OralableDevice {
+            oralableDevice.cancelPendingContinuations()
+        }
 
         bleManager?.disconnect(from: peripheral)
 
@@ -659,13 +688,24 @@ class DeviceManager: ObservableObject {
     }
 
     private func handleSensorReadingsBatch(_ readings: [SensorReading], from device: BLEDeviceProtocol) {
+        Logger.shared.info("[DeviceManager] 📥 Received batch: \(readings.count) readings from \(device.deviceInfo.name)")
+
         // Add to all readings
         allSensorReadings.append(contentsOf: readings)
 
-        // Update latest readings
+        // PERFORMANCE FIX: Batch update to prevent UI flooding
+        // First collect latest per type, then update latestReadings once per type
+        var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
-            latestReadings[reading.sensorType] = reading
+            latestByType[reading.sensorType] = reading
         }
+
+        // Single batch update (triggers publisher once per type, not per reading)
+        for (type, reading) in latestByType {
+            latestReadings[type] = reading
+        }
+
+        Logger.shared.info("[DeviceManager] 📊 Updated latestReadings: \(latestByType.count) types - \(latestByType.keys.map { $0.rawValue }.joined(separator: ", "))")
 
         // Emit batch for efficient downstream processing
         readingsBatchSubject.send(readings)

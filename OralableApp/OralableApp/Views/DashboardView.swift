@@ -319,7 +319,6 @@ struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         let designSystem = DesignSystem()
         let appState = AppStateManager()
-        let ble = OralableBLE()
         let healthKit = HealthKitManager()
         let sensorStore = SensorDataStore()
         let recordingSession = RecordingSessionManager()
@@ -338,7 +337,6 @@ struct DashboardView_Previews: PreviewProvider {
             healthKitManager: healthKit,
             recordingSessionManager: recordingSession,
             historicalDataManager: historicalData,
-            bleManager: ble,
             sensorDataStore: sensorStore,
             subscriptionManager: subscription,
             deviceManager: device,

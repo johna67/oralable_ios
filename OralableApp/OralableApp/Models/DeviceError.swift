@@ -19,11 +19,11 @@ import Foundation
 /// Unified device error type for all device-related errors
 enum DeviceError: LocalizedError {
     // Connection errors
-    case notConnected
+    case notConnected(String)
     case connectionFailed(String)
     case connectionLost
     case disconnected
-    case invalidPeripheral
+    case invalidPeripheral(String)
     case bluetoothUnavailable
     case bluetoothUnauthorized
 
@@ -59,14 +59,14 @@ enum DeviceError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidPeripheral:
-            return "Invalid or unavailable peripheral"
+        case .invalidPeripheral(let reason):
+            return "Invalid or unavailable peripheral: \(reason)"
         case .connectionFailed(let reason):
             return "Connection failed: \(reason)"
         case .connectionLost:
             return "Connection to device was lost"
-        case .notConnected:
-            return "Device is not connected"
+        case .notConnected(let reason):
+            return "Device is not connected: \(reason)"
         case .disconnected:
             return "Device disconnected"
         case .bluetoothUnavailable:

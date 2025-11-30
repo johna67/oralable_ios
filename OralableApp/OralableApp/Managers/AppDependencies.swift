@@ -2,29 +2,25 @@ import SwiftUI
 
 @MainActor
 final class AppDependencies: ObservableObject {
-    // Note: Create a shared instance in your app's entry point
-    // Example: let dependencies = AppDependencies(...)
-    // Then inject it via .withDependencies(dependencies)
-
+    // Core managers - no legacy OralableBLE
     let authenticationManager: AuthenticationManager
     let healthKitManager: HealthKitManager
     let recordingSessionManager: RecordingSessionManager
     let historicalDataManager: HistoricalDataManager
-    let bleManager: OralableBLE  // Legacy - kept for backward compatibility (to be removed)
     let sensorDataStore: SensorDataStore
     let subscriptionManager: SubscriptionManager
-    let deviceManager: DeviceManager  // New, complete BLE implementation
-    let deviceManagerAdapter: DeviceManagerAdapter  // Adapter for BLEManagerProtocol compatibility
-    let sensorDataProcessor: SensorDataProcessor  // Processes and stores sensor data history
+    let deviceManager: DeviceManager
+    let deviceManagerAdapter: DeviceManagerAdapter
+    let sensorDataProcessor: SensorDataProcessor
     let appStateManager: AppStateManager
     let sharedDataManager: SharedDataManager
     let designSystem: DesignSystem
+    let recordingStateCoordinator: RecordingStateCoordinator
 
     init(authenticationManager: AuthenticationManager,
          healthKitManager: HealthKitManager,
          recordingSessionManager: RecordingSessionManager,
          historicalDataManager: HistoricalDataManager,
-         bleManager: OralableBLE,
          sensorDataStore: SensorDataStore,
          subscriptionManager: SubscriptionManager,
          deviceManager: DeviceManager,
@@ -36,7 +32,6 @@ final class AppDependencies: ObservableObject {
         self.healthKitManager = healthKitManager
         self.recordingSessionManager = recordingSessionManager
         self.historicalDataManager = historicalDataManager
-        self.bleManager = bleManager
         self.sensorDataStore = sensorDataStore
         self.subscriptionManager = subscriptionManager
         self.deviceManager = deviceManager
@@ -45,19 +40,21 @@ final class AppDependencies: ObservableObject {
         self.appStateManager = appStateManager
         self.sharedDataManager = sharedDataManager
         self.designSystem = designSystem
+        self.recordingStateCoordinator = RecordingStateCoordinator.shared
 
-        Logger.shared.info("[AppDependencies] Initialized with passed SensorDataProcessor instance (should be .shared)")
+        Logger.shared.info("[AppDependencies] Initialized (legacy OralableBLE removed)")
     }
-    
+
     // MARK: - Factory Methods
     func makeDashboardViewModel() -> DashboardViewModel {
         return DashboardViewModel(
-            bleManager: bleManager,
+            deviceManagerAdapter: deviceManagerAdapter,
             deviceManager: deviceManager,
-            appStateManager: appStateManager
+            appStateManager: appStateManager,
+            recordingStateCoordinator: recordingStateCoordinator
         )
     }
-    
+
     func makeSettingsViewModel() -> SettingsViewModel {
         return SettingsViewModel(
             sensorDataProcessor: sensorDataProcessor
@@ -75,15 +72,15 @@ struct DependenciesModifier: ViewModifier {
             .environmentObject(dependencies.healthKitManager)
             .environmentObject(dependencies.recordingSessionManager)
             .environmentObject(dependencies.historicalDataManager)
-            .environmentObject(dependencies.bleManager)  // Legacy - for backward compatibility (to be removed)
-            .environmentObject(dependencies.deviceManager)  // New BLE system
-            .environmentObject(dependencies.deviceManagerAdapter)  // Adapter for BLEManagerProtocol
-            .environmentObject(dependencies.sensorDataProcessor)  // Sensor data history
+            .environmentObject(dependencies.deviceManager)
+            .environmentObject(dependencies.deviceManagerAdapter)
+            .environmentObject(dependencies.sensorDataProcessor)
             .environmentObject(dependencies.sensorDataStore)
             .environmentObject(dependencies.subscriptionManager)
             .environmentObject(dependencies.appStateManager)
             .environmentObject(dependencies.sharedDataManager)
             .environmentObject(dependencies.designSystem)
+            .environmentObject(dependencies.recordingStateCoordinator)
     }
 }
 

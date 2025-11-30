@@ -303,33 +303,33 @@ class MockBLEDevice: BLEDeviceProtocol {
     }
     
     func startDataStream() async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else { throw DeviceError.notConnected("Mock device not connected") }
         // Simulate data streaming
     }
-    
+
     func stopDataStream() async {
         // Stop streaming
     }
-    
+
     func requestReading(for sensorType: SensorType) async throws -> SensorReading? {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else { throw DeviceError.notConnected("Mock device not connected") }
         return SensorReading.mock(sensorType: sensorType)
     }
-    
+
     func parseData(_ data: Data, from characteristic: CBCharacteristic) -> [SensorReading] {
         []
     }
-    
+
     func sendCommand(_ command: DeviceCommand) async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else { throw DeviceError.notConnected("Mock device not connected") }
     }
-    
+
     func updateConfiguration(_ config: DeviceConfiguration) async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else { throw DeviceError.notConnected("Mock device not connected") }
     }
-    
+
     func updateDeviceInfo() async throws {
-        guard isConnected else { throw DeviceError.notConnected }
+        guard isConnected else { throw DeviceError.notConnected("Mock device not connected") }
     }
     
     // MARK: - Service Discovery (Added Day 2)

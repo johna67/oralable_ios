@@ -4,6 +4,7 @@
 //
 //  Created: November 11, 2025
 //  Testing SettingsViewModel functionality
+//  Updated: November 29, 2025 - Removed OralableBLE dependency
 //
 
 import XCTest
@@ -14,13 +15,11 @@ import Combine
 class SettingsViewModelTests: XCTestCase {
 
     var viewModel: SettingsViewModel!
-    var mockBLE: OralableBLE!
     var cancellables: Set<AnyCancellable>!
 
     override func setUp() async throws {
         try await super.setUp()
-        mockBLE = OralableBLE.mock()
-        viewModel = SettingsViewModel(bleManager: mockBLE)
+        viewModel = SettingsViewModel(sensorDataProcessor: SensorDataProcessor.shared)
         cancellables = []
 
         // Clear UserDefaults for clean state
@@ -33,7 +32,6 @@ class SettingsViewModelTests: XCTestCase {
 
     override func tearDown() async throws {
         viewModel = nil
-        mockBLE = nil
         cancellables = nil
         try await super.tearDown()
     }
@@ -189,25 +187,6 @@ class SettingsViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.useMetricUnits)
     }
 
-    // MARK: - PPG Channel Order Binding Tests
-
-    func testPPGChannelOrderSyncWithBLE() {
-        // Given
-        let expectation = XCTestExpectation(description: "PPG channel order syncs with BLE")
-
-        // When
-        mockBLE.ppgChannelOrder = .alternate1
-
-        // Wait a bit for Combine to process
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            // Then
-            XCTAssertEqual(self.viewModel.ppgChannelOrder, .alternate1)
-            expectation.fulfill()
-        }
-
-        wait(for: [expectation], timeout: 1.0)
-    }
-
     // MARK: - Chart Refresh Rate Tests
 
     func testChartRefreshRateOptions() {
@@ -239,20 +218,6 @@ class SettingsViewModelTests: XCTestCase {
         // Alerts still retain their values (up to view to disable UI)
         XCTAssertTrue(viewModel.connectionAlerts)
         XCTAssertTrue(viewModel.batteryAlerts)
-    }
-
-    // MARK: - Data Management Tests
-
-    func testClearAllData() {
-        // Given - add some data to BLE manager
-        mockBLE.logMessages.append(LogMessage(message: "Test log"))
-        XCTAssertFalse(mockBLE.logMessages.isEmpty)
-
-        // When
-        viewModel.clearAllData()
-
-        // Then
-        XCTAssertTrue(mockBLE.logMessages.isEmpty)
     }
 
     // MARK: - Privacy Settings Tests
