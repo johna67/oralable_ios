@@ -211,6 +211,19 @@ class SensorDataProcessor: ObservableObject {
         ppgIRBuffer.removeAll(keepingCapacity: true)
     }
 
+    /// Append a single IR sample to the buffer (for real-time HR calculation)
+    func appendToPPGIRBuffer(_ value: UInt32) {
+        ppgIRBuffer.append(value)
+    }
+
+    /// Trim PPG IR buffer to keep only the last N samples (sliding window)
+    func trimPPGIRBuffer(keepLast count: Int) {
+        guard ppgIRBuffer.count > count else { return }
+        let removeCount = ppgIRBuffer.count - count
+        ppgIRBuffer.removeFirst(removeCount)
+        Logger.shared.debug("[SensorDataProcessor] Trimmed PPG IR buffer to \(ppgIRBuffer.count) samples")
+    }
+
     /// Update accelerometer history
     func updateAccelHistory(from readings: [SensorReading]) async {
         var grouped: [Date: (x: Int16, y: Int16, z: Int16)] = [:]

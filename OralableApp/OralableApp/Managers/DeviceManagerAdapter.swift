@@ -98,6 +98,7 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
                     Task {
                         await self.sensorDataProcessor.processBatch(readings)
                         await self.sensorDataProcessor.updateAccelHistory(from: readings)
+                        // NOTE: Heart rate calculation now happens in updateSensorValues() for better timing
                     }
                     self.updateDeviceState(from: readings)
                 }
@@ -166,19 +167,35 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
         if let reading = readings[.ppgInfrared] {
             ppgIRValue = reading.value
             Logger.shared.debug("[DeviceManagerAdapter] 📡 PPG IR: \(Int(ppgIRValue))")
-            // Collect IR sample for heart rate calculation
-            Task { @MainActor in
-                let irSamples = self.sensorDataProcessor.getPPGIRBuffer()
-                if irSamples.count >= 50 {  // Need ~1 second of data at 50Hz
-                    if let result = self.bioMetricCalculator.calculateHeartRate(
-                        irSamples: irSamples,
-                        processor: self.sensorDataProcessor
-                    ) {
-                        self.heartRate = Int(result.bpm)
-                        Logger.shared.info("[DeviceManagerAdapter] 💓 Calculated HR from PPG: \(self.heartRate) bpm")
-                    }
-                    self.sensorDataProcessor.clearPPGIRBuffer()
+
+            // CRITICAL FIX: Collect IR sample directly here (not through throttled processBatch)
+            // This ensures buffer fills at real-time rate for accurate HR calculation
+            if reading.value > 0 {
+                sensorDataProcessor.appendToPPGIRBuffer(UInt32(reading.value))
+            }
+
+            // Check buffer and calculate heart rate when we have enough samples
+            // HeartRateCalculator requires windowSize=150 samples (3 seconds at 50Hz)
+            let irSamples = sensorDataProcessor.getPPGIRBuffer()
+
+            // Log buffer progress periodically
+            if irSamples.count % 50 == 0 && irSamples.count > 0 {
+                Logger.shared.info("[DeviceManagerAdapter] 📈 PPG IR buffer: \(irSamples.count)/150 samples")
+            }
+
+            if irSamples.count >= 150 {  // Need 3 seconds of data at 50Hz for FFT-based HR calc
+                Logger.shared.info("[DeviceManagerAdapter] 🔄 Attempting HR calculation with \(irSamples.count) samples...")
+                if let result = bioMetricCalculator.calculateHeartRate(
+                    irSamples: irSamples,
+                    processor: sensorDataProcessor
+                ) {
+                    heartRate = Int(result.bpm)
+                    heartRateQuality = result.quality
+                    Logger.shared.info("[DeviceManagerAdapter] 💓 Heart Rate: \(heartRate) bpm (quality: \(String(format: "%.2f", result.quality)))")
+                } else {
+                    Logger.shared.warning("[DeviceManagerAdapter] ⚠️ HR calculation returned nil (signal quality issue)")
                 }
+                sensorDataProcessor.clearPPGIRBuffer()
             }
         }
 
@@ -201,6 +218,43 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
         if let reading = readings[.accelerometerZ] {
             accelZ = reading.value
             Logger.shared.debug("[DeviceManagerAdapter] 📊 Accel Z: \(Int(accelZ))")
+        }
+    }
+
+    // MARK: - Heart Rate Calculation
+
+    /// Calculate heart rate from the accumulated PPG IR buffer
+    /// Called after processBatch() fills the buffer with new samples
+    private func calculateHeartRateFromBuffer() async {
+        await MainActor.run {
+            let irSamples = sensorDataProcessor.getPPGIRBuffer()
+
+            // Need at least 100 samples (~2 seconds at 50Hz) for reliable HR calculation
+            guard irSamples.count >= 100 else {
+                Logger.shared.debug("[DeviceManagerAdapter] 📊 PPG IR buffer: \(irSamples.count) samples (need 100+)")
+                return
+            }
+
+            Logger.shared.info("[DeviceManagerAdapter] 💓 Calculating HR from \(irSamples.count) samples...")
+
+            if let result = bioMetricCalculator.calculateHeartRate(
+                irSamples: irSamples,
+                processor: sensorDataProcessor
+            ) {
+                heartRate = Int(result.bpm)
+                heartRateQuality = result.quality
+                Logger.shared.info("[DeviceManagerAdapter] 💓 Heart Rate: \(heartRate) bpm (quality: \(String(format: "%.2f", result.quality)))")
+
+                // Keep only the last 50 samples for continuity (sliding window)
+                // This prevents gaps in HR calculation
+                if irSamples.count > 50 {
+                    sensorDataProcessor.trimPPGIRBuffer(keepLast: 50)
+                }
+            } else {
+                Logger.shared.warning("[DeviceManagerAdapter] ⚠️ HR calculation failed (low signal quality)")
+                // Clear buffer to get fresh samples
+                sensorDataProcessor.clearPPGIRBuffer()
+            }
         }
     }
 

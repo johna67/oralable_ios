@@ -50,8 +50,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     
     private let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
     private let sensorDataCharUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
-    private let commandCharUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")
-    private let ppgWaveformCharUUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")
+    // CORRECTED: 3A0FF002 is accelerometer data (154 bytes), not command
+    private let ppgWaveformCharUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")  // Accelerometer (154 bytes)
+    private let commandCharUUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")      // Commands/Temperature (8 bytes)
     
     private var tgmService: CBService?
     private var sensorDataCharacteristic: CBCharacteristic?
@@ -163,6 +164,19 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         } catch {
             Logger.shared.warning("[OralableDevice] ⚠️ Failed to enable accelerometer notifications: \(error.localizedDescription)")
         }
+    }
+
+    // Enable temperature notifications on 3A0FF003
+    func enableTemperatureNotifications() async {
+        guard let peripheral = peripheral,
+              let characteristic = commandCharacteristic else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Command characteristic not found for temperature")
+            return
+        }
+
+        Logger.shared.info("[OralableDevice] 🔔 Enabling notifications on temperature characteristic (3A0FF003)...")
+        peripheral.setNotifyValue(true, for: characteristic)
+        Logger.shared.info("[OralableDevice] ✅ Temperature notifications enabled")
     }
 
     // MARK: - LED Configuration
@@ -478,19 +492,58 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             }
         }
     }
-    
-    private func parsePPGWaveform(_ data: Data) {
-        let now = Date()
-        
-        #if DEBUG
-        Logger.shared.debug("[OralableDevice] 🌊 PPG Waveform packet | Size: \(data.count) bytes")
-        #endif
-        
-        guard data.count >= 8 else {
-            Logger.shared.warning("[OralableDevice] ⚠️ Waveform packet too small: \(data.count) bytes")
+
+    // MARK: - Battery Parsing (4-byte packets)
+
+    private func parseBatteryData(_ data: Data) {
+        guard data.count >= 4 else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Battery packet too small: \(data.count) bytes")
             return
         }
-        
+
+        // Battery is Int32 in millivolts
+        let millivolts = data.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(fromByteOffset: 0, as: Int32.self)
+        }
+
+        // Convert to percentage (typical LiPo: 3.0V = 0%, 4.2V = 100%)
+        let voltage = Double(millivolts) / 1000.0
+        let percentage = min(100.0, max(0.0, (voltage - 3.0) / (4.2 - 3.0) * 100.0))
+
+        Logger.shared.info("[OralableDevice] 🔋 Battery: \(millivolts)mV (\(String(format: "%.0f", percentage))%)")
+
+        let reading = SensorReading(
+            sensorType: .battery,
+            value: percentage,
+            timestamp: Date(),
+            deviceId: peripheral?.identifier.uuidString
+        )
+
+        latestReadings[.battery] = reading
+        readingsBatchSubject.send([reading])
+    }
+
+    private func parsePPGWaveform(_ data: Data) {
+        // Accelerometer packet format (per firmware spec):
+        // Bytes 0-3: Frame counter (UInt32)
+        // Bytes 4+: 25 samples, each 6 bytes (X, Y, Z as Int16)
+        // Total expected size: 4 + (25 * 6) = 154 bytes
+
+        // Fixed values per firmware spec - accelerometer doesn't send config in header
+        let sampleDataStart = 4              // Data starts after 4-byte frame counter
+        let samplesPerFrame = 25             // CONFIG_ACC_SAMPLES_PER_FRAME = 25
+        let sampleSizeBytes = 6              // 3 × Int16 (X, Y, Z) = 6 bytes per sample
+        let expectedSize = sampleDataStart + (samplesPerFrame * sampleSizeBytes)  // 154 bytes
+
+        #if DEBUG
+        Logger.shared.debug("[OralableDevice] 🏃 Accelerometer packet | Size: \(data.count) bytes (expected: \(expectedSize))")
+        #endif
+
+        guard data.count >= sampleDataStart + sampleSizeBytes else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Accelerometer packet too small: \(data.count) bytes (need at least \(sampleDataStart + sampleSizeBytes))")
+            return
+        }
+
         // Helper to read Int16 little-endian
         func readInt16(at offset: Int) -> Int16? {
             guard offset + 1 < data.count else { return nil }
@@ -498,20 +551,18 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                 ptr.loadUnaligned(fromByteOffset: offset, as: Int16.self)
             }
         }
-        
-        // Header parsing
-        let headerBytes = data.prefix(8)
-        let samplesPerFrame = Int(data[2])
-        let sampleSizeBytes = Int(data[3])
-        
-        #if DEBUG
-        Logger.shared.debug("[OralableDevice] 🌊 Waveform samples: \(samplesPerFrame), size: \(sampleSizeBytes) bytes")
-        #endif
-        
+
+        // Read frame counter for logging
+        let frameCounter = data.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(fromByteOffset: 0, as: UInt32.self)
+        }
+
         var readings: [SensorReading] = []
-        let sampleDataStart = 8
-        
-        for i in 0..<samplesPerFrame {
+
+        // Calculate actual number of samples we can parse
+        let actualSamples = min(samplesPerFrame, (data.count - sampleDataStart) / sampleSizeBytes)
+
+        for i in 0..<actualSamples {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
             
             guard sampleOffset + sampleSizeBytes <= data.count else {
@@ -566,13 +617,15 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         // Emit batch
         if !readings.isEmpty {
             readingsBatchSubject.send(readings)
-            
-            #if DEBUG
-            let accelCount = readings.filter { $0.sensorType == .accelerometerX || $0.sensorType == .accelerometerY || $0.sensorType == .accelerometerZ }.count
-            if accelCount > 0 {
-                Logger.shared.debug("[OralableDevice] 🌊 Accelerometer readings: \(accelCount) (X:\(readings.filter { $0.sensorType == .accelerometerX }.count), Y:\(readings.filter { $0.sensorType == .accelerometerY }.count), Z:\(readings.filter { $0.sensorType == .accelerometerZ }.count))")
+
+            // Log first sample values for debugging
+            if let x = latestByType[.accelerometerX]?.value,
+               let y = latestByType[.accelerometerY]?.value,
+               let z = latestByType[.accelerometerZ]?.value {
+                Logger.shared.info("[OralableDevice] 🏃 Accelerometer (frame #\(frameCounter)): X=\(Int(x)), Y=\(Int(y)), Z=\(Int(z)) | \(actualSamples) samples parsed")
             }
-            #endif
+        } else {
+            Logger.shared.warning("[OralableDevice] ⚠️ No accelerometer readings parsed from \(data.count) byte packet")
         }
     }
 }
@@ -704,6 +757,9 @@ extension OralableDevice: CBPeripheralDelegate {
             return
         }
 
+        // Debug logging for all incoming packets
+        Logger.shared.debug("[OralableDevice] 📦 Received \(data.count) bytes on characteristic: \(characteristic.uuid.uuidString.prefix(8))...")
+
         // Route to appropriate parser based on characteristic AND packet size
         switch characteristic.uuid {
         case sensorDataCharUUID:
@@ -711,6 +767,9 @@ extension OralableDevice: CBPeripheralDelegate {
             switch data.count {
             case 244:  // PPG packet: 4-byte frame counter + 20×12 bytes samples
                 parseSensorData(data)
+
+            case 4:  // Battery packet: 4 bytes as Int32 in millivolts
+                parseBatteryData(data)
 
             case 6...8:  // Temperature packet: 4-byte frame counter + 2-byte temp (+ padding)
                 parseTemperature(data)
@@ -724,8 +783,30 @@ extension OralableDevice: CBPeripheralDelegate {
             }
 
         case ppgWaveformCharUUID:
-            // Accelerometer data (misnamed as PPG waveform)
-            parsePPGWaveform(data)
+            // 3A0FF002: Accelerometer data (154 bytes expected)
+            if data.count == 154 {
+                parsePPGWaveform(data)
+            } else if data.count > 100 {
+                // Try accelerometer parser for similar sizes
+                parsePPGWaveform(data)
+            } else {
+                Logger.shared.warning("[OralableDevice] ⚠️ Unexpected packet size on 3A0FF002: \(data.count) bytes (expected 154)")
+            }
+
+        case commandCharUUID:
+            // 3A0FF003: Temperature (8 bytes) and potentially battery (4 bytes)
+            switch data.count {
+            case 6...8:
+                // Temperature data: 4-byte frame counter + 2-byte temp (+ optional padding)
+                parseTemperature(data)
+
+            case 4:
+                // Battery data: 4 bytes as Int32 millivolts
+                parseBatteryData(data)
+
+            default:
+                Logger.shared.debug("[OralableDevice] 📦 Data on 3A0FF003: \(data.count) bytes")
+            }
 
         default:
             Logger.shared.debug("[OralableDevice] Data from unknown characteristic: \(characteristic.uuid.uuidString)")

@@ -345,6 +345,9 @@ class DeviceManager: ObservableObject {
             if let oralableDevice = device as? OralableDevice {
                 await oralableDevice.enableAccelerometerNotifications()
 
+                // Step 4b: Enable temperature notifications on 3A0FF003
+                await oralableDevice.enableTemperatureNotifications()
+
                 // Step 5: Configure PPG LEDs to turn them on
                 do {
                     try await oralableDevice.configurePPGLEDs()

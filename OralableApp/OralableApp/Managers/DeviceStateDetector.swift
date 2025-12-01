@@ -311,10 +311,10 @@ class DeviceStateDetector: ObservableObject {
         Logger.shared.debug("   Is Actively Moving: \(metrics.isActivelyMoving)")
         Logger.shared.debug("   Is Stationary: \(metrics.isStationary)")
         
-        // Rule 3: In Motion (High movement AND high movement variability)
-        // BOTH average movement AND variability must be elevated for motion detection
-        // This prevents false positives from sensor noise when stationary
-        if metrics.isActivelyMoving && metrics.movementVariability > Thresholds.movementVariabilityThreshold {
+        // Rule 3: In Motion (High movement variability is the key indicator)
+        // When moving, the accelerometer magnitude varies significantly even if average stays near 1g
+        // Using variability as primary indicator since average magnitude stays ~16384 (1g) at rest
+        if metrics.movementVariability > Thresholds.movementVariabilityThreshold {
             confidence = 0.85
             
             details = [
@@ -327,6 +327,11 @@ class DeviceStateDetector: ObservableObject {
             
             Logger.shared.warning("🚨 Motion detected: BOTH conditions met")
             
+            // Increase confidence for very high variability (active handling/shaking)
+            if metrics.movementVariability > Thresholds.movementVariabilityThreshold * 2.0 {
+                confidence = 0.95
+            }
+
             return DeviceStateResult(
                 state: .inMotion,
                 confidence: confidence,
@@ -334,29 +339,7 @@ class DeviceStateDetector: ObservableObject {
                 details: details
             )
         }
-        
-        // Check for very high variability alone (device being actively handled/shaken)
-        // Increased threshold to 3x to avoid false positives from normal sensor noise
-        if metrics.movementVariability > Thresholds.movementVariabilityThreshold * 3.0 {
-            confidence = 0.75
-            
-            details = [
-                "movement": metrics.averageMovement,
-                "movementVariability": metrics.movementVariability,
-                "variabilityThreshold": Thresholds.movementVariabilityThreshold * 3.0,
-                "reason": "Very high movement variability detected (device being handled)"
-            ]
-            
-            Logger.shared.warning("🚨 Motion detected: Variability ALONE exceeded 3x threshold")
-            
-            return DeviceStateResult(
-                state: .inMotion,
-                confidence: confidence,
-                timestamp: Date(),
-                details: details
-            )
-        }
-        
+
         // Rule 4: Off Charger Idle (Stationary + low battery or decreasing + ambient temp)
         if metrics.isStationary && 
            !metrics.isHighBattery &&
