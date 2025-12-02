@@ -1,0 +1,15 @@
+# Clean URLs - serve .html files without extension
+/privacy    /privacy.html    200
+/terms      /terms.html      200
+/support    /support.html    200
+/product    /product.html    200
+/dentists   /for-dentists.html    200
+/for-dentists   /for-dentists.html    200
+/about      /about.html      200
+/beta       /beta.html       200
+
+# Redirect www to non-www (uncomment when using custom domain)
+# https://www.oralable.com/*    https://oralable.com/:splat    301
+
+# SPA fallback (if needed in the future)
+# /*    /index.html    200
