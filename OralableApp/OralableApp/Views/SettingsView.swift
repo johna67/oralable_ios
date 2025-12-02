@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  OralableApp
 //
-//  Simplified Settings - Health Integration only
+//  Settings - Subscription and Health Integration
 //
 
 import SwiftUI
@@ -13,6 +13,8 @@ struct SettingsView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var healthKitManager: HealthKitManager
 
+    @State private var showSubscriptionInfo = false
+
     init(viewModel: SettingsViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -20,6 +22,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
+                // Subscription Section
+                Section {
+                    subscriptionRow
+                } header: {
+                    Text("Subscription")
+                }
+
+                // Health Integration Section
                 Section {
                     healthKitRow
                 } header: {
@@ -29,8 +39,53 @@ struct SettingsView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showSubscriptionInfo) {
+                SubscriptionInfoView()
+            }
         }
         .navigationViewStyle(.stack)
+    }
+
+    private var subscriptionRow: some View {
+        Button(action: { showSubscriptionInfo = true }) {
+            HStack {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.orange)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Current Plan")
+                        .font(.system(size: 17))
+                        .foregroundColor(.primary)
+
+                    HStack(spacing: 4) {
+                        Text(dependencies.subscriptionManager.currentTier.displayName)
+                            .font(.system(size: 15))
+                            .foregroundColor(.secondary)
+
+                        if dependencies.subscriptionManager.currentTier == .premium {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                if dependencies.subscriptionManager.currentTier == .basic {
+                    Text("Upgrade")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.blue)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private var healthKitRow: some View {
