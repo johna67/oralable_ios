@@ -73,7 +73,9 @@ struct DashboardView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    // Movement card
+                    // Movement card - shows numeric value with color coding
+                    // Blue = still (low variability), Green = active (high variability)
+                    // Sparkline colors individual points based on deviation from mean
                     NavigationLink(destination: LazyView(
                         HistoricalView(
                             metricType: "Movement",
@@ -83,13 +85,13 @@ struct DashboardView: View {
                         .environmentObject(dependencies.historicalDataManager)
                         .environmentObject(dependencies.sensorDataProcessor)
                     )) {
-                        HealthMetricCard(
-                            icon: "figure.walk",
-                            title: "Movement",
-                            value: viewModel.isMoving ? "Active" : "Still",
-                            unit: "",
-                            color: .blue,
-                            sparklineData: viewModel.accelerometerData.suffix(20).map { $0 },
+                        MovementMetricCard(
+                            value: viewModel.isConnected ? formatMovementValue(viewModel.movementVariability) : "N/A",
+                            unit: viewModel.isConnected ? (viewModel.isMoving ? "Active" : "Still") : "",
+                            isActive: viewModel.isMoving,
+                            isConnected: viewModel.isConnected,
+                            sparklineData: Array(viewModel.accelerometerData.suffix(20)),
+                            threshold: ThresholdSettings.shared.movementThreshold,
                             showChevron: true
                         )
                     }
@@ -232,6 +234,20 @@ struct DashboardView: View {
         if level < 50 { return .orange }
         return .green
     }
+
+    /// Format movement value for display
+    /// Shows values in K notation for large numbers (e.g., 1.5K instead of 1500)
+    private func formatMovementValue(_ value: Double) -> String {
+        if value >= 1000 {
+            return String(format: "%.1fK", value / 1000)
+        } else if value >= 100 {
+            return String(format: "%.0f", value)
+        } else if value >= 10 {
+            return String(format: "%.1f", value)
+        } else {
+            return String(format: "%.2f", value)
+        }
+    }
 }
 
 // MARK: - Health Metric Card (Apple Health Style)
@@ -295,6 +311,78 @@ struct HealthMetricCard: View {
     }
 }
 
+// MARK: - Movement Metric Card (with threshold-colored sparkline)
+struct MovementMetricCard: View {
+    let value: String
+    let unit: String
+    let isActive: Bool
+    let isConnected: Bool
+    let sparklineData: [Double]
+    let threshold: Double
+    let showChevron: Bool
+
+    private var color: Color {
+        guard isConnected else { return .gray }
+        return isActive ? .green : .blue
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Top row: icon, title, chevron
+            HStack {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 20))
+                    .foregroundColor(color)
+
+                Text("Movement")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                }
+            }
+
+            // Value row with movement sparkline
+            HStack(alignment: .bottom) {
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.primary)
+
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(.system(size: 17))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Movement sparkline with per-point coloring
+                if !sparklineData.isEmpty && isConnected {
+                    MovementSparkline(
+                        data: sparklineData,
+                        threshold: threshold,
+                        isOverallActive: isActive,
+                        activeColor: .green,
+                        stillColor: .blue
+                    )
+                    .frame(width: 50, height: 30)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+    }
+}
+
 // MARK: - Mini Sparkline Chart
 struct MiniSparkline: View {
     let data: [Double]
@@ -308,6 +396,33 @@ struct MiniSparkline: View {
             )
             .foregroundStyle(color.opacity(0.6))
             .lineStyle(StrokeStyle(lineWidth: 2))
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+    }
+}
+
+// MARK: - Movement Sparkline with Threshold Coloring
+/// Sparkline that colors all points based on overall movement state
+/// Green when actively moving, blue when still
+struct MovementSparkline: View {
+    let data: [Double]
+    let threshold: Double  // Movement variability threshold from settings (500-5000)
+    let isOverallActive: Bool  // Whether the overall state is "Active" (variability > threshold)
+    let activeColor: Color
+    let stillColor: Color
+
+    var body: some View {
+        // All points use the same color based on overall active/still state
+        let pointColor = isOverallActive ? activeColor.opacity(0.8) : stillColor.opacity(0.6)
+
+        Chart(Array(data.enumerated()), id: \.offset) { index, value in
+            PointMark(
+                x: .value("Index", index),
+                y: .value("Value", value)
+            )
+            .foregroundStyle(pointColor)
+            .symbolSize(10)
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)

@@ -95,7 +95,13 @@ class DeviceManager: ObservableObject {
     
     /// Errors
     @Published var lastError: DeviceError?
-    
+
+    /// Bluetooth state for UI display
+    @Published var bluetoothState: CBManagerState = .unknown
+
+    /// Whether Bluetooth is ready for scanning/connecting
+    var isBluetoothReady: Bool { bluetoothState == .poweredOn }
+
     // Day 1: Connection readiness tracking
     @Published var deviceReadiness: [UUID: ConnectionReadiness] = [:]
     
@@ -193,9 +199,14 @@ class DeviceManager: ObservableObject {
             Logger.shared.debug("[DeviceManager] State: \(state.rawValue)")
 
             Task { @MainActor [weak self] in
-                if state != .poweredOn && (self?.isScanning ?? false) {
+                guard let self = self else { return }
+
+                // Update published state for UI
+                self.bluetoothState = state
+
+                if state != .poweredOn && self.isScanning {
                     Logger.shared.warning("[DeviceManager] Bluetooth not powered on, stopping scan")
-                    self?.isScanning = false
+                    self.isScanning = false
                 }
             }
         }
@@ -755,6 +766,7 @@ class DeviceManager: ObservableObject {
     // MARK: - Auto-Reconnect to Remembered Devices
 
     /// Attempt to auto-reconnect to previously remembered devices
+    /// This method waits for Bluetooth to be ready before attempting reconnection
     func attemptAutoReconnect() {
         let rememberedDevices = persistenceManager.getRememberedDevices()
         guard !rememberedDevices.isEmpty else {
@@ -762,25 +774,32 @@ class DeviceManager: ObservableObject {
             return
         }
 
-        Logger.shared.info("[DeviceManager] Attempting auto-reconnect to \(rememberedDevices.count) remembered device(s)")
+        Logger.shared.info("[DeviceManager] Scheduling auto-reconnect to \(rememberedDevices.count) remembered device(s)")
 
-        Task {
-            await startScanning()
-            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds to discover
+        // Use whenReady to defer scanning until Bluetooth is powered on
+        bleManager?.whenReady { [weak self] in
+            guard let self = self else { return }
 
-            for remembered in rememberedDevices {
-                if let discovered = discoveredDevices.first(where: { $0.peripheralIdentifier?.uuidString == remembered.id }) {
-                    do {
-                        try await connect(to: discovered)
-                        Logger.shared.info("[DeviceManager] Auto-reconnected to \(remembered.name)")
-                        break // Successfully connected, stop trying
-                    } catch {
-                        Logger.shared.debug("[DeviceManager] Auto-reconnect failed for \(remembered.name): \(error.localizedDescription)")
+            Task { @MainActor in
+                Logger.shared.info("[DeviceManager] ✅ Bluetooth ready - starting auto-reconnect scan")
+
+                await self.startScanning()
+                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds to discover
+
+                for remembered in rememberedDevices {
+                    if let discovered = self.discoveredDevices.first(where: { $0.peripheralIdentifier?.uuidString == remembered.id }) {
+                        do {
+                            try await self.connect(to: discovered)
+                            Logger.shared.info("[DeviceManager] Auto-reconnected to \(remembered.name)")
+                            break // Successfully connected, stop trying
+                        } catch {
+                            Logger.shared.debug("[DeviceManager] Auto-reconnect failed for \(remembered.name): \(error.localizedDescription)")
+                        }
                     }
                 }
-            }
 
-            stopScanning()
+                self.stopScanning()
+            }
         }
     }
 }

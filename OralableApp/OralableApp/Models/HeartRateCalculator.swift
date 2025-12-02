@@ -41,26 +41,36 @@ class HeartRateCalculator {
     /// - Parameter irSamples: Array of PPG IR values (UInt32)
     /// - Returns: HeartRateResult with BPM and quality metrics, or nil if insufficient data
     func calculateHeartRate(irSamples: [UInt32]) -> HeartRateResult? {
+        // Log input for debugging
+        Task { @MainActor in
+            Logger.shared.info("[HeartRateCalculator] 💓 calculateHeartRate called with \(irSamples.count) samples")
+            if let first = irSamples.first, let last = irSamples.last {
+                Logger.shared.info("[HeartRateCalculator] 💓 Sample range: first=\(first), last=\(last)")
+            }
+        }
+
         // Filter out invalid samples (saturation, zero, or out of range)
         let validSamples = irSamples.filter { sample in
             // Reject zero values (sensor error)
             guard sample > 0 else { return false }
-            
+
             // Reject saturation values (0x7FFFF = 524287 for 19-bit ADC)
             guard sample < 500000 else { return false }
-            
+
             // Reject very low values (likely not on tissue)
             guard sample > 1000 else { return false }
-            
+
             return true
         }
-        
+
+        Task { @MainActor in
+            Logger.shared.info("[HeartRateCalculator] 💓 Valid samples: \(validSamples.count)/\(irSamples.count)")
+        }
+
         // Need at least 80% valid samples to proceed
         guard Double(validSamples.count) / Double(irSamples.count) >= 0.8 else {
-            if shouldLogWarning() {
-                Task { @MainActor in
-                    Logger.shared.warning("[HeartRateCalculator] Too many invalid samples (\(validSamples.count)/\(irSamples.count))")
-                }
+            Task { @MainActor in
+                Logger.shared.warning("[HeartRateCalculator] ❌ Too many invalid samples (\(validSamples.count)/\(irSamples.count)) - need 80%")
             }
             return nil
         }
@@ -73,13 +83,15 @@ class HeartRateCalculator {
         let mean = samples.reduce(0, +) / Double(samples.count)
         let variance = samples.map { pow($0 - mean, 2) }.reduce(0, +) / Double(samples.count)
         let coefficientOfVariation = sqrt(variance) / mean
-        
+
+        Task { @MainActor in
+            Logger.shared.info("[HeartRateCalculator] 💓 Signal stats: mean=\(Int(mean)), CV=\(String(format: "%.4f", coefficientOfVariation))")
+        }
+
         // Signal should have some variability (>0.5%) but not too much (>50%)
         guard coefficientOfVariation > 0.005 && coefficientOfVariation < 0.5 else {
-            if shouldLogWarning() {
-                Task { @MainActor in
-                    Logger.shared.warning("[HeartRateCalculator] Poor signal variability (CV: \(String(format: "%.3f", coefficientOfVariation)))")
-                }
+            Task { @MainActor in
+                Logger.shared.warning("[HeartRateCalculator] ❌ Poor signal variability (CV: \(String(format: "%.4f", coefficientOfVariation))) - need 0.005-0.5")
             }
             return nil
         }
@@ -94,17 +106,27 @@ class HeartRateCalculator {
         
         // Need full window for reliable calculation
         guard signalBuffer.count >= windowSize else {
+            Task { @MainActor in
+                Logger.shared.info("[HeartRateCalculator] 💓 Buffer filling: \(self.signalBuffer.count)/\(self.windowSize)")
+            }
             return nil
         }
-        
+
         // Apply bandpass filter
         let filtered = bandpassFilter(signalBuffer)
-        
+
         // Detect peaks
         let peaks = detectPeaks(in: filtered)
-        
+
+        Task { @MainActor in
+            Logger.shared.info("[HeartRateCalculator] 💓 Detected \(peaks.count) peaks in signal")
+        }
+
         // Calculate heart rate from peaks
         guard let (bpm, quality) = calculateBPMFromPeaks(peaks, signalLength: filtered.count) else {
+            Task { @MainActor in
+                Logger.shared.warning("[HeartRateCalculator] ❌ calculateBPMFromPeaks returned nil (not enough valid peaks)")
+            }
             return nil
         }
         
@@ -146,7 +168,11 @@ class HeartRateCalculator {
         // Store for trend analysis
         lastHeartRate = bpm
         lastQuality = quality
-        
+
+        Task { @MainActor in
+            Logger.shared.info("[HeartRateCalculator] ✅ Heart Rate: \(Int(bpm)) BPM (quality: \(String(format: "%.2f", quality)))")
+        }
+
         return HeartRateResult(
             bpm: bpm,
             quality: quality,

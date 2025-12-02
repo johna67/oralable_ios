@@ -47,17 +47,22 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     @Published var batteryLevel: Int?
     
     // MARK: - TGM Service & Characteristics
-    
+
     private let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
     private let sensorDataCharUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
     // CORRECTED: 3A0FF002 is accelerometer data (154 bytes), not command
     private let ppgWaveformCharUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")  // Accelerometer (154 bytes)
     private let commandCharUUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")      // Commands/Temperature (8 bytes)
-    
+
+    // MARK: - Standard BLE Battery Service (0x180F)
+    private let batteryServiceUUID = CBUUID(string: "0000180F-0000-1000-8000-00805F9B34FB")
+    private let batteryLevelCharUUID = CBUUID(string: "00002A19-0000-1000-8000-00805F9B34FB")
+
     private var tgmService: CBService?
     private var sensorDataCharacteristic: CBCharacteristic?
     private var commandCharacteristic: CBCharacteristic?
     private var ppgWaveformCharacteristic: CBCharacteristic?
+    private var batteryLevelCharacteristic: CBCharacteristic?
     
     // MARK: - Data Collection State
     
@@ -105,12 +110,13 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         guard let peripheral = peripheral else {
             throw DeviceError.invalidPeripheral("Peripheral is nil")
         }
-        
+
         Logger.shared.info("[OralableDevice] 🔍 Starting service discovery...")
-        
+
         return try await withCheckedThrowingContinuation { continuation in
             self.serviceDiscoveryContinuation = continuation
-            peripheral.discoverServices([tgmServiceUUID])
+            // Discover both TGM service and standard Battery Service
+            peripheral.discoverServices([tgmServiceUUID, batteryServiceUUID])
         }
     }
     
@@ -411,6 +417,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     deviceId: peripheral?.identifier.uuidString,
                     quality: ppgIR > 10000 ? 0.9 : 0.1
                 ))
+                // Log PPG IR periodically for heart rate debugging
+                if i == 0 && ppgFrameCount % 50 == 0 {
+                    Logger.shared.info("[OralableDevice] 💓 PPG IR sample: \(ppgIR) (frame #\(ppgFrameCount))")
+                }
             }
 
             // PPG Green (bytes 8-11 of sample)
@@ -649,15 +659,29 @@ extension OralableDevice: CBPeripheralDelegate {
         }
         
         Logger.shared.info("[OralableDevice] ✅ Discovered \(services.count) service(s)")
-        
+
         // Find TGM service
         if let tgmSvc = services.first(where: { $0.uuid == tgmServiceUUID }) {
             self.tgmService = tgmSvc
             Logger.shared.info("[OralableDevice] ✅ TGM Service found: \(tgmSvc.uuid.uuidString)")
+        } else {
+            Logger.shared.warning("[OralableDevice] ⚠️ TGM Service not found")
+        }
+
+        // Find Battery service and discover its characteristics
+        if let batterySvc = services.first(where: { $0.uuid == batteryServiceUUID }) {
+            Logger.shared.info("[OralableDevice] ✅ Battery Service found: \(batterySvc.uuid.uuidString)")
+            // Discover battery characteristic
+            peripheral.discoverCharacteristics([batteryLevelCharUUID], for: batterySvc)
+        } else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Standard Battery Service (0x180F) not found")
+        }
+
+        // Resume continuation if TGM service found (battery is optional)
+        if tgmService != nil {
             serviceDiscoveryContinuation?.resume()
             serviceDiscoveryContinuation = nil
         } else {
-            Logger.shared.error("[OralableDevice] ❌ TGM Service not found")
             serviceDiscoveryContinuation?.resume(throwing: DeviceError.serviceNotFound("TGM service UUID not found in discovered services"))
             serviceDiscoveryContinuation = nil
         }
@@ -682,28 +706,47 @@ extension OralableDevice: CBPeripheralDelegate {
         
         var foundCount = 0
         
+        // Check if this is the Battery Service
+        if service.uuid == batteryServiceUUID {
+            Logger.shared.info("[OralableDevice] 🔋 Processing Battery Service characteristics...")
+            for characteristic in characteristics {
+                if characteristic.uuid == batteryLevelCharUUID {
+                    batteryLevelCharacteristic = characteristic
+                    Logger.shared.info("[OralableDevice] 🔋 Battery Level characteristic found (0x2A19)")
+                    Logger.shared.info("[OralableDevice] 🔋 Enabling battery notifications...")
+                    peripheral.setNotifyValue(true, for: characteristic)
+                    Logger.shared.info("[OralableDevice] 🔋 Reading initial battery level...")
+                    peripheral.readValue(for: characteristic)
+                } else {
+                    Logger.shared.debug("[OralableDevice] 🔋 Other battery characteristic: \(characteristic.uuid.uuidString)")
+                }
+            }
+            return  // Don't process as TGM characteristics
+        }
+
+        // Process TGM service characteristics
         for characteristic in characteristics {
             switch characteristic.uuid {
             case sensorDataCharUUID:
                 sensorDataCharacteristic = characteristic
                 Logger.shared.info("[OralableDevice] ✅ Sensor Data characteristic found")
                 foundCount += 1
-                
+
             case commandCharUUID:
                 commandCharacteristic = characteristic
                 Logger.shared.info("[OralableDevice] ✅ Command characteristic found")
                 foundCount += 1
-                
+
             case ppgWaveformCharUUID:
                 ppgWaveformCharacteristic = characteristic
                 Logger.shared.info("[OralableDevice] ✅ PPG Waveform characteristic found")
                 foundCount += 1
-                
+
             default:
                 Logger.shared.debug("[OralableDevice] Other characteristic: \(characteristic.uuid.uuidString)")
             }
         }
-        
+
         if foundCount >= 1 {  // At minimum need sensor data characteristic
             Logger.shared.info("[OralableDevice] ✅ Found \(foundCount)/3 expected characteristics")
             characteristicDiscoveryContinuation?.resume()
@@ -717,29 +760,41 @@ extension OralableDevice: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            Logger.shared.error("[OralableDevice] ❌ Notification state update failed: \(error.localizedDescription)")
-
-            // Resume appropriate continuation
-            if characteristic.uuid == sensorDataCharUUID {
+            // Log which characteristic failed with descriptive name
+            switch characteristic.uuid {
+            case sensorDataCharUUID:
+                Logger.shared.error("[OralableDevice] ❌ Notification state update failed for Sensor Data: \(error.localizedDescription)")
                 notificationEnableContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable sensor data notifications: \(error.localizedDescription)"))
                 notificationEnableContinuation = nil
-            } else if characteristic.uuid == ppgWaveformCharUUID {
+            case ppgWaveformCharUUID:
+                Logger.shared.error("[OralableDevice] ❌ Notification state update failed for Accelerometer: \(error.localizedDescription)")
                 accelerometerNotificationContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable accelerometer notifications: \(error.localizedDescription)"))
                 accelerometerNotificationContinuation = nil
+            case batteryLevelCharUUID:
+                Logger.shared.error("[OralableDevice] 🔋❌ Notification state update failed for Battery Level: \(error.localizedDescription)")
+            default:
+                Logger.shared.error("[OralableDevice] ❌ Notification state update failed: \(error.localizedDescription)")
             }
             return
         }
         
         if characteristic.isNotifying {
-            Logger.shared.info("[OralableDevice] ✅ Notifications enabled for \(characteristic.uuid.uuidString)")
-            
-            // Resume appropriate continuation
-            if characteristic.uuid == sensorDataCharUUID {
+            // Log which characteristic enabled notifications
+            switch characteristic.uuid {
+            case sensorDataCharUUID:
+                Logger.shared.info("[OralableDevice] ✅ Notifications enabled for Sensor Data (3A0FF001)")
                 notificationEnableContinuation?.resume()
                 notificationEnableContinuation = nil
-            } else if characteristic.uuid == ppgWaveformCharUUID {
+            case ppgWaveformCharUUID:
+                Logger.shared.info("[OralableDevice] ✅ Notifications enabled for Accelerometer (3A0FF002)")
                 accelerometerNotificationContinuation?.resume()
                 accelerometerNotificationContinuation = nil
+            case commandCharUUID:
+                Logger.shared.info("[OralableDevice] ✅ Notifications enabled for Command/Temperature (3A0FF003)")
+            case batteryLevelCharUUID:
+                Logger.shared.info("[OralableDevice] 🔋 Notifications enabled for Battery Level (0x2A19)")
+            default:
+                Logger.shared.info("[OralableDevice] ✅ Notifications enabled for \(characteristic.uuid.uuidString)")
             }
         } else {
             Logger.shared.warning("[OralableDevice] ⚠️ Notifications disabled for \(characteristic.uuid.uuidString)")
@@ -806,6 +861,22 @@ extension OralableDevice: CBPeripheralDelegate {
 
             default:
                 Logger.shared.debug("[OralableDevice] 📦 Data on 3A0FF003: \(data.count) bytes")
+            }
+
+        case batteryLevelCharUUID:
+            // Standard BLE Battery Level (0x2A19): 1 byte, 0-100%
+            if data.count >= 1 {
+                let percentage = Int(data[0])
+                Logger.shared.info("[OralableDevice] 🔋 Battery Level (BLE standard): \(percentage)%")
+
+                let reading = SensorReading(
+                    sensorType: .battery,
+                    value: Double(percentage),
+                    timestamp: Date(),
+                    deviceId: peripheral.identifier.uuidString
+                )
+                latestReadings[.battery] = reading
+                readingsBatchSubject.send([reading])
             }
 
         default:

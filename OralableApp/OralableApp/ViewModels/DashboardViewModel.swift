@@ -32,6 +32,15 @@ class DashboardViewModel: ObservableObject {
     @Published var isMoving: Bool = false
     @Published var positionQuality: String = "Good" // "Good", "Adjust", "Off"
 
+    // Movement metrics (numeric values for display)
+    @Published var movementValue: Double = 0.0       // Average movement magnitude
+    @Published var movementVariability: Double = 0.0 // Movement variability (determines active/still)
+
+    /// Movement threshold from user settings (dynamically updated)
+    private var movementActiveThreshold: Double {
+        ThresholdSettings.shared.movementThreshold
+    }
+
     // Device State Detection
     @Published var deviceStateDescription: String = "Unknown"
     @Published var deviceStateConfidence: Double = 0.0
@@ -113,6 +122,15 @@ class DashboardViewModel: ObservableObject {
 
     // MARK: - Private Methods
     private func setupBindings() {
+        // Subscribe to threshold changes for live UI updates
+        ThresholdSettings.shared.$movementThreshold
+            .sink { [weak self] newThreshold in
+                guard let self = self else { return }
+                // Re-evaluate isMoving with new threshold
+                self.isMoving = self.movementVariability > newThreshold
+            }
+            .store(in: &cancellables)
+
         // Bind recording state from coordinator (single source of truth)
         recordingStateCoordinator.$isRecording
             .assign(to: &$isRecording)
@@ -126,25 +144,29 @@ class DashboardViewModel: ObservableObject {
             }
             .assign(to: &$sessionDuration)
 
-        // Connection state from DeviceManager (readiness-aware) - reduced throttle
+        // Connection state from DeviceManager - simplified to just check if devices connected
+        // Data flow (accelerometer, PPG, etc.) is the real indicator of connection
         deviceManager.$connectedDevices
             .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] devices in
                 guard let self = self else { return }
-                self.isConnected = !devices.isEmpty && self.deviceManager.primaryDeviceReadiness == .ready
-                if !self.isConnected {
+                let wasConnected = self.isConnected
+                self.isConnected = !devices.isEmpty
+                Logger.shared.debug("[DashboardViewModel] connectedDevices changed: \(devices.count) devices, isConnected: \(self.isConnected)")
+                if wasConnected && !self.isConnected {
+                    // Only reset when transitioning from connected to disconnected
                     self.resetMetrics()
                 }
             }
             .store(in: &cancellables)
 
-        // Also watch readiness state changes - reduced throttle
+        // Also watch readiness state changes for logging
         deviceManager.$deviceReadiness
             .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] _ in
+            .sink { [weak self] readiness in
                 guard let self = self else { return }
-                self.isConnected = !self.deviceManager.connectedDevices.isEmpty &&
-                                  self.deviceManager.primaryDeviceReadiness == .ready
+                let primaryReadiness = self.deviceManager.primaryDeviceReadiness
+                Logger.shared.debug("[DashboardViewModel] deviceReadiness changed: primary=\(primaryReadiness)")
             }
             .store(in: &cancellables)
 
@@ -244,31 +266,49 @@ class DashboardViewModel: ObservableObject {
         if accelerometerData.count > 100 {
             accelerometerData.removeFirst()
         }
+
+        // Update movement value (latest magnitude)
+        movementValue = magnitude
+
+        // Calculate variability from recent samples (standard deviation)
+        if accelerometerData.count >= 10 {
+            let recentSamples = Array(accelerometerData.suffix(20))
+            let mean = recentSamples.reduce(0, +) / Double(recentSamples.count)
+            let variance = recentSamples.map { pow($0 - mean, 2) }.reduce(0, +) / Double(recentSamples.count)
+            movementVariability = sqrt(variance)
+
+            // Update isMoving based on variability threshold (from user settings)
+            isMoving = movementVariability > movementActiveThreshold
+        }
     }
 
     private func updateMAMStates(from stateResult: DeviceStateResult) {
         deviceStateDescription = stateResult.state.rawValue
         deviceStateConfidence = stateResult.confidence
 
+        // NOTE: isMoving is now calculated directly from accelerometer variability
+        // in processAccelerometerData(), not from DeviceStateDetector.
+        // This prevents race conditions between the two update sources.
+
         switch stateResult.state {
         case .onChargerStatic:
             isCharging = true
-            isMoving = false
+            // isMoving set by processAccelerometerData()
             positionQuality = "Off"
 
         case .offChargerStatic:
             isCharging = false
-            isMoving = false
+            // isMoving set by processAccelerometerData()
             positionQuality = "Off"
 
         case .inMotion:
             isCharging = false
-            isMoving = true
+            // isMoving set by processAccelerometerData()
             positionQuality = "Adjust"
 
         case .onCheek:
             isCharging = false
-            isMoving = false
+            // isMoving set by processAccelerometerData()
             if stateResult.confidence >= 0.8 {
                 positionQuality = "Good"
             } else if stateResult.confidence >= 0.6 {
@@ -279,7 +319,7 @@ class DashboardViewModel: ObservableObject {
 
         case .unknown:
             isCharging = false
-            isMoving = false
+            // isMoving set by processAccelerometerData()
             positionQuality = "Off"
         }
     }
@@ -294,6 +334,8 @@ class DashboardViewModel: ObservableObject {
         muscleActivity = 0.0
         muscleActivityHistory = []
         isMoving = false
+        movementValue = 0.0
+        movementVariability = 0.0
         positionQuality = "Off"
         deviceStateDescription = "Unknown"
         deviceStateConfidence = 0.0

@@ -54,13 +54,20 @@ struct DevicesView: View {
                 }
             }
             .onAppear {
-                // Day 4 Fix: Only auto-scan if no devices are connected
-                if deviceManager.connectedDevices.isEmpty {
+                // Only auto-scan if Bluetooth is ready and no devices connected
+                if deviceManager.isBluetoothReady && deviceManager.connectedDevices.isEmpty {
                     startScanning()
                 }
             }
             .onDisappear {
                 deviceManager.stopScanning()
+            }
+            .onChange(of: deviceManager.bluetoothState) { newState in
+                // Auto-start scan when Bluetooth becomes ready
+                if newState == .poweredOn && deviceManager.connectedDevices.isEmpty && !isScanning {
+                    Logger.shared.info("[DevicesView] 📶 Bluetooth ready - auto-starting scan")
+                    startScanning()
+                }
             }
         }
         .navigationViewStyle(.stack)
@@ -109,7 +116,15 @@ struct DevicesView: View {
             }
 
             if discoveredDevices.isEmpty {
-                if isScanning {
+                // Show Bluetooth state if not ready
+                if !deviceManager.isBluetoothReady {
+                    HStack {
+                        Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                            .foregroundColor(.orange)
+                        Text(bluetoothStateMessage)
+                            .foregroundColor(.secondary)
+                    }
+                } else if isScanning {
                     HStack {
                         Text("Searching...")
                             .foregroundColor(.secondary)
@@ -143,8 +158,29 @@ struct DevicesView: View {
         }
     }
 
+    // MARK: - Helper Properties
+
+    private var bluetoothStateMessage: String {
+        switch deviceManager.bluetoothState {
+        case .unknown:
+            return "Initializing Bluetooth..."
+        case .resetting:
+            return "Bluetooth resetting..."
+        case .unsupported:
+            return "Bluetooth not supported"
+        case .unauthorized:
+            return "Bluetooth permission required"
+        case .poweredOff:
+            return "Turn on Bluetooth"
+        case .poweredOn:
+            return "Bluetooth ready"
+        @unknown default:
+            return "Unknown Bluetooth state"
+        }
+    }
+
     // MARK: - Helper Methods
-    
+
     private func getDeviceReadiness(id: String) -> ConnectionReadiness {
         // Check if device is connected and get its readiness state
         if let device = deviceManager.connectedDevices.first(where: { $0.peripheralIdentifier?.uuidString == id }) {

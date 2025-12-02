@@ -132,13 +132,14 @@ struct HistoricalView: View {
             Text("Movement Data")
                 .font(designSystem.typography.headline)
                 .foregroundColor(designSystem.colors.textPrimary)
-            
+
             Chart(viewModel.dataPoints) { point in
-                LineMark(
+                PointMark(
                     x: .value("Time", point.timestamp),
                     y: .value("Movement", point.movementIntensity)
                 )
-                .foregroundStyle(designSystem.colors.info)
+                .foregroundStyle(Color.blue.opacity(0.6))
+                .symbolSize(10)
             }
             .frame(height: 250)
             .chartYAxis {

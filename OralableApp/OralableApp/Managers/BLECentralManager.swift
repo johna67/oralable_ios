@@ -12,31 +12,34 @@ import CoreBluetooth
 
 /// Centralized BLE manager that surfaces discovery/connection events via callbacks
 final class BLECentralManager: NSObject {
-    
+
     // MARK: - Callbacks
-    
+
     /// Called when a peripheral is discovered
     var onDeviceDiscovered: ((CBPeripheral, String, Int) -> Void)?
-    
+
     /// Called when a peripheral is connected
     var onDeviceConnected: ((CBPeripheral) -> Void)?
-    
+
     /// Called when a peripheral is disconnected
     var onDeviceDisconnected: ((CBPeripheral, Error?) -> Void)?
-    
+
     /// Called when Bluetooth state changes
     var onBluetoothStateChanged: ((CBManagerState) -> Void)?
-    
+
+    // MARK: - Public State
+
+    /// Current Bluetooth state - observable for UI updates
+    private(set) var state: CBManagerState = .unknown
+
+    /// Whether Bluetooth is ready for scanning/connecting
+    var isReady: Bool { state == .poweredOn }
+
     // MARK: - Private
 
-    // CRITICAL FIX: Lazy initialization prevents Bluetooth permission popup on app launch
-    // Core Bluetooth will only be initialized when actually needed (scan/connect)
-    private lazy var central: CBCentralManager = {
-        Task { @MainActor in
-            Logger.shared.info("[BLECentralManager] ⚡️ Lazy initializing CBCentralManager - BLE permission may be requested")
-        }
-        return CBCentralManager(delegate: self, queue: queue)
-    }()
+    // EAGER INITIALIZATION: CBCentralManager created immediately to get early state updates
+    // This triggers Bluetooth permission dialog on first app launch (required for BLE apps)
+    private var central: CBCentralManager!
 
     private var connectedPeripherals = Set<UUID>()
     private var pendingConnections = Set<UUID>()
@@ -45,14 +48,40 @@ final class BLECentralManager: NSObject {
     // Optional: filter by services if you want to narrow scanning
     private var serviceFilter: [CBUUID]?
 
+    // Pending operations to run when Bluetooth becomes ready
+    private var pendingOperations: [() -> Void] = []
+
     // MARK: - Init
 
     override init() {
         super.init()
-        Task { @MainActor in
-            Logger.shared.info("[BLECentralManager] Initialized (Core Bluetooth not yet started)")
+        // EAGER: Initialize CBCentralManager immediately
+        // This requests Bluetooth permission and starts receiving state updates
+        central = CBCentralManager(delegate: self, queue: queue)
+        Logger.shared.info("[BLECentralManager] ⚡️ Initialized - waiting for Bluetooth state...")
+    }
+
+    // MARK: - Ready State Handling
+
+    /// Execute an operation when Bluetooth is ready, or queue it if not ready yet
+    func whenReady(_ operation: @escaping () -> Void) {
+        if isReady {
+            operation()
+        } else {
+            pendingOperations.append(operation)
+            Logger.shared.info("[BLECentralManager] ⏳ Operation queued - waiting for Bluetooth to power on")
         }
-        // Note: central is now lazy - CBCentralManager won't be created until first access
+    }
+
+    /// Execute all pending operations (called when Bluetooth becomes ready)
+    private func executePendingOperations() {
+        guard isReady else { return }
+        let operations = pendingOperations
+        pendingOperations.removeAll()
+        Logger.shared.info("[BLECentralManager] ✅ Executing \(operations.count) pending operation(s)")
+        for operation in operations {
+            operation()
+        }
     }
     
     // MARK: - Scanning
@@ -137,9 +166,21 @@ final class BLECentralManager: NSObject {
 extension BLECentralManager: CBCentralManagerDelegate {
     
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        let previousState = state
+        state = central.state
+
         Task { @MainActor in
-            Logger.shared.info("Bluetooth state changed to: \(self.stateDescription(central.state))")
+            Logger.shared.info("[BLECentralManager] 📶 Bluetooth state: \(self.stateDescription(previousState)) → \(self.stateDescription(central.state))")
         }
+
+        // Execute pending operations when Bluetooth becomes ready
+        if state == .poweredOn && previousState != .poweredOn {
+            Task { @MainActor in
+                Logger.shared.info("[BLECentralManager] ✅ Bluetooth powered on - ready for scanning/connecting")
+            }
+            executePendingOperations()
+        }
+
         onBluetoothStateChanged?(central.state)
     }
     

@@ -35,6 +35,13 @@ struct SettingsView: View {
                 } header: {
                     Text("Health Integration")
                 }
+
+                // Detection Settings Section
+                Section {
+                    thresholdsRow
+                } header: {
+                    Text("Detection Settings")
+                }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
@@ -118,6 +125,32 @@ struct SettingsView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var thresholdsRow: some View {
+        NavigationLink {
+            ThresholdsSettingsView()
+        } label: {
+            HStack {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 20))
+                    .foregroundColor(.orange)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Thresholds")
+                        .font(.system(size: 17))
+                        .foregroundColor(.primary)
+
+                    Text("Adjust movement sensitivity")
+                        .font(.system(size: 15))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(.vertical, 4)
+        }
     }
 }
 

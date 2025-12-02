@@ -368,6 +368,7 @@ struct HistoricalDataPoint: Codable, Identifiable {
     
     // Activity metrics
     let movementIntensity: Double
+    let movementVariability: Double  // Standard deviation of accelerometer magnitude
     let grindingEvents: Int?
     let averagePPGIR: Double?
     let averagePPGRed: Double?
@@ -383,6 +384,7 @@ struct HistoricalDataPoint: Codable, Identifiable {
         averageTemperature: Double,
         averageBattery: Int,
         movementIntensity: Double,
+        movementVariability: Double = 0,
         grindingEvents: Int? = nil,
         averagePPGIR: Double? = nil,
         averagePPGRed: Double? = nil,
@@ -397,6 +399,7 @@ struct HistoricalDataPoint: Codable, Identifiable {
         self.averageTemperature = averageTemperature
         self.averageBattery = averageBattery
         self.movementIntensity = movementIntensity
+        self.movementVariability = movementVariability
         self.grindingEvents = grindingEvents
         self.averagePPGIR = averagePPGIR
         self.averagePPGRed = averagePPGRed

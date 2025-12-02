@@ -174,13 +174,19 @@ class HistoricalDataAggregator {
         let avgBatteryLevel = bucket.map { Double($0.battery.percentage) }.reduce(0, +) / count
         
         // Activity average (using accelerometer magnitude as proxy)
-        let avgActivityLevel = bucket.map { $0.accelerometer.magnitude }.reduce(0, +) / count
-        
+        let magnitudes = bucket.map { $0.accelerometer.magnitude }
+        let avgActivityLevel = magnitudes.reduce(0, +) / count
+
+        // Calculate movement variability (standard deviation of magnitudes)
+        let magnitudeMean = avgActivityLevel
+        let magnitudeVariance = magnitudes.map { pow($0 - magnitudeMean, 2) }.reduce(0, +) / count
+        let magnitudeVariability = sqrt(magnitudeVariance)
+
         // Note: Grinding metrics would need to be implemented in SensorData
         let grindingCount = 0 // bucket.filter { $0.grinding.isActive }.count
         let totalGrindingDuration: TimeInterval = 0 // bucket.map { $0.grinding.duration }.reduce(0, +)
         let avgGrindingIntensity = 0.0 // placeholder
-        
+
         return HistoricalDataPoint(
             timestamp: timestamp,
             averageHeartRate: nil, // Would need heart rate data from SensorData
@@ -190,6 +196,7 @@ class HistoricalDataAggregator {
             averageTemperature: avgTemperature,
             averageBattery: Int(avgBatteryLevel),
             movementIntensity: avgActivityLevel,
+            movementVariability: magnitudeVariability,
             grindingEvents: grindingCount,
             averagePPGIR: avgIR,
             averagePPGRed: avgRed,
