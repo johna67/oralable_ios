@@ -12,6 +12,58 @@ import Foundation
 import CoreBluetooth
 import Combine
 
+// MARK: - Accelerometer Conversion Utilities
+
+/// Utility for converting raw accelerometer values to physical units
+struct AccelerometerConversion {
+    /// Accelerometer range in g (typically ±2g, ±4g, ±8g, or ±16g)
+    /// LIS2DH12 default is ±2g
+    static let rangeG: Double = 2.0
+
+    /// Resolution in bits (LIS2DH12 is 12-bit but left-justified in 16-bit)
+    static let resolutionBits: Int = 12
+
+    /// Maximum raw value (for 12-bit left-justified in 16-bit: 32768 / 16 = 2048)
+    static let maxRawValue: Double = 2048.0
+
+    /// Convert raw Int16 value to g (gravitational acceleration)
+    /// - Parameter rawValue: Raw accelerometer reading (Int16)
+    /// - Returns: Acceleration in g units
+    static func toG(_ rawValue: Int16) -> Double {
+        // LIS2DH12 outputs 12-bit values left-justified in 16-bit register
+        // Need to divide by 16 (>> 4) to get actual 12-bit value, then scale to g
+        let shiftedValue = Double(rawValue) / 16.0
+        return (shiftedValue / maxRawValue) * rangeG
+    }
+
+    /// Convert raw Int16 value to m/s² (SI units)
+    /// - Parameter rawValue: Raw accelerometer reading (Int16)
+    /// - Returns: Acceleration in m/s²
+    static func toMeterPerSecondSquared(_ rawValue: Int16) -> Double {
+        return toG(rawValue) * 9.80665  // Standard gravity
+    }
+
+    /// Convert raw Int16 value to mg (milli-g, commonly used in accelerometers)
+    /// - Parameter rawValue: Raw accelerometer reading (Int16)
+    /// - Returns: Acceleration in mg
+    static func toMilliG(_ rawValue: Int16) -> Double {
+        return toG(rawValue) * 1000.0
+    }
+
+    /// Calculate magnitude from raw X, Y, Z values
+    /// - Parameters:
+    ///   - x: Raw X axis value
+    ///   - y: Raw Y axis value
+    ///   - z: Raw Z axis value
+    /// - Returns: Magnitude in g
+    static func magnitude(x: Int16, y: Int16, z: Int16) -> Double {
+        let xG = toG(x)
+        let yG = toG(y)
+        let zG = toG(z)
+        return sqrt(xG * xG + yG * yG + zG * zG)
+    }
+}
+
 /// Oralable-specific BLE device implementation
 class OralableDevice: NSObject, BLEDeviceProtocol {
     // MARK: - BLE Protocol Properties
@@ -51,7 +103,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     private let tgmServiceUUID = CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
     private let sensorDataCharUUID = CBUUID(string: "3A0FF001-98C4-46B2-94AF-1AEE0FD4C48E")
     // CORRECTED: 3A0FF002 is accelerometer data (154 bytes), not command
-    private let ppgWaveformCharUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")  // Accelerometer (154 bytes)
+    private let accelerometerCharUUID = CBUUID(string: "3A0FF002-98C4-46B2-94AF-1AEE0FD4C48E")  // Accelerometer (154 bytes)
     private let commandCharUUID = CBUUID(string: "3A0FF003-98C4-46B2-94AF-1AEE0FD4C48E")      // Commands/Temperature (8 bytes)
 
     // MARK: - Standard BLE Battery Service (0x180F)
@@ -61,7 +113,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     private var tgmService: CBService?
     private var sensorDataCharacteristic: CBCharacteristic?
     private var commandCharacteristic: CBCharacteristic?
-    private var ppgWaveformCharacteristic: CBCharacteristic?
+    private var accelerometerCharacteristic: CBCharacteristic?
     private var batteryLevelCharacteristic: CBCharacteristic?
     
     // MARK: - Data Collection State
@@ -75,8 +127,28 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     private var notificationEnableContinuation: CheckedContinuation<Void, Error>?
     private var accelerometerNotificationContinuation: CheckedContinuation<Void, Error>?
     
+    // MARK: - Notification Readiness State Machine
+
+    /// Tracks which characteristics have enabled notifications
+    struct NotificationReadiness: OptionSet {
+        let rawValue: UInt8
+
+        static let sensorData      = NotificationReadiness(rawValue: 1 << 0)  // 3A0FF001 - PPG
+        static let accelerometer   = NotificationReadiness(rawValue: 1 << 1)  // 3A0FF002 - Accelerometer
+        static let temperature     = NotificationReadiness(rawValue: 1 << 2)  // 3A0FF003 - Temperature
+
+        /// Minimum required for data collection
+        static let minimumRequired: NotificationReadiness = [.sensorData]
+
+        /// All notifications for full functionality
+        static let allNotifications: NotificationReadiness = [.sensorData, .accelerometer, .temperature]
+    }
+
+    private var notificationReadiness: NotificationReadiness = []
+    private var connectionReadyContinuation: CheckedContinuation<Void, Error>?
+
     // MARK: - Statistics
-    
+
     private var packetsReceived: Int = 0
     private var bytesReceived: Int = 0
     private var lastPacketTime: Date?
@@ -132,7 +204,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             peripheral?.discoverCharacteristics([
                 sensorDataCharUUID,
                 commandCharUUID,
-                ppgWaveformCharUUID
+                accelerometerCharUUID
             ], for: service)
         }
     }
@@ -154,8 +226,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     // Day 2: Enable accelerometer notifications (non-blocking)
     func enableAccelerometerNotifications() async {
         guard let peripheral = peripheral,
-              let characteristic = ppgWaveformCharacteristic else {
-            Logger.shared.warning("[OralableDevice] ⚠️ PPG Waveform characteristic not found for accelerometer")
+              let characteristic = accelerometerCharacteristic else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Accelerometer characteristic not found")
             return
         }
 
@@ -183,6 +255,54 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         Logger.shared.info("[OralableDevice] 🔔 Enabling notifications on temperature characteristic (3A0FF003)...")
         peripheral.setNotifyValue(true, for: characteristic)
         Logger.shared.info("[OralableDevice] ✅ Temperature notifications enabled")
+    }
+
+    // MARK: - Connection Readiness
+
+    /// Wait for all required notifications to be enabled before starting data collection
+    /// This prevents race conditions where data collection starts before notifications are ready
+    func waitForConnectionReady(timeout: TimeInterval = 5.0) async throws {
+        // If already ready, return immediately
+        if notificationReadiness.contains(.minimumRequired) {
+            Logger.shared.info("[OralableDevice] ✅ Already connection ready (readiness: \(notificationReadiness))")
+            return
+        }
+
+        Logger.shared.info("[OralableDevice] ⏳ Waiting for connection ready (current: \(notificationReadiness))...")
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.connectionReadyContinuation = continuation
+
+            // Set up timeout
+            Task {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+
+                // If continuation still exists, we timed out
+                if let cont = self.connectionReadyContinuation {
+                    self.connectionReadyContinuation = nil
+
+                    // Check if we have minimum required
+                    if self.notificationReadiness.contains(.minimumRequired) {
+                        Logger.shared.warning("[OralableDevice] ⚠️ Timeout but minimum readiness met (readiness: \(self.notificationReadiness))")
+                        cont.resume()
+                    } else {
+                        Logger.shared.error("[OralableDevice] ❌ Connection ready timeout - minimum requirements not met (readiness: \(self.notificationReadiness))")
+                        cont.resume(throwing: DeviceError.connectionFailed("Connection ready timeout - notifications not enabled"))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check current readiness and resume continuation if ready
+    private func checkAndResumeIfReady() {
+        guard let continuation = connectionReadyContinuation else { return }
+
+        if notificationReadiness.contains(.minimumRequired) {
+            Logger.shared.info("[OralableDevice] ✅ Connection ready! (readiness: \(notificationReadiness))")
+            connectionReadyContinuation = nil
+            continuation.resume()
+        }
     }
 
     // MARK: - LED Configuration
@@ -245,6 +365,14 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             accelerometerNotificationContinuation = nil
             Logger.shared.info("[OralableDevice] Cancelled pending accelerometer notification continuation")
         }
+        if let continuation = connectionReadyContinuation {
+            continuation.resume(throwing: DeviceError.connectionLost)
+            connectionReadyContinuation = nil
+            Logger.shared.info("[OralableDevice] Cancelled pending connection ready continuation")
+        }
+
+        // Reset readiness state on disconnect
+        notificationReadiness = []
     }
 
     // MARK: - Data Collection Control
@@ -257,16 +385,23 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         guard peripheral.state == .connected else {
             throw DeviceError.notConnected("Peripheral not connected")
         }
-        
+
         Logger.shared.info("[OralableDevice] Starting data collection...")
-        
+
+        // Wait for notifications to be ready before collecting data
+        // This prevents race conditions where we start collecting before notifications are enabled
+        if !notificationReadiness.contains(.minimumRequired) {
+            Logger.shared.info("[OralableDevice] ⏳ Waiting for notification readiness before data collection...")
+            try await waitForConnectionReady(timeout: 5.0)
+        }
+
         isCollecting = true
         sessionStartTime = Date()
         packetsReceived = 0
         bytesReceived = 0
         ppgFrameCount = 0
-        
-        Logger.shared.info("[OralableDevice] ✅ Data collection started")
+
+        Logger.shared.info("[OralableDevice] ✅ Data collection started (readiness: \(notificationReadiness))")
     }
     
     func stopDataCollection() async throws {
@@ -371,6 +506,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         let frameCounter = readUInt32(at: 0) ?? 0
         let samplesPerFrame = 20  // CONFIG_PPG_SAMPLES_PER_FRAME (hardcoded)
         let sampleSizeBytes = 12  // 3 × uint32_t per sample
+        let sampleIntervalMs: TimeInterval = 0.010  // 10ms per sample (100Hz sampling rate)
 
         #if DEBUG
         Logger.shared.debug("[OralableDevice] 📊 Frame #\(frameCounter) | Samples: \(samplesPerFrame) | Size: \(data.count) bytes")
@@ -387,6 +523,10 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         var readings: [SensorReading] = []
         let sampleDataStart = 4
 
+        // Calculate base timestamp: frame spans samplesPerFrame * 10ms before now
+        let frameDuration = Double(samplesPerFrame) * sampleIntervalMs
+        let baseTimestamp = now.addingTimeInterval(-frameDuration)
+
         for i in 0..<samplesPerFrame {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
 
@@ -395,7 +535,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                 break
             }
 
-            let sampleTimestamp = Date()
+            // Calculate proper timestamp: base + (sample_index * 10ms)
+            let sampleTimestamp = baseTimestamp.addingTimeInterval(Double(i) * sampleIntervalMs)
 
             // PPG Red (bytes 0-3 of sample)
             if let ppgRed = readUInt32(at: sampleOffset) {
@@ -533,7 +674,9 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         readingsBatchSubject.send([reading])
     }
 
-    private func parsePPGWaveform(_ data: Data) {
+    private func parseAccelerometerData(_ data: Data) {
+        let now = Date()
+
         // Accelerometer packet format (per firmware spec):
         // Bytes 0-3: Frame counter (UInt32)
         // Bytes 4+: 25 samples, each 6 bytes (X, Y, Z as Int16)
@@ -544,6 +687,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         let samplesPerFrame = 25             // CONFIG_ACC_SAMPLES_PER_FRAME = 25
         let sampleSizeBytes = 6              // 3 × Int16 (X, Y, Z) = 6 bytes per sample
         let expectedSize = sampleDataStart + (samplesPerFrame * sampleSizeBytes)  // 154 bytes
+        let sampleIntervalMs: TimeInterval = 0.010  // 10ms per sample (100Hz sampling rate)
 
         #if DEBUG
         Logger.shared.debug("[OralableDevice] 🏃 Accelerometer packet | Size: \(data.count) bytes (expected: \(expectedSize))")
@@ -572,16 +716,21 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         // Calculate actual number of samples we can parse
         let actualSamples = min(samplesPerFrame, (data.count - sampleDataStart) / sampleSizeBytes)
 
+        // Calculate base timestamp: frame spans actualSamples * 10ms before now
+        let frameDuration = Double(actualSamples) * sampleIntervalMs
+        let baseTimestamp = now.addingTimeInterval(-frameDuration)
+
         for i in 0..<actualSamples {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
-            
+
             guard sampleOffset + sampleSizeBytes <= data.count else {
-                Logger.shared.warning("[OralableDevice] ⚠️ Waveform sample \(i) exceeds bounds")
+                Logger.shared.warning("[OralableDevice] ⚠️ Accelerometer sample \(i) exceeds bounds")
                 break
             }
-            
-            let sampleTimestamp = Date()
-            
+
+            // Calculate proper timestamp: base + (sample_index * 10ms)
+            let sampleTimestamp = baseTimestamp.addingTimeInterval(Double(i) * sampleIntervalMs)
+
             // Accelerometer X (bytes 0-1)
             if let accelX = readInt16(at: sampleOffset) {
                 readings.append(SensorReading(
@@ -591,7 +740,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     deviceId: peripheral?.identifier.uuidString
                 ))
             }
-            
+
             // Accelerometer Y (bytes 2-3)
             if let accelY = readInt16(at: sampleOffset + 2) {
                 readings.append(SensorReading(
@@ -601,7 +750,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     deviceId: peripheral?.identifier.uuidString
                 ))
             }
-            
+
             // Accelerometer Z (bytes 4-5)
             if let accelZ = readInt16(at: sampleOffset + 4) {
                 readings.append(SensorReading(
@@ -612,18 +761,18 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                 ))
             }
         }
-        
+
         // DAY 4 PERFORMANCE FIX: Same batch update pattern as parseSensorData
         var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
             latestByType[reading.sensorType] = reading
         }
-        
+
         // Single batch update
         for (type, reading) in latestByType {
             latestReadings[type] = reading
         }
-        
+
         // Emit batch
         if !readings.isEmpty {
             readingsBatchSubject.send(readings)
@@ -737,9 +886,9 @@ extension OralableDevice: CBPeripheralDelegate {
                 Logger.shared.info("[OralableDevice] ✅ Command characteristic found")
                 foundCount += 1
 
-            case ppgWaveformCharUUID:
-                ppgWaveformCharacteristic = characteristic
-                Logger.shared.info("[OralableDevice] ✅ PPG Waveform characteristic found")
+            case accelerometerCharUUID:
+                accelerometerCharacteristic = characteristic
+                Logger.shared.info("[OralableDevice] ✅ Accelerometer characteristic found (3A0FF002)")
                 foundCount += 1
 
             default:
@@ -766,7 +915,7 @@ extension OralableDevice: CBPeripheralDelegate {
                 Logger.shared.error("[OralableDevice] ❌ Notification state update failed for Sensor Data: \(error.localizedDescription)")
                 notificationEnableContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable sensor data notifications: \(error.localizedDescription)"))
                 notificationEnableContinuation = nil
-            case ppgWaveformCharUUID:
+            case accelerometerCharUUID:
                 Logger.shared.error("[OralableDevice] ❌ Notification state update failed for Accelerometer: \(error.localizedDescription)")
                 accelerometerNotificationContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable accelerometer notifications: \(error.localizedDescription)"))
                 accelerometerNotificationContinuation = nil
@@ -779,25 +928,48 @@ extension OralableDevice: CBPeripheralDelegate {
         }
         
         if characteristic.isNotifying {
-            // Log which characteristic enabled notifications
+            // Log which characteristic enabled notifications and update readiness state
             switch characteristic.uuid {
             case sensorDataCharUUID:
                 Logger.shared.info("[OralableDevice] ✅ Notifications enabled for Sensor Data (3A0FF001)")
+                notificationReadiness.insert(.sensorData)
                 notificationEnableContinuation?.resume()
                 notificationEnableContinuation = nil
-            case ppgWaveformCharUUID:
+                checkAndResumeIfReady()
+
+            case accelerometerCharUUID:
                 Logger.shared.info("[OralableDevice] ✅ Notifications enabled for Accelerometer (3A0FF002)")
+                notificationReadiness.insert(.accelerometer)
                 accelerometerNotificationContinuation?.resume()
                 accelerometerNotificationContinuation = nil
+                checkAndResumeIfReady()
+
             case commandCharUUID:
                 Logger.shared.info("[OralableDevice] ✅ Notifications enabled for Command/Temperature (3A0FF003)")
+                notificationReadiness.insert(.temperature)
+                checkAndResumeIfReady()
+
             case batteryLevelCharUUID:
                 Logger.shared.info("[OralableDevice] 🔋 Notifications enabled for Battery Level (0x2A19)")
+
             default:
                 Logger.shared.info("[OralableDevice] ✅ Notifications enabled for \(characteristic.uuid.uuidString)")
             }
+
+            Logger.shared.debug("[OralableDevice] 📊 Notification readiness: \(notificationReadiness)")
         } else {
-            Logger.shared.warning("[OralableDevice] ⚠️ Notifications disabled for \(characteristic.uuid.uuidString)")
+            // Notification disabled - remove from readiness
+            switch characteristic.uuid {
+            case sensorDataCharUUID:
+                notificationReadiness.remove(.sensorData)
+            case accelerometerCharUUID:
+                notificationReadiness.remove(.accelerometer)
+            case commandCharUUID:
+                notificationReadiness.remove(.temperature)
+            default:
+                break
+            }
+            Logger.shared.warning("[OralableDevice] ⚠️ Notifications disabled for \(characteristic.uuid.uuidString) (readiness: \(notificationReadiness))")
         }
     }
     
@@ -837,13 +1009,13 @@ extension OralableDevice: CBPeripheralDelegate {
                 }
             }
 
-        case ppgWaveformCharUUID:
+        case accelerometerCharUUID:
             // 3A0FF002: Accelerometer data (154 bytes expected)
             if data.count == 154 {
-                parsePPGWaveform(data)
+                parseAccelerometerData(data)
             } else if data.count > 100 {
                 // Try accelerometer parser for similar sizes
-                parsePPGWaveform(data)
+                parseAccelerometerData(data)
             } else {
                 Logger.shared.warning("[OralableDevice] ⚠️ Unexpected packet size on 3A0FF002: \(data.count) bytes (expected 154)")
             }
