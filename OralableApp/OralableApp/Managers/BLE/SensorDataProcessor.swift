@@ -319,6 +319,44 @@ class SensorDataProcessor: ObservableObject {
         Logger.shared.info("[SensorDataProcessor] ✅ Cleared all history data | Removed \(priorCount) sensor data entries | New count: \(sensorDataHistory.count)")
     }
 
+    // MARK: - Accelerometer G-Unit Conversions
+
+    /// Get latest accelerometer values in g units
+    var accelerometerInG: (x: Double, y: Double, z: Double, magnitude: Double)? {
+        guard let latest = accelerometerHistory.last else { return nil }
+
+        let xG = AccelerometerConversion.toG(latest.x)
+        let yG = AccelerometerConversion.toG(latest.y)
+        let zG = AccelerometerConversion.toG(latest.z)
+        let mag = AccelerometerConversion.magnitude(xG: xG, yG: yG, zG: zG)
+
+        return (x: xG, y: yG, z: zG, magnitude: mag)
+    }
+
+    /// Get current accelerometer values as raw Int16 tuple
+    var accelerometerRaw: (x: Int16, y: Int16, z: Int16)? {
+        guard let latest = accelerometerHistory.last else { return nil }
+        return (x: latest.x, y: latest.y, z: latest.z)
+    }
+
+    /// Check if device is approximately at rest based on accelerometer magnitude
+    var isAtRest: Bool {
+        guard let latest = accelerometerHistory.last else { return false }
+        return AccelerometerConversion.isAtRest(x: latest.x, y: latest.y, z: latest.z)
+    }
+
+    /// Get accelerometer history converted to g units (last N samples)
+    func accelerometerHistoryInG(limit: Int = 100) -> [(timestamp: Date, x: Double, y: Double, z: Double, magnitude: Double)] {
+        let samples = accelerometerHistory.suffix(limit)
+        return samples.map { sample in
+            let xG = AccelerometerConversion.toG(sample.x)
+            let yG = AccelerometerConversion.toG(sample.y)
+            let zG = AccelerometerConversion.toG(sample.z)
+            let mag = AccelerometerConversion.magnitude(xG: xG, yG: yG, zG: zG)
+            return (timestamp: sample.timestamp, x: xG, y: yG, z: zG, magnitude: mag)
+        }
+    }
+
     // MARK: - Private Helper Methods
 
     private func convertToSensorData(readings: [SensorReading], timestamp: Date) -> SensorData {
