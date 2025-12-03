@@ -129,21 +129,47 @@ struct HistoricalView: View {
     // MARK: - Chart Implementations
     private var accelerometerChart: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Movement Data")
-                .font(designSystem.typography.headline)
-                .foregroundColor(designSystem.colors.textPrimary)
+            // Header with current value
+            HStack {
+                Text("Movement (g)")
+                    .font(designSystem.typography.headline)
+                    .foregroundColor(designSystem.colors.textPrimary)
 
+                Spacer()
+
+                // Show latest value in g-units
+                if let latest = viewModel.dataPoints.last {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(latest.isAtRest ? Color.blue : Color.green)
+                            .frame(width: 8, height: 8)
+                        Text(String(format: "%.2f g", latest.movementIntensityInG))
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundColor(designSystem.colors.textSecondary)
+                    }
+                }
+            }
+
+            // Chart with g-unit values
             Chart(viewModel.dataPoints) { point in
                 PointMark(
                     x: .value("Time", point.timestamp),
-                    y: .value("Movement", point.movementIntensity)
+                    y: .value("Acceleration", point.movementIntensityInG)
                 )
-                .foregroundStyle(Color.blue.opacity(0.6))
+                .foregroundStyle(point.isAtRest ? Color.blue.opacity(0.6) : Color.green.opacity(0.8))
                 .symbolSize(10)
             }
             .frame(height: 250)
+            .chartYScale(domain: 0...3)  // 0 to 3g range
             .chartYAxis {
-                AxisMarks(position: .leading)
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let g = value.as(Double.self) {
+                            Text(String(format: "%.1f", g))
+                        }
+                    }
+                }
             }
             .chartXAxis {
                 AxisMarks(values: .automatic) { _ in
@@ -151,6 +177,27 @@ struct HistoricalView: View {
                     AxisValueLabel(format: xAxisDateFormat)
                 }
             }
+
+            // Legend
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.blue.opacity(0.6))
+                        .frame(width: 8, height: 8)
+                    Text("At Rest (~1g)")
+                        .font(.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green.opacity(0.8))
+                        .frame(width: 8, height: 8)
+                    Text("Moving")
+                        .font(.caption)
+                        .foregroundColor(designSystem.colors.textTertiary)
+                }
+            }
+            .padding(.top, 4)
         }
     }
     

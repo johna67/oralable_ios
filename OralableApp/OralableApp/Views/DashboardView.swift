@@ -119,6 +119,14 @@ struct DashboardView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
+                    // Accelerometer (g-units) card
+                    AccelerometerCardView(
+                        xRaw: viewModel.isConnected ? viewModel.accelXRaw : 0,
+                        yRaw: viewModel.isConnected ? viewModel.accelYRaw : 0,
+                        zRaw: viewModel.isConnected ? viewModel.accelZRaw : 0,
+                        showChevron: false
+                    )
+
                     // Battery and Temperature side by side
                     HStack(spacing: 12) {
                         HealthMetricCard(

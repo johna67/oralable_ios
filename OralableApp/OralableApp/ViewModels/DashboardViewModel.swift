@@ -36,6 +36,21 @@ class DashboardViewModel: ObservableObject {
     @Published var movementValue: Double = 0.0       // Average movement magnitude
     @Published var movementVariability: Double = 0.0 // Movement variability (determines active/still)
 
+    // Accelerometer in g-units (for AccelerometerCardView)
+    @Published var accelXRaw: Int16 = 0
+    @Published var accelYRaw: Int16 = 0
+    @Published var accelZRaw: Int16 = 0
+
+    /// Accelerometer magnitude in g units
+    var accelerometerMagnitudeG: Double {
+        AccelerometerConversion.magnitude(x: accelXRaw, y: accelYRaw, z: accelZRaw)
+    }
+
+    /// Whether device is at rest (magnitude ~1g)
+    var isAtRest: Bool {
+        AccelerometerConversion.isAtRest(x: accelXRaw, y: accelYRaw, z: accelZRaw)
+    }
+
     /// Movement threshold from user settings (dynamically updated)
     private var movementActiveThreshold: Double {
         ThresholdSettings.shared.movementThreshold
@@ -260,6 +275,11 @@ class DashboardViewModel: ObservableObject {
     }
 
     private func processAccelerometerData(x: Double, y: Double, z: Double) {
+        // Store raw values for g-unit conversion
+        accelXRaw = Int16(clamping: Int(x))
+        accelYRaw = Int16(clamping: Int(y))
+        accelZRaw = Int16(clamping: Int(z))
+
         let magnitude = sqrt(x*x + y*y + z*z)
 
         accelerometerData.append(magnitude)
@@ -336,6 +356,9 @@ class DashboardViewModel: ObservableObject {
         isMoving = false
         movementValue = 0.0
         movementVariability = 0.0
+        accelXRaw = 0
+        accelYRaw = 0
+        accelZRaw = 0
         positionQuality = "Off"
         deviceStateDescription = "Unknown"
         deviceStateConfidence = 0.0

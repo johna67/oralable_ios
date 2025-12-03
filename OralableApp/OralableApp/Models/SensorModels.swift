@@ -405,4 +405,22 @@ struct HistoricalDataPoint: Codable, Identifiable {
         self.averagePPGRed = averagePPGRed
         self.averagePPGGreen = averagePPGGreen
     }
+
+    // MARK: - G-Unit Conversions
+
+    /// Movement intensity converted to g units
+    /// Note: movementIntensity is the raw magnitude from accelerometer
+    var movementIntensityInG: Double {
+        // The raw magnitude is sqrt(x² + y² + z²) where x, y, z are Int16 values
+        // We need to convert the magnitude to g using the sensitivity
+        // For LIS2DTW12 at ±2g: sensitivity = 0.244 mg/digit
+        // magnitude_g = magnitude_raw * sensitivity / 1000
+        return movementIntensity * AccelerometerConversion.sensitivity2g / 1000.0
+    }
+
+    /// Whether this data point represents a rest state (magnitude ~1g)
+    var isAtRest: Bool {
+        let mag = movementIntensityInG
+        return abs(mag - 1.0) < AccelerometerConversion.restTolerance
+    }
 }
