@@ -71,6 +71,11 @@ class DashboardViewModel: ObservableObject {
     // Recording state from coordinator (read-only binding)
     @Published private(set) var isRecording: Bool = false
 
+    /// Formatted duration string for recording button display (MM:SS)
+    var formattedDuration: String {
+        sessionDuration
+    }
+
     // MARK: - Private Properties
     private let deviceManagerAdapter: DeviceManagerAdapter
     private let deviceManager: DeviceManager

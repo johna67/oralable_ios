@@ -149,6 +149,16 @@ struct DashboardView: View {
                             showChevron: false
                         )
                     }
+
+                    // Recording Button
+                    RecordingButton(
+                        isRecording: viewModel.isRecording,
+                        isConnected: viewModel.isConnected,
+                        duration: viewModel.formattedDuration,
+                        action: { viewModel.toggleRecording() }
+                    )
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -434,6 +444,52 @@ struct MovementSparkline: View {
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+    }
+}
+
+// MARK: - Recording Button
+struct RecordingButton: View {
+    let isRecording: Bool
+    let isConnected: Bool
+    let duration: String
+    let action: () -> Void
+
+    private var buttonColor: Color {
+        if !isConnected { return .gray }
+        return isRecording ? .red : .black
+    }
+
+    private var iconName: String {
+        isRecording ? "stop.fill" : "circle.fill"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(buttonColor)
+                        .frame(width: 70, height: 70)
+                        .shadow(color: buttonColor.opacity(0.3), radius: 8, x: 0, y: 4)
+
+                    Image(systemName: iconName)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                if isRecording {
+                    Text(duration)
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundColor(.red)
+                } else {
+                    Text(isConnected ? "Record" : "Not Connected")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isConnected ? .primary : .secondary)
+                }
+            }
+        }
+        .disabled(!isConnected)
+        .opacity(isConnected ? 1.0 : 0.5)
     }
 }
 
