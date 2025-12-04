@@ -624,28 +624,42 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 
     // MARK: - Battery Parsing
 
+    /// Parse battery data from BLE packet using accurate LiPo discharge curve
     private func parseBatteryData(_ data: Data) {
         guard data.count >= 4 else {
-            Logger.shared.warning("[OralableDevice] ⚠️ Battery packet too small: \(data.count) bytes")
+            Logger.shared.warning("[OralableDevice] Battery data too short: \(data.count) bytes")
             return
         }
 
-        // Battery is Int32 in millivolts
         let millivolts = data.withUnsafeBytes { ptr in
             ptr.loadUnaligned(fromByteOffset: 0, as: Int32.self)
         }
 
-        // Convert to percentage (typical LiPo: 3.0V = 0%, 4.2V = 100%)
-        let voltage = Double(millivolts) / 1000.0
-        let percentage = min(100.0, max(0.0, (voltage - 3.0) / (4.2 - 3.0) * 100.0))
+        guard millivolts >= 2500 && millivolts <= 4500 else {
+            Logger.shared.warning("[OralableDevice] Battery voltage out of range: \(millivolts)mV")
+            return
+        }
 
-        Logger.shared.info("[OralableDevice] 🔋 Battery: \(millivolts)mV (\(String(format: "%.0f", percentage))%)")
+        let percentage = BatteryConversion.voltageToPercentage(millivolts: millivolts)
+        let status = BatteryConversion.batteryStatus(percentage: percentage)
+
+        Logger.shared.info("[OralableDevice] 🔋 Battery: \(millivolts)mV → \(String(format: "%.0f", percentage))% [\(status.rawValue)]")
+
+        if BatteryConversion.needsCharging(percentage: percentage) {
+            if BatteryConversion.isCritical(percentage: percentage) {
+                Logger.shared.warning("[OralableDevice] ⚠️ BATTERY CRITICAL: \(String(format: "%.0f", percentage))%")
+            } else {
+                Logger.shared.warning("[OralableDevice] ⚠️ Battery low: \(String(format: "%.0f", percentage))%")
+            }
+        }
 
         let reading = SensorReading(
             sensorType: .battery,
             value: percentage,
             timestamp: Date(),
-            deviceId: peripheral?.identifier.uuidString
+            deviceId: peripheral?.identifier.uuidString,
+            quality: nil,
+            rawMillivolts: millivolts
         )
 
         latestReadings[.battery] = reading

@@ -15,21 +15,24 @@ struct SensorReading: Codable, Identifiable, Equatable {
     
     /// Unique identifier
     let id: UUID
-    
+
     /// Type of sensor that produced this reading
     let sensorType: SensorType
-    
+
     /// Raw sensor value
     let value: Double
-    
+
     /// Timestamp when reading was captured
     let timestamp: Date
-    
+
     /// Optional device identifier
     let deviceId: String?
-    
+
     /// Optional quality indicator (0.0 - 1.0)
     let quality: Double?
+
+    /// Raw battery voltage in millivolts (only for battery readings)
+    let rawMillivolts: Int32?
     
     // MARK: - Initialization
     
@@ -39,7 +42,8 @@ struct SensorReading: Codable, Identifiable, Equatable {
         value: Double,
         timestamp: Date = Date(),
         deviceId: String? = nil,
-        quality: Double? = nil
+        quality: Double? = nil,
+        rawMillivolts: Int32? = nil
     ) {
         self.id = id
         self.sensorType = sensorType
@@ -47,6 +51,7 @@ struct SensorReading: Codable, Identifiable, Equatable {
         self.timestamp = timestamp
         self.deviceId = deviceId
         self.quality = quality
+        self.rawMillivolts = rawMillivolts
     }
     
     // MARK: - Computed Properties

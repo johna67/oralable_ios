@@ -356,6 +356,9 @@ class SensorDataProcessor: ObservableObject {
             return (timestamp: sample.timestamp, x: xG, y: yG, z: zG, magnitude: mag)
         }
     }
+    
+    
+    
 
     // MARK: - Private Helper Methods
 
