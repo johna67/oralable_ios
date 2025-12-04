@@ -16,7 +16,7 @@ struct OnboardingView: View {
     private let onboardingPages = [
         OnboardingPage(
             icon: "waveform.path.ecg",
-            title: "Monitor Your Bruxism",
+            title: "Muscle Activity Monitor",
             description: "Track teeth grinding and jaw clenching with precision PPG sensor technology",
             color: .black
         ),
@@ -81,7 +81,7 @@ struct OnboardingView: View {
 
             // Footer
             VStack(spacing: 8) {
-                Text("Requires Oralable device & Apple Health access")
+                Text("Requires Oralable device")
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textTertiary)
 

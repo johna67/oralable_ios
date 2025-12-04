@@ -12,8 +12,11 @@ struct SettingsView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @ObservedObject private var featureFlags = FeatureFlags.shared
 
     @State private var showSubscriptionInfo = false
+    @State private var developerTapCount = 0
+    @State private var showDeveloperSettings = false
 
     init(viewModel: SettingsViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -22,25 +25,38 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                // Subscription Section
-                Section {
-                    subscriptionRow
-                } header: {
-                    Text("Subscription")
+                // Subscription Section - CONDITIONAL
+                if featureFlags.showSubscription {
+                    Section {
+                        subscriptionRow
+                    } header: {
+                        Text("Subscription")
+                    }
                 }
 
-                // Health Integration Section
-                Section {
-                    healthKitRow
-                } header: {
-                    Text("Health Integration")
+                // Health Integration Section - CONDITIONAL
+                if featureFlags.showHealthIntegration {
+                    Section {
+                        healthKitRow
+                    } header: {
+                        Text("Health Integration")
+                    }
                 }
 
-                // Detection Settings Section
+                // Detection Settings Section - CONDITIONAL
+                if featureFlags.showDetectionSettings {
+                    Section {
+                        thresholdsRow
+                    } header: {
+                        Text("Detection Settings")
+                    }
+                }
+
+                // About Section - ALWAYS SHOWN (with hidden developer access)
                 Section {
-                    thresholdsRow
+                    aboutRow
                 } header: {
-                    Text("Detection Settings")
+                    Text("About")
                 }
             }
             .listStyle(.insetGrouped)
@@ -49,8 +65,58 @@ struct SettingsView: View {
             .sheet(isPresented: $showSubscriptionInfo) {
                 SubscriptionInfoView()
             }
+            .sheet(isPresented: $showDeveloperSettings) {
+                NavigationStack {
+                    DeveloperSettingsView()
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showDeveloperSettings = false
+                                }
+                            }
+                        }
+                }
+            }
         }
         .navigationViewStyle(.stack)
+    }
+
+    // MARK: - About Row (with hidden developer access)
+    private var aboutRow: some View {
+        Button(action: {
+            developerTapCount += 1
+            if developerTapCount >= 7 {
+                showDeveloperSettings = true
+                developerTapCount = 0
+            }
+            // Reset after 2 seconds of no taps
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if developerTapCount > 0 && developerTapCount < 7 {
+                    developerTapCount = 0
+                }
+            }
+        }) {
+            HStack {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 20))
+                    .foregroundColor(.gray)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("About")
+                        .font(.system(size: 17))
+                        .foregroundColor(.primary)
+
+                    Text("Version 1.0")
+                        .font(.system(size: 15))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 
     private var subscriptionRow: some View {

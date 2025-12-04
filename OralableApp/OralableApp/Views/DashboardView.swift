@@ -23,7 +23,8 @@ struct DashboardView: View {
     @EnvironmentObject var dependencies: AppDependencies
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var deviceManagerAdapter: DeviceManagerAdapter
-    @EnvironmentObject var deviceManager: DeviceManager  // ADD THIS LINE
+    @EnvironmentObject var deviceManager: DeviceManager
+    @ObservedObject private var featureFlags = FeatureFlags.shared
 
     @State private var viewModel: DashboardViewModel?
     @State private var showingProfile = false
@@ -51,7 +52,7 @@ struct DashboardView: View {
                     // Connection readiness indicator - UPDATED
                     connectionReadinessIndicator(viewModel: viewModel)
 
-                    // Muscle Activity - Primary card
+                    // Muscle Activity - Primary card (ALWAYS SHOWN)
                     NavigationLink(destination: LazyView(
                         HistoricalView(
                             metricType: "Muscle Activity",
@@ -64,7 +65,7 @@ struct DashboardView: View {
                         HealthMetricCard(
                             icon: "waveform.path.ecg",
                             title: "Muscle Activity",
-                            value: viewModel.muscleActivity > 0 ? String(format: "%.0f", viewModel.muscleActivity) : "N/A",
+                            value: viewModel.isConnected ? String(format: "%.0f", max(0, viewModel.muscleActivity)) : "N/A",
                             unit: "",
                             color: .purple,
                             sparklineData: viewModel.muscleActivityHistory,
@@ -73,81 +74,91 @@ struct DashboardView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    // Movement card - shows numeric value with color coding
-                    // Blue = still (low variability), Green = active (high variability)
-                    // Sparkline colors individual points based on deviation from mean
-                    NavigationLink(destination: LazyView(
-                        HistoricalView(
-                            metricType: "Movement",
-                            historicalDataManager: dependencies.historicalDataManager
-                        )
-                        .environmentObject(designSystem)
-                        .environmentObject(dependencies.historicalDataManager)
-                        .environmentObject(dependencies.sensorDataProcessor)
-                    )) {
-                        MovementMetricCard(
-                            value: viewModel.isConnected ? formatMovementValue(viewModel.movementVariability) : "N/A",
-                            unit: viewModel.isConnected ? (viewModel.isMoving ? "Active" : "Still") : "",
-                            isActive: viewModel.isMoving,
-                            isConnected: viewModel.isConnected,
-                            sparklineData: Array(viewModel.accelerometerData.suffix(20)),
-                            threshold: ThresholdSettings.shared.movementThreshold,
-                            showChevron: true
-                        )
+                    // Movement card - CONDITIONAL
+                    if featureFlags.showMovementCard {
+                        NavigationLink(destination: LazyView(
+                            HistoricalView(
+                                metricType: "Movement",
+                                historicalDataManager: dependencies.historicalDataManager
+                            )
+                            .environmentObject(designSystem)
+                            .environmentObject(dependencies.historicalDataManager)
+                            .environmentObject(dependencies.sensorDataProcessor)
+                        )) {
+                            MovementMetricCard(
+                                value: viewModel.isConnected ? formatMovementValue(viewModel.movementVariability) : "N/A",
+                                unit: viewModel.isConnected ? (viewModel.isMoving ? "Active" : "Still") : "",
+                                isActive: viewModel.isMoving,
+                                isConnected: viewModel.isConnected,
+                                sparklineData: Array(viewModel.accelerometerData.suffix(20)),
+                                threshold: ThresholdSettings.shared.movementThreshold,
+                                showChevron: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
 
-                    // Heart Rate card
-                    NavigationLink(destination: LazyView(
-                        HistoricalView(
-                            metricType: "Heart Rate",
-                            historicalDataManager: dependencies.historicalDataManager
-                        )
-                        .environmentObject(designSystem)
-                        .environmentObject(dependencies.historicalDataManager)
-                        .environmentObject(dependencies.sensorDataProcessor)
-                    )) {
-                        HealthMetricCard(
-                            icon: "heart.fill",
-                            title: "Heart Rate",
-                            value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "N/A",
-                            unit: viewModel.heartRate > 0 ? "BPM" : "",
-                            color: .red,
-                            sparklineData: [],
-                            showChevron: true
-                        )
+                    // Heart Rate card - CONDITIONAL
+                    if featureFlags.showHeartRateCard {
+                        NavigationLink(destination: LazyView(
+                            HistoricalView(
+                                metricType: "Heart Rate",
+                                historicalDataManager: dependencies.historicalDataManager
+                            )
+                            .environmentObject(designSystem)
+                            .environmentObject(dependencies.historicalDataManager)
+                            .environmentObject(dependencies.sensorDataProcessor)
+                        )) {
+                            HealthMetricCard(
+                                icon: "heart.fill",
+                                title: "Heart Rate",
+                                value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "N/A",
+                                unit: viewModel.heartRate > 0 ? "BPM" : "",
+                                color: .red,
+                                sparklineData: [],
+                                showChevron: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
 
-                    // Accelerometer (g-units) card
-                    AccelerometerCardView(
-                        xRaw: viewModel.isConnected ? viewModel.accelXRaw : 0,
-                        yRaw: viewModel.isConnected ? viewModel.accelYRaw : 0,
-                        zRaw: viewModel.isConnected ? viewModel.accelZRaw : 0,
-                        showChevron: false
-                    )
-
-                    // Battery and Temperature side by side
-                    HStack(spacing: 12) {
-                        HealthMetricCard(
-                            icon: batteryIcon(level: viewModel.batteryLevel, charging: viewModel.isCharging),
-                            title: "Battery",
-                            value: viewModel.batteryLevel > 0 ? "\(Int(viewModel.batteryLevel))" : "N/A",
-                            unit: viewModel.batteryLevel > 0 ? "%" : "",
-                            color: batteryColor(level: viewModel.batteryLevel),
-                            sparklineData: [],
+                    // Accelerometer (g-units) card - CONDITIONAL
+                    if featureFlags.showAccelerometerCard {
+                        AccelerometerCardView(
+                            xRaw: viewModel.isConnected ? viewModel.accelXRaw : 0,
+                            yRaw: viewModel.isConnected ? viewModel.accelYRaw : 0,
+                            zRaw: viewModel.isConnected ? viewModel.accelZRaw : 0,
                             showChevron: false
                         )
+                    }
 
-                        HealthMetricCard(
-                            icon: "thermometer",
-                            title: "Temperature",
-                            value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
-                            unit: viewModel.temperature > 0 ? "°C" : "",
-                            color: .orange,
-                            sparklineData: [],
-                            showChevron: false
-                        )
+                    // Battery and Temperature - CONDITIONAL
+                    if featureFlags.showBatteryCard || featureFlags.showTemperatureCard {
+                        HStack(spacing: 12) {
+                            if featureFlags.showBatteryCard {
+                                HealthMetricCard(
+                                    icon: batteryIcon(level: viewModel.batteryLevel, charging: viewModel.isCharging),
+                                    title: "Battery",
+                                    value: viewModel.batteryLevel > 0 ? "\(Int(viewModel.batteryLevel))" : "N/A",
+                                    unit: viewModel.batteryLevel > 0 ? "%" : "",
+                                    color: batteryColor(level: viewModel.batteryLevel),
+                                    sparklineData: [],
+                                    showChevron: false
+                                )
+                            }
+
+                            if featureFlags.showTemperatureCard {
+                                HealthMetricCard(
+                                    icon: "thermometer",
+                                    title: "Temperature",
+                                    value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
+                                    unit: viewModel.temperature > 0 ? "°C" : "",
+                                    color: .orange,
+                                    sparklineData: [],
+                                    showChevron: false
+                                )
+                            }
+                        }
                     }
 
                     // Recording Button

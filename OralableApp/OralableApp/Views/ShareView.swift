@@ -14,6 +14,7 @@ struct ShareView: View {
     @EnvironmentObject var sharedDataManager: SharedDataManager
     @ObservedObject var sensorDataProcessor: SensorDataProcessor
     @ObservedObject var deviceManager: DeviceManager
+    @ObservedObject private var featureFlags = FeatureFlags.shared
 
     @State private var shareCode: String = ""
     @State private var isGeneratingCode = false
@@ -26,12 +27,17 @@ struct ShareView: View {
     var body: some View {
         NavigationView {
             List {
-                shareCodeSection
+                // Export section - ALWAYS SHOWN
                 exportSection
-                sharedWithSection
+
+                // Share with Dentist section - CONDITIONAL
+                if featureFlags.showShareWithDentist {
+                    shareCodeSection
+                    sharedWithSection
+                }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Share")
+            .navigationTitle("Export")
             .navigationBarTitleDisplayMode(.large)
             .sheet(isPresented: $showingExportSheet) {
                 if let url = exportURL {
@@ -46,14 +52,17 @@ struct ShareView: View {
         }
         .navigationViewStyle(.stack)
         .task {
-            if shareCode.isEmpty {
-                await generateAndSaveShareCode()
+            // Only generate share code if feature is enabled
+            if featureFlags.showShareWithDentist {
+                if shareCode.isEmpty {
+                    await generateAndSaveShareCode()
+                }
+                // Refresh shared dentists list
+                sharedDataManager.loadSharedDentists()
+
+                // Sync current sensor data to CloudKit for dentist access
+                await sharedDataManager.uploadCurrentDataForSharing()
             }
-            // Refresh shared dentists list
-            sharedDataManager.loadSharedDentists()
-            
-            // Sync current sensor data to CloudKit for dentist access
-            await sharedDataManager.uploadCurrentDataForSharing()
         }
     }
 

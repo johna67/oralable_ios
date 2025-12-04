@@ -21,24 +21,12 @@ struct ProfileView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: designSystem.spacing.xl) {
-                    // Profile Header
+                    // Profile Header (name and email only)
                     profileHeader
-                    
-                    // User Info Section
-                    userInfoSection
-                    
-                    // Settings Section
-                    settingsSection
-                    
-                    // Account Actions
+
+                    // Account Actions (sign out only)
                     accountSection
-                    
-                    // App Information
-                    appInfoSection
-                    
-                    // Support Section
-                    supportSection
-                    
+
                     Spacer(minLength: 50)
                 }
                 .padding(designSystem.spacing.lg)
