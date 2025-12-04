@@ -76,6 +76,15 @@
             border-radius: 8px;
             margin: 20px 0;
         }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007AFF;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
         @media (max-width: 600px) {
             body {
                 padding: 15px;
@@ -90,13 +99,15 @@
     </style>
 </head>
 <body>
-    <h1>Privacy Policy</h1>
-    <p class="last-updated">Last Updated: November 30, 2025</p>
+    <a href="index.html" class="back-link">&larr; Back to Home</a>
 
-    <p>JAC Dental Solutions Limited ("we", "us", or "our") operates the Oralable mobile application and Oralable for Dentists mobile application (collectively, the "Apps"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Apps.</p>
+    <h1>Privacy Policy</h1>
+    <p class="last-updated">Last Updated: December 4, 2025</p>
+
+    <p>JAC Dental Solutions Limited ("we", "us", or "our") operates the Oralable mobile application and Oralable for Researchers mobile application (collectively, the "Apps"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Apps.</p>
 
     <div class="highlight">
-        <strong>Our Commitment:</strong> Your health data belongs to you. We use industry-standard encryption, secure Apple infrastructure, and give you full control over who sees your data.
+        <strong>Our Commitment:</strong> Your biofeedback data belongs to you. We use industry-standard encryption, secure Apple infrastructure, and give you full control over who sees your data.
     </div>
 
     <h2>1. Information We Collect</h2>
@@ -104,22 +115,12 @@
     <h3>1.1 Sensor Data</h3>
     <p>When you use an Oralable device, we collect:</p>
     <ul>
-        <li><strong>PPG (Photoplethysmography) Data:</strong> Light-based sensor readings from red, infrared, and green channels used to monitor blood flow and calculate heart rate</li>
-        <li><strong>Accelerometer Data:</strong> Movement and orientation data (X, Y, Z axes) used to detect bruxism events and sleep position</li>
-        <li><strong>Temperature Data:</strong> Skin temperature readings from the sensor</li>
-        <li><strong>Calculated Metrics:</strong> Heart rate, blood oxygen saturation (SpO2), and bruxism event detection derived from sensor data</li>
+        <li><strong>PPG (Photoplethysmography) Data:</strong> Light-based sensor readings used to monitor muscle activity</li>
+        <li><strong>Accelerometer Data:</strong> Movement and orientation data (X, Y, Z axes) used to detect activity patterns</li>
+        <li><strong>Muscle Activity Data:</strong> Calculated metrics derived from sensor readings</li>
     </ul>
 
-    <h3>1.2 HealthKit Data</h3>
-    <p>With your explicit permission, we may read and write the following data to Apple HealthKit:</p>
-    <ul>
-        <li>Heart rate measurements</li>
-        <li>Blood oxygen saturation</li>
-        <li>Sleep analysis data</li>
-    </ul>
-    <p>HealthKit data is stored locally on your device and in your iCloud account. We do not have access to your HealthKit data except through the permissions you grant within the app.</p>
-
-    <h3>1.3 Account Information</h3>
+    <h3>1.2 Account Information</h3>
     <p>When you sign in with Apple, we receive:</p>
     <ul>
         <li>A unique user identifier (not your Apple ID)</li>
@@ -128,7 +129,7 @@
     </ul>
     <p>We do not receive or store your Apple ID password.</p>
 
-    <h3>1.4 Device Information</h3>
+    <h3>1.3 Device Information</h3>
     <ul>
         <li>Device model and iOS version</li>
         <li>App version</li>
@@ -139,10 +140,9 @@
 
     <h3>2.1 Primary Uses</h3>
     <ul>
-        <li><strong>Health Monitoring:</strong> Display real-time and historical health metrics</li>
-        <li><strong>Bruxism Detection:</strong> Analyze sensor data to identify teeth grinding events</li>
-        <li><strong>Data Sharing:</strong> Enable you to share your health data with your dentist (only with your explicit consent)</li>
-        <li><strong>HealthKit Integration:</strong> Sync your data with Apple Health for comprehensive health tracking</li>
+        <li><strong>Biofeedback Display:</strong> Display real-time and recorded muscle activity data</li>
+        <li><strong>Session Recording:</strong> Store your recorded sessions for later review</li>
+        <li><strong>Data Export:</strong> Enable you to export your data as CSV</li>
     </ul>
 
     <h3>2.2 We Do NOT</h3>
@@ -153,34 +153,26 @@
         <li>Use third-party analytics or tracking services</li>
     </ul>
 
-    <h2>3. Data Sharing with Dentists</h2>
+    <h2>3. Data Sharing</h2>
 
     <h3>3.1 How Sharing Works</h3>
+    <p>If you choose to share your data with a researcher:</p>
     <ul>
         <li>You generate a 6-digit share code in the Oralable app</li>
-        <li>Your dentist enters this code in Oralable for Dentists</li>
+        <li>The researcher enters this code in Oralable for Researchers</li>
         <li>A secure connection is established via Apple CloudKit</li>
         <li>Share codes expire after 48 hours for security</li>
     </ul>
 
-    <h3>3.2 What Dentists Can See</h3>
-    <p>When you share with a dentist, they can view:</p>
-    <ul>
-        <li>Your health metrics (heart rate, SpO2, temperature)</li>
-        <li>Bruxism event data and patterns</li>
-        <li>Historical trends and analytics</li>
-    </ul>
-
-    <h3>3.3 Revoking Access</h3>
-    <p>You can revoke a dentist's access to your data at any time through the app. Once revoked, the dentist will no longer receive updates and their cached data will be removed.</p>
+    <h3>3.2 Revoking Access</h3>
+    <p>You can revoke any shared access to your data at any time through the app. Once revoked, the recipient will no longer receive updates and their cached data will be removed.</p>
 
     <h2>4. Data Storage and Security</h2>
 
     <h3>4.1 Where Your Data Is Stored</h3>
     <ul>
-        <li><strong>Local Device:</strong> Recent sensor data is stored locally on your iPhone/iPad</li>
-        <li><strong>Apple CloudKit:</strong> Shared data is stored securely in Apple's iCloud infrastructure</li>
-        <li><strong>Apple HealthKit:</strong> Health data you choose to sync is stored in your personal HealthKit database</li>
+        <li><strong>Local Device:</strong> Session data is stored locally on your iPhone/iPad</li>
+        <li><strong>Apple CloudKit:</strong> If you choose to share data, it is stored securely in Apple's iCloud infrastructure</li>
     </ul>
 
     <h3>4.2 Security Measures</h3>
@@ -202,7 +194,7 @@
     <p>If you are located in the European Union, you have the following rights:</p>
 
     <h3>6.1 Right to Access</h3>
-    <p>You can export all your data from the app at any time using the export feature in Settings.</p>
+    <p>You can export all your data from the app at any time using the export feature.</p>
 
     <h3>6.2 Right to Rectification</h3>
     <p>Contact us to correct any inaccurate personal information.</p>
@@ -214,7 +206,7 @@
     <p>Export your data in standard CSV format at any time.</p>
 
     <h3>6.5 Right to Object</h3>
-    <p>You can opt out of data sharing at any time by revoking dentist access.</p>
+    <p>You can opt out of data sharing at any time by revoking access.</p>
 
     <h2>7. Children's Privacy</h2>
     <p>Our Apps are not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.</p>
@@ -236,8 +228,8 @@
     <h2>10. Legal Basis for Processing (GDPR)</h2>
     <p>We process your personal data based on:</p>
     <ul>
-        <li><strong>Consent:</strong> For HealthKit integration, dentist data sharing, and optional features</li>
-        <li><strong>Contract:</strong> To provide the services you've requested (monitoring, analytics)</li>
+        <li><strong>Consent:</strong> For data sharing and optional features</li>
+        <li><strong>Contract:</strong> To provide the biofeedback services you've requested</li>
         <li><strong>Legitimate Interest:</strong> To improve our services and ensure security</li>
     </ul>
 

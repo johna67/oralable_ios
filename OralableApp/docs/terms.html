@@ -70,6 +70,27 @@
         a:hover {
             text-decoration: underline;
         }
+        .medical-disclaimer {
+            background-color: #dc3545;
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+        }
+        .medical-disclaimer h2 {
+            color: white;
+            margin-top: 0;
+            font-size: 22px;
+        }
+        .medical-disclaimer p {
+            color: white;
+        }
+        .medical-disclaimer ul {
+            color: white;
+        }
+        .medical-disclaimer li {
+            color: white;
+        }
         .important {
             background-color: #fff3cd;
             padding: 15px;
@@ -86,19 +107,14 @@
             border-radius: 8px;
             margin: 20px 0;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007AFF;
+            text-decoration: none;
         }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        th {
-            background-color: #f8f9fa;
-            font-weight: 600;
+        .back-link:hover {
+            text-decoration: underline;
         }
         @media (max-width: 600px) {
             body {
@@ -110,20 +126,32 @@
             h2 {
                 font-size: 18px;
             }
-            table {
-                font-size: 14px;
-            }
         }
     </style>
 </head>
 <body>
-    <h1>Terms of Service</h1>
-    <p class="last-updated">Last Updated: November 30, 2025</p>
+    <a href="index.html" class="back-link">&larr; Back to Home</a>
 
-    <p>Welcome to Oralable. These Terms of Service ("Terms") govern your use of the Oralable mobile application, Oralable for Dentists mobile application, and related services (collectively, the "Services") provided by JAC Dental Solutions Limited ("Company", "we", "us", or "our").</p>
+    <h1>Terms of Service</h1>
+    <p class="last-updated">Last Updated: December 4, 2025</p>
+
+    <p>Welcome to Oralable. These Terms of Service ("Terms") govern your use of the Oralable mobile application, Oralable for Researchers mobile application, and related services (collectively, the "Services") provided by JAC Dental Solutions Limited ("Company", "we", "us", or "our").</p>
 
     <div class="important">
         <strong>Important:</strong> By using our Services, you agree to these Terms. If you do not agree, please do not use our Services.
+    </div>
+
+    <div class="medical-disclaimer">
+        <h2>IMPORTANT: NOT A MEDICAL DEVICE</h2>
+        <p>Oralable is a consumer wellness product that monitors muscle activity. It is NOT a medical device.</p>
+        <ul>
+            <li>Does NOT diagnose any medical condition</li>
+            <li>Does NOT provide medical advice</li>
+            <li>Does NOT treat or cure any condition</li>
+            <li>NOT approved by FDA, CE, or any regulatory body as a medical device</li>
+            <li>For personal wellness awareness only</li>
+        </ul>
+        <p style="margin-bottom: 0;"><strong>Always consult qualified healthcare providers for any health concerns.</strong></p>
     </div>
 
     <h2>1. Acceptance of Terms</h2>
@@ -131,41 +159,38 @@
 
     <h2>2. Description of Services</h2>
 
-    <h3>2.1 Oralable (Patient App)</h3>
+    <h3>2.1 Oralable (User App)</h3>
     <p>Oralable is a wellness application that:</p>
     <ul>
         <li>Connects to Oralable sensor devices via Bluetooth</li>
-        <li>Displays health metrics including heart rate, blood oxygen, and movement data</li>
-        <li>Detects and tracks bruxism (teeth grinding) events</li>
-        <li>Enables optional data sharing with dental professionals</li>
-        <li>Integrates with Apple HealthKit</li>
+        <li>Displays muscle activity as biofeedback</li>
+        <li>Records sessions for later review</li>
+        <li>Enables optional data sharing with researchers</li>
+        <li>Exports data in CSV format</li>
     </ul>
 
-    <h3>2.2 Oralable for Dentists</h3>
-    <p>Oralable for Dentists enables dental professionals to:</p>
+    <h3>2.2 Oralable for Researchers</h3>
+    <p>Oralable for Researchers enables researchers to:</p>
     <ul>
-        <li>Receive patient health data shared through the patient app</li>
-        <li>View patient bruxism patterns and health metrics</li>
-        <li>Track patient progress over time</li>
-        <li>Export data for patient records</li>
+        <li>Receive data shared through the user app</li>
+        <li>View participant muscle activity patterns</li>
+        <li>Track data over time</li>
+        <li>Export data for research purposes</li>
     </ul>
 
-    <h2>3. Medical Disclaimer</h2>
+    <h2>3. Wellness Device Disclaimer</h2>
 
-    <div class="important">
-        <strong>IMPORTANT HEALTH NOTICE:</strong>
-        <p style="margin-top: 10px; margin-bottom: 0;">Oralable is a <strong>wellness device</strong>, NOT a medical device. Our Services are intended for informational and wellness purposes only and should NOT be used to:</p>
-        <ul style="margin-top: 10px; margin-bottom: 0;">
-            <li>Diagnose any medical condition</li>
-            <li>Treat, cure, or prevent any disease</li>
-            <li>Replace professional medical advice</li>
-            <li>Make medical decisions</li>
-        </ul>
-    </div>
+    <p>Oralable is a <strong>consumer wellness device</strong> designed for personal awareness of muscle activity patterns. It functions as biofeedback, similar to how a fitness tracker shows step counts or heart rate for general awareness.</p>
 
-    <p>Always consult with a qualified healthcare provider for medical advice, diagnosis, or treatment. Never disregard professional medical advice or delay seeking it because of information provided by our Services.</p>
+    <p><strong>Oralable is NOT intended to:</strong></p>
+    <ul>
+        <li>Diagnose any medical condition including bruxism, TMJ disorders, or sleep disorders</li>
+        <li>Provide medical advice or treatment recommendations</li>
+        <li>Replace professional healthcare evaluation</li>
+        <li>Be used for medical decision-making</li>
+    </ul>
 
-    <p>The data provided by Oralable may not be accurate for all users and should not be relied upon for medical decisions. If you experience any health concerns, contact a healthcare professional immediately.</p>
+    <p>If you have concerns about teeth grinding, jaw pain, or related issues, please consult a qualified healthcare provider such as a dentist, physician, or sleep specialist.</p>
 
     <h2>4. User Accounts</h2>
 
@@ -186,84 +211,31 @@
         <li>Notifying us immediately of any unauthorized use</li>
     </ul>
 
-    <h2>5. Subscriptions and Payments</h2>
+    <h2>5. Device Requirements</h2>
 
-    <h3>5.1 Free and Premium Tiers</h3>
-    <p>Our Services offer both free and premium subscription options:</p>
-
-    <table>
-        <tr>
-            <th>Feature</th>
-            <th>Free</th>
-            <th>Premium</th>
-        </tr>
-        <tr>
-            <td>Real-time monitoring</td>
-            <td>Yes</td>
-            <td>Yes</td>
-        </tr>
-        <tr>
-            <td>Basic analytics</td>
-            <td>Yes</td>
-            <td>Yes</td>
-        </tr>
-        <tr>
-            <td>Dentist connections</td>
-            <td>1</td>
-            <td>Unlimited</td>
-        </tr>
-        <tr>
-            <td>Advanced analytics</td>
-            <td>No</td>
-            <td>Yes</td>
-        </tr>
-        <tr>
-            <td>Data export</td>
-            <td>Limited</td>
-            <td>Unlimited</td>
-        </tr>
-        <tr>
-            <td>Historical analysis</td>
-            <td>7 days</td>
-            <td>Unlimited</td>
-        </tr>
-    </table>
-
-    <h3>5.2 Billing</h3>
-    <ul>
-        <li>Subscriptions are billed through Apple's App Store</li>
-        <li>Prices are displayed in your local currency</li>
-        <li>Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period</li>
-        <li>Your Apple ID account will be charged upon purchase confirmation</li>
-    </ul>
-
-    <h3>5.3 Cancellation and Refunds</h3>
-    <ul>
-        <li>You may cancel your subscription at any time through your Apple ID account settings</li>
-        <li>Cancellation takes effect at the end of the current billing period</li>
-        <li>Refunds are handled by Apple according to their refund policies</li>
-        <li>No refunds are provided for partial subscription periods</li>
-    </ul>
-
-    <h3>5.4 Price Changes</h3>
-    <p>We reserve the right to change subscription prices. Any price changes will be communicated in advance and will apply to the next billing cycle after notice.</p>
-
-    <h2>6. Device Requirements</h2>
-
-    <h3>6.1 Hardware</h3>
+    <h3>5.1 Hardware</h3>
     <ul>
         <li>Oralable sensor device or compatible ANR MuscleSeñse device (sold separately)</li>
         <li>iPhone or iPad with Bluetooth 4.0 or later</li>
-        <li>iOS 17.0 or later</li>
+        <li>iOS 18.0 or later</li>
     </ul>
 
-    <h3>6.2 Device Disclaimer</h3>
+    <h3>5.2 Device Disclaimer</h3>
     <p>We are not responsible for:</p>
     <ul>
         <li>Third-party device compatibility issues</li>
         <li>Device malfunctions or defects</li>
         <li>Injuries caused by improper device use</li>
         <li>Data accuracy variations due to device positioning or environmental factors</li>
+    </ul>
+
+    <h2>6. Data Accuracy Disclaimer</h2>
+    <p>The muscle activity data provided by Oralable:</p>
+    <ul>
+        <li>Has not been clinically validated</li>
+        <li>May vary based on device positioning and user physiology</li>
+        <li>Should not be relied upon for health decisions</li>
+        <li>Is provided for informational and awareness purposes only</li>
     </ul>
 
     <h2>7. User Responsibilities</h2>
@@ -277,23 +249,23 @@
         <li>Comply with all applicable laws and regulations</li>
     </ul>
 
-    <h2>8. Data Sharing (Patient to Dentist)</h2>
+    <h2>8. Data Sharing</h2>
 
-    <h3>8.1 Patient Consent</h3>
-    <p>By generating a share code and providing it to a dental professional, you:</p>
+    <h3>8.1 User Consent</h3>
+    <p>By generating a share code and providing it to a researcher, you:</p>
     <ul>
-        <li>Consent to sharing your health data with that professional</li>
+        <li>Consent to sharing your biofeedback data with that recipient</li>
         <li>Understand that shared data may be viewed, analyzed, and stored by the recipient</li>
         <li>Acknowledge that you can revoke access at any time</li>
     </ul>
 
-    <h3>8.2 Dentist Responsibilities</h3>
-    <p>Dental professionals using Oralable for Dentists agree to:</p>
+    <h3>8.2 Researcher Responsibilities</h3>
+    <p>Researchers using Oralable for Researchers agree to:</p>
     <ul>
-        <li>Use patient data only for legitimate healthcare purposes</li>
-        <li>Protect patient data in accordance with applicable regulations (e.g., HIPAA, GDPR)</li>
-        <li>Not share patient data with unauthorized parties</li>
-        <li>Delete patient data upon request or when no longer needed</li>
+        <li>Use participant data only for legitimate research purposes</li>
+        <li>Protect participant data in accordance with applicable regulations (e.g., GDPR)</li>
+        <li>Not share participant data with unauthorized parties</li>
+        <li>Obtain appropriate IRB/ethics approval for research use</li>
     </ul>
 
     <h2>9. Intellectual Property</h2>
@@ -323,34 +295,18 @@
     <h2>12. Termination</h2>
 
     <h3>12.1 By You</h3>
-    <p>You may stop using our Services at any time by deleting the app and cancelling any active subscriptions.</p>
+    <p>You may stop using our Services at any time by deleting the app.</p>
 
     <h3>12.2 By Us</h3>
     <p>We may suspend or terminate your access to the Services at any time, with or without cause, including for:</p>
     <ul>
         <li>Violation of these Terms</li>
         <li>Fraudulent or illegal activity</li>
-        <li>Non-payment of subscription fees</li>
         <li>Extended periods of inactivity</li>
-    </ul>
-
-    <h3>12.3 Effect of Termination</h3>
-    <p>Upon termination:</p>
-    <ul>
-        <li>Your right to use the Services immediately ceases</li>
-        <li>You may request deletion of your data</li>
-        <li>Provisions that should survive termination will remain in effect</li>
     </ul>
 
     <h2>13. Changes to Terms</h2>
     <p>We may modify these Terms at any time. Changes will be effective when posted, unless otherwise stated. Your continued use of the Services after changes constitutes acceptance of the modified Terms.</p>
-
-    <p>For material changes, we will provide notice through:</p>
-    <ul>
-        <li>In-app notification</li>
-        <li>Email to registered users</li>
-        <li>Update to the "Last Updated" date</li>
-    </ul>
 
     <h2>14. Governing Law and Disputes</h2>
 
@@ -365,24 +321,7 @@
         <li>Conducted in English</li>
     </ol>
 
-    <h3>14.3 Class Action Waiver</h3>
-    <p>You agree that any disputes will be resolved on an individual basis and not as part of a class action or representative proceeding.</p>
-
-    <h2>15. General Provisions</h2>
-
-    <h3>15.1 Entire Agreement</h3>
-    <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and JAC Dental Solutions Limited.</p>
-
-    <h3>15.2 Severability</h3>
-    <p>If any provision of these Terms is found to be invalid or unenforceable, the remaining provisions will continue in full force and effect.</p>
-
-    <h3>15.3 Waiver</h3>
-    <p>Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights.</p>
-
-    <h3>15.4 Assignment</h3>
-    <p>You may not assign or transfer these Terms without our prior written consent. We may assign our rights and obligations without restriction.</p>
-
-    <h2>16. Contact Information</h2>
+    <h2>15. Contact Information</h2>
     <div class="company-info">
         <p><strong>JAC Dental Solutions Limited</strong></p>
         <p>Email: <a href="mailto:legal@oralable.com">legal@oralable.com</a></p>
@@ -390,7 +329,7 @@
         <p>Website: <a href="https://oralable.com">oralable.com</a></p>
     </div>
 
-    <h2>17. Apple-Specific Terms</h2>
+    <h2>16. Apple-Specific Terms</h2>
     <p>If you are using our iOS applications:</p>
     <ul>
         <li>These Terms are between you and JAC Dental Solutions Limited, not Apple Inc.</li>
