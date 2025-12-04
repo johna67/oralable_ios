@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Oralable</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #ffffff;
+            color: #1a1a1a;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #000;
+        }
+        h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #000;
+        }
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        ul {
+            margin-bottom: 15px;
+            padding-left: 25px;
+        }
+        li {
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        .contact-box {
+            background-color: #007AFF;
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .contact-box h2 {
+            color: white;
+            margin-top: 0;
+        }
+        .contact-box a {
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .faq-item {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .faq-question {
+            font-weight: 600;
+            color: #000;
+            margin-bottom: 10px;
+        }
+        .faq-answer {
+            color: #333;
+            margin: 0;
+        }
+        a {
+            color: #007AFF;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .troubleshooting {
+            background-color: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+        }
+        .troubleshooting h3 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .step {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .step-number {
+            background-color: #007AFF;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .quick-link {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            text-decoration: none;
+            color: #333;
+            transition: background-color 0.2s;
+        }
+        .quick-link:hover {
+            background-color: #e9ecef;
+            text-decoration: none;
+        }
+        .quick-link-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            h2 {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Support Center</h1>
+    <p class="subtitle">Get help with Oralable and Oralable for Dentists</p>
+
+    <div class="contact-box">
+        <h2>Need Help?</h2>
+        <p>Our support team is here to assist you</p>
+        <a href="mailto:support@oralable.com">support@oralable.com</a>
+    </div>
+
+    <div class="quick-links">
+        <a href="#faq" class="quick-link">
+            <div class="quick-link-icon">&#x2753;</div>
+            <div>FAQ</div>
+        </a>
+        <a href="#troubleshooting" class="quick-link">
+            <div class="quick-link-icon">&#x1F527;</div>
+            <div>Troubleshooting</div>
+        </a>
+        <a href="#getting-started" class="quick-link">
+            <div class="quick-link-icon">&#x1F680;</div>
+            <div>Getting Started</div>
+        </a>
+        <a href="#contact" class="quick-link">
+            <div class="quick-link-icon">&#x2709;</div>
+            <div>Contact Us</div>
+        </a>
+    </div>
+
+    <h2 id="getting-started">Getting Started</h2>
+
+    <h3>For Patients (Oralable App)</h3>
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <strong>Download the App</strong><br>
+            Get Oralable from the App Store on your iPhone or iPad.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <strong>Sign In</strong><br>
+            Use Sign in with Apple for secure, private authentication.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <strong>Pair Your Device</strong><br>
+            Go to the Devices tab and tap "Scan" to find your Oralable sensor. Tap to connect.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <strong>Start Monitoring</strong><br>
+            Once connected, you'll see real-time data on your dashboard.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">5</div>
+        <div class="step-content">
+            <strong>Share with Your Dentist (Optional)</strong><br>
+            Go to Settings > Share with Dentist > Generate Code. Give this code to your dentist.
+        </div>
+    </div>
+
+    <h3>For Dentists (Oralable for Dentists App)</h3>
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <strong>Download Oralable for Dentists</strong><br>
+            Search for "Oralable for Dentists" in the App Store.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <strong>Sign In</strong><br>
+            Use Sign in with Apple for your professional account.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <strong>Add a Patient</strong><br>
+            Tap "Add Patient" and enter the 6-digit code your patient provides.
+        </div>
+    </div>
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <strong>View Patient Data</strong><br>
+            Once connected, you'll automatically receive patient health data.
+        </div>
+    </div>
+
+    <h2 id="faq">Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+        <p class="faq-question">What devices are compatible with Oralable?</p>
+        <p class="faq-answer">Oralable works with the Oralable sensor device and ANR MuscleSeñse devices. Both connect via Bluetooth Low Energy (BLE) 4.0 or later. Your iPhone or iPad must be running iOS 17.0 or later.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">Where can I buy an Oralable device?</p>
+        <p class="faq-answer">Oralable devices are available on Tindie. Visit <a href="https://tindie.com">tindie.com</a> and search for "Oralable" to find our official store.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">Is my data secure?</p>
+        <p class="faq-answer">Yes. All data is encrypted in transit and at rest. We use Apple's secure CloudKit infrastructure and Sign in with Apple. We never sell your data or share it without your explicit consent. See our <a href="privacy.html">Privacy Policy</a> for details.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">How do I share my data with my dentist?</p>
+        <p class="faq-answer">In the Oralable app, go to Settings > Share with Dentist > Generate Share Code. A 6-digit code will be displayed that's valid for 48 hours. Give this code to your dentist to enter in their Oralable for Dentists app.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">Can I revoke my dentist's access to my data?</p>
+        <p class="faq-answer">Yes, at any time. Go to Settings > Shared Connections, select the dentist, and tap "Revoke Access". They will immediately lose access to your data.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">What does the Premium subscription include?</p>
+        <p class="faq-answer">Premium unlocks: unlimited dentist connections, advanced analytics and insights, unlimited data export, historical data analysis, custom alerts, and priority support. Free tier includes full real-time monitoring, basic analytics, and 1 dentist connection.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">How do I cancel my subscription?</p>
+        <p class="faq-answer">Subscriptions are managed through Apple. Go to iPhone Settings > Your Name > Subscriptions > Oralable, then tap "Cancel Subscription". You'll retain access until the end of your billing period.</p>
+    </div>
+
+    <div class="faq-item">
+        <p class="faq-question">Does Oralable work with Apple Health?</p>
+        <p class="faq-answer">Yes! With your permission, Oralable can save heart rate, blood oxygen, and sleep data to Apple Health. Enable this in Settings > HealthKit Integration.</p>
+    </div>
+
+    <h2 id="troubleshooting">Troubleshooting</h2>
+
+    <div class="troubleshooting">
+        <h3>Device Won't Connect via Bluetooth</h3>
+        <p>Try these steps in order:</p>
+        <ol>
+            <li><strong>Check Bluetooth is enabled</strong> - Go to iPhone Settings > Bluetooth and ensure it's turned on</li>
+            <li><strong>Restart the Oralable device</strong> - Turn it off and on again, or place it on the charger briefly</li>
+            <li><strong>Restart the app</strong> - Force close Oralable and reopen it</li>
+            <li><strong>Forget and re-pair</strong> - In iPhone Settings > Bluetooth, find the Oralable device, tap the (i) icon, and select "Forget This Device". Then scan again in the app</li>
+            <li><strong>Restart your iPhone</strong> - Sometimes a full restart resolves Bluetooth issues</li>
+            <li><strong>Check battery</strong> - Ensure your Oralable device is charged (LED should indicate battery status)</li>
+        </ol>
+    </div>
+
+    <div class="troubleshooting">
+        <h3>Data Not Appearing on Dashboard</h3>
+        <ol>
+            <li><strong>Verify connection</strong> - Check that the device shows "Ready" (green) in the Devices tab</li>
+            <li><strong>Wait for data</strong> - It may take 10-15 seconds after connection for data to appear</li>
+            <li><strong>Check device placement</strong> - Ensure the sensor is making good contact with skin</li>
+            <li><strong>Check for interference</strong> - Move away from other Bluetooth devices temporarily</li>
+        </ol>
+    </div>
+
+    <div class="troubleshooting">
+        <h3>Share Code Not Working</h3>
+        <ol>
+            <li><strong>Check expiration</strong> - Share codes expire after 48 hours. Generate a new one if needed</li>
+            <li><strong>Verify the code</strong> - Ensure all 6 digits are entered correctly</li>
+            <li><strong>Check internet connection</strong> - Both patient and dentist need internet access</li>
+            <li><strong>Try again later</strong> - CloudKit may be temporarily unavailable. Wait a few minutes and try again</li>
+        </ol>
+    </div>
+
+    <div class="troubleshooting">
+        <h3>App Crashes or Freezes</h3>
+        <ol>
+            <li><strong>Update the app</strong> - Ensure you have the latest version from the App Store</li>
+            <li><strong>Restart the app</strong> - Force close and reopen</li>
+            <li><strong>Restart your device</strong> - A fresh start often resolves issues</li>
+            <li><strong>Reinstall</strong> - Delete and reinstall the app (your data is backed up to CloudKit)</li>
+            <li><strong>Contact support</strong> - If issues persist, email us with details about what happened</li>
+        </ol>
+    </div>
+
+    <h2 id="contact">Contact Us</h2>
+
+    <p>We're here to help! Reach out through any of these channels:</p>
+
+    <ul>
+        <li><strong>Email:</strong> <a href="mailto:support@oralable.com">support@oralable.com</a></li>
+        <li><strong>Response Time:</strong> We aim to respond within 24-48 hours on business days</li>
+        <li><strong>Professional Support:</strong> Dentist users can email <a href="mailto:dentist-support@oralable.com">dentist-support@oralable.com</a> for priority assistance</li>
+    </ul>
+
+    <h3>When Contacting Support</h3>
+    <p>To help us resolve your issue quickly, please include:</p>
+    <ul>
+        <li>Your device model (e.g., iPhone 15 Pro)</li>
+        <li>iOS version (Settings > General > About)</li>
+        <li>Oralable app version (Settings > About in the app)</li>
+        <li>A description of the issue</li>
+        <li>Screenshots if applicable</li>
+    </ul>
+
+    <h2>Additional Resources</h2>
+
+    <ul>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Service</a></li>
+        <li><a href="https://oralable.com">Oralable Website</a></li>
+    </ul>
+
+    <p style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+        &copy; 2025 JAC Dental Solutions Limited. All rights reserved.
+    </p>
+</body>
+</html>

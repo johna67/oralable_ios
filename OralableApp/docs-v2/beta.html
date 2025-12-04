@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Early Access - Oralable</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #ffffff;
+            color: #1a1a1a;
+            line-height: 1.7;
+        }
+        .disclaimer-banner {
+            background: #fff3cd;
+            padding: 15px 20px;
+            text-align: center;
+            font-size: 14px;
+            border-bottom: 1px solid #ffc107;
+        }
+        .disclaimer-banner strong {
+            color: #856404;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 20px;
+            background: #fff;
+            border-bottom: 1px solid #e8e8ed;
+        }
+        nav a {
+            color: #1d1d1f;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        nav a:hover {
+            color: #007AFF;
+        }
+        .hero {
+            background: linear-gradient(135deg, #000 0%, #333 100%);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 42px;
+            margin-bottom: 20px;
+        }
+        .hero p {
+            font-size: 18px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 10px;
+        }
+        .hero .launch-date {
+            font-size: 16px;
+            opacity: 0.7;
+            margin-top: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .form-container {
+            background: #f5f5f7;
+            padding: 40px;
+            border-radius: 16px;
+            margin: 30px 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            margin-top: 4px;
+            width: 18px;
+            height: 18px;
+        }
+        .checkbox-group label {
+            font-size: 14px;
+            color: #333;
+        }
+        .required-checkbox {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .required-checkbox label {
+            font-weight: 600;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: #000;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .submit-btn:hover {
+            background: #333;
+        }
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .benefits {
+            margin: 40px 0;
+        }
+        .benefit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .benefit-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .benefit-text h4 {
+            margin-bottom: 5px;
+        }
+        .benefit-text p {
+            font-size: 14px;
+            color: #666;
+            margin: 0;
+        }
+        footer {
+            padding: 40px 20px;
+            text-align: center;
+            color: #86868b;
+            font-size: 14px;
+            border-top: 1px solid #e8e8ed;
+        }
+        footer a {
+            color: #86868b;
+            text-decoration: none;
+            margin: 0 15px;
+        }
+        @media (max-width: 600px) {
+            .hero h1 {
+                font-size: 28px;
+            }
+            nav {
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+            .form-container {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="disclaimer-banner">
+        <strong>WELLNESS DEVICE</strong> - Oralable is a muscle activity monitor for personal awareness. Not a medical device.
+    </div>
+
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="product.html">Product</a>
+        <a href="for-researchers.html">For Researchers</a>
+        <a href="about.html">About</a>
+        <a href="beta.html">Early Access</a>
+    </nav>
+
+    <section class="hero">
+        <h1>Join Early Access</h1>
+        <p>Be among the first to experience Oralable, a new way to monitor your jaw muscle activity.</p>
+        <p class="launch-date">Launching January 2026</p>
+    </section>
+
+    <div class="container">
+        <h2>What You Get</h2>
+
+        <div class="benefits">
+            <div class="benefit-item">
+                <div class="benefit-icon">&#x1F4E6;</div>
+                <div class="benefit-text">
+                    <h4>Early Hardware Access</h4>
+                    <p>Get the Oralable device before public launch</p>
+                </div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">&#x1F4F1;</div>
+                <div class="benefit-text">
+                    <h4>TestFlight Beta</h4>
+                    <p>Access the iOS app before App Store release</p>
+                </div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">&#x1F4AC;</div>
+                <div class="benefit-text">
+                    <h4>Direct Feedback Channel</h4>
+                    <p>Your input shapes the product</p>
+                </div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">&#x1F381;</div>
+                <div class="benefit-text">
+                    <h4>Founder Pricing</h4>
+                    <p>Special pricing for early supporters</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-container">
+            <h2>Request Early Access</h2>
+
+            <form id="early-access-form" action="https://formspree.io/f/your-form-id" method="POST">
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="name" required placeholder="Your name">
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required placeholder="you@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="interest">Primary Interest</label>
+                    <select id="interest" name="interest" required>
+                        <option value="">Select...</option>
+                        <option value="personal">Personal Use - Curious about my patterns</option>
+                        <option value="research">Research - Academic or independent study</option>
+                        <option value="developer">Developer - Integration opportunities</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="device">Do you have a compatible device?</label>
+                    <select id="device" name="device" required>
+                        <option value="">Select...</option>
+                        <option value="need-oralable">No - I'll need an Oralable device</option>
+                        <option value="have-anr">Yes - I have an ANR MuscleSeñse</option>
+                        <option value="unsure">Not sure</option>
+                    </select>
+                </div>
+
+                <div class="required-checkbox">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="wellness-agreement" name="wellness_agreement" required>
+                        <label for="wellness-agreement">
+                            <strong>I understand that Oralable is a wellness device, not a medical device.</strong> It monitors muscle activity for personal awareness and does NOT diagnose, treat, or cure any medical condition.
+                        </label>
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="updates" name="updates" checked>
+                    <label for="updates">Keep me updated on launch news and early access opportunities</label>
+                </div>
+
+                <button type="submit" class="submit-btn">Request Early Access</button>
+            </form>
+        </div>
+
+        <p style="text-align: center; color: #666; font-size: 14px;">
+            We'll notify you when early access opens. No payment required now.<br>
+            Questions? Email <a href="mailto:hello@oralable.com">hello@oralable.com</a>
+        </p>
+    </div>
+
+    <footer>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="support.html">Support</a>
+        <p style="margin-top: 20px;">&copy; 2025 JAC Dental Solutions Limited. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Disable submit until wellness agreement is checked
+        document.getElementById('wellness-agreement').addEventListener('change', function() {
+            document.querySelector('.submit-btn').disabled = !this.checked;
+        });
+        // Initial state
+        document.querySelector('.submit-btn').disabled = true;
+    </script>
+</body>
+</html>
