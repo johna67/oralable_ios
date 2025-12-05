@@ -266,7 +266,13 @@
         <div class="form-container">
             <h2>Request Early Access</h2>
 
-            <form id="early-access-form" action="https://formspree.io/f/your-form-id" method="POST">
+            <form id="early-access-form" name="early-access" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/beta-success.html">
+                <!-- Honeypot field to prevent spam (hidden from users) -->
+                <p style="display:none;">
+                    <label>Don't fill this out: <input name="bot-field" /></label>
+                </p>
+                <input type="hidden" name="form-name" value="early-access" />
+
                 <div class="form-group">
                     <label for="name">Name</label>
                     <input type="text" id="name" name="name" required placeholder="Your name">
