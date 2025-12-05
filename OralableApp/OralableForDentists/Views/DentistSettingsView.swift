@@ -19,6 +19,12 @@ struct DentistSettingsView: View {
     @State private var versionTapCount = 0
     @State private var showDeveloperSettings = false
 
+    // Account deletion states
+    @State private var showDeleteAccountAlert = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+
     var body: some View {
         NavigationView {
             List {
@@ -111,6 +117,7 @@ struct DentistSettingsView: View {
                     Text("App")
                 }
 
+                // Sign Out Section
                 Section {
                     Button(action: {
                         showingSignOutConfirmation = true
@@ -118,15 +125,35 @@ struct DentistSettingsView: View {
                         HStack {
                             Spacer()
                             Text("Sign Out")
-                                .foregroundColor(.red)
+                                .foregroundColor(.primary)
                             Spacer()
                         }
                     }
+                }
+
+                // Delete Account Section (Apple Requirement)
+                Section {
+                    Button(action: {
+                        showDeleteAccountAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                            Text("Delete Account")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .disabled(isDeleting)
+                } footer: {
+                    Text("This will permanently delete your account and all associated data.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            // Sign Out Confirmation
             .confirmationDialog(
                 "Sign Out",
                 isPresented: $showingSignOutConfirmation,
@@ -138,6 +165,32 @@ struct DentistSettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Are you sure you want to sign out?")
+            }
+            // Delete Account - First Confirmation
+            .alert("Delete Account", isPresented: $showDeleteAccountAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Continue", role: .destructive) {
+                    showDeleteConfirmation = true
+                }
+            } message: {
+                Text("This will permanently delete your account, all participant connections, and data. This action cannot be undone.")
+            }
+            // Delete Account - Final Confirmation
+            .alert("Are You Absolutely Sure?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete My Account", role: .destructive) {
+                    deleteAccount()
+                }
+            } message: {
+                Text("All your data including participant connections and account information will be permanently deleted. You will need to create a new account to use the app again.")
+            }
+            // Delete Error Alert
+            .alert("Deletion Error", isPresented: .constant(deleteError != nil)) {
+                Button("OK") { deleteError = nil }
+            } message: {
+                if let error = deleteError {
+                    Text(error)
+                }
             }
             .sheet(isPresented: $showDeveloperSettings) {
                 NavigationStack {
@@ -151,8 +204,59 @@ struct DentistSettingsView: View {
                         }
                 }
             }
+            // Loading overlay during deletion
+            .overlay {
+                if isDeleting {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+
+                            Text("Deleting account...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                        .padding(32)
+                        .background(Color(UIColor.systemGray5))
+                        .cornerRadius(16)
+                    }
+                }
+            }
         }
         .navigationViewStyle(.stack)
+    }
+
+    // MARK: - Account Deletion
+
+    private func deleteAccount() {
+        isDeleting = true
+
+        Task {
+            do {
+                // Delete CloudKit data first
+                try await dataManager.deleteAllUserData()
+
+                // Delete local data and sign out
+                await authenticationManager.deleteAccount()
+
+                // Reset feature flags
+                FeatureFlags.shared.resetToDefaults()
+
+                await MainActor.run {
+                    isDeleting = false
+                    // Auth state change will trigger return to welcome screen
+                }
+            } catch {
+                await MainActor.run {
+                    isDeleting = false
+                    deleteError = "Failed to delete account: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     private var accountRow: some View {

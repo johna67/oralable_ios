@@ -109,4 +109,76 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
             Logger.shared.error("[DentistAuth] Failed to check credential state: \(error)")
         }
     }
+
+    // MARK: - Account Deletion (Apple App Store Requirement)
+
+    /// Deletes all user data and signs out
+    /// This is required by Apple for apps that support account creation
+    func deleteAccount() async {
+        Logger.shared.info("[DentistAuth] 🗑️ Starting account deletion process")
+
+        // Clear all UserDefaults
+        clearAllUserDefaults()
+
+        // Clear Keychain data (includes dentist-specific keys)
+        clearAllKeychainData()
+
+        // Delete all authentication data from parent class
+        deleteAllAuthenticationData()
+
+        // Reset authentication state
+        isAuthenticated = false
+        userID = nil
+        userEmail = nil
+        userFullName = nil
+        authenticationError = nil
+
+        Logger.shared.info("[DentistAuth] 🗑️ Account deletion completed - local data cleared")
+    }
+
+    private func clearAllUserDefaults() {
+        let defaults = UserDefaults.standard
+
+        // Legacy authentication keys
+        defaults.removeObject(forKey: "dentistAppleID")
+        defaults.removeObject(forKey: "dentistName")
+        defaults.removeObject(forKey: "dentistEmail")
+
+        // App state keys
+        defaults.removeObject(forKey: "hasLaunchedBefore")
+        defaults.removeObject(forKey: "hasCompletedOnboarding")
+
+        // Feature flags (reset to defaults)
+        defaults.removeObject(forKey: "feature.dashboard.showMovement")
+        defaults.removeObject(forKey: "feature.dashboard.showTemperature")
+        defaults.removeObject(forKey: "feature.dashboard.showHeartRate")
+        defaults.removeObject(forKey: "feature.dashboard.showAdvancedAnalytics")
+        defaults.removeObject(forKey: "feature.settings.showSubscription")
+        defaults.removeObject(forKey: "feature.showMultiParticipant")
+        defaults.removeObject(forKey: "feature.showDataExport")
+        defaults.removeObject(forKey: "feature.showANRComparison")
+
+        // Sync to disk
+        defaults.synchronize()
+
+        Logger.shared.info("[DentistAuth] 🗑️ UserDefaults cleared")
+    }
+
+    private func clearAllKeychainData() {
+        // Clear all keychain items for this app
+        let secItemClasses = [
+            kSecClassGenericPassword,
+            kSecClassInternetPassword,
+            kSecClassCertificate,
+            kSecClassKey,
+            kSecClassIdentity
+        ]
+
+        for secItemClass in secItemClasses {
+            let query: [String: Any] = [kSecClass as String: secItemClass]
+            SecItemDelete(query as CFDictionary)
+        }
+
+        Logger.shared.info("[DentistAuth] 🗑️ Keychain data cleared")
+    }
 }

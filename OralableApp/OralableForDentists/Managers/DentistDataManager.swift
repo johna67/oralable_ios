@@ -468,6 +468,77 @@ class DentistDataManager: ObservableObject {
         // Get dentist's name from authentication
         return UserDefaults.standard.string(forKey: "dentistName")
     }
+
+    // MARK: - Account Deletion (Apple App Store Requirement)
+
+    /// Deletes all dentist's data from CloudKit
+    /// This is required by Apple for apps that support account creation
+    func deleteAllUserData() async throws {
+        guard let dentistID = dentistID else {
+            Logger.shared.warning("[DentistDataManager] Cannot delete data - not authenticated")
+            return
+        }
+
+        Logger.shared.info("[DentistDataManager] 🗑️ Starting CloudKit data deletion for dentist: \(dentistID)")
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Delete SharedPatientData records (dentist's patient connections)
+            try await deleteRecords(ofType: "SharedPatientData", forDentistID: dentistID)
+
+            // Clear local state
+            patients = []
+
+            isLoading = false
+            Logger.shared.info("[DentistDataManager] 🗑️ Successfully deleted all CloudKit data for dentist")
+        } catch {
+            isLoading = false
+            errorMessage = "Failed to delete cloud data: \(error.localizedDescription)"
+            Logger.shared.error("[DentistDataManager] ❌ Failed to delete CloudKit data: \(error)")
+            throw DentistDataError.cloudKitError(error)
+        }
+    }
+
+    private func deleteRecords(ofType recordType: String, forDentistID dentistID: String) async throws {
+        let predicate = NSPredicate(format: "dentistID == %@", dentistID)
+        let query = CKQuery(recordType: recordType, predicate: predicate)
+
+        do {
+            let (matchResults, _) = try await publicDatabase.records(matching: query)
+
+            var recordIDsToDelete: [CKRecord.ID] = []
+            for (recordID, result) in matchResults {
+                switch result {
+                case .success:
+                    recordIDsToDelete.append(recordID)
+                case .failure(let error):
+                    Logger.shared.warning("[DentistDataManager] Error fetching \(recordType) record: \(error)")
+                }
+            }
+
+            if !recordIDsToDelete.isEmpty {
+                Logger.shared.info("[DentistDataManager] Deleting \(recordIDsToDelete.count) \(recordType) records")
+
+                // Delete records
+                for recordID in recordIDsToDelete {
+                    try await publicDatabase.deleteRecord(withID: recordID)
+                }
+
+                Logger.shared.info("[DentistDataManager] ✅ Deleted \(recordIDsToDelete.count) \(recordType) records")
+            } else {
+                Logger.shared.info("[DentistDataManager] No \(recordType) records found to delete")
+            }
+        } catch {
+            // Handle "record type not found" error gracefully
+            let nsError = error as NSError
+            if nsError.domain == CKErrorDomain && nsError.code == CKError.unknownItem.rawValue {
+                Logger.shared.info("[DentistDataManager] Record type \(recordType) doesn't exist - nothing to delete")
+            } else {
+                throw error
+            }
+        }
+    }
 }
 
 // MARK: - Errors
@@ -479,6 +550,7 @@ enum DentistDataError: LocalizedError {
     case shareCodeExpired
     case patientAlreadyAdded
     case patientLimitReached
+    case cloudKitError(Error)
 
     var errorDescription: String? {
         switch self {
@@ -494,6 +566,8 @@ enum DentistDataError: LocalizedError {
             return "You already have access to this patient's data"
         case .patientLimitReached:
             return "You've reached your patient limit. Please upgrade to add more patients."
+        case .cloudKitError(let error):
+            return "Cloud error: \(error.localizedDescription)"
         }
     }
 }
