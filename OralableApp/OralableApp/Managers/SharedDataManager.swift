@@ -628,6 +628,74 @@ class SharedDataManager: ObservableObject {
             throw ShareError.cloudKitError(error)
         }
     }
+
+    // MARK: - Account Deletion (Apple App Store Requirement)
+
+    /// Deletes all user data from CloudKit
+    /// This is required by Apple for apps that support account creation
+    func deleteAllUserData() async throws {
+        guard let patientID = userID else {
+            Logger.shared.warning("[SharedDataManager] Cannot delete data - not authenticated")
+            return
+        }
+
+        Logger.shared.info("[SharedDataManager] 🗑️ Starting CloudKit data deletion for user: \(patientID)")
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Delete ShareInvitation records
+            try await deleteRecords(ofType: "ShareInvitation", forPatientID: patientID)
+
+            // Delete SharedPatientData records
+            try await deleteRecords(ofType: "SharedPatientData", forPatientID: patientID)
+
+            // Delete HealthDataRecord records
+            try await deleteRecords(ofType: "HealthDataRecord", forPatientID: patientID)
+
+            // Clear local state
+            sharedDentists = []
+            lastSyncDate = nil
+
+            isLoading = false
+            Logger.shared.info("[SharedDataManager] 🗑️ Successfully deleted all CloudKit data for user")
+        } catch {
+            isLoading = false
+            errorMessage = "Failed to delete cloud data: \(error.localizedDescription)"
+            Logger.shared.error("[SharedDataManager] ❌ Failed to delete CloudKit data: \(error)")
+            throw ShareError.cloudKitError(error)
+        }
+    }
+
+    private func deleteRecords(ofType recordType: String, forPatientID patientID: String) async throws {
+        let predicate = NSPredicate(format: "patientID == %@", patientID)
+        let query = CKQuery(recordType: recordType, predicate: predicate)
+
+        let (matchResults, _) = try await publicDatabase.records(matching: query)
+
+        var recordIDsToDelete: [CKRecord.ID] = []
+        for (recordID, result) in matchResults {
+            switch result {
+            case .success:
+                recordIDsToDelete.append(recordID)
+            case .failure(let error):
+                Logger.shared.warning("[SharedDataManager] Error fetching \(recordType) record: \(error)")
+            }
+        }
+
+        if !recordIDsToDelete.isEmpty {
+            Logger.shared.info("[SharedDataManager] Deleting \(recordIDsToDelete.count) \(recordType) records")
+
+            // Delete records in batches
+            for recordID in recordIDsToDelete {
+                try await publicDatabase.deleteRecord(withID: recordID)
+            }
+
+            Logger.shared.info("[SharedDataManager] ✅ Deleted \(recordIDsToDelete.count) \(recordType) records")
+        } else {
+            Logger.shared.info("[SharedDataManager] No \(recordType) records found to delete")
+        }
+    }
 }
 
 // MARK: - Share Errors

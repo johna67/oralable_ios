@@ -138,7 +138,7 @@ final class AuthenticationManager: ObservableObject {
         defaults.removeObject(forKey: "userGivenName")
         defaults.removeObject(forKey: "userFamilyName")
         defaults.removeObject(forKey: "userEmail")
-        
+
         isAuthenticated = false
         userID = nil
         userFullName = nil
@@ -146,7 +146,84 @@ final class AuthenticationManager: ObservableObject {
         userFamilyName = nil
         userEmail = nil
         authenticationError = nil
-        
+
         Logger.shared.info("🔐 Authentication state reset")
+    }
+
+    // MARK: - Account Deletion (Apple App Store Requirement)
+
+    /// Deletes all user data and signs out
+    /// This is required by Apple for apps that support account creation
+    func deleteAccount() async {
+        Logger.shared.info("🗑️ Starting account deletion process")
+
+        // Clear all UserDefaults
+        clearAllUserDefaults()
+
+        // Clear Keychain data
+        clearKeychainData()
+
+        // Reset authentication state
+        isAuthenticated = false
+        userID = nil
+        userFullName = nil
+        userGivenName = nil
+        userFamilyName = nil
+        userEmail = nil
+        authenticationError = nil
+
+        Logger.shared.info("🗑️ Account deletion completed - local data cleared")
+    }
+
+    private func clearAllUserDefaults() {
+        let defaults = UserDefaults.standard
+
+        // Authentication keys
+        defaults.removeObject(forKey: "isAuthenticated")
+        defaults.removeObject(forKey: "userID")
+        defaults.removeObject(forKey: "userFullName")
+        defaults.removeObject(forKey: "userGivenName")
+        defaults.removeObject(forKey: "userFamilyName")
+        defaults.removeObject(forKey: "userEmail")
+        defaults.removeObject(forKey: "appleUserID")
+
+        // App state keys
+        defaults.removeObject(forKey: "hasLaunchedBefore")
+        defaults.removeObject(forKey: "hasCompletedOnboarding")
+        defaults.removeObject(forKey: "sessionCount")
+        defaults.removeObject(forKey: "totalSleepHours")
+
+        // Feature flags (reset to defaults)
+        defaults.removeObject(forKey: "feature.dashboard.showMovement")
+        defaults.removeObject(forKey: "feature.dashboard.showTemperature")
+        defaults.removeObject(forKey: "feature.dashboard.showHeartRate")
+        defaults.removeObject(forKey: "feature.dashboard.showAdvancedAnalytics")
+        defaults.removeObject(forKey: "feature.settings.showSubscription")
+        defaults.removeObject(forKey: "feature.showMultiParticipant")
+        defaults.removeObject(forKey: "feature.showDataExport")
+        defaults.removeObject(forKey: "feature.showANRComparison")
+
+        // Sync to disk
+        defaults.synchronize()
+
+        Logger.shared.info("🗑️ UserDefaults cleared")
+    }
+
+    private func clearKeychainData() {
+        // Clear all keychain items for this app
+        let secItemClasses = [
+            kSecClassGenericPassword,
+            kSecClassInternetPassword,
+            kSecClassCertificate,
+            kSecClassKey,
+            kSecClassIdentity
+        ]
+
+        for secItemClass in secItemClasses {
+            let query: [String: Any] = [kSecClass as String: secItemClass]
+            SecItemDelete(query as CFDictionary)
+        }
+
+        Logger.shared.info("🗑️ Keychain data cleared")
     }
 }

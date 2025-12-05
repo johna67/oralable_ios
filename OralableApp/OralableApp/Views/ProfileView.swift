@@ -11,12 +11,17 @@ import AuthenticationServices
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var designSystem: DesignSystem
+    @EnvironmentObject var sharedDataManager: SharedDataManager
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var showingPrivacyPolicy = false
     @State private var showingTerms = false
     @State private var showingSignOut = false
-    
+    @State private var showingDeleteAccount = false
+    @State private var showingDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -24,7 +29,7 @@ struct ProfileView: View {
                     // Profile Header (name and email only)
                     profileHeader
 
-                    // Account Actions (sign out only)
+                    // Account Actions (sign out and delete account)
                     accountSection
 
                     Spacer(minLength: 50)
@@ -54,6 +59,7 @@ struct ProfileView: View {
                 }
             }
         }
+        // Sign Out Alert
         .alert("Sign Out", isPresented: $showingSignOut) {
             Button("Cancel", role: .cancel) { }
             Button("Sign Out", role: .destructive) {
@@ -62,6 +68,78 @@ struct ProfileView: View {
             }
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        // Delete Account - First Confirmation
+        .alert("Delete Account", isPresented: $showingDeleteAccount) {
+            Button("Cancel", role: .cancel) { }
+            Button("Continue", role: .destructive) {
+                showingDeleteConfirmation = true
+            }
+        } message: {
+            Text("This will permanently delete your account and all associated data. This action cannot be undone.")
+        }
+        // Delete Account - Final Confirmation
+        .alert("Are You Absolutely Sure?", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete My Account", role: .destructive) {
+                deleteAccount()
+            }
+        } message: {
+            Text("All your data including wellness recordings, shared dentist connections, and account information will be permanently deleted.")
+        }
+        // Delete Error Alert
+        .alert("Deletion Error", isPresented: .constant(deleteError != nil)) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            if let error = deleteError {
+                Text(error)
+            }
+        }
+        // Loading overlay during deletion
+        .overlay {
+            if isDeleting {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+
+                        Text("Deleting account...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    .padding(32)
+                    .background(Color(UIColor.systemGray5))
+                    .cornerRadius(16)
+                }
+            }
+        }
+    }
+
+    private func deleteAccount() {
+        isDeleting = true
+
+        Task {
+            do {
+                // Delete CloudKit data first
+                try await sharedDataManager.deleteAllUserData()
+
+                // Delete local data and sign out
+                await authManager.deleteAccount()
+
+                await MainActor.run {
+                    isDeleting = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isDeleting = false
+                    deleteError = "Failed to delete account: \(error.localizedDescription)"
+                }
+            }
         }
     }
     
@@ -194,16 +272,34 @@ struct ProfileView: View {
                 .font(designSystem.typography.caption)
                 .foregroundColor(designSystem.colors.textTertiary)
                 .padding(.horizontal, designSystem.spacing.xs)
-            
+
             VStack(spacing: 0) {
                 if authManager.isAuthenticated {
+                    // Sign Out Button
                     Button(action: {
                         showingSignOut = true
                     }) {
                         HStack {
                             Image(systemName: "arrow.right.square")
-                                .foregroundColor(.red)
+                                .foregroundColor(designSystem.colors.textSecondary)
                             Text("Sign Out")
+                                .foregroundColor(designSystem.colors.textPrimary)
+                            Spacer()
+                        }
+                        .padding(designSystem.spacing.md)
+                    }
+
+                    Divider()
+                        .background(designSystem.colors.divider)
+
+                    // Delete Account Button
+                    Button(action: {
+                        showingDeleteAccount = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                            Text("Delete Account")
                                 .foregroundColor(.red)
                             Spacer()
                         }
