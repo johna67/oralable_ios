@@ -165,7 +165,7 @@ struct TrendIndicator: View {
 struct SessionRowCard: View {
     let date: Date
     let duration: TimeInterval
-    let bruxismEvents: Int
+    let activityEvents: Int  // Renamed from bruxismEvents for wellness positioning
     let peakIntensity: Double
 
     var body: some View {
@@ -183,9 +183,9 @@ struct SessionRowCard: View {
 
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text("\(bruxismEvents)")
+                    Text("\(activityEvents)")
                         .font(.headline)
-                        .foregroundColor(.red)
+                        .foregroundColor(.purple)
                     Text("events")
                         .font(.caption)
                         .foregroundColor(.secondary)

@@ -345,7 +345,7 @@ struct PatientHealthDataView_Previews: PreviewProvider {
                     )
                 )
             )
-            .environmentObject(DesignSystem.shared)
+            .environmentObject(DesignSystem())
         }
     }
 }

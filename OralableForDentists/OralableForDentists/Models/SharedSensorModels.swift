@@ -8,9 +8,10 @@
 import Foundation
 import Compression
 
-// MARK: - Bruxism Session Data (matches patient app)
+// MARK: - Wellness Session Data (matches consumer app)
+// Note: BruxismSessionData name retained for CloudKit backwards compatibility
 
-/// Serializable structure containing bruxism sensor data from CloudKit
+/// Serializable structure containing oral wellness sensor data from CloudKit
 struct BruxismSessionData: Codable {
     let sensorReadings: [SerializableSensorData]
     let recordingCount: Int

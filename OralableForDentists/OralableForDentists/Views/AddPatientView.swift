@@ -93,12 +93,12 @@ struct AddPatientView: View {
             .onAppear {
                 isCodeFieldFocused = true
             }
-            .alert("Patient Added", isPresented: $showSuccess) {
+            .alert("Participant Added", isPresented: $showSuccess) {
                 Button("Done") {
                     dismiss()
                 }
             } message: {
-                Text("You can now view this patient's bruxism data.")
+                Text("You can now view this participant's oral wellness data.")
             }
         }
     }

@@ -28,7 +28,7 @@ struct PatientHealthSummary {
     let patientID: String
     let recordingDate: Date
     let sessionDuration: TimeInterval
-    let bruxismEvents: Int
+    let activityEvents: Int  // Muscle activity events (CloudKit field: bruxismEvents for backwards compatibility)
     let averageIntensity: Double
     let peakIntensity: Double
     let heartRateData: [Double]
@@ -325,7 +325,7 @@ class DentistDataManager: ObservableObject {
                             patientID: patient.patientID,
                             recordingDate: recordDate,
                             sessionDuration: duration,
-                            bruxismEvents: record["bruxismEvents"] as? Int ?? 0,
+                            activityEvents: record["bruxismEvents"] as? Int ?? 0,  // CloudKit field name retained for backwards compatibility
                             averageIntensity: record["averageIntensity"] as? Double ?? 0.0,
                             peakIntensity: record["peakIntensity"] as? Double ?? 0.0,
                             heartRateData: [],  // Would parse from measurements data

@@ -69,14 +69,14 @@ struct DentistOnboardingView: View {
     private let onboardingPages = [
         DentistOnboardingPage(
             icon: "person.2.fill",
-            title: "Manage Your Patients",
-            description: "Access and monitor bruxism data from your patients in one secure location",
+            title: "Manage Your Participants",
+            description: "Access and monitor oral wellness data from your participants in one secure location",
             color: .black
         ),
         DentistOnboardingPage(
             icon: "chart.bar.fill",
             title: "Track Progress",
-            description: "View detailed analytics and trends to provide better treatment recommendations",
+            description: "View detailed muscle activity analytics and trends to provide better wellness recommendations",
             color: .black
         ),
         DentistOnboardingPage(

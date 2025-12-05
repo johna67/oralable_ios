@@ -71,7 +71,7 @@ struct ColorSystem {
     let heartRate = Color.red
     let battery = Color.green
     let temperature = Color.orange
-    let bruxism = Color.red
+    let oralWellness = Color.purple  // Primary wellness metric color
 
     let shadow = Color.black.opacity(0.1)
 }

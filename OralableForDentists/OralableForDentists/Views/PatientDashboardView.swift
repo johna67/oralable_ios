@@ -2,7 +2,8 @@
 //  PatientDashboardView.swift
 //  OralableForDentists
 //
-//  Patient dashboard view - mirrors OralableApp DashboardView
+//  Participant dashboard view - mirrors OralableApp DashboardView
+//  Updated with FeatureFlags for wellness positioning
 //
 
 import SwiftUI
@@ -12,6 +13,7 @@ struct PatientDashboardView: View {
     let patient: DentistPatient
     @StateObject private var viewModel: PatientDashboardViewModel
     @EnvironmentObject var designSystem: DesignSystem
+    @ObservedObject private var featureFlags = FeatureFlags.shared
 
     init(patient: DentistPatient) {
         self.patient = patient
@@ -21,16 +23,16 @@ struct PatientDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                // Patient info header
+                // Participant info header
                 patientHeader
 
                 if viewModel.isLoading {
-                    ProgressView("Loading patient data...")
+                    ProgressView("Loading wellness data...")
                         .padding()
                 } else if !viewModel.hasSensorData {
                     noDataView
                 } else {
-                    // Muscle Activity - Primary card
+                    // Muscle Activity - Primary card (always visible)
                     NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Muscle Activity")) {
                         HealthMetricCard(
                             icon: "waveform.path.ecg",
@@ -44,44 +46,50 @@ struct PatientDashboardView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    // Movement card
-                    NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Movement")) {
+                    // Movement card (feature flagged)
+                    if featureFlags.showMovementCard {
+                        NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Movement")) {
+                            HealthMetricCard(
+                                icon: "figure.walk",
+                                title: "Movement",
+                                value: viewModel.isMoving ? "Active" : "Still",
+                                unit: "",
+                                color: .blue,
+                                sparklineData: Array(viewModel.accelerometerHistory.suffix(20)),
+                                showChevron: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
+                    // Heart Rate card (feature flagged)
+                    if featureFlags.showHeartRateCard {
+                        NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Heart Rate")) {
+                            HealthMetricCard(
+                                icon: "heart.fill",
+                                title: "Heart Rate",
+                                value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "N/A",
+                                unit: viewModel.heartRate > 0 ? "BPM" : "",
+                                color: .red,
+                                sparklineData: Array(viewModel.heartRateHistory.suffix(20)),
+                                showChevron: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
+                    // Temperature card (feature flagged)
+                    if featureFlags.showTemperatureCard {
                         HealthMetricCard(
-                            icon: "figure.walk",
-                            title: "Movement",
-                            value: viewModel.isMoving ? "Active" : "Still",
-                            unit: "",
-                            color: .blue,
-                            sparklineData: Array(viewModel.accelerometerHistory.suffix(20)),
-                            showChevron: true
+                            icon: "thermometer",
+                            title: "Temperature",
+                            value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
+                            unit: viewModel.temperature > 0 ? "°C" : "",
+                            color: .orange,
+                            sparklineData: [],
+                            showChevron: false
                         )
                     }
-                    .buttonStyle(PlainButtonStyle())
-
-                    // Heart Rate card
-                    NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Heart Rate")) {
-                        HealthMetricCard(
-                            icon: "heart.fill",
-                            title: "Heart Rate",
-                            value: viewModel.heartRate > 0 ? "\(viewModel.heartRate)" : "N/A",
-                            unit: viewModel.heartRate > 0 ? "BPM" : "",
-                            color: .red,
-                            sparklineData: Array(viewModel.heartRateHistory.suffix(20)),
-                            showChevron: true
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                    // Temperature (no navigation - simple display)
-                    HealthMetricCard(
-                        icon: "thermometer",
-                        title: "Temperature",
-                        value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
-                        unit: viewModel.temperature > 0 ? "C" : "",
-                        color: .orange,
-                        sparklineData: [],
-                        showChevron: false
-                    )
 
                     // Last updated
                     if let lastUpdated = viewModel.lastUpdated {
@@ -156,10 +164,10 @@ struct PatientDashboardView: View {
                 .font(.system(size: 50))
                 .foregroundColor(.secondary)
 
-            Text("No Sensor Data")
+            Text("No Wellness Data")
                 .font(.headline)
 
-            Text("This patient hasn't shared any sensor data yet. Data is uploaded when they complete recording sessions.")
+            Text("This participant hasn't shared any wellness data yet. Data is uploaded when they complete recording sessions.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
