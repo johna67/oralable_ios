@@ -117,7 +117,8 @@ struct HistoricalView: View {
     @ViewBuilder
     private var chartForMetric: some View {
         switch metricType {
-        case "Muscle Activity": muscleActivityChart
+        case "Muscle Activity": muscleActivityChart(isEMG: false)
+        case "EMG Activity": muscleActivityChart(isEMG: true)
         case "Movement": accelerometerChart
         case "Heart Rate": heartRateChart
         case "SpO2": spo2Chart
@@ -286,9 +287,14 @@ struct HistoricalView: View {
         }
     }
 
-    private var muscleActivityChart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Muscle Activity")
+    /// Muscle Activity chart - shows EMG data (ANR M40) or IR data (Oralable)
+    /// - Parameter isEMG: true for ANR M40 (blue), false for Oralable IR (purple)
+    private func muscleActivityChart(isEMG: Bool) -> some View {
+        let chartTitle = isEMG ? "EMG Activity (ANR M40)" : "Muscle Activity (IR)"
+        let chartColor: Color = isEMG ? .blue : .purple
+
+        return VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text(chartTitle)
                 .font(designSystem.typography.headline)
                 .foregroundColor(designSystem.colors.textPrimary)
 
@@ -298,7 +304,7 @@ struct HistoricalView: View {
                         x: .value("Time", point.timestamp),
                         y: .value("Activity", ppgIR)
                     )
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(chartColor)
                 }
             }
             .frame(height: 250)

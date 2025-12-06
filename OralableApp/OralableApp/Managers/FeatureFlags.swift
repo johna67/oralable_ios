@@ -204,7 +204,7 @@ class FeatureFlags: ObservableObject {
         - SpO2 Card: \(showSpO2Card)
         - Accelerometer Card: \(showAccelerometerCard)
         - Battery Card: \(showBatteryCard)
-        - Advanced Metrics: \(showAdvancedMetrics)
+        - ANR M40 Device Support: \(showAdvancedMetrics)
         - Share with Dentist: \(showShareWithDentist)
         - Share with Researcher: \(showShareWithResearcher)
         - Subscription: \(showSubscription)

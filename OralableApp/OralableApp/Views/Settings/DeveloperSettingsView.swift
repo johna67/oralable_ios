@@ -29,7 +29,7 @@ struct DeveloperSettingsView: View {
                 Toggle("SpO2 Card", isOn: $featureFlags.showSpO2Card)
                 Toggle("Accelerometer Card", isOn: $featureFlags.showAccelerometerCard)
                 Toggle("Battery Card", isOn: $featureFlags.showBatteryCard)
-                Toggle("Advanced Metrics", isOn: $featureFlags.showAdvancedMetrics)
+                Toggle("ANR M40 Device Support", isOn: $featureFlags.showAdvancedMetrics)
             }
 
             // Share Features Section
