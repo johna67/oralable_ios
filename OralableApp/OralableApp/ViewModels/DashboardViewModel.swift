@@ -19,6 +19,7 @@ class DashboardViewModel: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var deviceName: String = ""
     @Published var batteryLevel: Double = 0.0
+    @Published var connectedDeviceType: DeviceType? = nil
 
     // Metrics
     @Published var heartRate: Int = 0
@@ -64,7 +65,7 @@ class DashboardViewModel: ObservableObject {
     @Published var ppgData: [Double] = []
     @Published var accelerometerData: [Double] = []
 
-    // Muscle Activity (derived from PPG IR)
+    // Muscle Activity (derived from PPG IR or EMG)
     @Published var muscleActivity: Double = 0.0
     @Published var muscleActivityHistory: [Double] = []
 
@@ -74,6 +75,44 @@ class DashboardViewModel: ObservableObject {
     /// Formatted duration string for recording button display (MM:SS)
     var formattedDuration: String {
         sessionDuration
+    }
+
+    // MARK: - Device-Specific Display Labels
+
+    /// Label for the muscle activity card based on connected device type
+    var muscleActivityLabel: String {
+        switch connectedDeviceType {
+        case .anr:
+            return "EMG Activity"
+        case .oralable:
+            return "Muscle Activity"
+        default:
+            return "Muscle Activity"
+        }
+    }
+
+    /// Subtitle showing signal source
+    var signalSourceLabel: String {
+        switch connectedDeviceType {
+        case .anr:
+            return "ANR M40 EMG"
+        case .oralable:
+            return "Oralable IR"
+        default:
+            return ""
+        }
+    }
+
+    /// Icon for the muscle activity card
+    var muscleActivityIcon: String {
+        switch connectedDeviceType {
+        case .anr:
+            return "bolt.horizontal.circle.fill"
+        case .oralable:
+            return "waveform.path.ecg"
+        default:
+            return "waveform.path.ecg"
+        }
     }
 
     // MARK: - Private Properties
@@ -172,6 +211,15 @@ class DashboardViewModel: ObservableObject {
                 guard let self = self else { return }
                 let wasConnected = self.isConnected
                 self.isConnected = !devices.isEmpty
+
+                // Track connected device type for UI differentiation
+                if let primaryDevice = devices.first {
+                    self.connectedDeviceType = primaryDevice.type
+                    Logger.shared.info("[DashboardViewModel] 📱 Connected device type: \(primaryDevice.type.rawValue)")
+                } else {
+                    self.connectedDeviceType = nil
+                }
+
                 Logger.shared.debug("[DashboardViewModel] connectedDevices changed: \(devices.count) devices, isConnected: \(self.isConnected)")
                 if wasConnected && !self.isConnected {
                     // Only reset when transitioning from connected to disconnected

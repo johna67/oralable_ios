@@ -53,9 +53,10 @@ struct DashboardView: View {
                     connectionReadinessIndicator(viewModel: viewModel)
 
                     // Muscle Activity - Primary card (ALWAYS SHOWN)
+                    // Shows "EMG Activity" for ANR M40, "Muscle Activity" for Oralable
                     NavigationLink(destination: LazyView(
                         HistoricalView(
-                            metricType: "Muscle Activity",
+                            metricType: viewModel.muscleActivityLabel,
                             historicalDataManager: dependencies.historicalDataManager
                         )
                         .environmentObject(designSystem)
@@ -63,11 +64,11 @@ struct DashboardView: View {
                         .environmentObject(dependencies.sensorDataProcessor)
                     )) {
                         HealthMetricCard(
-                            icon: "waveform.path.ecg",
-                            title: "Muscle Activity",
+                            icon: viewModel.muscleActivityIcon,
+                            title: viewModel.muscleActivityLabel,
                             value: viewModel.isConnected ? String(format: "%.0f", max(0, viewModel.muscleActivity)) : "N/A",
-                            unit: "",
-                            color: .purple,
+                            unit: viewModel.signalSourceLabel,
+                            color: viewModel.connectedDeviceType == .anr ? .blue : .purple,
                             sparklineData: viewModel.muscleActivityHistory,
                             showChevron: true
                         )
@@ -210,11 +211,23 @@ struct DashboardView: View {
             Text(deviceManager.primaryDeviceReadiness.displayText)
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
-            
-            // Show device name if connected
+
+            // Show device type badge and name if connected
             if deviceManager.primaryDeviceReadiness.isConnected {
                 Text("•")
                     .foregroundColor(.secondary)
+
+                // Device type badge (ANR or Oralable)
+                if let deviceType = viewModel.connectedDeviceType {
+                    Text(deviceType == .anr ? "ANR" : "PPG")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(deviceType == .anr ? Color.blue : Color.purple)
+                        .cornerRadius(4)
+                }
+
                 Text(viewModel.deviceName.isEmpty ? "Device" : viewModel.deviceName)
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
