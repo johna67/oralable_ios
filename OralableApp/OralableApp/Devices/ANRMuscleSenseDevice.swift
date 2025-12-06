@@ -3,17 +3,7 @@
 //  OralableApp
 //
 //  Created by John A Cogan on 04/11/2025.
-//  Updated: December 5, 2025 - Fixed UUIDs to match ANR M40 BLE Design Guide
-//
-
-//
-//  ANRMuscleSenseDevice.swift
-//  OralableApp
-//
-//  Created: November 4, 2025
-//  Updated: December 5, 2025
-//  Concrete implementation of BLEDeviceProtocol for ANR Muscle Sense (M40) device
-//  UUIDs from official ANR M40 BLE Design Guide
+//  Updated: December 6, 2025 - Fixed service discovery stub methods
 //
 
 import Foundation
@@ -132,13 +122,15 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
         // Enable notifications for EMG data (Analog characteristic - 100ms interval)
         if let emgChar = characteristics[Self.analogCharacteristicUUID] {
             peripheral.setNotifyValue(true, for: emgChar)
-            Logger.shared.info("[ANR] Enabled EMG notifications (Analog 0x2A58)")
+            Logger.shared.info("[ANR] ✅ Enabled EMG notifications (Analog 0x2A58)")
+        } else {
+            Logger.shared.warning("[ANR] ⚠️ EMG characteristic not found - cannot enable notifications")
         }
 
         // Enable notifications for battery level
         if let batteryChar = characteristics[Self.batteryLevelUUID] {
             peripheral.setNotifyValue(true, for: batteryChar)
-            Logger.shared.info("[ANR] Enabled battery notifications (0x2A19)")
+            Logger.shared.info("[ANR] ✅ Enabled battery notifications (0x2A19)")
         }
     }
     
@@ -167,12 +159,14 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
         if characteristicUUID == Self.analogCharacteristicUUID {
             if let reading = parseEMGData(data, timestamp: timestamp) {
                 readings.append(reading)
+                Logger.shared.debug("[ANR] 📊 EMG: \(Int(reading.value))")
             }
         }
         // Battery Data (Battery Level 0x2A19)
         else if characteristicUUID == Self.batteryLevelUUID {
             if let reading = parseBatteryData(data, timestamp: timestamp) {
                 readings.append(reading)
+                Logger.shared.debug("[ANR] 🔋 Battery: \(Int(reading.value))%")
             }
         }
         // Device ID (Digital characteristic 0x2A56)
@@ -183,24 +177,31 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
         else if characteristicUUID == Self.firmwareRevisionUUID {
             if let fwVersion = String(data: data, encoding: .utf8) {
                 deviceInfo.firmwareVersion = fwVersion.trimmingCharacters(in: .controlCharacters)
+                Logger.shared.info("[ANR] Firmware: \(deviceInfo.firmwareVersion ?? "?")")
             }
         }
         else if characteristicUUID == Self.hardwareRevisionUUID {
             if let hwVersion = String(data: data, encoding: .utf8) {
                 deviceInfo.hardwareVersion = hwVersion.trimmingCharacters(in: .controlCharacters)
+                Logger.shared.info("[ANR] Hardware: \(deviceInfo.hardwareVersion ?? "?")")
             }
         }
 
-        // PERFORMANCE FIX: Batch update to prevent UI flooding
+        // Batch update to prevent UI flooding
         var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
             latestByType[reading.sensorType] = reading
             sensorReadingsSubject.send(reading)
         }
 
-        // Single batch update to latestReadings (triggers publisher only once per type)
+        // Single batch update to latestReadings
         for (type, reading) in latestByType {
             latestReadings[type] = reading
+        }
+
+        // Send batch for subscribers
+        if !readings.isEmpty {
+            sensorReadingsBatchSubject.send(readings)
         }
 
         return readings
@@ -212,7 +213,6 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
         guard isConnected else {
             throw DeviceError.notConnected("ANR device not connected")
         }
-
         // Commands not implemented for ANR device
     }
 
@@ -220,7 +220,6 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
         guard isConnected else {
             throw DeviceError.notConnected("ANR device not connected")
         }
-
         // Configuration not implemented for ANR device
     }
 
@@ -288,8 +287,6 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
         guard data.count >= 1 else { return }
         let deviceID = data[0]
         Logger.shared.info("[ANR] Device ID: \(deviceID)")
-        // Store device ID in name if needed
-        // deviceInfo.name = "ANR M40 #\(deviceID)"
     }
     
     private func parseBatteryData(_ data: Data, timestamp: Date) -> SensorReading? {
@@ -305,6 +302,42 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
             deviceId: deviceInfo.id.uuidString
         )
     }
+    
+    // MARK: - Service Discovery Methods (Called by DeviceManager)
+    
+    /// Trigger service discovery on the peripheral
+    func discoverServices() async throws {
+        guard let peripheral = peripheral else {
+            throw DeviceError.invalidPeripheral("ANR peripheral is nil")
+        }
+        
+        Logger.shared.info("[ANR] 🔍 Starting service discovery...")
+        
+        // Set delegate to receive callbacks
+        peripheral.delegate = self
+        
+        // Discover ANR M40 services
+        let serviceUUIDs = [
+            Self.automationIOServiceUUID,  // 0x1815 - EMG data
+            Self.batteryServiceUUID,       // 0x180F - Battery
+            Self.deviceInfoServiceUUID     // 0x180A - Device info
+        ]
+        
+        peripheral.discoverServices(serviceUUIDs)
+    }
+    
+    /// Characteristic discovery is handled automatically by didDiscoverServices delegate
+    func discoverCharacteristics() async throws {
+        // This is handled by the CBPeripheralDelegate callback
+        // didDiscoverServices triggers discoverCharacteristics for each service
+        Logger.shared.debug("[ANR] Characteristics discovered via delegate callback")
+    }
+    
+    /// Enable notifications for data streaming
+    func enableNotifications() async throws {
+        Logger.shared.info("[ANR] 🔔 Enabling notifications...")
+        try await startDataStream()
+    }
 }
 
 // MARK: - CBPeripheralDelegate
@@ -312,24 +345,28 @@ class ANRMuscleSenseDevice: NSObject, BLEDeviceProtocol {
 extension ANRMuscleSenseDevice: CBPeripheralDelegate {
     
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard error == nil else {
-            Logger.shared.error("[ANR] Service discovery error: \(error!.localizedDescription)")
+        if let error = error {
+            Logger.shared.error("[ANR] ❌ Service discovery error: \(error.localizedDescription)")
             return
         }
 
-        guard let services = peripheral.services else { return }
+        guard let services = peripheral.services else {
+            Logger.shared.warning("[ANR] ⚠️ No services found")
+            return
+        }
+
+        Logger.shared.info("[ANR] 📡 Found \(services.count) service(s)")
 
         for service in services {
-            // Discover characteristics for all ANR M40 services
             switch service.uuid {
             case Self.automationIOServiceUUID:
-                Logger.shared.info("[ANR] Found Automation IO service (0x1815)")
+                Logger.shared.info("[ANR] ✅ Found Automation IO service (0x1815)")
                 peripheral.discoverCharacteristics([Self.analogCharacteristicUUID, Self.digitalCharacteristicUUID], for: service)
             case Self.batteryServiceUUID:
-                Logger.shared.info("[ANR] Found Battery service (0x180F)")
+                Logger.shared.info("[ANR] ✅ Found Battery service (0x180F)")
                 peripheral.discoverCharacteristics([Self.batteryLevelUUID], for: service)
             case Self.deviceInfoServiceUUID:
-                Logger.shared.info("[ANR] Found Device Info service (0x180A)")
+                Logger.shared.info("[ANR] ✅ Found Device Info service (0x180A)")
                 peripheral.discoverCharacteristics([Self.firmwareRevisionUUID, Self.hardwareRevisionUUID, Self.modelNumberUUID, Self.serialNumberUUID], for: service)
             default:
                 Logger.shared.debug("[ANR] Ignoring unknown service: \(service.uuid)")
@@ -338,28 +375,38 @@ extension ANRMuscleSenseDevice: CBPeripheralDelegate {
     }
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard error == nil else {
-            Logger.shared.error("[ANR] Characteristic discovery error: \(error!.localizedDescription)")
+        if let error = error {
+            Logger.shared.error("[ANR] ❌ Characteristic discovery error: \(error.localizedDescription)")
             return
         }
 
-        guard let characteristics = service.characteristics else { return }
+        guard let characteristics = service.characteristics else {
+            Logger.shared.warning("[ANR] ⚠️ No characteristics found for service \(service.uuid)")
+            return
+        }
+
+        Logger.shared.info("[ANR] 📡 Found \(characteristics.count) characteristic(s) for service \(service.uuid)")
 
         for characteristic in characteristics {
-            Logger.shared.info("[ANR] Found characteristic: \(characteristic.uuid)")
+            Logger.shared.info("[ANR] ✅ Found characteristic: \(characteristic.uuid)")
 
-            // Need to dispatch to main actor for state updates
             Task { @MainActor in
                 self.characteristics[characteristic.uuid] = characteristic
 
                 // Read initial values for readable characteristics
                 switch characteristic.uuid {
                 case Self.batteryLevelUUID:
+                    Logger.shared.debug("[ANR] Reading battery level...")
                     peripheral.readValue(for: characteristic)
                 case Self.firmwareRevisionUUID, Self.hardwareRevisionUUID, Self.modelNumberUUID, Self.serialNumberUUID:
                     peripheral.readValue(for: characteristic)
                 case Self.digitalCharacteristicUUID:
-                    peripheral.readValue(for: characteristic)  // Read device ID
+                    Logger.shared.debug("[ANR] Reading device ID...")
+                    peripheral.readValue(for: characteristic)
+                case Self.analogCharacteristicUUID:
+                    // Enable EMG notifications immediately
+                    Logger.shared.info("[ANR] 🔔 Enabling EMG notifications...")
+                    peripheral.setNotifyValue(true, for: characteristic)
                 default:
                     break
                 }
@@ -372,14 +419,13 @@ extension ANRMuscleSenseDevice: CBPeripheralDelegate {
     }
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard error == nil else {
-            Logger.shared.error("[ANR] Value update error: \(error!.localizedDescription)")
+        if let error = error {
+            Logger.shared.error("[ANR] ❌ Value update error: \(error.localizedDescription)")
             return
         }
 
         guard let data = characteristic.value else { return }
 
-        // Parse data using the existing parseData method
         Task { @MainActor in
             let _ = self.parseData(data, from: characteristic)
         }
@@ -387,25 +433,10 @@ extension ANRMuscleSenseDevice: CBPeripheralDelegate {
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            Logger.shared.error("[ANR] Notification state error: \(error.localizedDescription)")
+            Logger.shared.error("[ANR] ❌ Notification state error for \(characteristic.uuid): \(error.localizedDescription)")
         } else {
-            Logger.shared.info("[ANR] Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid)")
+            let state = characteristic.isNotifying ? "✅ enabled" : "disabled"
+            Logger.shared.info("[ANR] Notifications \(state) for \(characteristic.uuid)")
         }
     }
-    // MARK: - Service Discovery Methods (Day 2 - Stub Implementation)
-        
-        func discoverServices() async throws {
-            // TODO: Implement ANR-specific service discovery
-            Logger.shared.debug("[ANRMuscleSenseDevice] Service discovery not yet implemented")
-        }
-        
-        func discoverCharacteristics() async throws {
-            // TODO: Implement ANR-specific characteristic discovery
-            Logger.shared.debug("[ANRMuscleSenseDevice] Characteristic discovery not yet implemented")
-        }
-        
-        func enableNotifications() async throws {
-            // TODO: Implement ANR-specific notification setup
-            Logger.shared.debug("[ANRMuscleSenseDevice] Notification setup not yet implemented")
-        }
 }
