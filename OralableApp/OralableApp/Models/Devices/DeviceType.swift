@@ -5,6 +5,7 @@
 //  Updated: November 10, 2025
 //  FIXED: Now using correct TGM Service UUID
 //  FIXED: Added DeviceConnectionState enum
+//  FIXED: December 5, 2025 - ANR M40 uses Automation IO Service (0x1815) per design guide
 //  NOTE: SensorType is defined in SensorType.swift (not here)
 //
 
@@ -15,16 +16,17 @@ enum DeviceType: String, CaseIterable, Codable {
     case oralable = "Oralable"
     case anr = "ANR Muscle Sense"
     case demo = "Demo Device"
-    
+
     // MARK: - BLE Configuration
-    
+
     var serviceUUID: CBUUID {
         switch self {
         case .oralable:
             // FIXED: Using correct TGM Service UUID from firmware
             return CBUUID(string: "3A0FF000-98C4-46B2-94AF-1AEE0FD4C48E")
         case .anr:
-            return CBUUID(string: "19B10000-E8F2-537E-4F6C-D104768A1214")
+            // ANR M40 Design Guide: Automation IO Service for EMG data
+            return CBUUID(string: "1815")
         case .demo:
             return CBUUID(string: "00000000-0000-0000-0000-000000000000")
         }
