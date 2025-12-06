@@ -122,6 +122,7 @@ struct HistoricalView: View {
         case "Movement": accelerometerChart
         case "Heart Rate": heartRateChart
         case "SpO2": spo2Chart
+        case "Temperature": temperatureChart
         case "PPG": ppgChart
         default: accelerometerChart
         }
@@ -277,6 +278,43 @@ struct HistoricalView: View {
             .frame(height: 250)
             .chartYAxis {
                 AxisMarks(position: .leading)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: xAxisDateFormat)
+                }
+            }
+        }
+    }
+
+    private var temperatureChart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            Text("Temperature (°C)")
+                .font(designSystem.typography.headline)
+                .foregroundColor(designSystem.colors.textPrimary)
+
+            Chart(viewModel.dataPoints) { point in
+                // averageTemperature is non-optional, filter out default/invalid values
+                if point.averageTemperature > 0 {
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("Temperature", point.averageTemperature)
+                    )
+                    .foregroundStyle(.orange)
+                }
+            }
+            .frame(height: 250)
+            .chartYScale(domain: 30...42)  // Normal body temperature range
+            .chartYAxis {
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let temp = value.as(Double.self) {
+                            Text(String(format: "%.0f°", temp))
+                        }
+                    }
+                }
             }
             .chartXAxis {
                 AxisMarks(values: .automatic) { _ in

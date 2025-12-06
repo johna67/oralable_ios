@@ -3,38 +3,74 @@
 //  OralableApp
 //
 //  Created: December 6, 2025
-//  Purpose: History view with segmented control to filter EMG (ANR M40) and IR (Oralable) sessions
+//  Updated: December 6, 2025 - Restructured with 4-segment picker (EMG/IR/Movement/Temperature)
+//  Purpose: History view with segmented control to filter data by type and device source
 //
 
 import SwiftUI
 
-/// Filter options for session history
-enum SessionHistoryFilter: String, CaseIterable {
-    case all = "All"
+/// Filter options for session history - 4 segments showing data type and device source
+enum HistoryFilter: String, CaseIterable {
     case emg = "EMG"
     case ir = "IR"
+    case movement = "Move"
+    case temperature = "Temp"
 
+    /// Device that produces this data type
+    var deviceSource: String {
+        switch self {
+        case .emg: return "ANR M40"
+        case .ir, .movement, .temperature: return "Oralable"
+        }
+    }
+
+    /// Icon for this data type
     var icon: String {
         switch self {
-        case .all: return "list.bullet"
         case .emg: return "bolt.horizontal.circle.fill"
         case .ir: return "waveform.path.ecg"
+        case .movement: return "figure.walk"
+        case .temperature: return "thermometer.medium"
         }
     }
 
+    /// Color for this data type
     var color: Color {
         switch self {
-        case .all: return .primary
         case .emg: return .blue
         case .ir: return .purple
+        case .movement: return .green
+        case .temperature: return .orange
         }
     }
 
+    /// Empty state title
+    var emptyTitle: String {
+        switch self {
+        case .emg: return "No EMG Data"
+        case .ir: return "No IR Data"
+        case .movement: return "No Movement Data"
+        case .temperature: return "No Temperature Data"
+        }
+    }
+
+    /// Empty state message
+    var emptyMessage: String {
+        switch self {
+        case .emg: return "Connect an ANR M40 device and start recording to capture EMG data."
+        case .ir: return "Connect an Oralable device and start recording to capture IR/PPG data."
+        case .movement: return "Connect an Oralable device and start recording to capture movement data."
+        case .temperature: return "Connect an Oralable device and start recording to capture temperature data."
+        }
+    }
+
+    /// Detailed description for section header
     var description: String {
         switch self {
-        case .all: return "All Sessions"
-        case .emg: return "ANR M40 (EMG)"
-        case .ir: return "Oralable (IR)"
+        case .emg: return "Electromyography (Muscle Electrical Activity)"
+        case .ir: return "Infrared PPG (Photoplethysmography)"
+        case .movement: return "Accelerometer (Motion Detection)"
+        case .temperature: return "Skin Temperature"
         }
     }
 }
@@ -43,31 +79,43 @@ struct SessionHistoryView: View {
     @EnvironmentObject var designSystem: DesignSystem
     @ObservedObject var sessionManager: RecordingSessionManager
 
-    @State private var selectedFilter: SessionHistoryFilter = .all
+    @State private var selectedFilter: HistoryFilter = .ir
 
     /// Filtered sessions based on selected filter
     private var filteredSessions: [RecordingSession] {
         switch selectedFilter {
-        case .all:
-            return sessionManager.sessions
         case .emg:
-            return sessionManager.emgSessions
+            return sessionManager.sessions.filter { $0.deviceType == .anr }
         case .ir:
-            return sessionManager.irSessions
+            return sessionManager.sessions.filter { $0.deviceType == .oralable }
+        case .movement:
+            // Movement data comes from Oralable device (accelerometer)
+            return sessionManager.sessions.filter { $0.deviceType == .oralable && $0.hasAccelerometerData }
+        case .temperature:
+            // Temperature data comes from Oralable device
+            return sessionManager.sessions.filter { $0.deviceType == .oralable && $0.hasTemperatureData }
         }
     }
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Segmented filter picker
+                // 4-segment picker
                 filterPicker
-                    .padding()
-
-                // Session count summary
-                sessionSummary
                     .padding(.horizontal)
-                    .padding(.bottom, 8)
+                    .padding(.top, 8)
+
+                // Source label with description
+                sourceInfo
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+
+                // Session count
+                if !filteredSessions.isEmpty {
+                    sessionCount
+                        .padding(.horizontal)
+                        .padding(.bottom, 4)
+                }
 
                 // Session list or empty state
                 if filteredSessions.isEmpty {
@@ -84,48 +132,50 @@ struct SessionHistoryView: View {
     // MARK: - Subviews
 
     private var filterPicker: some View {
-        Picker("Filter", selection: $selectedFilter) {
-            ForEach(SessionHistoryFilter.allCases, id: \.self) { filter in
-                HStack {
-                    Image(systemName: filter.icon)
-                    Text(filter.rawValue)
-                }
-                .tag(filter)
+        Picker("Data Type", selection: $selectedFilter) {
+            ForEach(HistoryFilter.allCases, id: \.self) { filter in
+                Text(filter.rawValue).tag(filter)
             }
         }
         .pickerStyle(.segmented)
     }
 
-    private var sessionSummary: some View {
+    private var sourceInfo: some View {
+        HStack(spacing: 8) {
+            Image(systemName: selectedFilter.icon)
+                .foregroundColor(selectedFilter.color)
+                .font(.system(size: 16))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(selectedFilter.description)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+
+                Text("Source: \(selectedFilter.deviceSource)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(12)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(10)
+    }
+
+    private var sessionCount: some View {
         HStack {
             Text("\(filteredSessions.count) session\(filteredSessions.count == 1 ? "" : "s")")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-
             Spacer()
-
-            // Show breakdown when "All" is selected
-            if selectedFilter == .all && sessionManager.sessions.count > 0 {
-                HStack(spacing: 12) {
-                    if sessionManager.emgSessions.count > 0 {
-                        Label("\(sessionManager.emgSessions.count)", systemImage: "bolt.horizontal.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    if sessionManager.irSessions.count > 0 {
-                        Label("\(sessionManager.irSessions.count)", systemImage: "waveform.path.ecg")
-                            .font(.caption)
-                            .foregroundColor(.purple)
-                    }
-                }
-            }
         }
     }
 
     private var sessionList: some View {
         List {
             ForEach(filteredSessions) { session in
-                SessionRowView(session: session)
+                SessionRowView(session: session, highlightColor: selectedFilter.color)
             }
             .onDelete(perform: deleteSession)
         }
@@ -140,28 +190,17 @@ struct SessionHistoryView: View {
                 .font(.system(size: 60))
                 .foregroundColor(selectedFilter.color.opacity(0.5))
 
-            Text("No \(selectedFilter.description) Found")
+            Text(selectedFilter.emptyTitle)
                 .font(.headline)
                 .foregroundColor(.primary)
 
-            Text(emptyStateMessage)
+            Text(selectedFilter.emptyMessage)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
             Spacer()
-        }
-    }
-
-    private var emptyStateMessage: String {
-        switch selectedFilter {
-        case .all:
-            return "Start a recording session to see your history here."
-        case .emg:
-            return "Connect an ANR M40 device and start recording to capture EMG data."
-        case .ir:
-            return "Connect an Oralable device and start recording to capture IR data."
         }
     }
 
@@ -179,6 +218,7 @@ struct SessionHistoryView: View {
 
 struct SessionRowView: View {
     let session: RecordingSession
+    var highlightColor: Color = .blue
 
     private var dataTypeColor: Color {
         switch session.deviceType {
@@ -193,7 +233,7 @@ struct SessionRowView: View {
             // Data type indicator
             Image(systemName: session.dataTypeIcon)
                 .font(.title2)
-                .foregroundColor(dataTypeColor)
+                .foregroundColor(highlightColor)
                 .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 4) {

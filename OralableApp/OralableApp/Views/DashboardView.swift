@@ -123,6 +123,30 @@ struct DashboardView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
 
+                    // SpO2 card - CONDITIONAL
+                    if featureFlags.showSpO2Card {
+                        NavigationLink(destination: LazyView(
+                            HistoricalView(
+                                metricType: "SpO2",
+                                historicalDataManager: dependencies.historicalDataManager
+                            )
+                            .environmentObject(designSystem)
+                            .environmentObject(dependencies.historicalDataManager)
+                            .environmentObject(dependencies.sensorDataProcessor)
+                        )) {
+                            HealthMetricCard(
+                                icon: "lungs.fill",
+                                title: "Blood Oxygen",
+                                value: viewModel.spO2 > 0 ? "\(viewModel.spO2)" : "N/A",
+                                unit: viewModel.spO2 > 0 ? "%" : "",
+                                color: .cyan,
+                                sparklineData: [],
+                                showChevron: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
                     // Accelerometer (g-units) card - CONDITIONAL
                     if featureFlags.showAccelerometerCard {
                         AccelerometerCardView(
@@ -133,33 +157,41 @@ struct DashboardView: View {
                         )
                     }
 
-                    // Battery and Temperature - CONDITIONAL
-                    if featureFlags.showBatteryCard || featureFlags.showTemperatureCard {
-                        HStack(spacing: 12) {
-                            if featureFlags.showBatteryCard {
-                                HealthMetricCard(
-                                    icon: batteryIcon(level: viewModel.batteryLevel, charging: viewModel.isCharging),
-                                    title: "Battery",
-                                    value: viewModel.batteryLevel > 0 ? "\(Int(viewModel.batteryLevel))" : "N/A",
-                                    unit: viewModel.batteryLevel > 0 ? "%" : "",
-                                    color: batteryColor(level: viewModel.batteryLevel),
-                                    sparklineData: [],
-                                    showChevron: false
-                                )
-                            }
-
-                            if featureFlags.showTemperatureCard {
-                                HealthMetricCard(
-                                    icon: "thermometer",
-                                    title: "Temperature",
-                                    value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
-                                    unit: viewModel.temperature > 0 ? "°C" : "",
-                                    color: .orange,
-                                    sparklineData: [],
-                                    showChevron: false
-                                )
-                            }
+                    // Temperature card - CONDITIONAL (with history navigation)
+                    if featureFlags.showTemperatureCard {
+                        NavigationLink(destination: LazyView(
+                            HistoricalView(
+                                metricType: "Temperature",
+                                historicalDataManager: dependencies.historicalDataManager
+                            )
+                            .environmentObject(designSystem)
+                            .environmentObject(dependencies.historicalDataManager)
+                            .environmentObject(dependencies.sensorDataProcessor)
+                        )) {
+                            HealthMetricCard(
+                                icon: "thermometer",
+                                title: "Temperature",
+                                value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
+                                unit: viewModel.temperature > 0 ? "°C" : "",
+                                color: .orange,
+                                sparklineData: [],
+                                showChevron: true
+                            )
                         }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
+                    // Battery card - CONDITIONAL (no history)
+                    if featureFlags.showBatteryCard {
+                        HealthMetricCard(
+                            icon: batteryIcon(level: viewModel.batteryLevel, charging: viewModel.isCharging),
+                            title: "Battery",
+                            value: viewModel.batteryLevel > 0 ? "\(Int(viewModel.batteryLevel))" : "N/A",
+                            unit: viewModel.batteryLevel > 0 ? "%" : "",
+                            color: batteryColor(level: viewModel.batteryLevel),
+                            sparklineData: [],
+                            showChevron: false
+                        )
                     }
 
                     // Recording Button

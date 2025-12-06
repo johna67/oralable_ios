@@ -104,6 +104,21 @@ struct RecordingSession: Identifiable, Codable {
             return "gray"
         }
     }
+
+    /// Whether this session has accelerometer data
+    /// For Oralable device sessions, accelerometer is always captured
+    var hasAccelerometerData: Bool {
+        // Oralable device always captures accelerometer data
+        // ANR M40 may also capture accelerometer data
+        return sensorDataCount > 0
+    }
+
+    /// Whether this session has temperature data
+    /// Only Oralable device captures temperature
+    var hasTemperatureData: Bool {
+        // Temperature is only captured by Oralable device
+        return deviceType == .oralable && sensorDataCount > 0
+    }
 }
 
 /// Recording session status
