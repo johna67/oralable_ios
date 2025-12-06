@@ -18,7 +18,7 @@ protocol RecordingSessionManagerProtocol: AnyObject {
     var sessions: [RecordingSession] { get }
 
     // MARK: - Session Management
-    func startSession(deviceID: String?, deviceName: String?) throws -> RecordingSession
+    func startSession(deviceID: String?, deviceName: String?, deviceType: DeviceType?) throws -> RecordingSession
     func stopSession() throws
     func pauseSession() throws
     func resumeSession() throws

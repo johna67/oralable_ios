@@ -24,6 +24,9 @@ struct RecordingSession: Identifiable, Codable {
     var deviceID: String?
     var deviceName: String?
 
+    /// Device type that recorded this session (ANR M40 = EMG, Oralable = IR)
+    var deviceType: DeviceType?
+
     // Counts of collected data
     var sensorDataCount: Int = 0
     var ppgDataCount: Int = 0
@@ -42,13 +45,15 @@ struct RecordingSession: Identifiable, Codable {
         startTime: Date = Date(),
         status: RecordingStatus = .recording,
         deviceID: String? = nil,
-        deviceName: String? = nil
+        deviceName: String? = nil,
+        deviceType: DeviceType? = nil
     ) {
         self.id = id
         self.startTime = startTime
         self.status = status
         self.deviceID = deviceID
         self.deviceName = deviceName
+        self.deviceType = deviceType
     }
 
     /// Format duration as HH:MM:SS
@@ -61,6 +66,42 @@ struct RecordingSession: Identifiable, Codable {
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
+        }
+    }
+
+    /// Display label for the data type (EMG or IR)
+    var dataTypeLabel: String {
+        switch deviceType {
+        case .anr:
+            return "EMG"
+        case .oralable:
+            return "IR"
+        default:
+            return "Unknown"
+        }
+    }
+
+    /// Icon for the data type
+    var dataTypeIcon: String {
+        switch deviceType {
+        case .anr:
+            return "bolt.horizontal.circle.fill"
+        case .oralable:
+            return "waveform.path.ecg"
+        default:
+            return "questionmark.circle"
+        }
+    }
+
+    /// Color for the data type
+    var dataTypeColorName: String {
+        switch deviceType {
+        case .anr:
+            return "blue"
+        case .oralable:
+            return "purple"
+        default:
+            return "gray"
         }
     }
 }
@@ -91,6 +132,23 @@ class RecordingSessionManager: ObservableObject {
     @Published var currentSession: RecordingSession?
     @Published var sessions: [RecordingSession] = []
 
+    // MARK: - Filtered Session Lists
+
+    /// Sessions recorded with ANR M40 (EMG data)
+    var emgSessions: [RecordingSession] {
+        sessions.filter { $0.deviceType == .anr }
+    }
+
+    /// Sessions recorded with Oralable device (IR data)
+    var irSessions: [RecordingSession] {
+        sessions.filter { $0.deviceType == .oralable }
+    }
+
+    /// Sessions with unknown device type
+    var unknownSessions: [RecordingSession] {
+        sessions.filter { $0.deviceType == nil }
+    }
+
     private let fileManager = FileManager.default
     private var sessionDataBuffer: [String] = []
     private let maxBufferSize = 100
@@ -110,7 +168,7 @@ class RecordingSessionManager: ObservableObject {
     // MARK: - Session Management
 
     /// Start a new recording session
-    func startSession(deviceID: String?, deviceName: String?) throws -> RecordingSession {
+    func startSession(deviceID: String?, deviceName: String?, deviceType: DeviceType? = nil) throws -> RecordingSession {
         // Check if a session is already in progress
         guard currentSession == nil else {
             throw DeviceError.recordingAlreadyInProgress
@@ -118,7 +176,8 @@ class RecordingSessionManager: ObservableObject {
 
         let session = RecordingSession(
             deviceID: deviceID,
-            deviceName: deviceName
+            deviceName: deviceName,
+            deviceType: deviceType
         )
 
         currentSession = session
