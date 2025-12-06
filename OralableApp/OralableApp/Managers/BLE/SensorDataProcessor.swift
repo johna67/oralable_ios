@@ -4,8 +4,10 @@
 //
 //  Created: November 19, 2025
 //  FIXED: November 28, 2025 - Removed * 1000 multiplication causing Int16 overflow
+//  FIXED: December 5, 2025 - Added EMG support for ANR M40 device (treat .emg like .ppgInfrared)
 //  Responsibility: Process and aggregate raw sensor readings from BLE devices
 //  - PPG data processing (Red, IR, Green channels)
+//  - EMG data processing (ANR M40 - treated as ppgInfrared equivalent)
 //  - Accelerometer data aggregation
 //  - Temperature processing
 //  - Battery level processing
@@ -101,7 +103,8 @@ class SensorDataProcessor: ObservableObject {
                 let tempData = TemperatureData(celsius: reading.value, timestamp: reading.timestamp)
                 tempUpdates.append((reading.value, tempData))
 
-            case .ppgRed, .ppgInfrared, .ppgGreen:
+            case .ppgRed, .ppgInfrared, .ppgGreen, .emg:
+                // EMG from ANR M40 is treated identically to ppgInfrared for muscle activity
                 hasPPGData = true
 
             case .accelerometerX, .accelerometerY, .accelerometerZ:
@@ -160,7 +163,7 @@ class SensorDataProcessor: ObservableObject {
         var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
         var irSamples: [UInt32] = []
 
-        for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen].contains(reading.sensorType) {
+        for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen, .emg].contains(reading.sensorType) {
             // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
             let timestamp = reading.timestamp
             var current = grouped[timestamp] ?? (0, 0, 0)
@@ -169,7 +172,8 @@ class SensorDataProcessor: ObservableObject {
             case .ppgRed:
                 current.red = Int32(reading.value)
                 await MainActor.run { self.ppgRedValue = reading.value }
-            case .ppgInfrared:
+            case .ppgInfrared, .emg:
+                // EMG from ANR M40 is stored in IR channel (equivalent signal type)
                 current.ir = Int32(reading.value)
                 await MainActor.run { self.ppgIRValue = reading.value }
                 if reading.value > 0 {
@@ -372,7 +376,7 @@ class SensorDataProcessor: ObservableObject {
         for reading in readings {
             switch reading.sensorType {
             case .ppgRed: ppgRed = Int32(reading.value)
-            case .ppgInfrared: ppgIR = Int32(reading.value)
+            case .ppgInfrared, .emg: ppgIR = Int32(reading.value)  // EMG treated as IR equivalent
             case .ppgGreen: ppgGreen = Int32(reading.value)
             case .accelerometerX: accelX = Int16(reading.value)  // ✅ FIXED: Removed * 1000
             case .accelerometerY: accelY = Int16(reading.value)  // ✅ FIXED: Removed * 1000
