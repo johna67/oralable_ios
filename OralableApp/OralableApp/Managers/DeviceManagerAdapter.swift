@@ -155,7 +155,10 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
         // Update battery
         if let reading = readings[.battery] {
             batteryLevel = reading.value
-            Logger.shared.info("[DeviceManagerAdapter] 🔋 Battery: \(Int(batteryLevel))%")
+            // ✅ FIXED: Also update SensorDataProcessor.batteryLevel so CSV export gets the correct value
+            // Battery readings come via latestReadings but are often throttled out of readingsBatchPublisher
+            sensorDataProcessor.batteryLevel = reading.value
+            Logger.shared.info("[DeviceManagerAdapter] 🔋 Battery: \(Int(batteryLevel))% (synced to SensorDataProcessor)")
         }
 
         // Update PPG values

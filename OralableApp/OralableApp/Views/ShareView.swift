@@ -239,14 +239,37 @@ struct ShareView: View {
 
     private func generateCSVFile() async -> URL? {
         let sensorData = sensorDataProcessor.sensorDataHistory
-        var csvString = "Timestamp,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate\n"
+        var csvString = "Timestamp,Device_Type,EMG,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate\n"
 
         let dateFormatter = ISO8601DateFormatter()
 
         for data in sensorData {
             let timestamp = dateFormatter.string(from: data.timestamp)
             let heartRate = data.heartRate?.bpm ?? 0
-            let line = "\(timestamp),\(data.ppg.ir),\(data.ppg.red),\(data.ppg.green),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.temperature.celsius),\(data.battery.percentage),\(heartRate)\n"
+
+            // Device type determines which columns get data
+            let deviceTypeName: String
+            let emgValue: Int32
+            let ppgIRValue: Int32
+
+            switch data.deviceType {
+            case .anr:
+                // ANR M40: EMG data is stored in ppg.ir, no actual PPG
+                deviceTypeName = "ANR M40"
+                emgValue = data.ppg.ir  // EMG muscle activity value
+                ppgIRValue = 0          // ANR doesn't have PPG
+            case .oralable:
+                // Oralable: PPG data, no EMG
+                deviceTypeName = "Oralable"
+                emgValue = 0            // Oralable doesn't have EMG
+                ppgIRValue = data.ppg.ir
+            case .demo:
+                deviceTypeName = "Demo"
+                emgValue = 0
+                ppgIRValue = data.ppg.ir
+            }
+
+            let line = "\(timestamp),\(deviceTypeName),\(emgValue),\(ppgIRValue),\(data.ppg.red),\(data.ppg.green),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.temperature.celsius),\(data.battery.percentage),\(heartRate)\n"
             csvString.append(line)
         }
 

@@ -268,6 +268,15 @@ class SensorDataProcessor: ObservableObject {
 
     /// Update legacy sensor data history (for backward compatibility)
     func updateLegacySensorData(with readings: [SensorReading]) async {
+        // ✅ FIXED: Extract battery reading from entire batch FIRST (before grouping by timestamp)
+        // Battery readings often have different timestamps than PPG/accel readings
+        if let batteryReading = readings.first(where: { $0.sensorType == .battery }) {
+            await MainActor.run {
+                self.batteryLevel = batteryReading.value
+                Logger.shared.debug("[SensorDataProcessor] 🔋 Updated batteryLevel from batch: \(Int(batteryReading.value))%")
+            }
+        }
+
         // Group readings by exact timestamp (preserve offsets)
         var groupedReadings: [Date: [SensorReading]] = [:]
         for reading in readings {
@@ -369,24 +378,46 @@ class SensorDataProcessor: ObservableObject {
     private func convertToSensorData(readings: [SensorReading], timestamp: Date) -> SensorData {
         var ppgRed: Int32 = 0, ppgIR: Int32 = 0, ppgGreen: Int32 = 0
         var accelX: Int16 = 0, accelY: Int16 = 0, accelZ: Int16 = 0
-        var temperature: Double = 36.0, battery: Int = 0
+        var temperature: Double = 36.0
+        var batteryFromReading: Int? = nil  // Track if we got a battery reading
         var heartRate: Double? = nil, heartRateQuality: Double? = nil
         var spo2: Double? = nil, spo2Quality: Double? = nil
+        var detectedDeviceType: DeviceType = .oralable
+        var hasEMG = false
 
         for reading in readings {
             switch reading.sensorType {
             case .ppgRed: ppgRed = Int32(reading.value)
-            case .ppgInfrared, .emg: ppgIR = Int32(reading.value)  // EMG treated as IR equivalent
+            case .ppgInfrared: ppgIR = Int32(reading.value)
+            case .emg:
+                // EMG data indicates ANR M40 device
+                ppgIR = Int32(reading.value)
+                hasEMG = true
+                detectedDeviceType = .anr
             case .ppgGreen: ppgGreen = Int32(reading.value)
             case .accelerometerX: accelX = Int16(reading.value)  // ✅ FIXED: Removed * 1000
             case .accelerometerY: accelY = Int16(reading.value)  // ✅ FIXED: Removed * 1000
             case .accelerometerZ: accelZ = Int16(reading.value)  // ✅ FIXED: Removed * 1000
             case .temperature: temperature = reading.value
-            case .battery: battery = Int(reading.value)
+            case .battery: batteryFromReading = Int(reading.value)
             case .heartRate: heartRate = reading.value; heartRateQuality = reading.quality ?? 0.8
             case .spo2: spo2 = reading.value; spo2Quality = reading.quality ?? 0.8
+            case .muscleActivity:
+                // Muscle activity also indicates ANR M40 device
+                hasEMG = true
+                detectedDeviceType = .anr
             default: break
             }
+        }
+
+        // ✅ FIXED: Use latest known battery level if no battery reading in this timestamp group
+        let battery = batteryFromReading ?? Int(self.batteryLevel)
+
+        // Debug: Log battery source
+        if batteryFromReading != nil {
+            Logger.shared.debug("[SensorDataProcessor] Battery from reading: \(battery)%")
+        } else if self.batteryLevel > 0 {
+            Logger.shared.debug("[SensorDataProcessor] Battery from cached level: \(battery)% (self.batteryLevel=\(Int(self.batteryLevel)))")
         }
 
         let ppgData = PPGData(red: ppgRed, ir: ppgIR, green: ppgGreen, timestamp: timestamp)
@@ -403,7 +434,8 @@ class SensorDataProcessor: ObservableObject {
             temperature: tempData,
             battery: batteryData,
             heartRate: heartRateData,
-            spo2: spo2Data
+            spo2: spo2Data,
+            deviceType: detectedDeviceType
         )
     }
     

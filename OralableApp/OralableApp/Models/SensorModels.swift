@@ -14,17 +14,20 @@ import Foundation
 struct SensorData: Identifiable, Codable {
     let id: UUID
     let timestamp: Date
-    
+
     // Raw sensor data
     let ppg: PPGData
     let accelerometer: AccelerometerData
     let temperature: TemperatureData
     let battery: BatteryData
-    
+
     // Calculated metrics
     let heartRate: HeartRateData?
-    let spo2: SpO2Data?  // NEW: Blood oxygen saturation
-    
+    let spo2: SpO2Data?  // Blood oxygen saturation
+
+    // Device identification
+    let deviceType: DeviceType
+
     init(
         id: UUID = UUID(),
         timestamp: Date = Date(),
@@ -33,7 +36,8 @@ struct SensorData: Identifiable, Codable {
         temperature: TemperatureData,
         battery: BatteryData,
         heartRate: HeartRateData? = nil,
-        spo2: SpO2Data? = nil
+        spo2: SpO2Data? = nil,
+        deviceType: DeviceType = .oralable
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -43,6 +47,7 @@ struct SensorData: Identifiable, Codable {
         self.battery = battery
         self.heartRate = heartRate
         self.spo2 = spo2
+        self.deviceType = deviceType
     }
     
     // MARK: - Mock Data
