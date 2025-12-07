@@ -49,14 +49,13 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 12) {
-                    // Connection readiness indicator - UPDATED
-                    connectionReadinessIndicator(viewModel: viewModel)
+                    // Dual device connection status indicator
+                    dualDeviceStatusIndicator(viewModel: viewModel)
 
-                    // Muscle Activity - Primary card (ALWAYS SHOWN)
-                    // Shows "EMG Activity" for ANR M40, "Muscle Activity" for Oralable
+                    // PPG Card (Oralable) - Shows IR sensor data
                     NavigationLink(destination: LazyView(
                         HistoricalView(
-                            metricType: viewModel.muscleActivityLabel,
+                            metricType: "IR Activity",
                             historicalDataManager: dependencies.historicalDataManager
                         )
                         .environmentObject(designSystem)
@@ -64,12 +63,34 @@ struct DashboardView: View {
                         .environmentObject(dependencies.sensorDataProcessor)
                     )) {
                         HealthMetricCard(
-                            icon: viewModel.muscleActivityIcon,
-                            title: viewModel.muscleActivityLabel,
-                            value: viewModel.isConnected ? String(format: "%.0f", max(0, viewModel.muscleActivity)) : "N/A",
-                            unit: viewModel.signalSourceLabel,
-                            color: viewModel.connectedDeviceType == .anr ? .blue : .purple,
-                            sparklineData: viewModel.muscleActivityHistory,
+                            icon: "waveform.path.ecg",
+                            title: "PPG Sensor",
+                            value: viewModel.oralableConnected ? String(format: "%.0f", max(0, viewModel.ppgIRValue)) : "N/A",
+                            unit: viewModel.oralableConnected ? "Oralable IR" : "Not Connected",
+                            color: .purple,
+                            sparklineData: viewModel.ppgHistory,
+                            showChevron: true
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    // EMG Card (ANR M40) - Shows EMG muscle activity
+                    NavigationLink(destination: LazyView(
+                        HistoricalView(
+                            metricType: "EMG Activity",
+                            historicalDataManager: dependencies.historicalDataManager
+                        )
+                        .environmentObject(designSystem)
+                        .environmentObject(dependencies.historicalDataManager)
+                        .environmentObject(dependencies.sensorDataProcessor)
+                    )) {
+                        HealthMetricCard(
+                            icon: "bolt.fill",
+                            title: "EMG Sensor",
+                            value: viewModel.anrConnected ? String(format: "%.0f", max(0, viewModel.emgValue)) : "N/A",
+                            unit: viewModel.anrConnected ? "ANR M40 µV" : "Not Connected",
+                            color: .blue,
+                            sparklineData: viewModel.emgHistory,
                             showChevron: true
                         )
                     }
@@ -231,69 +252,67 @@ struct DashboardView: View {
         .onDisappear { viewModel.stopMonitoring() }
     }
 
-    // MARK: - Connection Readiness Indicator - UPDATED
-    private func connectionReadinessIndicator(viewModel: DashboardViewModel) -> some View {
-        HStack(spacing: 8) {
-            // Status dot with readiness color
-            Circle()
-                .fill(readinessColor)
-                .frame(width: 10, height: 10)
-
-            // Display readiness text
-            Text(deviceManager.primaryDeviceReadiness.displayText)
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
-
-            // Show device type badge and name if connected
-            if deviceManager.primaryDeviceReadiness.isConnected {
-                Text("•")
-                    .foregroundColor(.secondary)
-
-                // Device type badge (ANR or Oralable)
-                if let deviceType = viewModel.connectedDeviceType {
-                    Text(deviceType == .anr ? "ANR" : "PPG")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(deviceType == .anr ? Color.blue : Color.purple)
-                        .cornerRadius(4)
-                }
-
-                Text(viewModel.deviceName.isEmpty ? "Device" : viewModel.deviceName)
+    // MARK: - Dual Device Status Indicator
+    private func dualDeviceStatusIndicator(viewModel: DashboardViewModel) -> some View {
+        VStack(spacing: 6) {
+            // Oralable status row
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(viewModel.oralableConnected ? Color.green : Color.gray)
+                    .frame(width: 10, height: 10)
+                
+                Text("PPG")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.purple)
+                    .cornerRadius(4)
+                
+                Text("Oralable")
                     .font(.system(size: 14))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text(viewModel.oralableConnected ? "Ready" : "Not Connected")
+                    .font(.system(size: 12))
+                    .foregroundColor(viewModel.oralableConnected ? .green : .secondary)
             }
-
-            Spacer()
-
-            // Connect button only if disconnected
-            if !viewModel.isConnected {
-                Button(action: { viewModel.startScanning() }) {
-                    Text("Connect")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.blue)
-                }
+            
+            // ANR M40 status row
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(viewModel.anrConnected ? Color.green : (viewModel.anrFailed ? Color.red : Color.gray))
+                    .frame(width: 10, height: 10)
+                
+                Text("EMG")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue)
+                    .cornerRadius(4)
+                
+                Text("ANR M40")
+                    .font(.system(size: 14))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text(viewModel.anrConnected ? "Ready" : (viewModel.anrFailed ? "Failed" : "Not Connected"))
+                    .font(.system(size: 12))
+                    .foregroundColor(viewModel.anrConnected ? .green : (viewModel.anrFailed ? .red : .secondary))
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 1)
     }
 
     // MARK: - Helper Functions
-    
-    private var readinessColor: Color {
-        switch deviceManager.primaryDeviceReadiness {
-        case .ready:
-            return .green
-        case .failed:
-            return .red
-        case .disconnected:
-            return .gray
-        default:
-            return .orange
-        }
-    }
     
     private func batteryIcon(level: Double, charging: Bool) -> String {
         if charging { return "battery.100.bolt" }
@@ -586,11 +605,3 @@ struct DashboardView_Previews: PreviewProvider {
             .environmentObject(designSystem)
     }
 }
-
-// ==============================================================================
-// MARK: - V2 FEATURES (Commented out for future use)
-// ==============================================================================
-
-/*
-// (keeping all your V2 commented code as-is)
-*/

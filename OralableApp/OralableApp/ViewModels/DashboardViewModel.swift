@@ -3,8 +3,7 @@
 //  OralableApp
 //
 //  Complete ViewModel with MAM state detection
-//  Updated: November 29, 2025 - Refactored for RecordingStateCoordinator
-//  Fixed: Timer memory leak, uses single source of truth for recording state
+//  Updated: December 7, 2025 - Added dual-device support (Oralable + ANR M40)
 //
 
 import SwiftUI
@@ -20,6 +19,17 @@ class DashboardViewModel: ObservableObject {
     @Published var deviceName: String = ""
     @Published var batteryLevel: Double = 0.0
     @Published var connectedDeviceType: DeviceType? = nil
+
+    // MARK: - Dual Device Connection Status
+    @Published var oralableConnected: Bool = false
+    @Published var anrConnected: Bool = false
+    @Published var anrFailed: Bool = false
+
+    // MARK: - Dual Device Sensor Values
+    @Published var ppgIRValue: Double = 0.0      // IR sensor value from Oralable
+    @Published var emgValue: Double = 0.0        // EMG value from ANR M40
+    @Published var ppgHistory: [Double] = []     // PPG sparkline data
+    @Published var emgHistory: [Double] = []     // EMG sparkline data
 
     // Metrics
     @Published var heartRate: Int = 0
@@ -137,7 +147,6 @@ class DashboardViewModel: ObservableObject {
     }
 
     deinit {
-        // Cancellables will be cleaned up automatically
         Logger.shared.info("[DashboardViewModel] deinit - cleaning up subscriptions")
     }
 
@@ -185,7 +194,6 @@ class DashboardViewModel: ObservableObject {
         ThresholdSettings.shared.$movementThreshold
             .sink { [weak self] newThreshold in
                 guard let self = self else { return }
-                // Re-evaluate isMoving with new threshold
                 self.isMoving = self.movementVariability > newThreshold
             }
             .store(in: &cancellables)
@@ -203,8 +211,7 @@ class DashboardViewModel: ObservableObject {
             }
             .assign(to: &$sessionDuration)
 
-        // Connection state from DeviceManager - simplified to just check if devices connected
-        // Data flow (accelerometer, PPG, etc.) is the real indicator of connection
+        // Connection state from DeviceManager - track both devices separately
         deviceManager.$connectedDevices
             .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] devices in
@@ -212,31 +219,39 @@ class DashboardViewModel: ObservableObject {
                 let wasConnected = self.isConnected
                 self.isConnected = !devices.isEmpty
 
-                // Track connected device type for UI differentiation
+                // Track each device type separately for dual-device UI
+                self.oralableConnected = devices.contains { $0.type == .oralable }
+                self.anrConnected = devices.contains { $0.type == .anr }
+
+                // Track connected device type for UI differentiation (primary device)
                 if let primaryDevice = devices.first {
                     self.connectedDeviceType = primaryDevice.type
-                    Logger.shared.info("[DashboardViewModel] 📱 Connected device type: \(primaryDevice.type.rawValue)")
+                    Logger.shared.info("[DashboardViewModel] 📱 Connected devices: Oralable=\(self.oralableConnected), ANR=\(self.anrConnected)")
                 } else {
                     self.connectedDeviceType = nil
                 }
 
                 Logger.shared.debug("[DashboardViewModel] connectedDevices changed: \(devices.count) devices, isConnected: \(self.isConnected)")
                 if wasConnected && !self.isConnected {
-                    // Only reset when transitioning from connected to disconnected
                     self.resetMetrics()
                 }
             }
             .store(in: &cancellables)
 
-        // Also watch readiness state changes for logging
-        deviceManager.$deviceReadiness
-            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] readiness in
-                guard let self = self else { return }
-                let primaryReadiness = self.deviceManager.primaryDeviceReadiness
-                Logger.shared.debug("[DashboardViewModel] deviceReadiness changed: primary=\(primaryReadiness)")
-            }
-            .store(in: &cancellables)
+        // Track device readiness changes for logging
+                deviceManager.$deviceReadiness
+                    .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+                    .sink { [weak self] readiness in
+                        guard let self = self else { return }
+                        let primaryReadiness = self.deviceManager.primaryDeviceReadiness
+                        Logger.shared.debug("[DashboardViewModel] deviceReadiness changed: primary=\(primaryReadiness)")
+                        
+                        // Reset anrFailed when ANR connects successfully
+                        if self.anrConnected {
+                            self.anrFailed = false
+                        }
+                    }
+                    .store(in: &cancellables)
 
         // Device name from primary device
         deviceManager.$primaryDevice
@@ -280,11 +295,27 @@ class DashboardViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Subscribe to PPG data for waveform
+        // Subscribe to PPG IR data for Oralable card
+        deviceManagerAdapter.ppgIRValuePublisher
+            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] value in
+                self?.processPPGIRData(value)
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to PPG Red data for waveform (legacy)
         deviceManagerAdapter.ppgRedValuePublisher
             .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] value in
                 self?.processPPGData(value)
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to EMG data for ANR M40 card
+        deviceManagerAdapter.emgValuePublisher
+            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] value in
+                self?.processEMGData(value)
             }
             .store(in: &cancellables)
 
@@ -314,21 +345,61 @@ class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    // MARK: - PPG IR Data Processing (Oralable)
+    private func processPPGIRData(_ value: Double) {
+        ppgIRValue = value
+
+        ppgHistory.append(value)
+        if ppgHistory.count > 20 {
+            ppgHistory.removeFirst()
+        }
+
+        // Also update legacy muscle activity if Oralable is the primary device
+        if connectedDeviceType == .oralable {
+            muscleActivity = value
+            muscleActivityHistory.append(value)
+            if muscleActivityHistory.count > 20 {
+                muscleActivityHistory.removeFirst()
+            }
+        }
+    }
+
+    // MARK: - EMG Data Processing (ANR M40)
+    private func processEMGData(_ value: Double) {
+        emgValue = value
+
+        emgHistory.append(value)
+        if emgHistory.count > 20 {
+            emgHistory.removeFirst()
+        }
+
+        // Also update legacy muscle activity if ANR is the primary device
+        if connectedDeviceType == .anr {
+            muscleActivity = value
+            muscleActivityHistory.append(value)
+            if muscleActivityHistory.count > 20 {
+                muscleActivityHistory.removeFirst()
+            }
+        }
+    }
+
     private func processPPGData(_ value: Double) {
         ppgData.append(value)
         if ppgData.count > 100 {
             ppgData.removeFirst()
         }
 
-        muscleActivity = value
-        muscleActivityHistory.append(value)
-        if muscleActivityHistory.count > 20 {
-            muscleActivityHistory.removeFirst()
+        // Legacy: only update muscle activity from PPG Red if no IR data flowing
+        if ppgIRValue == 0 && connectedDeviceType == .oralable {
+            muscleActivity = value
+            muscleActivityHistory.append(value)
+            if muscleActivityHistory.count > 20 {
+                muscleActivityHistory.removeFirst()
+            }
         }
     }
 
     private func processAccelerometerData(x: Double, y: Double, z: Double) {
-        // Store raw values for g-unit conversion
         accelXRaw = Int16(clamping: Int(x))
         accelYRaw = Int16(clamping: Int(y))
         accelZRaw = Int16(clamping: Int(z))
@@ -340,17 +411,13 @@ class DashboardViewModel: ObservableObject {
             accelerometerData.removeFirst()
         }
 
-        // Update movement value (latest magnitude)
         movementValue = magnitude
 
-        // Calculate variability from recent samples (standard deviation)
         if accelerometerData.count >= 10 {
             let recentSamples = Array(accelerometerData.suffix(20))
             let mean = recentSamples.reduce(0, +) / Double(recentSamples.count)
             let variance = recentSamples.map { pow($0 - mean, 2) }.reduce(0, +) / Double(recentSamples.count)
             movementVariability = sqrt(variance)
-
-            // Update isMoving based on variability threshold (from user settings)
             isMoving = movementVariability > movementActiveThreshold
         }
     }
@@ -359,29 +426,18 @@ class DashboardViewModel: ObservableObject {
         deviceStateDescription = stateResult.state.rawValue
         deviceStateConfidence = stateResult.confidence
 
-        // NOTE: isMoving is now calculated directly from accelerometer variability
-        // in processAccelerometerData(), not from DeviceStateDetector.
-        // This prevents race conditions between the two update sources.
-
         switch stateResult.state {
         case .onChargerStatic:
             isCharging = true
-            // isMoving set by processAccelerometerData()
             positionQuality = "Off"
-
         case .offChargerStatic:
             isCharging = false
-            // isMoving set by processAccelerometerData()
             positionQuality = "Off"
-
         case .inMotion:
             isCharging = false
-            // isMoving set by processAccelerometerData()
             positionQuality = "Adjust"
-
         case .onCheek:
             isCharging = false
-            // isMoving set by processAccelerometerData()
             if stateResult.confidence >= 0.8 {
                 positionQuality = "Good"
             } else if stateResult.confidence >= 0.6 {
@@ -389,10 +445,8 @@ class DashboardViewModel: ObservableObject {
             } else {
                 positionQuality = "Off"
             }
-
         case .unknown:
             isCharging = false
-            // isMoving set by processAccelerometerData()
             positionQuality = "Off"
         }
     }
@@ -415,6 +469,15 @@ class DashboardViewModel: ObservableObject {
         positionQuality = "Off"
         deviceStateDescription = "Unknown"
         deviceStateConfidence = 0.0
+
+        // Reset dual-device specific values
+        ppgIRValue = 0.0
+        emgValue = 0.0
+        ppgHistory = []
+        emgHistory = []
+        oralableConnected = false
+        anrConnected = false
+        anrFailed = false
     }
 }
 

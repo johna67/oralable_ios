@@ -4,7 +4,7 @@
 //
 //  Created: November 24, 2025
 //  Purpose: Adapts DeviceManager to BLEManagerProtocol for compatibility with existing ViewModels
-//  Updated: November 29, 2025 - Added diagnostic logging for data flow
+//  Updated: December 7, 2025 - Added EMG support for ANR M40 dual-device
 //
 
 import Foundation
@@ -44,6 +44,7 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
     @Published var ppgRedValue: Double = 0.0
     @Published var ppgIRValue: Double = 0.0
     @Published var ppgGreenValue: Double = 0.0
+    @Published var emgValue: Double = 0.0  // EMG value from ANR M40
     @Published var isRecording: Bool = false
     @Published var deviceState: DeviceStateResult?
 
@@ -159,6 +160,18 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
             // Battery readings come via latestReadings but are often throttled out of readingsBatchPublisher
             sensorDataProcessor.batteryLevel = reading.value
             Logger.shared.info("[DeviceManagerAdapter] 🔋 Battery: \(Int(batteryLevel))% (synced to SensorDataProcessor)")
+        }
+
+        // Update EMG value (ANR M40)
+        if let reading = readings[.emg] {
+            emgValue = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] ⚡ EMG: \(Int(emgValue)) µV")
+        }
+
+        // Also check for muscleActivity sensor type (alternative EMG source)
+        if let reading = readings[.muscleActivity] {
+            emgValue = reading.value
+            Logger.shared.debug("[DeviceManagerAdapter] ⚡ Muscle Activity (EMG): \(Int(emgValue)) µV")
         }
 
         // Update PPG values
@@ -332,6 +345,7 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
     var ppgRedValuePublisher: Published<Double>.Publisher { $ppgRedValue }
     var ppgIRValuePublisher: Published<Double>.Publisher { $ppgIRValue }
     var ppgGreenValuePublisher: Published<Double>.Publisher { $ppgGreenValue }
+    var emgValuePublisher: Published<Double>.Publisher { $emgValue }  // EMG publisher for ANR M40
     var accelXPublisher: Published<Double>.Publisher { $accelX }
     var accelYPublisher: Published<Double>.Publisher { $accelY }
     var accelZPublisher: Published<Double>.Publisher { $accelZ }
