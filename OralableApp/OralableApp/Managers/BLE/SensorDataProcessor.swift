@@ -5,12 +5,13 @@
 //  Created: November 19, 2025
 //  FIXED: November 28, 2025 - Removed * 1000 multiplication causing Int16 overflow
 //  FIXED: December 5, 2025 - Added EMG support for ANR M40 device (treat .emg like .ppgInfrared)
+//  FIXED: December 8, 2025 - Per-device battery tracking to fix dual-device battery export
 //  Responsibility: Process and aggregate raw sensor readings from BLE devices
 //  - PPG data processing (Red, IR, Green channels)
 //  - EMG data processing (ANR M40 - treated as ppgInfrared equivalent)
 //  - Accelerometer data aggregation
 //  - Temperature processing
-//  - Battery level processing
+//  - Battery level processing (per-device)
 //  - Circular buffer management for each sensor type
 //
 
@@ -44,7 +45,11 @@ class SensorDataProcessor: ObservableObject {
     @Published var ppgRedValue: Double = 0.0
     @Published var ppgIRValue: Double = 0.0
     @Published var ppgGreenValue: Double = 0.0
-    @Published var batteryLevel: Double = 0.0
+    
+    // ✅ FIXED: Per-device battery tracking
+    @Published var batteryLevel: Double = 0.0  // Legacy: used by DeviceManagerAdapter for UI display
+    private var batteryLevelOralable: Double = 0.0  // Battery for Oralable device
+    private var batteryLevelANR: Double = 0.0       // Battery for ANR M40 device
 
     // MARK: - Private Properties
 
@@ -58,7 +63,35 @@ class SensorDataProcessor: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        Logger.shared.info("[SensorDataProcessor] Initialized")
+        Logger.shared.info("[SensorDataProcessor] Initialized with per-device battery tracking")
+    }
+    
+    // MARK: - Per-Device Battery Methods
+    
+    /// Update battery level for a specific device type
+    func updateBatteryLevel(_ level: Double, for deviceType: DeviceType) {
+        switch deviceType {
+        case .oralable:
+            batteryLevelOralable = level
+            Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery: \(Int(level))%")
+        case .anr:
+            batteryLevelANR = level
+            Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: \(Int(level))%")
+        case .demo:
+            batteryLevelOralable = level  // Demo uses Oralable slot
+        }
+        // Also update legacy batteryLevel for UI display (use most recent)
+        batteryLevel = level
+    }
+    
+    /// Get cached battery level for a specific device type
+    func getBatteryLevel(for deviceType: DeviceType) -> Double {
+        switch deviceType {
+        case .oralable, .demo:
+            return batteryLevelOralable
+        case .anr:
+            return batteryLevelANR
+        }
     }
 
     // MARK: - Public Processing Methods
@@ -268,12 +301,33 @@ class SensorDataProcessor: ObservableObject {
 
     /// Update legacy sensor data history (for backward compatibility)
     func updateLegacySensorData(with readings: [SensorReading]) async {
-        // ✅ FIXED: Extract battery reading from entire batch FIRST (before grouping by timestamp)
+        // ✅ FIXED: Extract battery readings and determine device type FIRST
         // Battery readings often have different timestamps than PPG/accel readings
+        // We need to detect device type from the readings to store battery per-device
+        
+        // Detect if this batch contains EMG (ANR M40) or PPG (Oralable) data
+        let hasEMG = readings.contains { $0.sensorType == .emg || $0.sensorType == .muscleActivity }
+        let hasPPG = readings.contains { $0.sensorType == .ppgRed || $0.sensorType == .ppgGreen }
+        
+        // Update per-device battery levels
         if let batteryReading = readings.first(where: { $0.sensorType == .battery }) {
             await MainActor.run {
-                self.batteryLevel = batteryReading.value
-                Logger.shared.debug("[SensorDataProcessor] 🔋 Updated batteryLevel from batch: \(Int(batteryReading.value))%")
+                let batteryValue = batteryReading.value
+                
+                // Determine which device this battery belongs to based on other readings in batch
+                if hasEMG && !hasPPG {
+                    // Pure ANR M40 batch
+                    self.batteryLevelANR = batteryValue
+                    Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery from batch: \(Int(batteryValue))%")
+                } else if hasPPG && !hasEMG {
+                    // Pure Oralable batch
+                    self.batteryLevelOralable = batteryValue
+                    Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery from batch: \(Int(batteryValue))%")
+                } else {
+                    // Mixed or unknown - update legacy fallback
+                    self.batteryLevel = batteryValue
+                    Logger.shared.debug("[SensorDataProcessor] 🔋 Mixed batch battery: \(Int(batteryValue))%")
+                }
             }
         }
 
@@ -329,6 +383,12 @@ class SensorDataProcessor: ObservableObject {
         sensorDataHistory.removeAll()
         ppgIRBuffer.removeAll()
         logMessages.removeAll()
+        
+        // ✅ Also clear per-device battery levels
+        batteryLevelOralable = 0.0
+        batteryLevelANR = 0.0
+        batteryLevel = 0.0
+        
         Logger.shared.info("[SensorDataProcessor] ✅ Cleared all history data | Removed \(priorCount) sensor data entries | New count: \(sensorDataHistory.count)")
     }
 
@@ -410,14 +470,25 @@ class SensorDataProcessor: ObservableObject {
             }
         }
 
-        // ✅ FIXED: Use latest known battery level if no battery reading in this timestamp group
-        let battery = batteryFromReading ?? Int(self.batteryLevel)
-
-        // Debug: Log battery source
-        if batteryFromReading != nil {
-            Logger.shared.debug("[SensorDataProcessor] Battery from reading: \(battery)%")
-        } else if self.batteryLevel > 0 {
-            Logger.shared.debug("[SensorDataProcessor] Battery from cached level: \(battery)% (self.batteryLevel=\(Int(self.batteryLevel)))")
+        // ✅ FIXED: Use per-device cached battery level based on detected device type
+        let battery: Int
+        if let fromReading = batteryFromReading {
+            battery = fromReading
+            Logger.shared.debug("[SensorDataProcessor] Battery from reading: \(battery)% for \(detectedDeviceType)")
+        } else {
+            // Use cached battery for this specific device type
+            switch detectedDeviceType {
+            case .anr:
+                battery = Int(self.batteryLevelANR)
+                if battery > 0 {
+                    Logger.shared.debug("[SensorDataProcessor] Battery from ANR cache: \(battery)%")
+                }
+            case .oralable, .demo:
+                battery = Int(self.batteryLevelOralable)
+                if battery > 0 {
+                    Logger.shared.debug("[SensorDataProcessor] Battery from Oralable cache: \(battery)%")
+                }
+            }
         }
 
         let ppgData = PPGData(red: ppgRed, ir: ppgIR, green: ppgGreen, timestamp: timestamp)
