@@ -15,13 +15,6 @@ struct MainTabView: View {
                     Label("Dashboard", systemImage: "house.fill")
                 }
 
-            // History Tab
-            SessionHistoryView(sessionManager: dependencies.recordingSessionManager)
-                .environmentObject(designSystem)
-                .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
-                }
-
             // Devices Tab
             DevicesView()
                 .environmentObject(designSystem)

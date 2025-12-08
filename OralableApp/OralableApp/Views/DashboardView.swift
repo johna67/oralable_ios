@@ -54,13 +54,9 @@ struct DashboardView: View {
 
                     // PPG Card (Oralable) - Shows IR sensor data
                     NavigationLink(destination: LazyView(
-                        HistoricalView(
-                            metricType: "IR Activity",
-                            historicalDataManager: dependencies.historicalDataManager
-                        )
-                        .environmentObject(designSystem)
-                        .environmentObject(dependencies.historicalDataManager)
-                        .environmentObject(dependencies.sensorDataProcessor)
+                        HistoricalView(metricType: "IR Activity")
+                            .environmentObject(designSystem)
+                            .environmentObject(dependencies.recordingSessionManager)
                     )) {
                         HealthMetricCard(
                             icon: "waveform.path.ecg",
@@ -76,13 +72,9 @@ struct DashboardView: View {
 
                     // EMG Card (ANR M40) - Shows EMG muscle activity
                     NavigationLink(destination: LazyView(
-                        HistoricalView(
-                            metricType: "EMG Activity",
-                            historicalDataManager: dependencies.historicalDataManager
-                        )
-                        .environmentObject(designSystem)
-                        .environmentObject(dependencies.historicalDataManager)
-                        .environmentObject(dependencies.sensorDataProcessor)
+                        HistoricalView(metricType: "EMG Activity")
+                            .environmentObject(designSystem)
+                            .environmentObject(dependencies.recordingSessionManager)
                     )) {
                         HealthMetricCard(
                             icon: "bolt.fill",
@@ -99,13 +91,9 @@ struct DashboardView: View {
                     // Movement card - CONDITIONAL
                     if featureFlags.showMovementCard {
                         NavigationLink(destination: LazyView(
-                            HistoricalView(
-                                metricType: "Movement",
-                                historicalDataManager: dependencies.historicalDataManager
-                            )
-                            .environmentObject(designSystem)
-                            .environmentObject(dependencies.historicalDataManager)
-                            .environmentObject(dependencies.sensorDataProcessor)
+                            HistoricalView(metricType: "Movement")
+                                .environmentObject(designSystem)
+                                .environmentObject(dependencies.recordingSessionManager)
                         )) {
                             MovementMetricCard(
                                 value: viewModel.isConnected ? formatMovementValue(viewModel.movementVariability) : "N/A",
@@ -123,13 +111,9 @@ struct DashboardView: View {
                     // Heart Rate card - CONDITIONAL
                     if featureFlags.showHeartRateCard {
                         NavigationLink(destination: LazyView(
-                            HistoricalView(
-                                metricType: "Heart Rate",
-                                historicalDataManager: dependencies.historicalDataManager
-                            )
-                            .environmentObject(designSystem)
-                            .environmentObject(dependencies.historicalDataManager)
-                            .environmentObject(dependencies.sensorDataProcessor)
+                            HistoricalView(metricType: "Heart Rate")
+                                .environmentObject(designSystem)
+                                .environmentObject(dependencies.recordingSessionManager)
                         )) {
                             HealthMetricCard(
                                 icon: "heart.fill",
@@ -147,13 +131,9 @@ struct DashboardView: View {
                     // SpO2 card - CONDITIONAL
                     if featureFlags.showSpO2Card {
                         NavigationLink(destination: LazyView(
-                            HistoricalView(
-                                metricType: "SpO2",
-                                historicalDataManager: dependencies.historicalDataManager
-                            )
-                            .environmentObject(designSystem)
-                            .environmentObject(dependencies.historicalDataManager)
-                            .environmentObject(dependencies.sensorDataProcessor)
+                            HistoricalView(metricType: "SpO2")
+                                .environmentObject(designSystem)
+                                .environmentObject(dependencies.recordingSessionManager)
                         )) {
                             HealthMetricCard(
                                 icon: "lungs.fill",
@@ -181,13 +161,9 @@ struct DashboardView: View {
                     // Temperature card - CONDITIONAL (with history navigation)
                     if featureFlags.showTemperatureCard {
                         NavigationLink(destination: LazyView(
-                            HistoricalView(
-                                metricType: "Temperature",
-                                historicalDataManager: dependencies.historicalDataManager
-                            )
-                            .environmentObject(designSystem)
-                            .environmentObject(dependencies.historicalDataManager)
-                            .environmentObject(dependencies.sensorDataProcessor)
+                            HistoricalView(metricType: "Temperature")
+                                .environmentObject(designSystem)
+                                .environmentObject(dependencies.recordingSessionManager)
                         )) {
                             HealthMetricCard(
                                 icon: "thermometer",

@@ -274,16 +274,20 @@ struct ShareView: View {
         }
 
         let fileName = "oralable_data_\(Int(Date().timeIntervalSince1970)).csv"
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        
+        // Save to Documents directory (for History view to find)
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsURL.appendingPathComponent(fileName)
 
         do {
-            try csvString.write(to: tempURL, atomically: true, encoding: .utf8)
-            Logger.shared.info("[ShareView] CSV file created: \(fileName) with \(sensorData.count) records")
-            return tempURL
+            try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
+            Logger.shared.info("[ShareView] ✅ CSV file saved to Documents: \(fileName) with \(sensorData.count) records")
+            return fileURL
         } catch {
-            Logger.shared.error("[ShareView] Failed to create CSV: \(error.localizedDescription)")
+            Logger.shared.error("[ShareView] ❌ Failed to create CSV: \(error.localizedDescription)")
             return nil
         }
+    
     }
 }
 

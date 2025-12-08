@@ -1,382 +1,548 @@
+//
+//  HistoricalView.swift
+//  OralableApp
+//
+//  Updated: December 8, 2025 - Load from ShareView exports instead of RecordingSessions
+//
+
 import SwiftUI
 import Charts
 
+/// Metric types available for viewing
+enum HistoryMetricTab: String, CaseIterable {
+    case emg = "EMG"
+    case ir = "IR"
+    case move = "Move"
+    case temp = "Temp"
+    
+    var metricType: String {
+        switch self {
+        case .emg: return "EMG Activity"
+        case .ir: return "IR Activity"
+        case .move: return "Movement"
+        case .temp: return "Temperature"
+        }
+    }
+    
+    var chartColor: Color {
+        switch self {
+        case .emg: return .blue
+        case .ir: return .purple
+        case .move: return .green
+        case .temp: return .orange
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .emg: return "bolt.horizontal.circle.fill"
+        case .ir: return "waveform.path.ecg"
+        case .move: return "gyroscope"
+        case .temp: return "thermometer"
+        }
+    }
+    
+    var unit: String {
+        switch self {
+        case .emg: return "µV"
+        case .ir: return "ADC"
+        case .move: return "g"
+        case .temp: return "°C"
+        }
+    }
+}
+
 struct HistoricalView: View {
     @EnvironmentObject var designSystem: DesignSystem
-    @EnvironmentObject var historicalDataManager: HistoricalDataManager
 
-    @StateObject private var viewModel: HistoricalViewModel
+    // Selected metric tab
+    @State private var selectedTab: HistoryMetricTab = .emg
+    
+    // Session data points loaded from CSV
+    @State private var dataPoints: [HistoricalDataPoint] = []
+    
+    // Export file info
+    @State private var loadedExportFile: SessionDataLoader.ExportFileInfo?
+    
+    // Loading state
+    @State private var isLoading: Bool = false
 
-    let metricType: String
+    // Initial metric type passed from dashboard (optional)
+    let initialMetricType: String?
 
-    init(metricType: String = "Movement",
-         historicalDataManager: HistoricalDataManager) {
-        self.metricType = metricType
-        // Create the ViewModel directly here
-        _viewModel = StateObject(
-            wrappedValue: HistoricalViewModel(
-                historicalDataManager: historicalDataManager
-            )
-        )
-        Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType)")
+    init(metricType: String? = nil) {
+        self.initialMetricType = metricType
+        Logger.shared.info("[HistoricalView] Initialized with metricType: \(metricType ?? "none")")
     }
     
     // MARK: - Computed Properties
     
-    /// Date format for x-axis labels based on selected time range
+    private var hasData: Bool {
+        !dataPoints.isEmpty
+    }
+    
+    private var hasExportFiles: Bool {
+        loadedExportFile != nil || SessionDataLoader.shared.getMostRecentExportFile() != nil
+    }
+    
+    /// Date format for x-axis labels
     private var xAxisDateFormat: Date.FormatStyle {
-        switch viewModel.selectedTimeRange {
-        case .minute:
+        guard let exportFile = loadedExportFile else {
             return .dateTime.hour().minute().second()
-        case .hour:
-            return .dateTime.hour().minute()
-        case .day:
-            return .dateTime.hour()
-        case .week:
-            return .dateTime.month().day()
-        case .month:
-            return .dateTime.month().day()
         }
+        
+        // Check data span to determine format
+        if let first = dataPoints.first?.timestamp, let last = dataPoints.last?.timestamp {
+            let duration = last.timeIntervalSince(first)
+            if duration < 60 {
+                return .dateTime.hour().minute().second()
+            } else if duration < 3600 {
+                return .dateTime.hour().minute()
+            }
+        }
+        
+        return .dateTime.hour().minute()
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: designSystem.spacing.lg) {
-                if !viewModel.dataPoints.isEmpty {
-                    Text("Data points: \(viewModel.dataPoints.count)")
-                        .font(.caption)
-                        .foregroundColor(.green)
+        VStack(spacing: 0) {
+            // Metric tab selector
+            metricTabSelector
+                .padding(.horizontal, designSystem.spacing.md)
+                .padding(.top, designSystem.spacing.sm)
+            
+            ScrollView {
+                VStack(spacing: designSystem.spacing.lg) {
+                    // Export file info banner
+                    if let exportFile = loadedExportFile {
+                        exportInfoBanner(exportFile: exportFile)
+                    }
+                    
+                    // Chart or empty state
+                    if isLoading {
+                        loadingView
+                    } else if hasData {
+                        metricChart
+                        dataSummaryCard
+                    } else {
+                        emptyStateView
+                    }
                 }
-
-                timeRangeSelector
-
-                if viewModel.hasCurrentMetrics && viewModel.hasSufficientDataForCurrentRange {
-                    metricChart
-                } else {
-                    emptyStateView
-                }
+                .padding(designSystem.spacing.md)
             }
-            .padding(designSystem.spacing.md)
         }
-        .navigationTitle(metricType)
+        .navigationTitle("History")
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
-            Logger.shared.debug("[HistoricalView] View appeared for metric: \(metricType)")
-            viewModel.updateAllMetrics()
+            setInitialTab()
+            loadExportData()
+        }
+        .onChange(of: selectedTab) { _ in
+            loadExportData()
         }
     }
-
-    // MARK: - Time Range Selector
-    private var timeRangeSelector: some View {
-        VStack(spacing: designSystem.spacing.sm) {
-            Picker("Time Range", selection: $viewModel.selectedTimeRange) {
-                Text("Min").tag(TimeRange.minute)
-                Text("Hour").tag(TimeRange.hour)
-                Text("Day").tag(TimeRange.day)
-                Text("Week").tag(TimeRange.week)
-            }
-            .pickerStyle(SegmentedPickerStyle())
-
-            HStack {
-                Button(action: { viewModel.selectPreviousTimeRange() }) {
-                    Image(systemName: "chevron.left")
-                        .frame(width: 44, height: 44)
-                        .background(designSystem.colors.backgroundTertiary)
-                        .cornerRadius(designSystem.cornerRadius.small)
+    
+    // MARK: - Metric Tab Selector
+    
+    private var metricTabSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(HistoryMetricTab.allCases, id: \.self) { tab in
+                Button(action: { selectedTab = tab }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 16))
+                        Text(tab.rawValue)
+                            .font(.caption.bold())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(selectedTab == tab ? tab.chartColor.opacity(0.15) : Color.clear)
+                    .foregroundColor(selectedTab == tab ? tab.chartColor : designSystem.colors.textSecondary)
                 }
-
+            }
+        }
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.medium)
+    }
+    
+    // MARK: - Export Info Banner
+    
+    private func exportInfoBanner(exportFile: SessionDataLoader.ExportFileInfo) -> some View {
+        VStack(spacing: designSystem.spacing.xs) {
+            HStack {
+                // File icon
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(designSystem.colors.textSecondary)
+                
+                // File name
+                Text(exportFile.url.lastPathComponent)
+                    .font(.caption.bold())
+                    .foregroundColor(designSystem.colors.textPrimary)
+                    .lineLimit(1)
+                
                 Spacer()
-
-                Text(viewModel.timeRangeText)
+                
+                // Data points count
+                Text("\(dataPoints.count) points")
+                    .font(.caption)
+                    .foregroundColor(designSystem.colors.textTertiary)
+            }
+            
+            HStack {
+                // Export date
+                let formatter: DateFormatter = {
+                    let f = DateFormatter()
+                    f.dateStyle = .medium
+                    f.timeStyle = .short
+                    return f
+                }()
+                Text("Exported: \(formatter.string(from: exportFile.creationDate))")
+                    .font(.caption)
+                    .foregroundColor(designSystem.colors.textSecondary)
+                
+                Spacer()
+                
+                // File size
+                let sizeKB = Double(exportFile.fileSize) / 1024.0
+                Text(String(format: "%.1f KB", sizeKB))
+                    .font(.caption)
+                    .foregroundColor(designSystem.colors.textTertiary)
+            }
+        }
+        .padding(designSystem.spacing.sm)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.medium)
+    }
+    
+    // MARK: - Metric Chart
+    
+    private var metricChart: some View {
+        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
+            // Header
+            HStack {
+                Text(selectedTab.metricType)
                     .font(designSystem.typography.headline)
                     .foregroundColor(designSystem.colors.textPrimary)
-
+                
                 Spacer()
-
-                Button(action: { viewModel.selectNextTimeRange() }) {
-                    Image(systemName: "chevron.right")
-                        .frame(width: 44, height: 44)
-                        .background(designSystem.colors.backgroundTertiary)
-                        .cornerRadius(designSystem.cornerRadius.small)
+                
+                // Latest value
+                if let latestValue = getLatestValue() {
+                    Text(formatValue(latestValue))
+                        .font(.system(.subheadline, design: .monospaced))
+                        .foregroundColor(designSystem.colors.textSecondary)
                 }
-                .disabled(viewModel.isCurrentTimeRange)
             }
-        }
-    }
-
-    // MARK: - Metric Chart
-    private var metricChart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            chartForMetric
+            
+            // Chart
+            chartForSelectedTab
+                .frame(height: 250)
         }
         .padding(designSystem.spacing.md)
         .background(designSystem.colors.backgroundSecondary)
         .cornerRadius(designSystem.cornerRadius.large)
     }
-
+    
     @ViewBuilder
-    private var chartForMetric: some View {
-        switch metricType {
-        case "Muscle Activity": muscleActivityChart(isEMG: false)
-        case "EMG Activity": muscleActivityChart(isEMG: true)
-        case "Movement": accelerometerChart
-        case "Heart Rate": heartRateChart
-        case "SpO2": spo2Chart
-        case "Temperature": temperatureChart
-        case "PPG": ppgChart
-        default: accelerometerChart
+    private var chartForSelectedTab: some View {
+        switch selectedTab {
+        case .emg, .ir:
+            activityChart
+        case .move:
+            movementChart
+        case .temp:
+            temperatureChart
         }
     }
-
-    // MARK: - Chart Implementations
-    private var accelerometerChart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            // Header with current value
+    
+    private var activityChart: some View {
+        Chart(dataPoints) { point in
+            if let value = point.averagePPGIR {
+                LineMark(
+                    x: .value("Time", point.timestamp),
+                    y: .value("Activity", value)
+                )
+                .foregroundStyle(selectedTab.chartColor)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading)
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: xAxisDateFormat)
+            }
+        }
+    }
+    
+    private var movementChart: some View {
+        Chart(dataPoints) { point in
+            PointMark(
+                x: .value("Time", point.timestamp),
+                y: .value("Acceleration", point.movementIntensityInG)
+            )
+            .foregroundStyle(point.isAtRest ? Color.blue.opacity(0.6) : Color.green.opacity(0.8))
+            .symbolSize(10)
+        }
+        .chartYScale(domain: 0...3)
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let g = value.as(Double.self) {
+                        Text(String(format: "%.1f", g))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: xAxisDateFormat)
+            }
+        }
+    }
+    
+    private var temperatureChart: some View {
+        Chart(dataPoints) { point in
+            if point.averageTemperature > 0 {
+                LineMark(
+                    x: .value("Time", point.timestamp),
+                    y: .value("Temperature", point.averageTemperature)
+                )
+                .foregroundStyle(selectedTab.chartColor)
+            }
+        }
+        .chartYScale(domain: 30...42)
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let temp = value.as(Double.self) {
+                        Text(String(format: "%.0f°", temp))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: xAxisDateFormat)
+            }
+        }
+    }
+    
+    // MARK: - Data Summary Card
+    
+    private var dataSummaryCard: some View {
+        VStack(spacing: designSystem.spacing.sm) {
             HStack {
-                Text("Movement (g)")
+                Text("Summary")
                     .font(designSystem.typography.headline)
                     .foregroundColor(designSystem.colors.textPrimary)
-
                 Spacer()
-
-                // Show latest value in g-units
-                if let latest = viewModel.dataPoints.last {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(latest.isAtRest ? Color.blue : Color.green)
-                            .frame(width: 8, height: 8)
-                        Text(String(format: "%.2f g", latest.movementIntensityInG))
-                            .font(.system(.subheadline, design: .monospaced))
-                            .foregroundColor(designSystem.colors.textSecondary)
-                    }
-                }
             }
-
-            // Chart with g-unit values
-            Chart(viewModel.dataPoints) { point in
-                PointMark(
-                    x: .value("Time", point.timestamp),
-                    y: .value("Acceleration", point.movementIntensityInG)
-                )
-                .foregroundStyle(point.isAtRest ? Color.blue.opacity(0.6) : Color.green.opacity(0.8))
-                .symbolSize(10)
+            
+            HStack(spacing: designSystem.spacing.md) {
+                summaryItem(title: "Min", value: formatValue(getMinValue()))
+                summaryItem(title: "Max", value: formatValue(getMaxValue()))
+                summaryItem(title: "Avg", value: formatValue(getAverageValue()))
             }
-            .frame(height: 250)
-            .chartYScale(domain: 0...3)  // 0 to 3g range
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let g = value.as(Double.self) {
-                            Text(String(format: "%.1f", g))
-                        }
-                    }
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xAxisDateFormat)
-                }
-            }
-
-            // Legend
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.blue.opacity(0.6))
-                        .frame(width: 8, height: 8)
-                    Text("At Rest (~1g)")
-                        .font(.caption)
-                        .foregroundColor(designSystem.colors.textTertiary)
-                }
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green.opacity(0.8))
-                        .frame(width: 8, height: 8)
-                    Text("Moving")
-                        .font(.caption)
-                        .foregroundColor(designSystem.colors.textTertiary)
-                }
-            }
-            .padding(.top, 4)
         }
+        .padding(designSystem.spacing.md)
+        .background(designSystem.colors.backgroundSecondary)
+        .cornerRadius(designSystem.cornerRadius.large)
     }
     
-    private var heartRateChart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Heart Rate (bpm)")
-                .font(designSystem.typography.headline)
+    private func summaryItem(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(designSystem.colors.textTertiary)
+            Text(value)
+                .font(.system(.body, design: .monospaced).bold())
                 .foregroundColor(designSystem.colors.textPrimary)
-            
-            Chart(viewModel.dataPoints) { point in
-                if let heartRate = point.averageHeartRate {
-                    LineMark(
-                        x: .value("Time", point.timestamp),
-                        y: .value("Heart Rate", heartRate)
-                    )
-                    .foregroundStyle(.red)
-                }
-            }
-            .frame(height: 250)
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xAxisDateFormat)
-                }
-            }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, designSystem.spacing.sm)
+        .background(designSystem.colors.backgroundTertiary)
+        .cornerRadius(designSystem.cornerRadius.small)
     }
     
-    private var spo2Chart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Blood Oxygen (%)")
-                .font(designSystem.typography.headline)
-                .foregroundColor(designSystem.colors.textPrimary)
-            
-            Chart(viewModel.dataPoints) { point in
-                if let spo2 = point.averageSpO2 {
-                    LineMark(
-                        x: .value("Time", point.timestamp),
-                        y: .value("SpO2", spo2)
-                    )
-                    .foregroundStyle(.blue)
-                }
-            }
-            .frame(height: 250)
-            .chartYScale(domain: 85...100)
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xAxisDateFormat)
-                }
-            }
+    // MARK: - Loading View
+    
+    private var loadingView: some View {
+        VStack(spacing: designSystem.spacing.md) {
+            ProgressView()
+                .scaleEffect(1.5)
+            Text("Loading data...")
+                .font(designSystem.typography.body)
+                .foregroundColor(designSystem.colors.textSecondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(designSystem.spacing.xl)
     }
-
-    private var ppgChart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("PPG Signal (IR)")
-                .font(designSystem.typography.headline)
-                .foregroundColor(designSystem.colors.textPrimary)
-
-            Chart(viewModel.dataPoints) { point in
-                if let ppgIR = point.averagePPGIR {
-                    LineMark(
-                        x: .value("Time", point.timestamp),
-                        y: .value("PPG IR", ppgIR)
-                    )
-                    .foregroundStyle(.red)
-                }
-            }
-            .frame(height: 250)
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xAxisDateFormat)
-                }
-            }
-        }
-    }
-
-    private var temperatureChart: some View {
-        VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Temperature (°C)")
-                .font(designSystem.typography.headline)
-                .foregroundColor(designSystem.colors.textPrimary)
-
-            Chart(viewModel.dataPoints) { point in
-                // averageTemperature is non-optional, filter out default/invalid values
-                if point.averageTemperature > 0 {
-                    LineMark(
-                        x: .value("Time", point.timestamp),
-                        y: .value("Temperature", point.averageTemperature)
-                    )
-                    .foregroundStyle(.orange)
-                }
-            }
-            .frame(height: 250)
-            .chartYScale(domain: 30...42)  // Normal body temperature range
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let temp = value.as(Double.self) {
-                            Text(String(format: "%.0f°", temp))
-                        }
-                    }
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xAxisDateFormat)
-                }
-            }
-        }
-    }
-
-    /// Muscle Activity chart - shows EMG data (ANR M40) or IR data (Oralable)
-    /// - Parameter isEMG: true for ANR M40 (blue), false for Oralable IR (purple)
-    private func muscleActivityChart(isEMG: Bool) -> some View {
-        let chartTitle = isEMG ? "EMG Activity (ANR M40)" : "Muscle Activity (IR)"
-        let chartColor: Color = isEMG ? .blue : .purple
-
-        return VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text(chartTitle)
-                .font(designSystem.typography.headline)
-                .foregroundColor(designSystem.colors.textPrimary)
-
-            Chart(viewModel.dataPoints) { point in
-                if let ppgIR = point.averagePPGIR {
-                    LineMark(
-                        x: .value("Time", point.timestamp),
-                        y: .value("Activity", ppgIR)
-                    )
-                    .foregroundStyle(chartColor)
-                }
-            }
-            .frame(height: 250)
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xAxisDateFormat)
-                }
-            }
-        }
-    }
-
+    
     // MARK: - Empty State
+    
     private var emptyStateView: some View {
         VStack(spacing: designSystem.spacing.lg) {
-            Image(systemName: viewModel.dataPoints.isEmpty
-                  ? "chart.line.uptrend.xyaxis.circle"
-                  : "chart.line.uptrend.xyaxis")
+            Image(systemName: "chart.line.uptrend.xyaxis.circle")
                 .font(.system(size: 60))
                 .foregroundColor(designSystem.colors.textTertiary)
 
-            Text(viewModel.dataPoints.isEmpty ? "No Data in This Range" : "Data Span Too Short")
+            Text(emptyStateTitle)
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            Text(viewModel.dataSufficiencyMessage ?? "")
+            Text(emptyStateMessage)
                 .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
         }
         .padding(designSystem.spacing.xl)
+    }
+    
+    private var emptyStateTitle: String {
+        if !hasExportFiles {
+            return "No Exports"
+        }
+        return "No \(selectedTab.rawValue) Data"
+    }
+    
+    private var emptyStateMessage: String {
+        if !hasExportFiles {
+            return "Use the Share tab to export sensor data, then view it here."
+        }
+        
+        switch selectedTab {
+        case .emg:
+            return "No EMG data found in the export. Connect an ANR M40 device and export data."
+        case .ir:
+            return "No IR data found in the export. Connect an Oralable device and export data."
+        case .move:
+            return "No movement data found in the export."
+        case .temp:
+            return "No temperature data found in the export. Temperature is only recorded by the Oralable device."
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func setInitialTab() {
+        guard let initial = initialMetricType else { return }
+        
+        switch initial {
+        case "EMG Activity":
+            selectedTab = .emg
+        case "IR Activity", "Muscle Activity", "PPG":
+            selectedTab = .ir
+        case "Movement":
+            selectedTab = .move
+        case "Temperature":
+            selectedTab = .temp
+        default:
+            break
+        }
+    }
+    
+    private func loadExportData() {
+        isLoading = true
+        dataPoints = []
+        
+        // DEBUG: List all files in Documents
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        Logger.shared.info("[HistoricalView] 📁 Documents path: \(documentsPath.path)")
+        
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: documentsPath, includingPropertiesForKeys: nil)
+            Logger.shared.info("[HistoricalView] 📁 Found \(files.count) files in Documents:")
+            for file in files {
+                Logger.shared.info("[HistoricalView]   - \(file.lastPathComponent)")
+            }
+            
+            // Check for CSV files with oralable_data prefix
+            let csvFiles = files.filter {
+                $0.pathExtension == "csv" && $0.lastPathComponent.hasPrefix("oralable_data_")
+            }
+            Logger.shared.info("[HistoricalView] 📊 Matching CSV files: \(csvFiles.count)")
+            for csv in csvFiles {
+                Logger.shared.info("[HistoricalView]   ✅ Match: \(csv.lastPathComponent)")
+            }
+        } catch {
+            Logger.shared.error("[HistoricalView] ❌ Failed to list documents: \(error)")
+        }
+        
+        // Load from most recent ShareView export
+        loadedExportFile = SessionDataLoader.shared.getMostRecentExportFile()
+        Logger.shared.info("[HistoricalView] 🔍 Export file found: \(loadedExportFile?.url.lastPathComponent ?? "NONE")")
+        
+        if loadedExportFile != nil {
+            let points = SessionDataLoader.shared.loadFromMostRecentExport(metricType: selectedTab.metricType)
+            dataPoints = points
+            Logger.shared.info("[HistoricalView] ✅ Loaded \(points.count) data points for \(selectedTab.metricType)")
+        } else {
+            Logger.shared.warning("[HistoricalView] ⚠️ No export files found matching pattern 'oralable_data_*.csv'")
+        }
+        
+        isLoading = false
+    }
+    
+    private func getLatestValue() -> Double? {
+        guard let lastPoint = dataPoints.last else { return nil }
+        
+        switch selectedTab {
+        case .emg, .ir:
+            return lastPoint.averagePPGIR
+        case .move:
+            return lastPoint.movementIntensityInG
+        case .temp:
+            return lastPoint.averageTemperature > 0 ? lastPoint.averageTemperature : nil
+        }
+    }
+    
+    private func getMinValue() -> Double? {
+        let values = getValuesForSelectedTab()
+        return values.min()
+    }
+    
+    private func getMaxValue() -> Double? {
+        let values = getValuesForSelectedTab()
+        return values.max()
+    }
+    
+    private func getAverageValue() -> Double? {
+        let values = getValuesForSelectedTab()
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+    
+    private func getValuesForSelectedTab() -> [Double] {
+        switch selectedTab {
+        case .emg, .ir:
+            return dataPoints.compactMap { $0.averagePPGIR }
+        case .move:
+            return dataPoints.map { $0.movementIntensityInG }
+        case .temp:
+            return dataPoints.map { $0.averageTemperature }.filter { $0 > 0 }
+        }
+    }
+    
+    private func formatValue(_ value: Double?) -> String {
+        guard let value = value else { return "--" }
+        
+        switch selectedTab {
+        case .emg:
+            return String(format: "%.0f %@", value, selectedTab.unit)
+        case .ir:
+            return String(format: "%.0f %@", value, selectedTab.unit)
+        case .move:
+            return String(format: "%.2f %@", value, selectedTab.unit)
+        case .temp:
+            return String(format: "%.1f%@", value, selectedTab.unit)
+        }
     }
 }
