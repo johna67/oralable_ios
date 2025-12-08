@@ -4,6 +4,7 @@
 //
 //  Created: December 7, 2025
 //  Updated: December 8, 2025 - Added support for ShareView export files
+//  Updated: December 8, 2025 - Fixed movement chart g-unit conversion
 //  Purpose: Load and parse recorded session data from CSV files
 //
 
@@ -15,6 +16,12 @@ class SessionDataLoader {
     // MARK: - Singleton
     static let shared = SessionDataLoader()
     private init() {}
+    
+    // MARK: - Constants
+    
+    /// LIS2DTW12 accelerometer conversion factor (±2g range, 14-bit resolution)
+    /// 1g = 16384 LSB
+    private let accelLSBPerG: Double = 16384.0
     
     // MARK: - Export File Info
     
@@ -36,7 +43,7 @@ class SessionDataLoader {
             return []
         }
         
-        Logger.shared.info("[SessionDataLoader] Loading from export: \(exportFile.url.lastPathComponent)")
+        Logger.shared.info("[SessionDataLoader] Loading from export: \(exportFile.url.lastPathComponent) for metric: \(metricType)")
         return loadFromExportFile(at: exportFile.url, metricType: metricType)
     }
     
@@ -49,9 +56,10 @@ class SessionDataLoader {
         do {
             let content = try String(contentsOf: url, encoding: .utf8)
             let readings = parseShareViewExport(content: content, metricType: metricType)
+            Logger.shared.info("[SessionDataLoader] ✅ Loaded \(readings.count) data points for \(metricType)")
             return readings
         } catch {
-            Logger.shared.error("[SessionDataLoader] Failed to load export file: \(error)")
+            Logger.shared.error("[SessionDataLoader] ❌ Failed to load export file: \(error)")
             return []
         }
     }
@@ -160,7 +168,10 @@ class SessionDataLoader {
     /// Header: Timestamp,Device_Type,EMG,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate
     private func parseShareViewExport(content: String, metricType: String) -> [HistoricalDataPoint] {
         let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
-        guard lines.count > 1 else { return [] }
+        guard lines.count > 1 else {
+            Logger.shared.warning("[SessionDataLoader] Empty CSV file")
+            return []
+        }
         
         // Verify header
         let header = lines[0].lowercased()
@@ -168,6 +179,8 @@ class SessionDataLoader {
             Logger.shared.warning("[SessionDataLoader] Invalid export format - missing expected headers")
             return []
         }
+        
+        Logger.shared.info("[SessionDataLoader] 📄 Parsing \(lines.count - 1) CSV rows for metric: \(metricType)")
         
         // Determine which device type to filter for based on metric
         let targetDeviceType: String?
@@ -177,7 +190,7 @@ class SessionDataLoader {
         case "IR Activity", "Muscle Activity":
             targetDeviceType = "Oralable"
         case "Movement":
-            targetDeviceType = nil  // Both devices have accelerometer
+            targetDeviceType = nil  // Both devices have accelerometer (but ANR doesn't send it)
         case "Temperature":
             targetDeviceType = "Oralable"  // Only Oralable has temperature
         default:
@@ -187,10 +200,11 @@ class SessionDataLoader {
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime]
         
-        var dataPoints: [HistoricalDataPoint] = []
-        
         // Group by timestamp for aggregation
         var groupedData: [Date: [(emg: Double, ir: Double, red: Double, green: Double, accelX: Double, accelY: Double, accelZ: Double, temp: Double, battery: Int, hr: Double, deviceType: String)]] = [:]
+        
+        var rowsProcessed = 0
+        var rowsWithAccel = 0
         
         for line in lines.dropFirst() {
             let columns = line.components(separatedBy: ",")
@@ -216,6 +230,11 @@ class SessionDataLoader {
             let battery = Int(Double(columns[10]) ?? 0)
             let hr = Double(columns[11]) ?? 0
             
+            rowsProcessed += 1
+            if accelX != 0 || accelY != 0 || accelZ != 0 {
+                rowsWithAccel += 1
+            }
+            
             // Round timestamp to nearest second for grouping
             let roundedTimestamp = Date(timeIntervalSince1970: floor(timestamp.timeIntervalSince1970))
             
@@ -225,13 +244,16 @@ class SessionDataLoader {
             groupedData[roundedTimestamp]?.append((emg, ir, red, green, accelX, accelY, accelZ, temp, battery, hr, deviceType))
         }
         
+        Logger.shared.info("[SessionDataLoader] 📊 Processed \(rowsProcessed) rows, \(rowsWithAccel) with accelerometer data, \(groupedData.count) unique timestamps")
+        
         // Convert grouped data to HistoricalDataPoints
+        var dataPoints: [HistoricalDataPoint] = []
         for (timestamp, readings) in groupedData.sorted(by: { $0.key < $1.key }) {
             let point = createDataPointFromExport(timestamp: timestamp, readings: readings, metricType: metricType)
             dataPoints.append(point)
         }
         
-        Logger.shared.info("[SessionDataLoader] Parsed \(dataPoints.count) data points from export for metric: \(metricType)")
+        Logger.shared.info("[SessionDataLoader] ✅ Created \(dataPoints.count) data points for \(metricType)")
         return dataPoints
     }
     
@@ -253,21 +275,41 @@ class SessionDataLoader {
         let avgBattery = readings.map { $0.battery }.filter { $0 > 0 }.max() ?? 0
         let avgHR = readings.map { $0.hr }.filter { $0 > 0 }.reduce(0, +) / max(Double(readings.filter { $0.hr > 0 }.count), 1)
         
-        // Calculate movement magnitude
+        // Calculate movement magnitude in g units
         var movementIntensity: Double = 0
         var movementVariability: Double = 0
         
-        let accelReadings = readings.filter { $0.accelX != 0 || $0.accelY != 0 || $0.accelZ != 0 }
+        // Filter readings that have accelerometer data (non-zero values)
+        let accelReadings = readings.filter { reading in
+            return reading.accelX != 0 || reading.accelY != 0 || reading.accelZ != 0
+        }
+        
         if !accelReadings.isEmpty {
-            let magnitudes = accelReadings.map { reading in
-                sqrt(reading.accelX * reading.accelX + reading.accelY * reading.accelY + reading.accelZ * reading.accelZ)
+            // Convert raw ADC values to g units, then calculate magnitude
+            let magnitudes: [Double] = accelReadings.map { reading in
+                let xG = reading.accelX / self.accelLSBPerG
+                let yG = reading.accelY / self.accelLSBPerG
+                let zG = reading.accelZ / self.accelLSBPerG
+                let mag = sqrt(xG * xG + yG * yG + zG * zG)
+                return mag
             }
+            
             movementIntensity = magnitudes.reduce(0, +) / Double(magnitudes.count)
             
             if magnitudes.count > 1 {
                 let mean = movementIntensity
                 let squaredDiffs = magnitudes.map { pow($0 - mean, 2) }
                 movementVariability = sqrt(squaredDiffs.reduce(0, +) / Double(magnitudes.count - 1))
+            }
+            
+            // Log first data point's movement calculation for debugging
+            if metricType == "Movement" {
+                if let first = accelReadings.first {
+                    let xG = first.accelX / self.accelLSBPerG
+                    let yG = first.accelY / self.accelLSBPerG
+                    let zG = first.accelZ / self.accelLSBPerG
+                    Logger.shared.info("[SessionDataLoader] 🔢 Sample accel: raw(\(Int(first.accelX)),\(Int(first.accelY)),\(Int(first.accelZ))) -> g(\(String(format: "%.3f", xG)),\(String(format: "%.3f", yG)),\(String(format: "%.3f", zG))) = \(String(format: "%.3f", movementIntensity))g")
+                }
             }
         }
         
@@ -470,10 +512,11 @@ class SessionDataLoader {
             var magnitudes: [Double] = []
             
             for i in 0..<count {
-                let x = accelXValues[i]
-                let y = accelYValues[i]
-                let z = accelZValues[i]
-                let mag = sqrt(x*x + y*y + z*z)
+                // Convert raw ADC to g units
+                let xG = accelXValues[i] / accelLSBPerG
+                let yG = accelYValues[i] / accelLSBPerG
+                let zG = accelZValues[i] / accelLSBPerG
+                let mag = sqrt(xG * xG + yG * yG + zG * zG)
                 magnitudes.append(mag)
             }
             

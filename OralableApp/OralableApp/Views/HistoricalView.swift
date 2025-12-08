@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Updated: December 8, 2025 - Load from ShareView exports instead of RecordingSessions
+//  Updated: December 8, 2025 - Fixed movement chart to use movementIntensity directly (already in g units)
 //
 
 import SwiftUI
@@ -277,11 +278,12 @@ struct HistoricalView: View {
         }
     }
     
+    // FIXED: Use movementIntensity directly (already in g units from SessionDataLoader)
     private var movementChart: some View {
         Chart(dataPoints) { point in
             PointMark(
                 x: .value("Time", point.timestamp),
-                y: .value("Acceleration", point.movementIntensityInG)
+                y: .value("Acceleration", point.movementIntensity)  // ← FIXED: was movementIntensityInG
             )
             .foregroundStyle(point.isAtRest ? Color.blue.opacity(0.6) : Color.green.opacity(0.8))
             .symbolSize(10)
@@ -453,44 +455,56 @@ struct HistoricalView: View {
         isLoading = true
         dataPoints = []
         
-        // DEBUG: List all files in Documents
+        // DEBUG: List files
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         Logger.shared.info("[HistoricalView] 📁 Documents path: \(documentsPath.path)")
         
         do {
             let files = try FileManager.default.contentsOfDirectory(at: documentsPath, includingPropertiesForKeys: nil)
             Logger.shared.info("[HistoricalView] 📁 Found \(files.count) files in Documents:")
-            for file in files {
-                Logger.shared.info("[HistoricalView]   - \(file.lastPathComponent)")
-            }
             
-            // Check for CSV files with oralable_data prefix
             let csvFiles = files.filter {
                 $0.pathExtension == "csv" && $0.lastPathComponent.hasPrefix("oralable_data_")
             }
             Logger.shared.info("[HistoricalView] 📊 Matching CSV files: \(csvFiles.count)")
-            for csv in csvFiles {
-                Logger.shared.info("[HistoricalView]   ✅ Match: \(csv.lastPathComponent)")
-            }
         } catch {
             Logger.shared.error("[HistoricalView] ❌ Failed to list documents: \(error)")
         }
         
-        // Load from most recent ShareView export
+        // Get export file
         loadedExportFile = SessionDataLoader.shared.getMostRecentExportFile()
         Logger.shared.info("[HistoricalView] 🔍 Export file found: \(loadedExportFile?.url.lastPathComponent ?? "NONE")")
         
-        if loadedExportFile != nil {
+        if let exportFile = loadedExportFile {
+            Logger.shared.info("[HistoricalView] 📂 Calling loadFromMostRecentExport for metric: \(selectedTab.metricType)")
             let points = SessionDataLoader.shared.loadFromMostRecentExport(metricType: selectedTab.metricType)
+            Logger.shared.info("[HistoricalView] ✅ Loaded \(points.count) data points")
+            
+            if points.isEmpty {
+                Logger.shared.warning("[HistoricalView] ⚠️ No data points returned - checking file directly...")
+                // Try loading file directly to debug
+                do {
+                    let content = try String(contentsOf: exportFile.url, encoding: .utf8)
+                    let lines = content.components(separatedBy: .newlines)
+                    Logger.shared.info("[HistoricalView] 📄 File has \(lines.count) lines")
+                    if lines.count > 1 {
+                        Logger.shared.info("[HistoricalView] 📄 Header: \(lines[0])")
+                        Logger.shared.info("[HistoricalView] 📄 First data: \(lines[1])")
+                    }
+                } catch {
+                    Logger.shared.error("[HistoricalView] ❌ Failed to read file: \(error)")
+                }
+            }
+            
             dataPoints = points
-            Logger.shared.info("[HistoricalView] ✅ Loaded \(points.count) data points for \(selectedTab.metricType)")
         } else {
-            Logger.shared.warning("[HistoricalView] ⚠️ No export files found matching pattern 'oralable_data_*.csv'")
+            Logger.shared.warning("[HistoricalView] ⚠️ No export files found")
         }
         
         isLoading = false
     }
     
+    // FIXED: Use movementIntensity directly (already in g units from SessionDataLoader)
     private func getLatestValue() -> Double? {
         guard let lastPoint = dataPoints.last else { return nil }
         
@@ -498,7 +512,7 @@ struct HistoricalView: View {
         case .emg, .ir:
             return lastPoint.averagePPGIR
         case .move:
-            return lastPoint.movementIntensityInG
+            return lastPoint.movementIntensity  // ← FIXED: was movementIntensityInG
         case .temp:
             return lastPoint.averageTemperature > 0 ? lastPoint.averageTemperature : nil
         }
@@ -520,12 +534,13 @@ struct HistoricalView: View {
         return values.reduce(0, +) / Double(values.count)
     }
     
+    // FIXED: Use movementIntensity directly (already in g units from SessionDataLoader)
     private func getValuesForSelectedTab() -> [Double] {
         switch selectedTab {
         case .emg, .ir:
             return dataPoints.compactMap { $0.averagePPGIR }
         case .move:
-            return dataPoints.map { $0.movementIntensityInG }
+            return dataPoints.map { $0.movementIntensity }  // ← FIXED: was movementIntensityInG
         case .temp:
             return dataPoints.map { $0.averageTemperature }.filter { $0 > 0 }
         }

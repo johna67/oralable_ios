@@ -91,21 +91,20 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
 
         // Subscribe to BATCH publisher for history storage
         // Throttle to 1 update per second to prevent flooding from multiple subscribers
+        // Update legacy sensor data less frequently (every 3 seconds)
+        // COLLECT all readings over the interval instead of just taking latest
         deviceManager.readingsBatchPublisher
-            .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] readings in
+            .collect(.byTime(DispatchQueue.main, .seconds(3)))
+            .sink { [weak self] batchesOfReadings in
                 guard let self = self else { return }
-                if !readings.isEmpty {
+                let allReadings = batchesOfReadings.flatMap { $0 }
+                if !allReadings.isEmpty {
                     Task {
-                        await self.sensorDataProcessor.processBatch(readings)
-                        await self.sensorDataProcessor.updateAccelHistory(from: readings)
-                        // NOTE: Heart rate calculation now happens in updateSensorValues() for better timing
+                        await self.sensorDataProcessor.updateLegacySensorData(with: allReadings)
                     }
-                    self.updateDeviceState(from: readings)
                 }
             }
             .store(in: &cancellables)
-
         // Update legacy sensor data less frequently (every 3 seconds)
         deviceManager.readingsBatchPublisher
             .throttle(for: .seconds(3), scheduler: DispatchQueue.main, latest: true)
