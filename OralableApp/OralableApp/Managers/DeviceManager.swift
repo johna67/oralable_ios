@@ -8,6 +8,7 @@
 //  Added: ConnectionReadiness state machine and async discovery methods
 //  UPDATED: November 29, 2025 (Day 4 - Memory Fix + Diagnostic Logging)
 //  Fixed: Auto-stop scanning when ready, prevent duplicate device instances, smart scan restart prevention
+//  UPDATED: December 8, 2025 - Stricter device filtering (only Oralable and ANR)
 //
 
 import Foundation
@@ -223,26 +224,23 @@ class DeviceManager: ObservableObject {
         Logger.shared.debug("[DeviceManager] Discovered device #\(discoveryCount): \(name) | RSSI: \(rssi) dBm")
         #endif
 
-        // Day 4 Fix: Check if already discovered OR already have a device instance
-        if discoveredDevices.contains(where: { $0.peripheralIdentifier == peripheral.identifier }) ||
-           devices[peripheral.identifier] != nil {
-            // Update RSSI for existing device
-            if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
-                discoveredDevices[index].signalStrength = rssi
-            }
-            Logger.shared.debug("[DeviceManager] ⏭️ Device already exists - updating RSSI only")
-            return  // Don't create duplicate instances
+        // Check if already in discoveredDevices list (UI)
+        if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheral.identifier }) {
+            // Just update RSSI for existing entry
+            discoveredDevices[index].signalStrength = rssi
+            Logger.shared.debug("[DeviceManager] ⏭️ Device already in list - updating RSSI only")
+            return
         }
 
-        // Detect device type
+        // Detect device type - STRICT FILTERING
         guard let deviceType = detectDeviceType(from: name, peripheral: peripheral) else {
             Logger.shared.debug("[DeviceManager] ❌ Unknown device type '\(name)' - rejected")
             return
         }
 
-        Logger.shared.info("[DeviceManager] ✅ New device discovered: \(name) (\(deviceType))")
+        Logger.shared.info("[DeviceManager] ✅ Device discovered: \(name) (\(deviceType))")
 
-        // Create device info
+        // Create device info for UI
         let deviceInfo = DeviceInfo(
             type: deviceType,
             name: name,
@@ -251,35 +249,40 @@ class DeviceManager: ObservableObject {
             signalStrength: rssi
         )
 
-        // Add to discovered list
+        // Always add to discovered list for UI display
         discoveredDevices.append(deviceInfo)
-        Logger.shared.info("[DeviceManager] 📝 Device added to list. Total discovered: \(discoveredDevices.count)")
+        Logger.shared.info("[DeviceManager] 📝 Device added to UI list. Total discovered: \(discoveredDevices.count)")
         
         // Initialize readiness state
         deviceReadiness[peripheral.identifier] = .disconnected
 
-        // Create device instance
-        let device: BLEDeviceProtocol
+        // Only create new device instance if we don't already have one
+        // (device instances persist across scans to maintain state)
+        if devices[peripheral.identifier] == nil {
+            let device: BLEDeviceProtocol
 
-        switch deviceType {
-        case .oralable:
-            device = OralableDevice(peripheral: peripheral)
-        case .anr:
-            device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
-        case .demo:
-            #if DEBUG
-            device = MockBLEDevice(type: .demo)
-            #else
-            device = OralableDevice(peripheral: peripheral)
-            #endif
+            switch deviceType {
+            case .oralable:
+                device = OralableDevice(peripheral: peripheral)
+            case .anr:
+                device = ANRMuscleSenseDevice(peripheral: peripheral, name: name)
+            case .demo:
+                #if DEBUG
+                device = MockBLEDevice(type: .demo)
+                #else
+                device = OralableDevice(peripheral: peripheral)
+                #endif
+            }
+
+            // Store device - KEY POINT: Using peripheral.identifier as the key
+            devices[peripheral.identifier] = device
+            Logger.shared.debug("[DeviceManager] 💾 New device instance created and stored")
+
+            // Subscribe to device sensor readings
+            subscribeToDevice(device)
+        } else {
+            Logger.shared.debug("[DeviceManager] 📦 Reusing existing device instance")
         }
-
-        // Store device - KEY POINT: Using peripheral.identifier as the key
-        devices[peripheral.identifier] = device
-        Logger.shared.debug("[DeviceManager] 💾 Device stored in devices dictionary")
-
-        // Subscribe to device sensor readings
-        subscribeToDevice(device)
 
         #if DEBUG
         Logger.shared.debug("[DeviceManager] 📊 Total devices in system:")
@@ -520,25 +523,26 @@ class DeviceManager: ObservableObject {
         reconnectionAttempts.removeAll()
     }
     
+    // MARK: - Device Type Detection
+    // UPDATED: December 8, 2025 - Stricter filtering to only accept Oralable and ANR devices
+    
     private func detectDeviceType(from name: String, peripheral: CBPeripheral) -> DeviceType? {
         let lowercaseName = name.lowercased()
 
-        // Check for Oralable by name
-        if lowercaseName.contains("oralable") ||
-           lowercaseName.contains("tgm") ||
-           lowercaseName.contains("n02cl") {
+        // Check for Oralable device - STRICT matching
+        if lowercaseName.contains("oralable") {
+            Logger.shared.info("[DeviceManager] ✅ Detected Oralable device: \(name)")
             return .oralable
         }
 
-        // Check for ANR
-        if lowercaseName.contains("anr") ||
-           lowercaseName.contains("muscle") ||
-           lowercaseName.contains("m40") ||
-           lowercaseName.contains("anr corp") {
+        // Check for ANR M40 device - STRICT matching
+        if lowercaseName.contains("anr") || lowercaseName.contains("m40") {
+            Logger.shared.info("[DeviceManager] ✅ Detected ANR device: \(name)")
             return .anr
         }
 
-        // Unknown device type
+        // Reject all other devices
+        Logger.shared.debug("[DeviceManager] ❌ Rejecting unknown device: \(name)")
         return nil
     }
     

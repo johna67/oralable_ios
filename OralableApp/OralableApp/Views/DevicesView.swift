@@ -5,6 +5,7 @@
 //  iOS Bluetooth Settings Style - Shows remembered and discovered devices
 //  Updated: Shows connection readiness state progression
 //  Updated: November 29, 2025 (Day 4) - Smart scan prevention
+//  Updated: December 8, 2025 - Fixed ANR showing "Failed" when actually working
 //
 
 import SwiftUI
@@ -181,12 +182,42 @@ struct DevicesView: View {
 
     // MARK: - Helper Methods
 
+    /// Get device readiness state with fallback for devices that show "failed" but are actually working
     private func getDeviceReadiness(id: String) -> ConnectionReadiness {
-        // Check if device is connected and get its readiness state
+        // Check if device is in connected devices list
         if let device = deviceManager.connectedDevices.first(where: { $0.peripheralIdentifier?.uuidString == id }) {
-            // Use UUID directly, not uuidString
             if let peripheralId = device.peripheralIdentifier {
-                return deviceManager.deviceReadiness[peripheralId] ?? .disconnected
+                let readiness = deviceManager.deviceReadiness[peripheralId] ?? .disconnected
+                
+                // FIX: If discovery failed but device is still connected, treat as Ready
+                // This handles ANR M40 devices that work but fail the standard discovery flow
+                if case .failed = readiness {
+                    // Device is in connectedDevices, so it's actually connected
+                    // Check if we're receiving data from this device type
+                    let deviceName = device.name.lowercased()
+                    
+                    if deviceName.contains("anr") || deviceName.contains("m40") {
+                        // ANR device - check if we have EMG data
+                        if deviceManagerAdapter.emgValue > 0 {
+                            Logger.shared.debug("[DevicesView] ANR shows failed but has EMG data - treating as Ready")
+                            return .ready
+                        }
+                    } else if deviceName.contains("oralable") {
+                        // Oralable device - check if we have PPG data
+                        if deviceManagerAdapter.ppgIRValue > 0 {
+                            Logger.shared.debug("[DevicesView] Oralable shows failed but has PPG data - treating as Ready")
+                            return .ready
+                        }
+                    }
+                    
+                    // If we're connected but no data yet, show as connected rather than failed
+                    if device.connectionState == .connected {
+                        Logger.shared.debug("[DevicesView] Device shows failed but is connected - treating as Connected")
+                        return .connected
+                    }
+                }
+                
+                return readiness
             }
         }
         return .disconnected

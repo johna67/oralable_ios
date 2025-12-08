@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Apple Health Style Dashboard - V1 Minimal
+//  Updated: December 8, 2025 - Added Movement to connection indicator, show g-units
 //
 
 import SwiftUI
@@ -49,8 +50,17 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 12) {
-                    // Dual device connection status indicator
-                    dualDeviceStatusIndicator(viewModel: viewModel)
+                    // Dual device connection status indicator (now includes Movement)
+                    deviceStatusIndicator(viewModel: viewModel)
+
+                    // Recording Button - at top for easy access
+                    RecordingButton(
+                        isRecording: viewModel.isRecording,
+                        isConnected: viewModel.isConnected,
+                        duration: viewModel.formattedDuration,
+                        action: { viewModel.toggleRecording() }
+                    )
+                    .padding(.vertical, 8)
 
                     // PPG Card (Oralable) - Shows IR sensor data
                     NavigationLink(destination: LazyView(
@@ -88,7 +98,7 @@ struct DashboardView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    // Movement card - CONDITIONAL
+                    // Movement card - CONDITIONAL - Now shows g-units
                     if featureFlags.showMovementCard {
                         NavigationLink(destination: LazyView(
                             HistoricalView(metricType: "Movement")
@@ -96,8 +106,9 @@ struct DashboardView: View {
                                 .environmentObject(dependencies.recordingSessionManager)
                         )) {
                             MovementMetricCard(
-                                value: viewModel.isConnected ? formatMovementValue(viewModel.movementVariability) : "N/A",
-                                unit: viewModel.isConnected ? (viewModel.isMoving ? "Active" : "Still") : "",
+                                value: viewModel.isConnected ? formatMovementInG(viewModel: viewModel) : "N/A",
+                                unit: viewModel.isConnected ? "g" : "",
+                                statusText: viewModel.isConnected ? (viewModel.isMoving ? "Active" : "Still") : "Not Connected",
                                 isActive: viewModel.isMoving,
                                 isConnected: viewModel.isConnected,
                                 sparklineData: Array(viewModel.accelerometerData.suffix(20)),
@@ -190,16 +201,6 @@ struct DashboardView: View {
                             showChevron: false
                         )
                     }
-
-                    // Recording Button
-                    RecordingButton(
-                        isRecording: viewModel.isRecording,
-                        isConnected: viewModel.isConnected,
-                        duration: viewModel.formattedDuration,
-                        action: { viewModel.toggleRecording() }
-                    )
-                    .padding(.top, 16)
-                    .padding(.bottom, 20)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -228,10 +229,14 @@ struct DashboardView: View {
         .onDisappear { viewModel.stopMonitoring() }
     }
 
-    // MARK: - Dual Device Status Indicator
-    private func dualDeviceStatusIndicator(viewModel: DashboardViewModel) -> some View {
-        VStack(spacing: 6) {
-            // Oralable status row
+    // MARK: - Device Status Indicator (PPG, EMG, Movement)
+    private func deviceStatusIndicator(viewModel: DashboardViewModel) -> some View {
+        // Get per-device battery levels
+        let oralableBattery = SensorDataProcessor.shared.getBatteryLevel(for: .oralable)
+        let anrBattery = SensorDataProcessor.shared.getBatteryLevel(for: .anr)
+        
+        return VStack(spacing: 6) {
+            // Oralable (PPG) status row with battery
             HStack(spacing: 8) {
                 Circle()
                     .fill(viewModel.oralableConnected ? Color.green : Color.gray)
@@ -251,12 +256,24 @@ struct DashboardView: View {
                 
                 Spacer()
                 
+                // Battery indicator for Oralable
+                if viewModel.oralableConnected && oralableBattery >= 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: batteryIconSmall(level: oralableBattery))
+                            .font(.system(size: 12))
+                            .foregroundColor(batteryColor(level: oralableBattery))
+                        Text("\(Int(oralableBattery))%")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 Text(viewModel.oralableConnected ? "Ready" : "Not Connected")
                     .font(.system(size: 12))
                     .foregroundColor(viewModel.oralableConnected ? .green : .secondary)
             }
             
-            // ANR M40 status row
+            // ANR M40 (EMG) status row with battery (N/A)
             HStack(spacing: 8) {
                 Circle()
                     .fill(viewModel.anrConnected ? Color.green : (viewModel.anrFailed ? Color.red : Color.gray))
@@ -276,9 +293,59 @@ struct DashboardView: View {
                 
                 Spacer()
                 
+                // Battery indicator for ANR - show N/A (battery < 0 means not available)
+                if viewModel.anrConnected {
+                    HStack(spacing: 2) {
+                        Image(systemName: "battery.0")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        Text(anrBattery >= 0 ? "\(Int(anrBattery))%" : "N/A")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 Text(viewModel.anrConnected ? "Ready" : (viewModel.anrFailed ? "Failed" : "Not Connected"))
                     .font(.system(size: 12))
                     .foregroundColor(viewModel.anrConnected ? .green : (viewModel.anrFailed ? .red : .secondary))
+            }
+            
+            // Movement (Accelerometer) status row - data from Oralable device
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(hasAccelerometerData(viewModel: viewModel) ? Color.green : Color.gray)
+                    .frame(width: 10, height: 10)
+                
+                Text("MOVE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green)
+                    .cornerRadius(4)
+                
+                Text("Oralable")
+                    .font(.system(size: 14))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                // Battery indicator for Oralable (same device as PPG)
+                if viewModel.oralableConnected && oralableBattery >= 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: batteryIconSmall(level: oralableBattery))
+                            .font(.system(size: 12))
+                            .foregroundColor(batteryColor(level: oralableBattery))
+                        Text("\(Int(oralableBattery))%")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Status: Match PPG row logic - "Not Connected" when Oralable disconnected
+                Text(viewModel.oralableConnected ? (hasAccelerometerData(viewModel: viewModel) ? "Ready" : "No Data") : "Not Connected")
+                    .font(.system(size: 12))
+                    .foregroundColor(hasAccelerometerData(viewModel: viewModel) ? .green : .secondary)
             }
         }
         .padding(.horizontal, 12)
@@ -286,6 +353,20 @@ struct DashboardView: View {
         .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 1)
+    }
+    
+    /// Small battery icon for status indicator
+    private func batteryIconSmall(level: Double) -> String {
+        if level > 75 { return "battery.100" }
+        if level > 50 { return "battery.75" }
+        if level > 25 { return "battery.50" }
+        if level > 0 { return "battery.25" }
+        return "battery.0"
+    }
+    
+    /// Check if we have accelerometer data (any axis non-zero)
+    private func hasAccelerometerData(viewModel: DashboardViewModel) -> Bool {
+        return viewModel.isConnected && (viewModel.accelXRaw != 0 || viewModel.accelYRaw != 0 || viewModel.accelZRaw != 0)
     }
 
     // MARK: - Helper Functions
@@ -304,7 +385,21 @@ struct DashboardView: View {
         return .green
     }
 
-    /// Format movement value for display
+    /// Calculate and format movement magnitude in g-units
+    /// Raw accelerometer values are in LSB units (±2g range = 16384 LSB/g)
+    private func formatMovementInG(viewModel: DashboardViewModel) -> String {
+        let x = Double(viewModel.accelXRaw)
+        let y = Double(viewModel.accelYRaw)
+        let z = Double(viewModel.accelZRaw)
+        
+        // Calculate magnitude and convert to g-units
+        // LIS2DTW12 at ±2g has 16384 LSB/g sensitivity
+        let magnitude = sqrt(x*x + y*y + z*z) / 16384.0
+        
+        return String(format: "%.2f", magnitude)
+    }
+
+    /// Format movement value for display (legacy - used for variability)
     /// Shows values in K notation for large numbers (e.g., 1.5K instead of 1500)
     private func formatMovementValue(_ value: Double) -> String {
         if value >= 1000 {
@@ -384,6 +479,7 @@ struct HealthMetricCard: View {
 struct MovementMetricCard: View {
     let value: String
     let unit: String
+    let statusText: String  // "Active", "Still", or "Not Connected"
     let isActive: Bool
     let isConnected: Bool
     let sparklineData: [Double]
@@ -399,7 +495,7 @@ struct MovementMetricCard: View {
         VStack(alignment: .leading, spacing: 8) {
             // Top row: icon, title, chevron
             HStack {
-                Image(systemName: "figure.walk")
+                Image(systemName: "gyroscope")
                     .font(.system(size: 20))
                     .foregroundColor(color)
 
@@ -428,6 +524,12 @@ struct MovementMetricCard: View {
                             .font(.system(size: 17))
                             .foregroundColor(.secondary)
                     }
+                    
+                    // Status indicator (Active/Still/Not Connected)
+                    Text(statusText)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isConnected ? (isActive ? .green : .blue) : .secondary)
+                        .padding(.leading, 8)
                 }
 
                 Spacer()

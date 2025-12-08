@@ -49,7 +49,7 @@ class SensorDataProcessor: ObservableObject {
     // ✅ FIXED: Per-device battery tracking
     @Published var batteryLevel: Double = 0.0  // Legacy: used by DeviceManagerAdapter for UI display
     private var batteryLevelOralable: Double = 0.0  // Battery for Oralable device
-    private var batteryLevelANR: Double = 0.0       // Battery for ANR M40 device
+    private var batteryLevelANR: Double = -1.0      // Battery for ANR M40 device (-1 = N/A, device doesn't report battery)
 
     // MARK: - Private Properties
 
@@ -74,14 +74,21 @@ class SensorDataProcessor: ObservableObject {
         case .oralable:
             batteryLevelOralable = level
             Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery: \(Int(level))%")
+            // Update legacy batteryLevel for UI display
+            batteryLevel = level
         case .anr:
             batteryLevelANR = level
-            Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: \(Int(level))%")
+            // Don't log percentage if N/A (-1)
+            if level >= 0 {
+                Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: \(Int(level))%")
+            } else {
+                Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: N/A")
+            }
+            // Don't update legacy batteryLevel for ANR (would be misleading if -1)
         case .demo:
             batteryLevelOralable = level  // Demo uses Oralable slot
+            batteryLevel = level
         }
-        // Also update legacy batteryLevel for UI display (use most recent)
-        batteryLevel = level
     }
     
     /// Get cached battery level for a specific device type
@@ -310,24 +317,19 @@ class SensorDataProcessor: ObservableObject {
         let hasPPG = readings.contains { $0.sensorType == .ppgRed || $0.sensorType == .ppgGreen }
         
         // Update per-device battery levels
+        // NOTE: Battery readings ONLY come from Oralable hardware
+        // ANR M40 does NOT have a battery characteristic
         if let batteryReading = readings.first(where: { $0.sensorType == .battery }) {
             await MainActor.run {
                 let batteryValue = batteryReading.value
                 
-                // Determine which device this battery belongs to based on other readings in batch
-                if hasEMG && !hasPPG {
-                    // Pure ANR M40 batch
-                    self.batteryLevelANR = batteryValue
-                    Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery from batch: \(Int(batteryValue))%")
-                } else if hasPPG && !hasEMG {
-                    // Pure Oralable batch
-                    self.batteryLevelOralable = batteryValue
-                    Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery from batch: \(Int(batteryValue))%")
-                } else {
-                    // Mixed or unknown - update legacy fallback
-                    self.batteryLevel = batteryValue
-                    Logger.shared.debug("[SensorDataProcessor] 🔋 Mixed batch battery: \(Int(batteryValue))%")
-                }
+                // Battery ALWAYS comes from Oralable (ANR M40 doesn't report battery)
+                // Even if the batch contains EMG data, the battery is from Oralable
+                self.batteryLevelOralable = batteryValue
+                Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery from batch: \(Int(batteryValue))%")
+                
+                // Also update legacy fallback
+                self.batteryLevel = batteryValue
             }
         }
 
@@ -386,7 +388,7 @@ class SensorDataProcessor: ObservableObject {
         
         // ✅ Also clear per-device battery levels
         batteryLevelOralable = 0.0
-        batteryLevelANR = 0.0
+        batteryLevelANR = -1.0  // ANR doesn't report battery, keep as N/A
         batteryLevel = 0.0
         
         Logger.shared.info("[SensorDataProcessor] ✅ Cleared all history data | Removed \(priorCount) sensor data entries | New count: \(sensorDataHistory.count)")

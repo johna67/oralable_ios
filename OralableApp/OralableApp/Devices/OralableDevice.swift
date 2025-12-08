@@ -1064,80 +1064,44 @@ extension OralableDevice: CBPeripheralDelegate {
 // MARK: - Accelerometer Conversion Utilities (Fix 4)
 
 /// Utility for converting raw LIS2DTW12 accelerometer values to physical units
-/// Based on LIS2DTW12 datasheet DS12825 Rev 4, Table 3
+/// Uses fixed-point conversion assuming ±2g full scale with 14-bit resolution
 struct AccelerometerConversion {
-    
-    // MARK: - Sensitivity Values (mg/digit at 14-bit mode)
-    
-    /// Sensitivity for ±2g full scale: 0.244 mg/digit
-    static let sensitivity2g: Double = 0.244
-    
-    /// Sensitivity for ±4g full scale: 0.488 mg/digit
-    static let sensitivity4g: Double = 0.488
-    
-    /// Sensitivity for ±8g full scale: 0.976 mg/digit
-    static let sensitivity8g: Double = 0.976
-    
-    /// Sensitivity for ±16g full scale: 1.952 mg/digit
-    static let sensitivity16g: Double = 1.952
-    
-    /// Current full scale setting (firmware default is ±2g)
-    static let currentFullScale: Int = 2
-    
+
     // MARK: - Conversion Methods
-    
-    /// Get sensitivity for given full scale
-    private static func sensitivity(forFullScale fullScale: Int) -> Double {
-        switch fullScale {
-        case 2: return sensitivity2g
-        case 4: return sensitivity4g
-        case 8: return sensitivity8g
-        case 16: return sensitivity16g
-        default: return sensitivity2g
-        }
-    }
-    
+
     /// Convert raw Int16 value to g (gravitational acceleration)
-    /// - Parameters:
-    ///   - rawValue: Raw accelerometer reading (Int16, two's complement)
-    ///   - fullScale: Full scale setting (2, 4, 8, or 16). Default is 2.
+    /// Uses fixed-point conversion: raw value / 16384 = g
+    /// This assumes ±2g full scale with 14-bit resolution
+    /// - Parameter rawValue: Raw accelerometer reading (Int16, two's complement)
     /// - Returns: Acceleration in g units
-    static func toG(_ rawValue: Int16, fullScale: Int = currentFullScale) -> Double {
-        let sens = sensitivity(forFullScale: fullScale)
-        // sensitivity is in mg/digit, divide by 1000 to get g
-        return Double(rawValue) * sens / 1000.0
+    static func toG(_ rawValue: Int16) -> Double {
+        return Double(rawValue) / 16384.0
     }
     
     /// Convert raw Int16 value to mg (milli-g)
-    /// - Parameters:
-    ///   - rawValue: Raw accelerometer reading (Int16)
-    ///   - fullScale: Full scale setting (2, 4, 8, or 16). Default is 2.
+    /// - Parameter rawValue: Raw accelerometer reading (Int16)
     /// - Returns: Acceleration in mg (milli-g)
-    static func toMilliG(_ rawValue: Int16, fullScale: Int = currentFullScale) -> Double {
-        let sens = sensitivity(forFullScale: fullScale)
-        return Double(rawValue) * sens
+    static func toMilliG(_ rawValue: Int16) -> Double {
+        return toG(rawValue) * 1000.0
     }
-    
+
     /// Convert raw Int16 value to m/s² (SI units)
-    /// - Parameters:
-    ///   - rawValue: Raw accelerometer reading (Int16)
-    ///   - fullScale: Full scale setting (2, 4, 8, or 16). Default is 2.
+    /// - Parameter rawValue: Raw accelerometer reading (Int16)
     /// - Returns: Acceleration in m/s²
-    static func toMeterPerSecondSquared(_ rawValue: Int16, fullScale: Int = currentFullScale) -> Double {
-        return toG(rawValue, fullScale: fullScale) * 9.80665  // Standard gravity
+    static func toMeterPerSecondSquared(_ rawValue: Int16) -> Double {
+        return toG(rawValue) * 9.80665  // Standard gravity
     }
-    
+
     /// Calculate magnitude from raw X, Y, Z values
     /// - Parameters:
     ///   - x: Raw X axis value (Int16)
     ///   - y: Raw Y axis value (Int16)
     ///   - z: Raw Z axis value (Int16)
-    ///   - fullScale: Full scale setting. Default is 2.
     /// - Returns: Magnitude in g units
-    static func magnitude(x: Int16, y: Int16, z: Int16, fullScale: Int = currentFullScale) -> Double {
-        let xG = toG(x, fullScale: fullScale)
-        let yG = toG(y, fullScale: fullScale)
-        let zG = toG(z, fullScale: fullScale)
+    static func magnitude(x: Int16, y: Int16, z: Int16) -> Double {
+        let xG = toG(x)
+        let yG = toG(y)
+        let zG = toG(z)
         return sqrt(xG * xG + yG * yG + zG * zG)
     }
     

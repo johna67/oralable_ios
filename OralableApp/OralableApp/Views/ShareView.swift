@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Share screen - Share code and connections management
+//  Updated: December 8, 2025 - Optimized CSV export performance
 //
 
 import SwiftUI
@@ -23,6 +24,8 @@ struct ShareView: View {
     @State private var exportURL: URL? = nil
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isExporting = false
+    @State private var exportProgress: String = ""
 
     var body: some View {
         NavigationView {
@@ -71,27 +74,45 @@ struct ShareView: View {
         Section {
             Button(action: exportCSV) {
                 HStack {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                        .frame(width: 32)
+                    if isExporting {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                            .frame(width: 32)
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                            .frame(width: 32)
+                    }
 
-                    Text("Export Data as CSV")
-                        .font(.system(size: 17))
-                        .foregroundColor(.primary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isExporting ? "Exporting..." : "Export Data as CSV")
+                            .font(.system(size: 17))
+                            .foregroundColor(.primary)
+                        
+                        if isExporting && !exportProgress.isEmpty {
+                            Text(exportProgress)
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                    }
 
                     Spacer()
 
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                    if !isExporting {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                    }
                 }
             }
             .buttonStyle(PlainButtonStyle())
+            .disabled(isExporting)
         } header: {
             Text("Export")
         } footer: {
-            Text("Export your sensor data for use in other applications")
+            let recordCount = sensorDataProcessor.sensorDataHistory.count
+            Text("Export your sensor data for use in other applications (\(recordCount) records)")
         }
     }
 
@@ -225,24 +246,60 @@ struct ShareView: View {
         }
     }
 
-    // MARK: - Export CSV
+    // MARK: - Export CSV (Optimized)
     private func exportCSV() {
         Task {
-            if let url = await generateCSVFile() {
+            await MainActor.run {
+                isExporting = true
+                exportProgress = "Preparing..."
+            }
+            
+            if let url = await generateCSVFileOptimized() {
                 await MainActor.run {
+                    isExporting = false
+                    exportProgress = ""
                     exportURL = url
                     showingExportSheet = true
+                }
+            } else {
+                await MainActor.run {
+                    isExporting = false
+                    exportProgress = ""
                 }
             }
         }
     }
 
-    private func generateCSVFile() async -> URL? {
+    /// Optimized CSV generation using array join instead of string concatenation
+    /// This is O(n) instead of O(n²) for string operations
+    private func generateCSVFileOptimized() async -> URL? {
         let sensorData = sensorDataProcessor.sensorDataHistory
-        var csvString = "Timestamp,Device_Type,EMG,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate\n"
-
+        let totalCount = sensorData.count
+        
+        guard totalCount > 0 else {
+            await MainActor.run {
+                errorMessage = "No data to export"
+                showError = true
+            }
+            return nil
+        }
+        
+        Logger.shared.info("[ShareView] 📊 Starting optimized CSV export with \(totalCount) records")
+        let startTime = Date()
+        
+        // Pre-allocate array capacity for performance
+        var lines: [String] = []
+        lines.reserveCapacity(totalCount + 1)
+        
+        // Header
+        lines.append("Timestamp,Device_Type,EMG,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate")
+        
         let dateFormatter = ISO8601DateFormatter()
-
+        
+        // Process in batches for UI updates
+        let batchSize = 1000
+        var processedCount = 0
+        
         for data in sensorData {
             let timestamp = dateFormatter.string(from: data.timestamp)
             let heartRate = data.heartRate?.bpm ?? 0
@@ -254,14 +311,12 @@ struct ShareView: View {
 
             switch data.deviceType {
             case .anr:
-                // ANR M40: EMG data is stored in ppg.ir, no actual PPG
                 deviceTypeName = "ANR M40"
-                emgValue = data.ppg.ir  // EMG muscle activity value
-                ppgIRValue = 0          // ANR doesn't have PPG
+                emgValue = data.ppg.ir
+                ppgIRValue = 0
             case .oralable:
-                // Oralable: PPG data, no EMG
                 deviceTypeName = "Oralable"
-                emgValue = 0            // Oralable doesn't have EMG
+                emgValue = 0
                 ppgIRValue = data.ppg.ir
             case .demo:
                 deviceTypeName = "Demo"
@@ -269,10 +324,30 @@ struct ShareView: View {
                 ppgIRValue = data.ppg.ir
             }
 
-            let line = "\(timestamp),\(deviceTypeName),\(emgValue),\(ppgIRValue),\(data.ppg.red),\(data.ppg.green),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.temperature.celsius),\(data.battery.percentage),\(heartRate)\n"
-            csvString.append(line)
+            // Build line using string interpolation (faster than repeated concatenation)
+            let line = "\(timestamp),\(deviceTypeName),\(emgValue),\(ppgIRValue),\(data.ppg.red),\(data.ppg.green),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.temperature.celsius),\(data.battery.percentage),\(heartRate)"
+            lines.append(line)
+            
+            processedCount += 1
+            
+            // Update progress every batch
+            if processedCount % batchSize == 0 {
+                let progress = Double(processedCount) / Double(totalCount) * 100
+                await MainActor.run {
+                    exportProgress = "Processing \(processedCount)/\(totalCount) (\(Int(progress))%)"
+                }
+                // Yield to allow UI updates
+                await Task.yield()
+            }
         }
-
+        
+        await MainActor.run {
+            exportProgress = "Writing file..."
+        }
+        
+        // Join all lines at once (O(n) operation)
+        let csvString = lines.joined(separator: "\n")
+        
         let fileName = "oralable_data_\(Int(Date().timeIntervalSince1970)).csv"
         
         // Save to Documents directory (for History view to find)
@@ -281,13 +356,19 @@ struct ShareView: View {
 
         do {
             try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
-            Logger.shared.info("[ShareView] ✅ CSV file saved to Documents: \(fileName) with \(sensorData.count) records")
+            
+            let elapsed = Date().timeIntervalSince(startTime)
+            Logger.shared.info("[ShareView] ✅ CSV export complete: \(fileName) | \(totalCount) records | \(String(format: "%.2f", elapsed))s")
+            
             return fileURL
         } catch {
             Logger.shared.error("[ShareView] ❌ Failed to create CSV: \(error.localizedDescription)")
+            await MainActor.run {
+                errorMessage = "Failed to save CSV: \(error.localizedDescription)"
+                showError = true
+            }
             return nil
         }
-    
     }
 }
 

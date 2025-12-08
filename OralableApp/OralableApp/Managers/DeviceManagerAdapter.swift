@@ -5,6 +5,7 @@
 //  Created: November 24, 2025
 //  Purpose: Adapts DeviceManager to BLEManagerProtocol for compatibility with existing ViewModels
 //  Updated: December 7, 2025 - Added EMG support for ANR M40 dual-device
+//  Updated: December 8, 2025 - Fixed battery tracking: only Oralable reports battery, ANR shows 100%
 //
 
 import Foundation
@@ -90,9 +91,8 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
             .store(in: &cancellables)
 
         // Subscribe to BATCH publisher for history storage
-        // Throttle to 1 update per second to prevent flooding from multiple subscribers
-        // Update legacy sensor data less frequently (every 3 seconds)
-        // COLLECT all readings over the interval instead of just taking latest
+        // COLLECT all readings over 3 second intervals instead of just taking latest
+        // This ensures we don't miss any readings while reducing processing frequency
         deviceManager.readingsBatchPublisher
             .collect(.byTime(DispatchQueue.main, .seconds(3)))
             .sink { [weak self] batchesOfReadings in
@@ -101,18 +101,6 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
                 if !allReadings.isEmpty {
                     Task {
                         await self.sensorDataProcessor.updateLegacySensorData(with: allReadings)
-                    }
-                }
-            }
-            .store(in: &cancellables)
-        // Update legacy sensor data less frequently (every 3 seconds)
-        deviceManager.readingsBatchPublisher
-            .throttle(for: .seconds(3), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] readings in
-                guard let self = self else { return }
-                if !readings.isEmpty {
-                    Task {
-                        await self.sensorDataProcessor.updateLegacySensorData(with: readings)
                     }
                 }
             }
@@ -152,13 +140,24 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
             Logger.shared.info("[DeviceManagerAdapter] 🌡️ Temperature: \(String(format: "%.1f", temperature))°C")
         }
 
-        // Update battery
+        // ✅ FIXED: Battery ONLY comes from Oralable device
+        // ANR M40 does NOT have a battery characteristic - it doesn't report battery level
         if let reading = readings[.battery] {
             batteryLevel = reading.value
-            // ✅ FIXED: Also update SensorDataProcessor.batteryLevel so CSV export gets the correct value
-            // Battery readings come via latestReadings but are often throttled out of readingsBatchPublisher
-            sensorDataProcessor.batteryLevel = reading.value
-            Logger.shared.info("[DeviceManagerAdapter] 🔋 Battery: \(Int(batteryLevel))% (synced to SensorDataProcessor)")
+            
+            // Battery readings ONLY come from Oralable hardware
+            // Always attribute to Oralable regardless of what's connected
+            sensorDataProcessor.updateBatteryLevel(reading.value, for: .oralable)
+            Logger.shared.info("[DeviceManagerAdapter] 🔋 Oralable Battery: \(Int(batteryLevel))%")
+            
+            // Check if ANR is connected - set to -1 to indicate "N/A" (not available)
+            let connectedDeviceNames = deviceManager.connectedDevices.map { $0.name.lowercased() }
+            let hasANR = connectedDeviceNames.contains { $0.contains("anr") || $0.contains("m40") || $0.contains("muscle") }
+            if hasANR {
+                // ANR M40 doesn't report battery - set to -1 to indicate "N/A"
+                sensorDataProcessor.updateBatteryLevel(-1.0, for: .anr)
+                Logger.shared.debug("[DeviceManagerAdapter] 🔋 ANR M40 Battery: N/A")
+            }
         }
 
         // Update EMG value (ANR M40)
