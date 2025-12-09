@@ -1,6 +1,6 @@
 //
-//  DentistHistoricalDataModels.swift
-//  OralableForDentists
+//  ProfessionalHistoricalDataModels.swift
+//  OralableForProfessionals
 //
 //  Historical data models for displaying patient charts (mirrors OralableApp)
 //

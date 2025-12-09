@@ -25,7 +25,7 @@ class FeatureFlags: ObservableObject {
         static let showSpO2Card = "feature.dashboard.showSpO2"
         static let showAccelerometerCard = "feature.dashboard.showAccelerometer"
         static let showBatteryCard = "feature.dashboard.showBattery"
-        static let showShareWithDentist = "feature.share.showDentist"
+        static let showShareWithProfessional = "feature.share.showProfessional"
         static let showShareWithResearcher = "feature.share.showResearcher"
         static let showSubscription = "feature.settings.showSubscription"
         static let showHealthIntegration = "feature.settings.showHealthIntegration"
@@ -41,9 +41,9 @@ class FeatureFlags: ObservableObject {
         static let showSpO2Card = false
         static let showAccelerometerCard = false
         static let showBatteryCard = false  // Hidden for pre-launch
-        static let showShareWithDentist = false
+        static let showShareWithProfessional = true
         static let showShareWithResearcher = false
-        static let showSubscription = false
+        static let showSubscription = true
         static let showHealthIntegration = false
         static let showAdvancedMetrics = false
         static let showDetectionSettings = false  // Hidden for pre-launch
@@ -79,8 +79,8 @@ class FeatureFlags: ObservableObject {
     }
 
     // MARK: - Share Features
-    @Published var showShareWithDentist: Bool {
-        didSet { defaults.set(showShareWithDentist, forKey: Keys.showShareWithDentist) }
+    @Published var showShareWithProfessional: Bool {
+        didSet { defaults.set(showShareWithProfessional, forKey: Keys.showShareWithProfessional) }
     }
 
     @Published var showShareWithResearcher: Bool {
@@ -110,7 +110,7 @@ class FeatureFlags: ObservableObject {
         self.showAccelerometerCard = defaults.object(forKey: Keys.showAccelerometerCard) as? Bool ?? Defaults.showAccelerometerCard
         self.showBatteryCard = defaults.object(forKey: Keys.showBatteryCard) as? Bool ?? Defaults.showBatteryCard
         self.showAdvancedMetrics = defaults.object(forKey: Keys.showAdvancedMetrics) as? Bool ?? Defaults.showAdvancedMetrics
-        self.showShareWithDentist = defaults.object(forKey: Keys.showShareWithDentist) as? Bool ?? Defaults.showShareWithDentist
+        self.showShareWithProfessional = defaults.object(forKey: Keys.showShareWithProfessional) as? Bool ?? Defaults.showShareWithProfessional
         self.showShareWithResearcher = defaults.object(forKey: Keys.showShareWithResearcher) as? Bool ?? Defaults.showShareWithResearcher
         self.showSubscription = defaults.object(forKey: Keys.showSubscription) as? Bool ?? Defaults.showSubscription
         self.showHealthIntegration = defaults.object(forKey: Keys.showHealthIntegration) as? Bool ?? Defaults.showHealthIntegration
@@ -130,7 +130,7 @@ class FeatureFlags: ObservableObject {
         showAccelerometerCard = false
         showBatteryCard = false
         showAdvancedMetrics = false
-        showShareWithDentist = false
+        showShareWithProfessional = true
         showShareWithResearcher = false
         showSubscription = false
         showHealthIntegration = false
@@ -147,7 +147,7 @@ class FeatureFlags: ObservableObject {
         showAccelerometerCard = true
         showBatteryCard = true
         showAdvancedMetrics = true
-        showShareWithDentist = true
+        showShareWithProfessional = true
         showShareWithResearcher = true
         showSubscription = true
         showHealthIntegration = true
@@ -164,7 +164,7 @@ class FeatureFlags: ObservableObject {
         showAccelerometerCard = true
         showBatteryCard = true
         showAdvancedMetrics = true
-        showShareWithDentist = false
+        showShareWithProfessional = true
         showShareWithResearcher = false
         showSubscription = true
         showHealthIntegration = true
@@ -181,7 +181,7 @@ class FeatureFlags: ObservableObject {
         showAccelerometerCard = true
         showBatteryCard = true
         showAdvancedMetrics = true
-        showShareWithDentist = false
+        showShareWithProfessional = true
         showShareWithResearcher = true
         showSubscription = true
         showHealthIntegration = true
@@ -205,7 +205,7 @@ class FeatureFlags: ObservableObject {
         - Accelerometer Card: \(showAccelerometerCard)
         - Battery Card: \(showBatteryCard)
         - ANR M40 Device Support: \(showAdvancedMetrics)
-        - Share with Dentist: \(showShareWithDentist)
+        - Share with Professional: \(showShareWithProfessional)
         - Share with Researcher: \(showShareWithResearcher)
         - Subscription: \(showSubscription)
         - Health Integration: \(showHealthIntegration)

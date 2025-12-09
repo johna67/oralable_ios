@@ -139,7 +139,7 @@ struct HealthKitPermissionView: View {
 
                 BenefitRow(
                     icon: "person.fill.checkmark",
-                    text: "Provide comprehensive reports to your dentist"
+                    text: "Provide comprehensive reports to your provider"
                 )
 
                 BenefitRow(

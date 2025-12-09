@@ -2,10 +2,10 @@ import SwiftUI
 import StoreKit
 
 struct UpgradePromptView: View {
-    @EnvironmentObject var subscriptionManager: DentistSubscriptionManager
+    @EnvironmentObject var subscriptionManager: ProfessionalSubscriptionManager
     @Environment(\.dismiss) var dismiss
 
-    @State private var selectedTier: DentistSubscriptionTier = .professional
+    @State private var selectedTier: ProfessionalSubscriptionTier = .professional
     @State private var isPurchasing = false
     @State private var errorMessage: String?
 
@@ -46,7 +46,7 @@ struct UpgradePromptView: View {
 
                 // Tier Cards
                 VStack(spacing: 16) {
-                    ForEach(DentistSubscriptionTier.allCases.filter { $0 != .starter }, id: \.self) { tier in
+                    ForEach(ProfessionalSubscriptionTier.allCases.filter { $0 != .starter }, id: \.self) { tier in
                         TierCard(
                             tier: tier,
                             isSelected: selectedTier == tier,
@@ -132,9 +132,9 @@ struct UpgradePromptView: View {
         let productID: String
         switch selectedTier {
         case .professional:
-            productID = "com.jacdental.oralable.dentist.professional.monthly"
+            productID = "com.jacdental.oralable.professional.professional.monthly"
         case .practice:
-            productID = "com.jacdental.oralable.dentist.practice.monthly"
+            productID = "com.jacdental.oralable.professional.practice.monthly"
         case .starter:
             return // Can't purchase free tier
         }
@@ -157,7 +157,7 @@ struct UpgradePromptView: View {
 // MARK: - Tier Card
 
 struct TierCard: View {
-    let tier: DentistSubscriptionTier
+    let tier: ProfessionalSubscriptionTier
     let isSelected: Bool
     let isCurrent: Bool
     let onSelect: () -> Void
@@ -242,7 +242,7 @@ struct FeatureComparisonTable: View {
         ("Analytics", ["Basic", "Advanced", "Practice-wide"]),
         ("Support", ["Email", "Priority", "Dedicated"]),
         ("API Access", ["-", "✓", "✓"]),
-        ("Multi-Dentist", ["-", "-", "✓"])
+        ("Multi-Professional", ["-", "-", "✓"])
     ]
 
     var body: some View {
@@ -302,6 +302,6 @@ struct FeatureComparisonTable: View {
 #Preview {
     NavigationView {
         UpgradePromptView()
-            .environmentObject(DentistSubscriptionManager.shared)
+            .environmentObject(ProfessionalSubscriptionManager.shared)
     }
 }

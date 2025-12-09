@@ -1,7 +1,7 @@
 import SwiftUI
 
-// MARK: - Share with Dentist Component
-struct ShareWithDentistSection: View {
+// MARK: - Share with Professional Component
+struct ShareWithProfessionalSection: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var sharedDataManager: SharedDataManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
@@ -20,10 +20,10 @@ struct ShareWithDentistSection: View {
                     .foregroundColor(.black)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Share with Dentist")
+                    Text("Share with Professional")
                         .font(designSystem.typography.headline)
 
-                    Text("Allow your dentist to view your data")
+                    Text("Allow your healthcare professional to view your data")
                         .font(designSystem.typography.caption)
                         .foregroundColor(designSystem.colors.textSecondary)
                 }
@@ -33,7 +33,7 @@ struct ShareWithDentistSection: View {
 
             // Generate Share Code Button
             Button(action: {
-                if subscriptionManager.currentTier == .basic && sharedDataManager.sharedDentists.count >= 1 {
+                if subscriptionManager.currentTier == .basic && sharedDataManager.sharedProfessionals.count >= 1 {
                     showUpgradePrompt = true
                 } else {
                     generateShareCode()
@@ -76,8 +76,8 @@ struct ShareWithDentistSection: View {
                 .cornerRadius(12)
             }
 
-            // List of shared dentists
-            if !sharedDataManager.sharedDentists.isEmpty {
+            // List of shared professionals
+            if !sharedDataManager.sharedProfessionals.isEmpty {
                 Divider()
                     .padding(.vertical, 8)
 
@@ -85,8 +85,8 @@ struct ShareWithDentistSection: View {
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textSecondary)
 
-                ForEach(sharedDataManager.sharedDentists) { dentist in
-                    SharedDentistRow(dentist: dentist)
+                ForEach(sharedDataManager.sharedProfessionals) { professional in
+                    SharedProfessionalRow(professional: professional)
                 }
             }
 
@@ -94,7 +94,7 @@ struct ShareWithDentistSection: View {
             if subscriptionManager.currentTier == .basic {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
-                    Text("Basic tier: Share with 1 dentist")
+                    Text("Basic tier: Share with 1 professional")
                         .font(designSystem.typography.caption)
                 }
                 .foregroundColor(designSystem.colors.textSecondary)
@@ -120,7 +120,7 @@ struct ShareWithDentistSection: View {
                 shareCode = try await sharedDataManager.createShareInvitation()
                 showShareCode = true
             } catch {
-                Logger.shared.error("[ShareWithDentistSection] Error generating share code: \(error)")
+                Logger.shared.error("[ShareWithProfessionalSection] Error generating share code: \(error)")
                 errorMessage = "Failed to generate share code: \(error.localizedDescription)"
                 showError = true
             }
@@ -128,19 +128,19 @@ struct ShareWithDentistSection: View {
     }
 }
 
-struct SharedDentistRow: View {
+struct SharedProfessionalRow: View {
     @EnvironmentObject var designSystem: DesignSystem
     @EnvironmentObject var sharedDataManager: SharedDataManager
-    let dentist: SharedDentist
+    let professional: SharedProfessional
     @State private var showRevokeConfirmation = false
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(dentist.dentistName ?? "Dentist")
+                Text(professional.professionalName ?? "Professional")
                     .font(designSystem.typography.body)
 
-                Text("Shared: \(dentist.sharedDate.formatted(date: .abbreviated, time: .omitted))")
+                Text("Shared: \(professional.sharedDate.formatted(date: .abbreviated, time: .omitted))")
                     .font(designSystem.typography.caption)
                     .foregroundColor(designSystem.colors.textSecondary)
             }
@@ -162,16 +162,16 @@ struct SharedDentistRow: View {
                 revokeAccess()
             }
         } message: {
-            Text("This dentist will no longer be able to view your data.")
+            Text("This professional will no longer be able to view your data.")
         }
     }
 
     private func revokeAccess() {
         Task {
             do {
-                try await sharedDataManager.revokeAccessForDentist(dentistID: dentist.dentistID)
+                try await sharedDataManager.revokeAccessForProfessional(professionalID: professional.professionalID)
             } catch {
-                Logger.shared.error("[revoking access: \(error)")
+                Logger.shared.error("[SharedProfessionalRow] Error revoking access: \(error)")
             }
         }
     }

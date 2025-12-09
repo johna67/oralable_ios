@@ -2,9 +2,9 @@ import Foundation
 import StoreKit
 import Combine
 
-// MARK: - Dentist Subscription Tiers
+// MARK: - Professional Subscription Tiers
 
-enum DentistSubscriptionTier: String, Codable, CaseIterable {
+enum ProfessionalSubscriptionTier: String, Codable, CaseIterable {
     case starter = "starter"       // Free - up to 5 patients
     case professional = "professional"  // €29.99/month - up to 50 patients
     case practice = "practice"     // €99.99/month - unlimited patients
@@ -64,7 +64,7 @@ enum DentistSubscriptionTier: String, Codable, CaseIterable {
         case .practice:
             return [
                 "Unlimited patients",
-                "Multi-dentist access",
+                "Multi-professional access",
                 "Practice-wide analytics",
                 "White-label reports",
                 "Dedicated support",
@@ -79,15 +79,15 @@ enum DentistSubscriptionTier: String, Codable, CaseIterable {
     }
 }
 
-// MARK: - Dentist Subscription Manager
+// MARK: - Professional Subscription Manager
 
 @MainActor
-class DentistSubscriptionManager: ObservableObject {
-    static let shared = DentistSubscriptionManager()
+class ProfessionalSubscriptionManager: ObservableObject {
+    static let shared = ProfessionalSubscriptionManager()
 
     // MARK: - Published Properties
 
-    @Published var currentTier: DentistSubscriptionTier = .starter
+    @Published var currentTier: ProfessionalSubscriptionTier = .starter
     @Published var isSubscriptionActive: Bool = false
     @Published var subscriptionExpiryDate: Date?
     @Published var availableProducts: [Product] = []
@@ -107,10 +107,10 @@ class DentistSubscriptionManager: ObservableObject {
     // MARK: - Product Identifiers
 
     private enum ProductIdentifier {
-        static let professionalMonthly = "com.jacdental.oralable.dentist.professional.monthly"
-        static let professionalYearly = "com.jacdental.oralable.dentist.professional.yearly"
-        static let practiceMonthly = "com.jacdental.oralable.dentist.practice.monthly"
-        static let practiceYearly = "com.jacdental.oralable.dentist.practice.yearly"
+        static let professionalMonthly = "com.jacdental.oralable.professional.monthly"
+        static let professionalYearly = "com.jacdental.oralable.professional.yearly"
+        static let practiceMonthly = "com.jacdental.oralable.practice.monthly"
+        static let practiceYearly = "com.jacdental.oralable.practice.yearly"
     }
 
     // MARK: - Initialization
@@ -216,7 +216,7 @@ class DentistSubscriptionManager: ObservableObject {
     // MARK: - Subscription Status
 
     func loadSubscriptionStatus() async {
-        var highestTier: DentistSubscriptionTier = .starter
+        var highestTier: ProfessionalSubscriptionTier = .starter
         var isActive = false
         var expiryDate: Date?
 
@@ -282,7 +282,7 @@ class DentistSubscriptionManager: ObservableObject {
 
     // MARK: - Helper Methods
 
-    private func tierForProductID(_ productID: String) -> DentistSubscriptionTier? {
+    private func tierForProductID(_ productID: String) -> ProfessionalSubscriptionTier? {
         switch productID {
         case ProductIdentifier.professionalMonthly,
              ProductIdentifier.professionalYearly:
@@ -311,12 +311,12 @@ class DentistSubscriptionManager: ObservableObject {
         return count >= currentTier.maxPatients
     }
 
-    func suggestedUpgradeTier(forPatientCount count: Int) -> DentistSubscriptionTier? {
-        if count >= DentistSubscriptionTier.practice.maxPatients {
+    func suggestedUpgradeTier(forPatientCount count: Int) -> ProfessionalSubscriptionTier? {
+        if count >= ProfessionalSubscriptionTier.practice.maxPatients {
             return .practice
-        } else if count >= DentistSubscriptionTier.professional.maxPatients {
+        } else if count >= ProfessionalSubscriptionTier.professional.maxPatients {
             return .professional
-        } else if count >= DentistSubscriptionTier.starter.maxPatients {
+        } else if count >= ProfessionalSubscriptionTier.starter.maxPatients {
             return .professional
         }
         return nil

@@ -230,7 +230,7 @@ class RecordingSessionManager: ObservableObject {
         Logger.shared.info(" [RecordingSessionManager] Stopped session: \(session.id) - Duration: \(session.formattedDuration)")
         saveSessions()
 
-        // Upload session to CloudKit for dentist access
+        // Upload session to CloudKit for professional access
         uploadSessionToCloudKit(session)
     }
 

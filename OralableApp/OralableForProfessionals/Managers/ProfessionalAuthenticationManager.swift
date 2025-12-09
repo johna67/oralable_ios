@@ -1,8 +1,8 @@
 //
-//  DentistAuthenticationManager.swift
-//  OralableForDentists
+//  ProfessionalAuthenticationManager.swift
+//  OralableForProfessionals
 //
-//  Manages authentication for dentist app using Sign in with Apple
+//  Manages authentication for professional app using Sign in with Apple
 //  Inherits common Apple Sign In functionality from BaseAuthenticationManager
 //
 
@@ -10,26 +10,26 @@ import Foundation
 import AuthenticationServices
 import SwiftUI
 
-/// Dentist app authentication manager
+/// Professional app authentication manager
 /// Inherits common Apple Sign In functionality from BaseAuthenticationManager
 @MainActor
-class DentistAuthenticationManager: BaseAuthenticationManager {
+class ProfessionalAuthenticationManager: BaseAuthenticationManager {
 
-    // MARK: - Dentist-Specific Properties
+    // MARK: - Professional-Specific Properties
 
-    /// Convenience accessors for dentist-specific naming
-    var dentistID: String? { userID }
-    var dentistName: String? { userFullName }
-    var dentistEmail: String? { userEmail }
+    /// Convenience accessors for professional-specific naming
+    var professionalID: String? { userID }
+    var professionalName: String? { userFullName }
+    var professionalEmail: String? { userEmail }
 
     // MARK: - Keychain Configuration Override
 
-    /// Override to use dentist-specific keychain keys
+    /// Override to use professional-specific keychain keys
     override var keychainKeys: (userID: String, email: String, fullName: String) {
         return (
-            "com.oralable.dentist.userID",
-            "com.oralable.dentist.userEmail",
-            "com.oralable.dentist.userFullName"
+            "com.oralable.professional.userID",
+            "com.oralable.professional.userEmail",
+            "com.oralable.professional.userFullName"
         )
     }
 
@@ -41,20 +41,20 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
         // Migrate any existing UserDefaults data to Keychain
         migrateFromUserDefaults()
 
-        Logger.shared.info("[DentistAuth] Dentist authentication manager initialized")
+        Logger.shared.info("[ProfessionalAuth] Professional authentication manager initialized")
     }
 
     // MARK: - Migration from UserDefaults
 
     /// Migrate authentication data from UserDefaults to secure Keychain storage
     private func migrateFromUserDefaults() {
-        let userIDKey = "dentistAppleID"
-        let nameKey = "dentistName"
-        let emailKey = "dentistEmail"
+        let userIDKey = "professionalAppleID"
+        let nameKey = "professionalName"
+        let emailKey = "professionalEmail"
 
         // Check if there's data in UserDefaults that needs migration
         if let oldUserID = UserDefaults.standard.string(forKey: userIDKey) {
-            Logger.shared.info("[DentistAuth] Migrating authentication data from UserDefaults to Keychain")
+            Logger.shared.info("[ProfessionalAuth] Migrating authentication data from UserDefaults to Keychain")
 
             let oldName = UserDefaults.standard.string(forKey: nameKey)
             let oldEmail = UserDefaults.standard.string(forKey: emailKey)
@@ -73,7 +73,7 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
             UserDefaults.standard.removeObject(forKey: nameKey)
             UserDefaults.standard.removeObject(forKey: emailKey)
 
-            Logger.shared.info("[DentistAuth] Migration complete - data now securely stored in Keychain")
+            Logger.shared.info("[ProfessionalAuth] Migration complete - data now securely stored in Keychain")
         }
     }
 
@@ -81,32 +81,32 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
 
     /// Check if the Apple ID credential is still valid
     func checkCredentialState() async {
-        guard let dentistID = dentistID else { return }
+        guard let professionalID = professionalID else { return }
 
         let provider = ASAuthorizationAppleIDProvider()
 
         do {
-            let state = try await provider.credentialState(forUserID: dentistID)
+            let state = try await provider.credentialState(forUserID: professionalID)
 
             await MainActor.run {
                 switch state {
                 case .authorized:
                     self.isAuthenticated = true
-                    Logger.shared.info("[DentistAuth] Credential state: authorized")
+                    Logger.shared.info("[ProfessionalAuth] Credential state: authorized")
 
                 case .revoked, .notFound:
-                    Logger.shared.warning("[DentistAuth] Credential state: revoked/not found - signing out")
+                    Logger.shared.warning("[ProfessionalAuth] Credential state: revoked/not found - signing out")
                     self.signOut()
 
                 case .transferred:
-                    Logger.shared.warning("[DentistAuth] Credential transferred")
+                    Logger.shared.warning("[ProfessionalAuth] Credential transferred")
 
                 @unknown default:
-                    Logger.shared.warning("[DentistAuth] Unknown credential state")
+                    Logger.shared.warning("[ProfessionalAuth] Unknown credential state")
                 }
             }
         } catch {
-            Logger.shared.error("[DentistAuth] Failed to check credential state: \(error)")
+            Logger.shared.error("[ProfessionalAuth] Failed to check credential state: \(error)")
         }
     }
 
@@ -115,12 +115,12 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
     /// Deletes all user data and signs out
     /// This is required by Apple for apps that support account creation
     func deleteAccount() async {
-        Logger.shared.info("[DentistAuth] 🗑️ Starting account deletion process")
+        Logger.shared.info("[ProfessionalAuth] 🗑️ Starting account deletion process")
 
         // Clear all UserDefaults
         clearAllUserDefaults()
 
-        // Clear Keychain data (includes dentist-specific keys)
+        // Clear Keychain data (includes professional-specific keys)
         clearAllKeychainData()
 
         // Delete all authentication data from parent class
@@ -133,16 +133,16 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
         userFullName = nil
         authenticationError = nil
 
-        Logger.shared.info("[DentistAuth] 🗑️ Account deletion completed - local data cleared")
+        Logger.shared.info("[ProfessionalAuth] 🗑️ Account deletion completed - local data cleared")
     }
 
     private func clearAllUserDefaults() {
         let defaults = UserDefaults.standard
 
         // Legacy authentication keys
-        defaults.removeObject(forKey: "dentistAppleID")
-        defaults.removeObject(forKey: "dentistName")
-        defaults.removeObject(forKey: "dentistEmail")
+        defaults.removeObject(forKey: "professionalAppleID")
+        defaults.removeObject(forKey: "professionalName")
+        defaults.removeObject(forKey: "professionalEmail")
 
         // App state keys
         defaults.removeObject(forKey: "hasLaunchedBefore")
@@ -161,7 +161,7 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
         // Sync to disk
         defaults.synchronize()
 
-        Logger.shared.info("[DentistAuth] 🗑️ UserDefaults cleared")
+        Logger.shared.info("[ProfessionalAuth] 🗑️ UserDefaults cleared")
     }
 
     private func clearAllKeychainData() {
@@ -179,6 +179,6 @@ class DentistAuthenticationManager: BaseAuthenticationManager {
             SecItemDelete(query as CFDictionary)
         }
 
-        Logger.shared.info("[DentistAuth] 🗑️ Keychain data cleared")
+        Logger.shared.info("[ProfessionalAuth] 🗑️ Keychain data cleared")
     }
 }

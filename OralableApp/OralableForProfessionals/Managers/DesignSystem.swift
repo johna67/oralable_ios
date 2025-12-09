@@ -1,6 +1,6 @@
 //
 //  DesignSystem.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Shared design system - matches OralableApp
 //

@@ -24,7 +24,7 @@ enum SubscriptionTier: String, Codable {
                 "View real-time sensor data",
                 "Daily/weekly summaries",
                 "Basic data export",
-                "Share with ONE dentist"
+                "Share with ONE professional"
             ]
         case .premium:
             return [
@@ -345,7 +345,7 @@ class SubscriptionManager: ObservableObject {
 
     // MARK: - Feature Access
 
-    func canShareWithMultipleDentists() -> Bool {
+    func canShareWithMultipleProfessionals() -> Bool {
         return currentTier == .premium
     }
 
@@ -357,7 +357,7 @@ class SubscriptionManager: ObservableObject {
         return currentTier == .premium
     }
 
-    func maxDentistShares() -> Int {
+    func maxProfessionalShares() -> Int {
         switch currentTier {
         case .basic:
             return 1

@@ -3,23 +3,23 @@ import Combine
 import StoreKit
 
 @MainActor
-class DentistSettingsViewModel: ObservableObject {
+class ProfessionalSettingsViewModel: ObservableObject {
     // MARK: - Published Properties
 
-    @Published var currentTier: DentistSubscriptionTier = .starter
+    @Published var currentTier: ProfessionalSubscriptionTier = .starter
     @Published var isSubscriptionActive: Bool = false
     @Published var subscriptionExpiryDate: Date?
     @Published var availableProducts: [Product] = []
     @Published var isPurchasing: Bool = false
     @Published var showingUpgradeSheet: Bool = false
     @Published var errorMessage: String?
-    @Published var dentistName: String?
-    @Published var dentistEmail: String?
+    @Published var professionalName: String?
+    @Published var professionalEmail: String?
 
     // MARK: - Dependencies
 
-    private let subscriptionManager: DentistSubscriptionManager
-    private let authenticationManager: DentistAuthenticationManager
+    private let subscriptionManager: ProfessionalSubscriptionManager
+    private let authenticationManager: ProfessionalAuthenticationManager
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Computed Properties
@@ -43,7 +43,7 @@ class DentistSettingsViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(subscriptionManager: DentistSubscriptionManager, authenticationManager: DentistAuthenticationManager) {
+    init(subscriptionManager: ProfessionalSubscriptionManager, authenticationManager: ProfessionalAuthenticationManager) {
         self.subscriptionManager = subscriptionManager
         self.authenticationManager = authenticationManager
 
@@ -75,11 +75,11 @@ class DentistSettingsViewModel: ObservableObject {
         // Subscribe to authentication manager updates
         authenticationManager.$userFullName
             .receive(on: DispatchQueue.main)
-            .assign(to: &$dentistName)
+            .assign(to: &$professionalName)
 
         authenticationManager.$userEmail
             .receive(on: DispatchQueue.main)
-            .assign(to: &$dentistEmail)
+            .assign(to: &$professionalEmail)
     }
 
     // MARK: - Actions

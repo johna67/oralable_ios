@@ -1,6 +1,6 @@
 //
 //  PatientListView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Apple Health Style - matches OralableApp
 //
@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct PatientListView: View {
-    @EnvironmentObject var dependencies: DentistAppDependencies
+    @EnvironmentObject var dependencies: ProfessionalAppDependencies
     @StateObject private var viewModel: PatientListViewModel
 
     init() {
         _viewModel = StateObject(wrappedValue: PatientListViewModel(
-            dataManager: DentistDataManager.shared,
-            subscriptionManager: DentistSubscriptionManager.shared
+            dataManager: ProfessionalDataManager.shared,
+            subscriptionManager: ProfessionalSubscriptionManager.shared
         ))
     }
 
@@ -137,7 +137,7 @@ struct PatientListView: View {
 }
 
 struct PatientRowCard: View {
-    let patient: DentistPatient
+    let patient: ProfessionalPatient
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

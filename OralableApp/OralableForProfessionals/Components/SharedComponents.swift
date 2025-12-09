@@ -1,6 +1,6 @@
 //
 //  SharedComponents.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Reusable UI components matching OralableApp style
 //

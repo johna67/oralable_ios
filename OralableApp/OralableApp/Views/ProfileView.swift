@@ -85,7 +85,7 @@ struct ProfileView: View {
                 deleteAccount()
             }
         } message: {
-            Text("All your data including wellness recordings, shared dentist connections, and account information will be permanently deleted.")
+            Text("All your data including wellness recordings, shared professional connections, and account information will be permanently deleted.")
         }
         // Delete Error Alert
         .alert("Deletion Error", isPresented: .constant(deleteError != nil)) {

@@ -1,6 +1,6 @@
 //
 //  DeveloperSettingsView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Developer settings for feature flag control
 //  Access via 7-tap on version number in Settings

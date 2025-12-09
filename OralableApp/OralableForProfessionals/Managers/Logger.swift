@@ -1,8 +1,8 @@
 //
 //  Logger.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
-//  Simple logger for OralableForDentists app
+//  Simple logger for OralableForProfessionals app
 //
 
 import Foundation

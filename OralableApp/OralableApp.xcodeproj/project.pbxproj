@@ -7,12 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2671AFEA2EE7BDE700A5D229 /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 2671AFE92EE7BDE700A5D229 /* AsyncAlgorithms */; };
 		26785D372ED6C96A004BA1A3 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26785D362ED6C96A004BA1A3 /* Algorithms */; };
 		26992C5F2ED6C28A00D9993D /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26992C5E2ED6C28A00D9993D /* AsyncAlgorithms */; };
 		26A0F47C2EBAE8C00054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */; };
 		26A0F47E2EBAE8D80054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47D2EBAE8D80054C5FC /* AsyncAlgorithms */; };
 		26A0F4802EBAE8EE0054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47F2EBAE8EE0054C5FC /* AsyncAlgorithms */; };
-		26FE17B82EE6D6A200026648 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 26FE178F2EE6D0D200026648 /* Info.plist */; };
 		26FE17B92EE6D6AF00026648 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 26FE17932EE6D0D200026648 /* PrivacyInfo.xcprivacy */; };
 		26FE17BD2EE6D77F00026648 /* AsyncBluetooth in Frameworks */ = {isa = PBXBuildFile; productRef = 26FE17BC2EE6D77F00026648 /* AsyncBluetooth */; };
 		26FE17BE2EE6D93400026648 /* OralableForProfessionals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE17922EE6D0D200026648 /* OralableForProfessionals.swift */; };
@@ -200,6 +200,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2671AFEA2EE7BDE700A5D229 /* AsyncAlgorithms in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,6 +460,7 @@
 			);
 			name = OralableForProfessionalsUITests;
 			packageProductDependencies = (
+				2671AFE92EE7BDE700A5D229 /* AsyncAlgorithms */,
 			);
 			productName = OralableForDentistsUITests;
 			productReference = 26D6C4062ECD181B00C60C3D /* OralableForProfessionalsUITests.xctest */;
@@ -556,7 +558,6 @@
 				26FE17BF2EE6D96A00026648 /* ProfessionalConfiguration.storekit in Resources */,
 				26FE17B92EE6D6AF00026648 /* PrivacyInfo.xcprivacy in Resources */,
 				26FE17C02EE6D97500026648 /* Assets.xcassets in Resources */,
-				26FE17B82EE6D6A200026648 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -611,8 +612,6 @@
 				26FE17D22EE6D9CC00026648 /* PatientListViewModel.swift in Sources */,
 				26FE17D32EE6D9CC00026648 /* PatientDashboardViewModel.swift in Sources */,
 				26FE17D92EE6DA0400026648 /* SharedComponents.swift in Sources */,
-				26FE17DD2EE6DCE900026648 /* OralableForProfessionalsUITestsLaunchTests.swift in Sources */,
-				26FE17DE2EE6DCF200026648 /* OralableForProfessionalsUITests.swift in Sources */,
 				26FE17D42EE6D9CC00026648 /* ProfessionalSettingsViewModel.swift in Sources */,
 				26FE17D52EE6D9CC00026648 /* AddPatientViewModel.swift in Sources */,
 				26FE17D62EE6D9CC00026648 /* PatientHistoricalViewModel.swift in Sources */,
@@ -644,6 +643,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26FE17DD2EE6DCE900026648 /* OralableForProfessionalsUITestsLaunchTests.swift in Sources */,
+				26FE17DE2EE6DCF200026648 /* OralableForProfessionalsUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -953,7 +954,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = OralableForDentists/Info.plist;
+				INFOPLIST_FILE = OralableForProfessionals/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Oralable For Professionals";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -996,7 +997,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = OralableForDentists/Info.plist;
+				INFOPLIST_FILE = OralableForProfessionals/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Oralable For Professionals";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -1212,6 +1213,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2671AFE92EE7BDE700A5D229 /* AsyncAlgorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 268E58EC2EBADD940064E2BB /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
+			productName = AsyncAlgorithms;
+		};
 		26785D362ED6C96A004BA1A3 /* Algorithms */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 26785D352ED6C850004BA1A3 /* XCRemoteSwiftPackageReference "swift-algorithms" */;

@@ -1,13 +1,13 @@
 //
-//  OralableForDentistsUITestsLaunchTests.swift
-//  OralableForDentistsUITests
+//  OralableForProfessionalsUITestsLaunchTests.swift
+//  OralableForProfessionalsUITests
 //
 //  Created by John A Cogan on 18/11/2025.
 //
 
 import XCTest
 
-final class OralableForDentistsUITestsLaunchTests: XCTestCase {
+final class OralableForProfessionalsUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

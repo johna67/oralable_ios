@@ -1,6 +1,6 @@
 //
-//  DentistSettingsView.swift
-//  OralableForDentists
+//  ProfessionalSettingsView.swift
+//  OralableForProfessionals
 //
 //  Apple style settings - matches OralableApp
 //  Updated with FeatureFlags and Developer Settings access
@@ -8,10 +8,10 @@
 
 import SwiftUI
 
-struct DentistSettingsView: View {
-    @EnvironmentObject var authenticationManager: DentistAuthenticationManager
-    @EnvironmentObject var subscriptionManager: DentistSubscriptionManager
-    @EnvironmentObject var dataManager: DentistDataManager
+struct ProfessionalSettingsView: View {
+    @EnvironmentObject var authenticationManager: ProfessionalAuthenticationManager
+    @EnvironmentObject var subscriptionManager: ProfessionalSubscriptionManager
+    @EnvironmentObject var dataManager: ProfessionalDataManager
     @EnvironmentObject var designSystem: DesignSystem
     @ObservedObject private var featureFlags = FeatureFlags.shared
 
@@ -266,7 +266,7 @@ struct DentistSettingsView: View {
                 .foregroundColor(.gray)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(authenticationManager.userFullName ?? "Dentist")
+                Text(authenticationManager.userFullName ?? "Professional")
                     .font(.headline)
 
                 Text(authenticationManager.userEmail ?? "Signed in with Apple")

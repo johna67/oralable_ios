@@ -34,8 +34,8 @@ struct OnboardingView: View {
         ),
         OnboardingPage(
             icon: "person.2.fill",
-            title: "Share with Your Dentist",
-            description: "Collaborate with your healthcare provider by securely sharing your data",
+            title: "Share with Your Provider",
+            description: "Collaborate with your healthcare professional by securely sharing your data",
             color: .black
         )
     ]

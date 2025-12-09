@@ -1,6 +1,6 @@
 //
-//  OralableForDentists.swift
-//  OralableForDentists
+//  OralableForProfessionals.swift
+//  OralableForProfessionals
 //
 //  Updated with DesignSystem - matches OralableApp
 //
@@ -9,40 +9,40 @@ import SwiftUI
 import AuthenticationServices
 
 @main
-struct OralableForDentists: App {
-    @StateObject private var dependencies: DentistAppDependencies
+struct OralableForProfessionals: App {
+    @StateObject private var dependencies: ProfessionalAppDependencies
     @StateObject private var designSystem = DesignSystem()
 
     init() {
-        let deps = DentistAppDependencies()
+        let deps = ProfessionalAppDependencies()
         _dependencies = StateObject(wrappedValue: deps)
     }
 
     var body: some Scene {
         WindowGroup {
-            DentistRootView()
-                .withDentistDependencies(dependencies)
+            ProfessionalRootView()
+                .withProfessionalDependencies(dependencies)
                 .environmentObject(designSystem)
         }
     }
 }
 
-struct DentistRootView: View {
-    @EnvironmentObject var authenticationManager: DentistAuthenticationManager
+struct ProfessionalRootView: View {
+    @EnvironmentObject var authenticationManager: ProfessionalAuthenticationManager
 
     var body: some View {
         Group {
             if authenticationManager.isAuthenticated {
-                DentistMainTabView()
+                ProfessionalMainTabView()
             } else {
-                DentistOnboardingView()
+                ProfessionalOnboardingView()
             }
         }
     }
 }
 
-struct DentistMainTabView: View {
-    @EnvironmentObject var dependencies: DentistAppDependencies
+struct ProfessionalMainTabView: View {
+    @EnvironmentObject var dependencies: ProfessionalAppDependencies
 
     var body: some View {
         TabView {
@@ -52,7 +52,7 @@ struct DentistMainTabView: View {
                 }
                 .tag(0)
 
-            DentistSettingsView()
+            ProfessionalSettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
@@ -62,24 +62,24 @@ struct DentistMainTabView: View {
     }
 }
 
-struct DentistOnboardingView: View {
-    @EnvironmentObject var authenticationManager: DentistAuthenticationManager
+struct ProfessionalOnboardingView: View {
+    @EnvironmentObject var authenticationManager: ProfessionalAuthenticationManager
     @EnvironmentObject var designSystem: DesignSystem
 
     private let onboardingPages = [
-        DentistOnboardingPage(
+        ProfessionalOnboardingPage(
             icon: "person.2.fill",
             title: "Manage Your Participants",
             description: "Access and monitor oral wellness data from your participants in one secure location",
             color: .black
         ),
-        DentistOnboardingPage(
+        ProfessionalOnboardingPage(
             icon: "chart.bar.fill",
             title: "Track Progress",
             description: "View detailed muscle activity analytics and trends to provide better wellness recommendations",
             color: .black
         ),
-        DentistOnboardingPage(
+        ProfessionalOnboardingPage(
             icon: "lock.shield.fill",
             title: "Secure & Private",
             description: "HIPAA-compliant data sharing with end-to-end encryption",
@@ -97,13 +97,13 @@ struct DentistOnboardingView: View {
                 .padding(.top, 60)
                 .padding(.bottom, 40)
 
-            Text("Oralable for Dentists")
+            Text("Oralable for Professionals")
                 .font(designSystem.typography.h2)
                 .padding(.bottom, 40)
 
             TabView(selection: $currentPage) {
                 ForEach(0..<onboardingPages.count, id: \.self) { index in
-                    DentistOnboardingPageView(page: onboardingPages[index])
+                    ProfessionalOnboardingPageView(page: onboardingPages[index])
                         .tag(index)
                 }
             }
@@ -134,14 +134,14 @@ struct DentistOnboardingView: View {
             }
 
             VStack(spacing: 8) {
-                Text("For dental professionals only")
+                Text("For healthcare professionals only")
                     .font(designSystem.typography.caption)
                     .foregroundColor(.secondary)
 
                 HStack(spacing: 12) {
-                    Link("Privacy Policy", destination: URL(string: "https://oralable.com/dentist/privacy")!)
+                    Link("Privacy Policy", destination: URL(string: "https://oralable.com/professional/privacy")!)
                     Text("•")
-                    Link("Terms of Service", destination: URL(string: "https://oralable.com/dentist/terms")!)
+                    Link("Terms of Service", destination: URL(string: "https://oralable.com/professional/terms")!)
                 }
                 .font(designSystem.typography.caption)
                 .foregroundColor(.secondary)
@@ -152,15 +152,15 @@ struct DentistOnboardingView: View {
     }
 }
 
-struct DentistOnboardingPage {
+struct ProfessionalOnboardingPage {
     let icon: String
     let title: String
     let description: String
     let color: Color
 }
 
-struct DentistOnboardingPageView: View {
-    let page: DentistOnboardingPage
+struct ProfessionalOnboardingPageView: View {
+    let page: ProfessionalOnboardingPage
 
     var body: some View {
         VStack(spacing: 24) {

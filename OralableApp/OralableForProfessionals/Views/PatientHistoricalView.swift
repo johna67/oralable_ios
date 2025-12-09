@@ -1,6 +1,6 @@
 //
 //  PatientHistoricalView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Historical view for patient data - mirrors OralableApp HistoricalView
 //
@@ -9,13 +9,13 @@ import SwiftUI
 import Charts
 
 struct PatientHistoricalView: View {
-    let patient: DentistPatient
+    let patient: ProfessionalPatient
     let metricType: String
 
     @StateObject private var viewModel: PatientHistoricalViewModel
     @EnvironmentObject var designSystem: DesignSystem
 
-    init(patient: DentistPatient, metricType: String = "Movement") {
+    init(patient: ProfessionalPatient, metricType: String = "Movement") {
         self.patient = patient
         self.metricType = metricType
         _viewModel = StateObject(wrappedValue: PatientHistoricalViewModel(patient: patient))

@@ -1,6 +1,6 @@
 //
 //  SharedSensorModels.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Sensor data models shared with OralableApp for CloudKit data exchange
 //

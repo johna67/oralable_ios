@@ -1,6 +1,6 @@
 //
 //  PatientDashboardViewModel.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  ViewModel for patient dashboard - mirrors OralableApp DashboardViewModel
 //
@@ -27,13 +27,13 @@ class PatientDashboardViewModel: ObservableObject {
 
     // MARK: - Private Properties
 
-    private let patient: DentistPatient
-    private let dataManager: DentistDataManager
+    private let patient: ProfessionalPatient
+    private let dataManager: ProfessionalDataManager
     private var sensorData: [SerializableSensorData] = []
 
     // MARK: - Initialization
 
-    init(patient: DentistPatient, dataManager: DentistDataManager = .shared) {
+    init(patient: ProfessionalPatient, dataManager: ProfessionalDataManager = .shared) {
         self.patient = patient
         self.dataManager = dataManager
     }

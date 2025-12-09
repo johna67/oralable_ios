@@ -5,22 +5,22 @@ import Combine
 class PatientListViewModel: ObservableObject {
     // MARK: - Published Properties
 
-    @Published var patients: [DentistPatient] = []
+    @Published var patients: [ProfessionalPatient] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var searchText: String = ""
     @Published var showingAddPatient: Bool = false
-    @Published var selectedPatient: DentistPatient?
+    @Published var selectedPatient: ProfessionalPatient?
 
     // MARK: - Dependencies
 
-    private let dataManager: DentistDataManager
-    private let subscriptionManager: DentistSubscriptionManager
+    private let dataManager: ProfessionalDataManager
+    private let subscriptionManager: ProfessionalSubscriptionManager
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Computed Properties
 
-    var filteredPatients: [DentistPatient] {
+    var filteredPatients: [ProfessionalPatient] {
         if searchText.isEmpty {
             return patients
         }
@@ -42,13 +42,13 @@ class PatientListViewModel: ObservableObject {
         return "\(remaining) remaining"
     }
 
-    var currentTier: DentistSubscriptionTier {
+    var currentTier: ProfessionalSubscriptionTier {
         return subscriptionManager.currentTier
     }
 
     // MARK: - Initialization
 
-    init(dataManager: DentistDataManager, subscriptionManager: DentistSubscriptionManager) {
+    init(dataManager: ProfessionalDataManager, subscriptionManager: ProfessionalSubscriptionManager) {
         self.dataManager = dataManager
         self.subscriptionManager = subscriptionManager
 
@@ -80,7 +80,7 @@ class PatientListViewModel: ObservableObject {
         }
     }
 
-    func removePatient(_ patient: DentistPatient) {
+    func removePatient(_ patient: ProfessionalPatient) {
         Task {
             do {
                 try await dataManager.removePatient(patient)
@@ -90,7 +90,7 @@ class PatientListViewModel: ObservableObject {
         }
     }
 
-    func selectPatient(_ patient: DentistPatient) {
+    func selectPatient(_ patient: ProfessionalPatient) {
         selectedPatient = patient
     }
 

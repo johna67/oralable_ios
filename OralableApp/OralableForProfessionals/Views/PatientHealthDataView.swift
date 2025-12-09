@@ -1,6 +1,6 @@
 //
 //  PatientHealthDataView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Created: HealthKit Integration - Step 8
 //  Purpose: Display participant's HealthKit data correlated with oral wellness metrics

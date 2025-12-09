@@ -1,6 +1,6 @@
 //
 //  PatientDashboardView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Participant dashboard view - mirrors OralableApp DashboardView
 //  Updated with FeatureFlags for wellness positioning
@@ -10,12 +10,12 @@ import SwiftUI
 import Charts
 
 struct PatientDashboardView: View {
-    let patient: DentistPatient
+    let patient: ProfessionalPatient
     @StateObject private var viewModel: PatientDashboardViewModel
     @EnvironmentObject var designSystem: DesignSystem
     @ObservedObject private var featureFlags = FeatureFlags.shared
 
-    init(patient: DentistPatient) {
+    init(patient: ProfessionalPatient) {
         self.patient = patient
         _viewModel = StateObject(wrappedValue: PatientDashboardViewModel(patient: patient))
     }

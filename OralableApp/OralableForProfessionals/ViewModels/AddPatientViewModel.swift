@@ -13,8 +13,8 @@ class AddPatientViewModel: ObservableObject {
 
     // MARK: - Dependencies
 
-    private let dataManager: DentistDataManager
-    private let subscriptionManager: DentistSubscriptionManager
+    private let dataManager: ProfessionalDataManager
+    private let subscriptionManager: ProfessionalSubscriptionManager
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Computed Properties
@@ -29,7 +29,7 @@ class AddPatientViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(dataManager: DentistDataManager, subscriptionManager: DentistSubscriptionManager) {
+    init(dataManager: ProfessionalDataManager, subscriptionManager: ProfessionalSubscriptionManager) {
         self.dataManager = dataManager
         self.subscriptionManager = subscriptionManager
 

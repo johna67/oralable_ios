@@ -61,7 +61,7 @@ extension Data {
 struct SharedPatientData: Identifiable {
     let id: UUID
     let patientID: String          // Anonymized patient identifier
-    let dentistID: String          // Dentist's Apple ID
+    let dentistID: String          // Professional's Apple ID (CloudKit field name is "dentistID" for compatibility)
     let shareCode: String          // 6-digit share code
     let accessGrantedDate: Date
     let expiryDate: Date?          // Optional time limit
@@ -85,10 +85,10 @@ enum SharePermission: String, Codable {
     case readWrite = "read_write"  // Future use
 }
 
-struct SharedDentist: Identifiable {
+struct SharedProfessional: Identifiable {
     let id: String
-    let dentistID: String
-    let dentistName: String?
+    let professionalID: String
+    let professionalName: String?
     let sharedDate: Date
     let expiryDate: Date?
     let isActive: Bool
@@ -98,7 +98,7 @@ struct SharedDentist: Identifiable {
 
 @MainActor
 class SharedDataManager: ObservableObject {
-    @Published var sharedDentists: [SharedDentist] = []
+    @Published var sharedProfessionals: [SharedProfessional] = []
     @Published var isLoading = false
     @Published var isSyncing = false
     @Published var errorMessage: String?
@@ -111,10 +111,10 @@ class SharedDataManager: ObservableObject {
     private weak var sensorDataProcessor: SensorDataProcessor?
 
     init(authenticationManager: AuthenticationManager, healthKitManager: HealthKitManager, sensorDataProcessor: SensorDataProcessor? = nil) {
-        // Use shared container for both patient and dentist apps
+        // Use shared container for both patient and professional apps
         self.container = CKContainer(identifier: "iCloud.com.jacdental.oralable.shared")
 
-        // Use public database for data sharing between patient and dentist apps
+        // Use public database for data sharing between patient and professional apps
         self.publicDatabase = container.publicCloudDatabase
 
         // Store reference to authentication manager
@@ -126,7 +126,7 @@ class SharedDataManager: ObservableObject {
         // Store reference to sensor data processor for sensor data access
         self.sensorDataProcessor = sensorDataProcessor
 
-        loadSharedDentists()
+        loadSharedProfessionals()
     }
 
     // Computed property for backward compatibility
@@ -180,7 +180,7 @@ class SharedDataManager: ObservableObject {
         }
     }
 
-    func revokeAccessForDentist(dentistID: String) async throws {
+    func revokeAccessForProfessional(professionalID: String) async throws {
         guard let patientID = userID else {
             throw ShareError.notAuthenticated
         }
@@ -189,7 +189,7 @@ class SharedDataManager: ObservableObject {
         errorMessage = nil
 
         // Query for the share record
-        let predicate = NSPredicate(format: "patientID == %@ AND dentistID == %@", patientID, dentistID)
+        let predicate = NSPredicate(format: "patientID == %@ AND dentistID == %@", patientID, professionalID)
         let query = CKQuery(recordType: "SharedPatientData", predicate: predicate)
 
         do {
@@ -206,8 +206,8 @@ class SharedDataManager: ObservableObject {
                 }
             }
 
-            // Reload shared dentists
-            await loadSharedDentists()
+            // Reload shared professionals
+            await loadSharedProfessionals()
 
             isLoading = false
         } catch {
@@ -217,7 +217,7 @@ class SharedDataManager: ObservableObject {
         }
     }
 
-    func loadSharedDentists() {
+    func loadSharedProfessionals() {
         guard let patientID = userID else { return }
 
         Task {
@@ -229,34 +229,34 @@ class SharedDataManager: ObservableObject {
             do {
                 let (matchResults, _) = try await publicDatabase.records(matching: query)
 
-                var dentists: [SharedDentist] = []
+                var professionals: [SharedProfessional] = []
                 for (_, result) in matchResults {
                     switch result {
                     case .success(let record):
-                        if let dentistID = record["dentistID"] as? String,
+                        if let professionalID = record["dentistID"] as? String,
                            let sharedDate = record["accessGrantedDate"] as? Date {
-                            let dentist = SharedDentist(
+                            let professional = SharedProfessional(
                                 id: record.recordID.recordName,
-                                dentistID: dentistID,
-                                dentistName: record["dentistName"] as? String,
+                                professionalID: professionalID,
+                                professionalName: record["dentistName"] as? String,
                                 sharedDate: sharedDate,
                                 expiryDate: record["expiryDate"] as? Date,
                                 isActive: (record["isActive"] as? Int) == 1
                             )
-                            dentists.append(dentist)
+                            professionals.append(professional)
                         }
                     case .failure(let error):
-                        Logger.shared.error("[SharedDataManager] Error loading dentist: \(error)")
+                        Logger.shared.error("[SharedDataManager] Error loading professional: \(error)")
                     }
                 }
 
                 await MainActor.run {
-                    self.sharedDentists = dentists
+                    self.sharedProfessionals = professionals
                     self.isLoading = false
                 }
             } catch {
                 await MainActor.run {
-                    self.errorMessage = "Failed to load shared dentists: \(error.localizedDescription)"
+                    self.errorMessage = "Failed to load shared professionals: \(error.localizedDescription)"
                     self.isLoading = false
                 }
             }
@@ -654,7 +654,7 @@ class SharedDataManager: ObservableObject {
             try await deleteRecords(ofType: "HealthDataRecord", forPatientID: patientID)
 
             // Clear local state
-            sharedDentists = []
+            sharedProfessionals = []
             lastSyncDate = nil
 
             isLoading = false
@@ -705,7 +705,7 @@ enum ShareError: LocalizedError {
     case cloudKitError(Error)
     case invalidShareCode
     case shareCodeExpired
-    case dentistNotFound
+    case professionalNotFound
 
     var errorDescription: String? {
         switch self {
@@ -717,8 +717,8 @@ enum ShareError: LocalizedError {
             return "Invalid share code"
         case .shareCodeExpired:
             return "Share code has expired"
-        case .dentistNotFound:
-            return "Dentist not found"
+        case .professionalNotFound:
+            return "Professional not found"
         }
     }
 }
@@ -760,7 +760,7 @@ struct SleepDataPoint: Codable {
 
 // MARK: - Bruxism Session Data (for sharing sensor data)
 
-/// Serializable structure containing bruxism sensor data for sharing with dentists
+/// Serializable structure containing bruxism sensor data for sharing with professionals
 struct BruxismSessionData: Codable {
     let sensorReadings: [SerializableSensorData]
     let recordingCount: Int

@@ -2,10 +2,10 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// Central dependency injection container for the dentist app
+/// Central dependency injection container for the professional app
 /// Manages all core services and provides factory methods for ViewModels
 @MainActor
-class DentistAppDependencies: ObservableObject {
+class ProfessionalAppDependencies: ObservableObject {
     // MARK: - Singleton Prevention
 
     private static var initializationCount = 0
@@ -13,9 +13,9 @@ class DentistAppDependencies: ObservableObject {
 
     // MARK: - Core Services
 
-    let subscriptionManager: DentistSubscriptionManager
-    let dataManager: DentistDataManager
-    let authenticationManager: DentistAuthenticationManager
+    let subscriptionManager: ProfessionalSubscriptionManager
+    let dataManager: ProfessionalDataManager
+    let authenticationManager: ProfessionalAuthenticationManager
 
     // Note: DesignSystem will be shared from patient app
     // let designSystem: DesignSystem
@@ -24,22 +24,22 @@ class DentistAppDependencies: ObservableObject {
 
     init() {
         // CRITICAL: Prevent runaway initialization that causes memory crashes
-        DentistAppDependencies.initializationCount += 1
-        let count = DentistAppDependencies.initializationCount
+        ProfessionalAppDependencies.initializationCount += 1
+        let count = ProfessionalAppDependencies.initializationCount
 
-        Logger.shared.info("[DentistAppDependencies] Initializing dependency container #\(count)")
+        Logger.shared.info("[ProfessionalAppDependencies] Initializing dependency container #\(count)")
 
-        if count > DentistAppDependencies.maxInitializations {
-            Logger.shared.error("[DentistAppDependencies] ⚠️ CRITICAL: Too many initializations (\(count))! This will cause memory crash. Aborting.")
-            fatalError("[DentistAppDependencies] Runaway initialization detected - preventing memory leak crash")
+        if count > ProfessionalAppDependencies.maxInitializations {
+            Logger.shared.error("[ProfessionalAppDependencies] ⚠️ CRITICAL: Too many initializations (\(count))! This will cause memory crash. Aborting.")
+            fatalError("[ProfessionalAppDependencies] Runaway initialization detected - preventing memory leak crash")
         }
 
         // Initialize managers (no more singletons - using dependency injection)
-        self.authenticationManager = DentistAuthenticationManager()
-        self.subscriptionManager = DentistSubscriptionManager.shared  // TODO: Remove singleton
-        self.dataManager = DentistDataManager.shared  // TODO: Remove singleton
+        self.authenticationManager = ProfessionalAuthenticationManager()
+        self.subscriptionManager = ProfessionalSubscriptionManager.shared  // TODO: Remove singleton
+        self.dataManager = ProfessionalDataManager.shared  // TODO: Remove singleton
 
-        Logger.shared.info("[DentistAppDependencies] ✅ Dependency container initialized successfully")
+        Logger.shared.info("[ProfessionalAppDependencies] ✅ Dependency container initialized successfully")
     }
 
     // MARK: - Factory Methods
@@ -60,9 +60,9 @@ class DentistAppDependencies: ObservableObject {
         )
     }
 
-    /// Creates a DentistSettingsViewModel with injected dependencies
-    func makeSettingsViewModel() -> DentistSettingsViewModel {
-        return DentistSettingsViewModel(
+    /// Creates a ProfessionalSettingsViewModel with injected dependencies
+    func makeSettingsViewModel() -> ProfessionalSettingsViewModel {
+        return ProfessionalSettingsViewModel(
             subscriptionManager: subscriptionManager,
             authenticationManager: authenticationManager
         )
@@ -72,10 +72,10 @@ class DentistAppDependencies: ObservableObject {
 // MARK: - Testing Support
 
 #if DEBUG
-extension DentistAppDependencies {
+extension ProfessionalAppDependencies {
     /// Creates a mock dependencies container for testing and previews
-    static func mock() -> DentistAppDependencies {
-        return DentistAppDependencies()
+    static func mock() -> ProfessionalAppDependencies {
+        return ProfessionalAppDependencies()
     }
 }
 #endif
@@ -83,31 +83,31 @@ extension DentistAppDependencies {
 // MARK: - Environment Key
 
 /// Environment key for accessing dependencies throughout the app
-struct DentistAppDependenciesKey: EnvironmentKey {
-    @MainActor static var defaultValue: DentistAppDependencies {
+struct ProfessionalAppDependenciesKey: EnvironmentKey {
+    @MainActor static var defaultValue: ProfessionalAppDependencies {
         // Use a cached singleton to prevent repeated initialization
         // This prevents memory leaks from creating new instances on every access
         _cachedDefaultDependencies
     }
 
     // Cached instance to prevent repeated initialization
-    @MainActor private static let _cachedDefaultDependencies = DentistAppDependencies()
+    @MainActor private static let _cachedDefaultDependencies = ProfessionalAppDependencies()
 }
 
 extension EnvironmentValues {
-    var dentistDependencies: DentistAppDependencies {
-        get { self[DentistAppDependenciesKey.self] }
-        set { self[DentistAppDependenciesKey.self] = newValue }
+    var professionalDependencies: ProfessionalAppDependencies {
+        get { self[ProfessionalAppDependenciesKey.self] }
+        set { self[ProfessionalAppDependenciesKey.self] = newValue }
     }
 }
 
 // MARK: - View Extension
 
 extension View {
-    /// Injects all dentist app dependencies into the environment
-    func withDentistDependencies(_ dependencies: DentistAppDependencies) -> some View {
+    /// Injects all professional app dependencies into the environment
+    func withProfessionalDependencies(_ dependencies: ProfessionalAppDependencies) -> some View {
         self
-            .environment(\.dentistDependencies, dependencies)
+            .environment(\.professionalDependencies, dependencies)
             .environmentObject(dependencies)
             .environmentObject(dependencies.subscriptionManager)
             .environmentObject(dependencies.dataManager)

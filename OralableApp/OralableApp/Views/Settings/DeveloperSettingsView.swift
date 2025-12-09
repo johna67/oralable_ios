@@ -34,7 +34,7 @@ struct DeveloperSettingsView: View {
 
             // Share Features Section
             Section(header: Text("Share Features")) {
-                Toggle("Share with Dentist", isOn: $featureFlags.showShareWithDentist)
+                Toggle("Share with Professional", isOn: $featureFlags.showShareWithProfessional)
                 Toggle("Share with Researcher", isOn: $featureFlags.showShareWithResearcher)
             }
 

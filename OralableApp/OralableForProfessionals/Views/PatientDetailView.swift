@@ -1,6 +1,6 @@
 //
 //  PatientDetailView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Patient detail - now shows full dashboard with historical navigation
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct PatientDetailView: View {
-    let patient: DentistPatient
+    let patient: ProfessionalPatient
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -26,7 +26,7 @@ struct PatientDetailView: View {
 // MARK: - Preview
 
 #Preview {
-    PatientDetailView(patient: DentistPatient(
+    PatientDetailView(patient: ProfessionalPatient(
         id: "1",
         patientID: "patient123",
         patientName: "John Doe",

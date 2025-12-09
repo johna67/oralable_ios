@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - Patient Models
 
-struct DentistPatient: Identifiable, Codable {
+struct ProfessionalPatient: Identifiable, Codable {
     let id: String
     let patientID: String
     let patientName: String?  // Optional - patient may choose anonymity
@@ -41,15 +41,15 @@ struct PatientHealthSummary {
     }
 }
 
-// MARK: - Dentist Data Manager
+// MARK: - Professional Data Manager
 
 @MainActor
-class DentistDataManager: ObservableObject {
-    static let shared = DentistDataManager()
+class ProfessionalDataManager: ObservableObject {
+    static let shared = ProfessionalDataManager()
 
     // MARK: - Published Properties
 
-    @Published var patients: [DentistPatient] = []
+    @Published var patients: [ProfessionalPatient] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var successMessage: String?
@@ -59,10 +59,10 @@ class DentistDataManager: ObservableObject {
     private let container: CKContainer
     private let publicDatabase: CKDatabase
 
-    // Computed property that reads from Keychain (where DentistAuthenticationManager stores it)
-    private var dentistID: String? {
-        // Read from Keychain using the same key as DentistAuthenticationManager
-        let keychainKey = "com.oralable.dentist.userID"
+    // Computed property that reads from Keychain (where ProfessionalAuthenticationManager stores it)
+    private var professionalID: String? {
+        // Read from Keychain using the same key as ProfessionalAuthenticationManager
+        let keychainKey = "com.oralable.professional.userID"
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -80,7 +80,7 @@ class DentistDataManager: ObservableObject {
         }
 
         // Fallback: check UserDefaults for migration (legacy support)
-        return UserDefaults.standard.string(forKey: "dentistAppleID")
+        return UserDefaults.standard.string(forKey: "professionalAppleID")
     }
 
     // MARK: - Initialization
@@ -99,13 +99,13 @@ class DentistDataManager: ObservableObject {
     // MARK: - Share Code Entry
 
     func addPatientWithShareCode(_ shareCode: String) async throws {
-        guard let dentistID = dentistID else {
-            throw DentistDataError.notAuthenticated
+        guard let professionalID = professionalID else {
+            throw ProfessionalDataError.notAuthenticated
         }
 
         // Validate share code format (6 digits)
         guard shareCode.count == 6, Int(shareCode) != nil else {
-            throw DentistDataError.invalidShareCode
+            throw ProfessionalDataError.invalidShareCode
         }
 
         isLoading = true
@@ -120,49 +120,50 @@ class DentistDataManager: ObservableObject {
             let (matchResults, _) = try await publicDatabase.records(matching: query)
 
             guard let (_, result) = matchResults.first else {
-                throw DentistDataError.shareCodeNotFound
+                throw ProfessionalDataError.shareCodeNotFound
             }
 
             guard case .success(let invitationRecord) = result else {
-                throw DentistDataError.shareCodeNotFound
+                throw ProfessionalDataError.shareCodeNotFound
             }
 
             // Step 2: Check if code is expired
             if let expiryDate = invitationRecord["expiryDate"] as? Date,
                expiryDate < Date() {
-                throw DentistDataError.shareCodeExpired
+                throw ProfessionalDataError.shareCodeExpired
             }
 
             // Step 3: Get patient ID from invitation
             guard let patientID = invitationRecord["patientID"] as? String else {
-                throw DentistDataError.invalidShareCode
+                throw ProfessionalDataError.invalidShareCode
             }
 
-            // Step 4: Check if dentist already has access to this patient
+            // Step 4: Check if professional already has access to this patient
             if patients.contains(where: { $0.patientID == patientID }) {
-                throw DentistDataError.patientAlreadyAdded
+                throw ProfessionalDataError.patientAlreadyAdded
             }
 
             // Step 5: Create SharedPatientData record
             let sharedDataID = CKRecord.ID(recordName: UUID().uuidString)
             let sharedDataRecord = CKRecord(recordType: "SharedPatientData", recordID: sharedDataID)
 
+            // Note: CloudKit field names use "dentistID" for backwards compatibility
             sharedDataRecord["patientID"] = patientID as CKRecordValue
-            sharedDataRecord["dentistID"] = dentistID as CKRecordValue
+            sharedDataRecord["dentistID"] = professionalID as CKRecordValue
             sharedDataRecord["shareCode"] = shareCode as CKRecordValue
             sharedDataRecord["accessGrantedDate"] = Date() as CKRecordValue
             sharedDataRecord["isActive"] = 1 as CKRecordValue
-            sharedDataRecord["dentistName"] = getCurrentDentistName() as CKRecordValue?
+            sharedDataRecord["dentistName"] = getCurrentProfessionalName() as CKRecordValue?
 
             try await publicDatabase.save(sharedDataRecord)
 
             // Step 6: Update the invitation to mark it as used
-            invitationRecord["dentistID"] = dentistID as CKRecordValue
+            invitationRecord["dentistID"] = professionalID as CKRecordValue
             invitationRecord["isActive"] = 0 as CKRecordValue
             try await publicDatabase.save(invitationRecord)
 
             // Step 7: Add to local patient list
-            let newPatient = DentistPatient(
+            let newPatient = ProfessionalPatient(
                 id: sharedDataID.recordName,
                 patientID: patientID,
                 patientName: nil,  // Will be updated if patient provides name
@@ -178,7 +179,7 @@ class DentistDataManager: ObservableObject {
                 self.successMessage = "Patient added successfully"
             }
 
-        } catch let error as DentistDataError {
+        } catch let error as ProfessionalDataError {
             await MainActor.run {
                 self.isLoading = false
                 self.errorMessage = error.localizedDescription
@@ -196,19 +197,20 @@ class DentistDataManager: ObservableObject {
     // MARK: - Patient Management
 
     func loadPatients() {
-        guard let dentistID = dentistID else { return }
+        guard let professionalID = professionalID else { return }
 
         Task {
             isLoading = true
             errorMessage = nil
 
-            let predicate = NSPredicate(format: "dentistID == %@ AND isActive == 1", dentistID)
+            // Note: CloudKit field name is "dentistID" for backwards compatibility
+            let predicate = NSPredicate(format: "dentistID == %@ AND isActive == 1", professionalID)
             let query = CKQuery(recordType: "SharedPatientData", predicate: predicate)
 
             do {
                 let (matchResults, _) = try await publicDatabase.records(matching: query)
 
-                var loadedPatients: [DentistPatient] = []
+                var loadedPatients: [ProfessionalPatient] = []
 
                 for (_, result) in matchResults {
                     switch result {
@@ -217,7 +219,7 @@ class DentistDataManager: ObservableObject {
                            let shareCode = record["shareCode"] as? String,
                            let accessDate = record["accessGrantedDate"] as? Date {
 
-                            let patient = DentistPatient(
+                            let patient = ProfessionalPatient(
                                 id: record.recordID.recordName,
                                 patientID: patientID,
                                 patientName: record["patientName"] as? String,
@@ -230,7 +232,7 @@ class DentistDataManager: ObservableObject {
                             loadedPatients.append(patient)
                         }
                     case .failure(let error):
-                        Logger.shared.error("[DentistDataManager] Error loading patient record: \(error)")
+                        Logger.shared.error("[ProfessionalDataManager] Error loading patient record: \(error)")
                     }
                 }
 
@@ -244,13 +246,13 @@ class DentistDataManager: ObservableObject {
                 // This happens when no patients have been added yet in Development mode
                 let nsError = error as NSError
                 if nsError.domain == CKErrorDomain && nsError.code == CKError.unknownItem.rawValue {
-                    Logger.shared.info("[DentistDataManager] Record type doesn't exist yet - no patients have been added")
+                    Logger.shared.info("[ProfessionalDataManager] Record type doesn't exist yet - no patients have been added")
                     await MainActor.run {
                         self.patients = []
                         self.isLoading = false
                     }
                 } else {
-                    Logger.shared.error("[DentistDataManager] Failed to load patients: \(error)")
+                    Logger.shared.error("[ProfessionalDataManager] Failed to load patients: \(error)")
                     await MainActor.run {
                         self.errorMessage = "Failed to load patients: \(error.localizedDescription)"
                         self.isLoading = false
@@ -260,7 +262,7 @@ class DentistDataManager: ObservableObject {
         }
     }
 
-    func removePatient(_ patient: DentistPatient) async throws {
+    func removePatient(_ patient: ProfessionalPatient) async throws {
         isLoading = true
         errorMessage = nil
 
@@ -289,7 +291,7 @@ class DentistDataManager: ObservableObject {
 
     // MARK: - Patient Data Fetching
 
-    func fetchPatientHealthData(for patient: DentistPatient, from startDate: Date, to endDate: Date) async throws -> [PatientHealthSummary] {
+    func fetchPatientHealthData(for patient: ProfessionalPatient, from startDate: Date, to endDate: Date) async throws -> [PatientHealthSummary] {
         isLoading = true
         errorMessage = nil
 
@@ -330,7 +332,7 @@ class DentistDataManager: ObservableObject {
                         healthSummaries.append(summary)
                     }
                 case .failure(let error):
-                    Logger.shared.error("[DentistDataManager] Error loading health record: \(error)")
+                    Logger.shared.error("[ProfessionalDataManager] Error loading health record: \(error)")
                 }
             }
 
@@ -352,7 +354,7 @@ class DentistDataManager: ObservableObject {
     // MARK: - Fetch Sensor Time-Series Data
 
     /// Fetch detailed sensor data for a patient session (for time-series charts)
-    func fetchPatientSensorData(for patient: DentistPatient, sessionDate: Date) async throws -> BruxismSessionData? {
+    func fetchPatientSensorData(for patient: ProfessionalPatient, sessionDate: Date) async throws -> BruxismSessionData? {
         isLoading = true
         errorMessage = nil
 
@@ -387,7 +389,7 @@ class DentistDataManager: ObservableObject {
             }
 
             guard let decompressedData = compressedData.decompressed(expectedSize: uncompressedSize) else {
-                Logger.shared.error("[DentistDataManager] Failed to decompress sensor data")
+                Logger.shared.error("[ProfessionalDataManager] Failed to decompress sensor data")
                 await MainActor.run { self.isLoading = false }
                 return nil
             }
@@ -407,7 +409,7 @@ class DentistDataManager: ObservableObject {
     }
 
     /// Fetch all sensor data for a patient within a date range (for historical charts)
-    func fetchAllPatientSensorData(for patient: DentistPatient, from startDate: Date, to endDate: Date) async throws -> [SerializableSensorData] {
+    func fetchAllPatientSensorData(for patient: ProfessionalPatient, from startDate: Date, to endDate: Date) async throws -> [SerializableSensorData] {
         isLoading = true
         errorMessage = nil
 
@@ -438,7 +440,7 @@ class DentistDataManager: ObservableObject {
                         }
                     }
                 case .failure(let error):
-                    Logger.shared.error("[DentistDataManager] Error loading record: \(error)")
+                    Logger.shared.error("[ProfessionalDataManager] Error loading record: \(error)")
                 }
             }
 
@@ -458,50 +460,51 @@ class DentistDataManager: ObservableObject {
 
     // MARK: - Helper Methods
 
-    private func getCurrentDentistID() -> String? {
-        // This would get the dentist's Apple ID from Sign in with Apple
+    private func getCurrentProfessionalID() -> String? {
+        // This would get the professional's Apple ID from Sign in with Apple
         // For now, return a placeholder - will be implemented with actual auth
-        return UserDefaults.standard.string(forKey: "dentistAppleID")
+        return UserDefaults.standard.string(forKey: "professionalAppleID")
     }
 
-    private func getCurrentDentistName() -> String? {
-        // Get dentist's name from authentication
-        return UserDefaults.standard.string(forKey: "dentistName")
+    private func getCurrentProfessionalName() -> String? {
+        // Get professional's name from authentication
+        return UserDefaults.standard.string(forKey: "professionalName")
     }
 
     // MARK: - Account Deletion (Apple App Store Requirement)
 
-    /// Deletes all dentist's data from CloudKit
+    /// Deletes all professional's data from CloudKit
     /// This is required by Apple for apps that support account creation
     func deleteAllUserData() async throws {
-        guard let dentistID = dentistID else {
-            Logger.shared.warning("[DentistDataManager] Cannot delete data - not authenticated")
+        guard let professionalID = professionalID else {
+            Logger.shared.warning("[ProfessionalDataManager] Cannot delete data - not authenticated")
             return
         }
 
-        Logger.shared.info("[DentistDataManager] 🗑️ Starting CloudKit data deletion for dentist: \(dentistID)")
+        Logger.shared.info("[ProfessionalDataManager] 🗑️ Starting CloudKit data deletion for professional: \(professionalID)")
         isLoading = true
         errorMessage = nil
 
         do {
-            // Delete SharedPatientData records (dentist's patient connections)
-            try await deleteRecords(ofType: "SharedPatientData", forDentistID: dentistID)
+            // Delete SharedPatientData records (professional's patient connections)
+            try await deleteRecords(ofType: "SharedPatientData", forProfessionalID: professionalID)
 
             // Clear local state
             patients = []
 
             isLoading = false
-            Logger.shared.info("[DentistDataManager] 🗑️ Successfully deleted all CloudKit data for dentist")
+            Logger.shared.info("[ProfessionalDataManager] 🗑️ Successfully deleted all CloudKit data for professional")
         } catch {
             isLoading = false
             errorMessage = "Failed to delete cloud data: \(error.localizedDescription)"
-            Logger.shared.error("[DentistDataManager] ❌ Failed to delete CloudKit data: \(error)")
-            throw DentistDataError.cloudKitError(error)
+            Logger.shared.error("[ProfessionalDataManager] ❌ Failed to delete CloudKit data: \(error)")
+            throw ProfessionalDataError.cloudKitError(error)
         }
     }
 
-    private func deleteRecords(ofType recordType: String, forDentistID dentistID: String) async throws {
-        let predicate = NSPredicate(format: "dentistID == %@", dentistID)
+    private func deleteRecords(ofType recordType: String, forProfessionalID professionalID: String) async throws {
+        // Note: CloudKit field name is "dentistID" for backwards compatibility
+        let predicate = NSPredicate(format: "dentistID == %@", professionalID)
         let query = CKQuery(recordType: recordType, predicate: predicate)
 
         do {
@@ -513,27 +516,27 @@ class DentistDataManager: ObservableObject {
                 case .success:
                     recordIDsToDelete.append(recordID)
                 case .failure(let error):
-                    Logger.shared.warning("[DentistDataManager] Error fetching \(recordType) record: \(error)")
+                    Logger.shared.warning("[ProfessionalDataManager] Error fetching \(recordType) record: \(error)")
                 }
             }
 
             if !recordIDsToDelete.isEmpty {
-                Logger.shared.info("[DentistDataManager] Deleting \(recordIDsToDelete.count) \(recordType) records")
+                Logger.shared.info("[ProfessionalDataManager] Deleting \(recordIDsToDelete.count) \(recordType) records")
 
                 // Delete records
                 for recordID in recordIDsToDelete {
                     try await publicDatabase.deleteRecord(withID: recordID)
                 }
 
-                Logger.shared.info("[DentistDataManager] ✅ Deleted \(recordIDsToDelete.count) \(recordType) records")
+                Logger.shared.info("[ProfessionalDataManager] ✅ Deleted \(recordIDsToDelete.count) \(recordType) records")
             } else {
-                Logger.shared.info("[DentistDataManager] No \(recordType) records found to delete")
+                Logger.shared.info("[ProfessionalDataManager] No \(recordType) records found to delete")
             }
         } catch {
             // Handle "record type not found" error gracefully
             let nsError = error as NSError
             if nsError.domain == CKErrorDomain && nsError.code == CKError.unknownItem.rawValue {
-                Logger.shared.info("[DentistDataManager] Record type \(recordType) doesn't exist - nothing to delete")
+                Logger.shared.info("[ProfessionalDataManager] Record type \(recordType) doesn't exist - nothing to delete")
             } else {
                 throw error
             }
@@ -543,7 +546,7 @@ class DentistDataManager: ObservableObject {
 
 // MARK: - Errors
 
-enum DentistDataError: LocalizedError {
+enum ProfessionalDataError: LocalizedError {
     case notAuthenticated
     case invalidShareCode
     case shareCodeNotFound

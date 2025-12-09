@@ -33,8 +33,8 @@ struct ShareView: View {
                 // Export section - ALWAYS SHOWN
                 exportSection
 
-                // Share with Dentist section - CONDITIONAL
-                if featureFlags.showShareWithDentist {
+                // Share with Professional section - CONDITIONAL
+                if featureFlags.showShareWithProfessional {
                     shareCodeSection
                     sharedWithSection
                 }
@@ -56,14 +56,14 @@ struct ShareView: View {
         .navigationViewStyle(.stack)
         .task {
             // Only generate share code if feature is enabled
-            if featureFlags.showShareWithDentist {
+            if featureFlags.showShareWithProfessional {
                 if shareCode.isEmpty {
                     await generateAndSaveShareCode()
                 }
-                // Refresh shared dentists list
-                sharedDataManager.loadSharedDentists()
+                // Refresh shared professionals list
+                sharedDataManager.loadSharedProfessionals()
 
-                // Sync current sensor data to CloudKit for dentist access
+                // Sync current sensor data to CloudKit for professional access
                 await sharedDataManager.uploadCurrentDataForSharing()
             }
         }
@@ -145,7 +145,7 @@ struct ShareView: View {
                     .disabled(shareCode.isEmpty)
                 }
 
-                Text("Give this code to your dentist to share your data")
+                Text("Give this code to your healthcare professional to share your data")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                 
@@ -164,7 +164,7 @@ struct ShareView: View {
             }
             .padding(.vertical, 8)
         } header: {
-            Text("Share with Dentist")
+            Text("Share with Professional")
         } footer: {
             Text("Code expires in 48 hours")
         }
@@ -173,18 +173,18 @@ struct ShareView: View {
     // MARK: - Shared With Section
     private var sharedWithSection: some View {
         Section {
-            if sharedDataManager.sharedDentists.isEmpty {
+            if sharedDataManager.sharedProfessionals.isEmpty {
                 Text("No one has access to your data")
                     .foregroundColor(.secondary)
             } else {
-                ForEach(sharedDataManager.sharedDentists) { dentist in
+                ForEach(sharedDataManager.sharedProfessionals) { professional in
                     HStack {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 32))
                             .foregroundColor(.blue)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(dentist.dentistName ?? dentist.dentistID)
+                            Text(professional.professionalName ?? professional.professionalID)
                                 .font(.system(size: 17))
                                 .foregroundColor(.primary)
 
@@ -196,7 +196,7 @@ struct ShareView: View {
                         Spacer()
 
                         Button("Remove") {
-                            removeConnection(dentist)
+                            removeConnection(professional)
                         }
                         .font(.system(size: 15))
                         .foregroundColor(.red)
@@ -240,9 +240,9 @@ struct ShareView: View {
         }
     }
 
-    private func removeConnection(_ dentist: SharedDentist) {
+    private func removeConnection(_ professional: SharedProfessional) {
         Task {
-            try? await sharedDataManager.revokeAccessForDentist(dentistID: dentist.dentistID)
+            try? await sharedDataManager.revokeAccessForProfessional(professionalID: professional.professionalID)
         }
     }
 

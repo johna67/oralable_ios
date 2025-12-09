@@ -1,6 +1,6 @@
 //
 //  FeatureFlags.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Created: December 5, 2025
 //  Purpose: Feature flags for controlling app functionality
@@ -10,7 +10,7 @@
 import Foundation
 import Combine
 
-/// Feature flags for controlling OralableForDentists functionality
+/// Feature flags for controlling OralableForProfessionals functionality
 /// Pre-launch release hides advanced features for simpler App Store approval
 class FeatureFlags: ObservableObject {
     static let shared = FeatureFlags()
@@ -35,7 +35,7 @@ class FeatureFlags: ObservableObject {
         static let showTemperatureCard = false
         static let showHeartRateCard = false
         static let showAdvancedAnalytics = false
-        static let showSubscription = false
+        static let showSubscription = true
         static let showMultiParticipant = true  // Basic participant list always on
         static let showDataExport = true        // Basic export always on
         static let showANRComparison = false
@@ -98,7 +98,7 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = false
         showHeartRateCard = false
         showAdvancedAnalytics = false
-        showSubscription = false
+        showSubscription = true
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = false

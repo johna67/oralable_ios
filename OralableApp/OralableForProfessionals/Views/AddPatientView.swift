@@ -1,6 +1,6 @@
 //
 //  AddPatientView.swift
-//  OralableForDentists
+//  OralableForProfessionals
 //
 //  Apple style - matches OralableApp
 //
@@ -9,7 +9,7 @@ import SwiftUI
 
 struct AddPatientView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var dataManager: DentistDataManager
+    @EnvironmentObject var dataManager: ProfessionalDataManager
     @EnvironmentObject var designSystem: DesignSystem
 
     @State private var shareCode = ""
@@ -117,7 +117,7 @@ struct AddPatientView: View {
             do {
                 try await dataManager.addPatientWithShareCode(shareCode)
                 showSuccess = true
-            } catch let error as DentistDataError {
+            } catch let error as ProfessionalDataError {
                 errorMessage = error.localizedDescription
             } catch {
                 errorMessage = "Failed to add patient. Please try again."
