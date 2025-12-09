@@ -217,6 +217,52 @@
         .links-grid a:hover {
             background-color: #e8e8ed;
         }
+        .use-cases {
+            padding: 80px 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .use-cases h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        .use-cases .section-subtitle {
+            text-align: center;
+            color: #86868b;
+            font-size: 18px;
+            margin-bottom: 50px;
+        }
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+        .use-case-card {
+            padding: 30px;
+            background: #f5f5f7;
+            border-radius: 16px;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .use-case-card:hover {
+            border-color: #007AFF;
+        }
+        .use-case-card .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        .use-case-card h3 {
+            font-size: 20px;
+            margin-bottom: 12px;
+            color: #000;
+        }
+        .use-case-card p {
+            color: #86868b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
         footer {
             padding: 40px 20px;
             text-align: center;
@@ -259,7 +305,6 @@
         <a href="index.html">Home</a>
         <a href="product.html">Product</a>
         <a href="for-professionals.html">For Professionals</a>
-        <a href="for-researchers.html">For Researchers</a>
         <a href="about.html">About</a>
         <a href="beta.html">Early Access</a>
     </nav>
@@ -301,19 +346,41 @@
         </div>
     </section>
 
+    <section class="use-cases">
+        <h2>Built for Professionals</h2>
+        <p class="section-subtitle">One platform, multiple applications</p>
+        <div class="use-case-grid">
+            <div class="use-case-card">
+                <div class="icon">🔬</div>
+                <h3>Research</h3>
+                <p>Collect objective muscle activity data for academic studies, clinical trials, and sleep research. Export data in CSV format for analysis.</p>
+            </div>
+            <div class="use-case-card">
+                <div class="icon">🗣️</div>
+                <h3>Speech Therapy</h3>
+                <p>Monitor oral motor function, assess articulation patterns, and provide real-time biofeedback during therapy sessions.</p>
+            </div>
+            <div class="use-case-card">
+                <div class="icon">🦷</div>
+                <h3>Dentistry</h3>
+                <p>Track bruxism patterns, assess TMJ function, and evaluate nightguard effectiveness with objective measurements.</p>
+            </div>
+        </div>
+    </section>
+
     <section class="apps">
         <h2>Two Apps, One Platform</h2>
         <div class="app-grid">
             <div class="app-card">
                 <div class="feature-icon">📱</div>
                 <h3>Oralable</h3>
-                <p>Monitor your muscle activity patterns. Track trends over time. Share data securely with your healthcare provider.</p>
+                <p>For participants. Monitor your muscle activity patterns. Track trends over time. Share data with your healthcare professional.</p>
                 <a href="beta.html" class="btn btn-primary">Join Early Access</a>
             </div>
             <div class="app-card">
                 <div class="feature-icon">🩺</div>
                 <h3>Oralable for Professionals</h3>
-                <p>View participant wellness data. Track participant progress over time. Access detailed activity reports.</p>
+                <p>For researchers, therapists, and clinicians. View participant wellness data. Track progress across sessions. Access detailed activity reports.</p>
                 <a href="for-professionals.html" class="btn btn-secondary">Learn More</a>
             </div>
         </div>

@@ -189,6 +189,34 @@
         .pricing-card.featured ul {
             color: rgba(255,255,255,0.9);
         }
+        .use-cases {
+            margin: 40px 0;
+        }
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .use-case-card {
+            background: #f5f5f7;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .use-case-card .icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        .use-case-card h4 {
+            margin-bottom: 10px;
+            color: #000;
+        }
+        .use-case-card p {
+            font-size: 14px;
+            color: #666;
+            margin: 0;
+        }
         footer {
             padding: 40px 20px;
             text-align: center;
@@ -222,24 +250,44 @@
         <a href="index.html">Home</a>
         <a href="product.html">Product</a>
         <a href="for-professionals.html">For Professionals</a>
-        <a href="for-researchers.html">For Researchers</a>
         <a href="about.html">About</a>
         <a href="beta.html">Early Access</a>
     </nav>
 
     <section class="hero">
         <h1>Oralable for Professionals</h1>
-        <p>View participant wellness data. Track progress over time. Enhance communication.</p>
+        <p>For researchers, therapists, and clinicians. View participant data. Track progress. Enhance care.</p>
     </section>
 
     <div class="container">
-        <h2>Designed for Healthcare Providers</h2>
-        <p>Oralable for Professionals is a companion app that allows healthcare providers to view muscle activity data shared by their participants. Participants use the Oralable app to record sessions and can securely share their data with you using a simple share code.</p>
+        <h2>One Platform, Multiple Applications</h2>
+        <p>Oralable for Professionals is designed for healthcare providers, researchers, and therapists who need objective muscle activity data. Whether you're conducting research, providing therapy, or monitoring bruxism, Oralable provides the tools you need.</p>
+
+        <div class="use-cases">
+            <h2>Use Cases</h2>
+            <div class="use-case-grid">
+                <div class="use-case-card">
+                    <div class="icon">🔬</div>
+                    <h4>Research</h4>
+                    <p>Collect objective data for academic studies, clinical trials, and sleep research. Export data for statistical analysis.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="icon">🗣️</div>
+                    <h4>Speech Therapy</h4>
+                    <p>Monitor oral motor function, assess articulation patterns, and provide real-time biofeedback during sessions.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="icon">🦷</div>
+                    <h4>Dentistry</h4>
+                    <p>Track bruxism patterns, assess TMJ function, and evaluate nightguard effectiveness with objective measurements.</p>
+                </div>
+            </div>
+        </div>
 
         <div class="features">
             <div class="feature">
                 <h4>Participant Data Access</h4>
-                <p>View muscle activity patterns shared by your participants. See trends over time to support wellness discussions.</p>
+                <p>View muscle activity patterns shared by your participants. See trends over time to support care decisions.</p>
             </div>
             <div class="feature">
                 <h4>Secure Sharing</h4>
@@ -247,17 +295,17 @@
             </div>
             <div class="feature">
                 <h4>Progress Tracking</h4>
-                <p>Track participant wellness patterns over weeks and months. Identify trends and discuss them with your participants.</p>
+                <p>Track participant patterns over weeks and months. Identify trends and discuss them with your participants.</p>
             </div>
             <div class="feature">
-                <h4>Simple Interface</h4>
-                <p>Clean, intuitive design makes it easy to review participant data during appointments or between visits.</p>
+                <h4>Data Export</h4>
+                <p>Export data in CSV format for analysis, research documentation, or integration with other systems.</p>
             </div>
         </div>
 
         <div class="info-box">
             <h3>Important: Wellness Data Only</h3>
-            <p>Oralable is a consumer wellness device, not a medical device. The data should be used to support wellness conversations and awareness, not for diagnosis or treatment decisions. Always rely on clinical examination and professional judgment for care.</p>
+            <p>Oralable is a consumer wellness device, not a medical device. The data should be used to support conversations and awareness, not for diagnosis or treatment decisions. Always rely on clinical examination and professional judgment.</p>
         </div>
 
         <h2>How It Works</h2>
