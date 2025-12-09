@@ -5,9 +5,9 @@ import Combine
 // MARK: - Professional Subscription Tiers
 
 enum ProfessionalSubscriptionTier: String, Codable, CaseIterable {
-    case starter = "starter"       // Free - up to 5 patients
-    case professional = "professional"  // €29.99/month - up to 50 patients
-    case practice = "practice"     // €99.99/month - unlimited patients
+    case starter = "starter"       // Free - up to 5 participants
+    case professional = "professional"  // €29.99/month - up to 50 participants
+    case practice = "practice"     // €99.99/month - unlimited participants
 
     var displayName: String {
         switch self {
@@ -46,15 +46,15 @@ enum ProfessionalSubscriptionTier: String, Codable, CaseIterable {
         switch self {
         case .starter:
             return [
-                "Up to 5 patients",
-                "Basic patient monitoring",
+                "Up to 5 participants",
+                "Basic participant monitoring",
                 "View shared data",
                 "Daily summaries",
                 "Data export (CSV)"
             ]
         case .professional:
             return [
-                "Up to 50 patients",
+                "Up to 50 participants",
                 "Advanced analytics",
                 "Trend analysis",
                 "Custom reports",
@@ -63,7 +63,7 @@ enum ProfessionalSubscriptionTier: String, Codable, CaseIterable {
             ]
         case .practice:
             return [
-                "Unlimited patients",
+                "Unlimited participants",
                 "Multi-professional access",
                 "Practice-wide analytics",
                 "White-label reports",

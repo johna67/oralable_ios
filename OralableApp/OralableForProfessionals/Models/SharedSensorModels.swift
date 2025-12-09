@@ -23,10 +23,18 @@ struct BruxismSessionData: Codable {
 struct SerializableSensorData: Codable {
     let timestamp: Date
 
-    // PPG data
+    // Device identification (added Dec 9, 2025)
+    // Optional for backwards compatibility with existing CloudKit data
+    let deviceType: String?  // "Oralable" or "ANR M40"
+
+    // PPG data (from Oralable device)
     let ppgRed: Int32
     let ppgIR: Int32
     let ppgGreen: Int32
+
+    // EMG data (from ANR M40 device, added Dec 9, 2025)
+    // Optional for backwards compatibility
+    let emg: Double?
 
     // Accelerometer data
     let accelX: Int16
@@ -45,6 +53,62 @@ struct SerializableSensorData: Codable {
     let heartRateQuality: Double?
     let spo2Percentage: Double?
     let spo2Quality: Double?
+
+    // MARK: - Device Type Detection
+
+    /// Inferred device type based on data characteristics
+    /// For legacy data without deviceType field, we infer from sensor values
+    var inferredDeviceType: String {
+        // If deviceType is already set, use it
+        if let deviceType = deviceType {
+            return deviceType
+        }
+
+        // Infer from data: Oralable has PPG data, ANR M40 has EMG data
+        // If ppgIR > 0, it's from Oralable (PPG values are typically 1000+)
+        // If ppgIR == 0 or very low, and we have valid battery/temp, it might be ANR
+        if ppgIR > 1000 {
+            return "Oralable"
+        } else if emg != nil && emg! > 0 {
+            return "ANR M40"
+        } else if ppgIR > 0 && ppgIR < 1000 {
+            // Low ppgIR could be EMG value stored in IR field (legacy ANR data)
+            return "ANR M40"
+        }
+
+        // Default to Oralable if we can't determine
+        return "Oralable"
+    }
+
+    /// Whether this is from an ANR M40 device
+    var isANRDevice: Bool {
+        inferredDeviceType == "ANR M40"
+    }
+
+    /// Whether this is from an Oralable device
+    var isOralableDevice: Bool {
+        inferredDeviceType == "Oralable"
+    }
+
+    /// Get EMG value (from dedicated field or inferred from legacy data)
+    var emgValue: Double? {
+        if let emg = emg, emg > 0 {
+            return emg
+        }
+        // For legacy data, ANR stored EMG in ppgIR field
+        if isANRDevice && ppgIR > 0 && ppgIR < 1000 {
+            return Double(ppgIR)
+        }
+        return nil
+    }
+
+    /// Get PPG IR value (only valid for Oralable devices)
+    var ppgIRValue: Double? {
+        if isOralableDevice && ppgIR > 1000 {
+            return Double(ppgIR)
+        }
+        return nil
+    }
 }
 
 // MARK: - Data Compression Helpers

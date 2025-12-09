@@ -37,6 +37,9 @@ struct OralableApp: App {
         let designSystem = DesignSystem()
         let recordingStateCoordinator = RecordingStateCoordinator.shared
 
+        // Set up RecordingStateCoordinator with SharedDataManager for auto-sync after recording
+        recordingStateCoordinator.sharedDataManager = sharedDataManager
+
         // Create AppDependencies without legacy OralableBLE
         let dependencies = AppDependencies(
             authenticationManager: authenticationManager,

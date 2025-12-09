@@ -49,7 +49,7 @@ struct PatientHealthDataView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.sm) {
-            Text("Patient Health Data")
+            Text("Participant Health Data")
                 .font(designSystem.typography.h2)
                 .foregroundColor(designSystem.colors.textPrimary)
 
@@ -227,7 +227,7 @@ struct PatientHealthDataView: View {
                 .font(designSystem.typography.h3)
                 .foregroundColor(designSystem.colors.textPrimary)
 
-            Text("This patient has not authorized HealthKit data sharing")
+            Text("This participant has not authorized HealthKit data sharing")
                 .font(designSystem.typography.body)
                 .foregroundColor(designSystem.colors.textSecondary)
                 .multilineTextAlignment(.center)

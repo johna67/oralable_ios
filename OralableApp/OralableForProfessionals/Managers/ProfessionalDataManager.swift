@@ -22,6 +22,23 @@ struct ProfessionalPatient: Identifiable, Codable {
     var displayName: String {
         return patientName ?? anonymizedID
     }
+
+    var displayInitials: String {
+        if let name = patientName, !name.isEmpty {
+            let components = name.components(separatedBy: " ")
+            if components.count >= 2 {
+                let firstInitial = components[0].prefix(1)
+                let lastInitial = components[1].prefix(1)
+                return "\(firstInitial)\(lastInitial)".uppercased()
+            } else {
+                return String(name.prefix(2)).uppercased()
+            }
+        } else {
+            // For anonymized patients, use "P" + last 2 digits
+            let suffix = String(patientID.suffix(2))
+            return "P\(suffix)"
+        }
+    }
 }
 
 struct PatientHealthSummary {
@@ -176,7 +193,7 @@ class ProfessionalDataManager: ObservableObject {
             await MainActor.run {
                 self.patients.append(newPatient)
                 self.isLoading = false
-                self.successMessage = "Patient added successfully"
+                self.successMessage = "Participant added successfully"
             }
 
         } catch let error as ProfessionalDataError {
@@ -188,7 +205,7 @@ class ProfessionalDataManager: ObservableObject {
         } catch {
             await MainActor.run {
                 self.isLoading = false
-                self.errorMessage = "Failed to add patient: \(error.localizedDescription)"
+                self.errorMessage = "Failed to add participant: \(error.localizedDescription)"
             }
             throw error
         }
@@ -277,13 +294,13 @@ class ProfessionalDataManager: ObservableObject {
             await MainActor.run {
                 self.patients.removeAll { $0.id == patient.id }
                 self.isLoading = false
-                self.successMessage = "Patient removed"
+                self.successMessage = "Participant removed"
             }
 
         } catch {
             await MainActor.run {
                 self.isLoading = false
-                self.errorMessage = "Failed to remove patient: \(error.localizedDescription)"
+                self.errorMessage = "Failed to remove participant: \(error.localizedDescription)"
             }
             throw error
         }
@@ -345,7 +362,7 @@ class ProfessionalDataManager: ObservableObject {
         } catch {
             await MainActor.run {
                 self.isLoading = false
-                self.errorMessage = "Failed to load patient data: \(error.localizedDescription)"
+                self.errorMessage = "Failed to load participant data: \(error.localizedDescription)"
             }
             throw error
         }
@@ -558,17 +575,17 @@ enum ProfessionalDataError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
-            return "You must be signed in to add patients"
+            return "You must be signed in to add participants"
         case .invalidShareCode:
             return "Invalid share code format. Please enter a 6-digit code."
         case .shareCodeNotFound:
             return "Share code not found or has been deactivated"
         case .shareCodeExpired:
-            return "This share code has expired. Please request a new code from the patient."
+            return "This share code has expired. Please request a new code from the participant."
         case .patientAlreadyAdded:
-            return "You already have access to this patient's data"
+            return "You already have access to this participant's data"
         case .patientLimitReached:
-            return "You've reached your patient limit. Please upgrade to add more patients."
+            return "You've reached your participant limit. Please upgrade to add more participants."
         case .cloudKitError(let error):
             return "Cloud error: \(error.localizedDescription)"
         }

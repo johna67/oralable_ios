@@ -23,7 +23,6 @@ class FeatureFlags: ObservableObject {
         static let showTemperatureCard = "feature.dashboard.showTemperature"
         static let showHeartRateCard = "feature.dashboard.showHeartRate"
         static let showSpO2Card = "feature.dashboard.showSpO2"
-        static let showAccelerometerCard = "feature.dashboard.showAccelerometer"
         static let showBatteryCard = "feature.dashboard.showBattery"
         static let showShareWithProfessional = "feature.share.showProfessional"
         static let showShareWithResearcher = "feature.share.showResearcher"
@@ -39,7 +38,6 @@ class FeatureFlags: ObservableObject {
         static let showTemperatureCard = false
         static let showHeartRateCard = false
         static let showSpO2Card = false
-        static let showAccelerometerCard = false
         static let showBatteryCard = false  // Hidden for pre-launch
         static let showShareWithProfessional = true
         static let showShareWithResearcher = false
@@ -64,10 +62,6 @@ class FeatureFlags: ObservableObject {
 
     @Published var showSpO2Card: Bool {
         didSet { defaults.set(showSpO2Card, forKey: Keys.showSpO2Card) }
-    }
-
-    @Published var showAccelerometerCard: Bool {
-        didSet { defaults.set(showAccelerometerCard, forKey: Keys.showAccelerometerCard) }
     }
 
     @Published var showBatteryCard: Bool {
@@ -107,7 +101,6 @@ class FeatureFlags: ObservableObject {
         self.showTemperatureCard = defaults.object(forKey: Keys.showTemperatureCard) as? Bool ?? Defaults.showTemperatureCard
         self.showHeartRateCard = defaults.object(forKey: Keys.showHeartRateCard) as? Bool ?? Defaults.showHeartRateCard
         self.showSpO2Card = defaults.object(forKey: Keys.showSpO2Card) as? Bool ?? Defaults.showSpO2Card
-        self.showAccelerometerCard = defaults.object(forKey: Keys.showAccelerometerCard) as? Bool ?? Defaults.showAccelerometerCard
         self.showBatteryCard = defaults.object(forKey: Keys.showBatteryCard) as? Bool ?? Defaults.showBatteryCard
         self.showAdvancedMetrics = defaults.object(forKey: Keys.showAdvancedMetrics) as? Bool ?? Defaults.showAdvancedMetrics
         self.showShareWithProfessional = defaults.object(forKey: Keys.showShareWithProfessional) as? Bool ?? Defaults.showShareWithProfessional
@@ -127,7 +120,6 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = false
         showHeartRateCard = false
         showSpO2Card = false
-        showAccelerometerCard = false
         showBatteryCard = false
         showAdvancedMetrics = false
         showShareWithProfessional = true
@@ -144,7 +136,6 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = true
         showHeartRateCard = true
         showSpO2Card = true
-        showAccelerometerCard = true
         showBatteryCard = true
         showAdvancedMetrics = true
         showShareWithProfessional = true
@@ -161,7 +152,6 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = true
         showHeartRateCard = false
         showSpO2Card = false
-        showAccelerometerCard = true
         showBatteryCard = true
         showAdvancedMetrics = true
         showShareWithProfessional = true
@@ -178,7 +168,6 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = true
         showHeartRateCard = true
         showSpO2Card = true
-        showAccelerometerCard = true
         showBatteryCard = true
         showAdvancedMetrics = true
         showShareWithProfessional = true
@@ -202,7 +191,6 @@ class FeatureFlags: ObservableObject {
         - Temperature Card: \(showTemperatureCard)
         - Heart Rate Card: \(showHeartRateCard)
         - SpO2 Card: \(showSpO2Card)
-        - Accelerometer Card: \(showAccelerometerCard)
         - Battery Card: \(showBatteryCard)
         - ANR M40 Device Support: \(showAdvancedMetrics)
         - Share with Professional: \(showShareWithProfessional)

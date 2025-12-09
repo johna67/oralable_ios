@@ -48,7 +48,7 @@ struct ProfessionalMainTabView: View {
         TabView {
             PatientListView()
                 .tabItem {
-                    Label("Patients", systemImage: "person.2.fill")
+                    Label("Participants", systemImage: "person.2.fill")
                 }
                 .tag(0)
 

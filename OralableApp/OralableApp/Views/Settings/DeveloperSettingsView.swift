@@ -27,7 +27,6 @@ struct DeveloperSettingsView: View {
                 Toggle("Temperature Card", isOn: $featureFlags.showTemperatureCard)
                 Toggle("Heart Rate Card", isOn: $featureFlags.showHeartRateCard)
                 Toggle("SpO2 Card", isOn: $featureFlags.showSpO2Card)
-                Toggle("Accelerometer Card", isOn: $featureFlags.showAccelerometerCard)
                 Toggle("Battery Card", isOn: $featureFlags.showBatteryCard)
                 Toggle("ANR M40 Device Support", isOn: $featureFlags.showAdvancedMetrics)
             }
@@ -35,7 +34,7 @@ struct DeveloperSettingsView: View {
             // Share Features Section
             Section(header: Text("Share Features")) {
                 Toggle("Share with Professional", isOn: $featureFlags.showShareWithProfessional)
-                Toggle("Share with Researcher", isOn: $featureFlags.showShareWithResearcher)
+                Toggle("Share for Research Studies", isOn: $featureFlags.showShareWithResearcher)
             }
 
             // Settings Features Section

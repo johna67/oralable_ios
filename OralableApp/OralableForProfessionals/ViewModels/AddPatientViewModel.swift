@@ -74,7 +74,7 @@ class AddPatientViewModel: ObservableObject {
         Logger.shared.info("[AddPatientViewModel] Current patient count: \(currentPatientCount)")
         if !subscriptionManager.canAddMorePatients(currentCount: currentPatientCount) {
             Logger.shared.warning("[AddPatientViewModel] Patient limit reached")
-            errorMessage = "You've reached your patient limit. Please upgrade to add more patients."
+            errorMessage = "You've reached your participant limit. Please upgrade to add more participants."
             return
         }
 

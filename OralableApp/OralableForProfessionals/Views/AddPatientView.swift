@@ -31,10 +31,10 @@ struct AddPatientView: View {
                             .font(.system(size: 60))
                             .foregroundColor(.black)
 
-                        Text("Add a Patient")
+                        Text("Add a Participant")
                             .font(.title2.bold())
 
-                        Text("Enter the 6-digit share code provided by your patient")
+                        Text("Enter the 6-digit share code provided by your participant")
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -66,7 +66,7 @@ struct AddPatientView: View {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             } else {
-                                Text("Add Patient")
+                                Text("Add Participant")
                             }
                         }
                         .font(.headline)
@@ -81,7 +81,7 @@ struct AddPatientView: View {
                     .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Add Patient")
+            .navigationTitle("Add Participant")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -120,7 +120,7 @@ struct AddPatientView: View {
             } catch let error as ProfessionalDataError {
                 errorMessage = error.localizedDescription
             } catch {
-                errorMessage = "Failed to add patient. Please try again."
+                errorMessage = "Failed to add participant. Please try again."
             }
             isLoading = false
         }

@@ -159,16 +159,6 @@ struct DashboardView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
 
-                    // Accelerometer (g-units) card - CONDITIONAL
-                    if featureFlags.showAccelerometerCard {
-                        AccelerometerCardView(
-                            xRaw: viewModel.isConnected ? viewModel.accelXRaw : 0,
-                            yRaw: viewModel.isConnected ? viewModel.accelYRaw : 0,
-                            zRaw: viewModel.isConnected ? viewModel.accelZRaw : 0,
-                            showChevron: false
-                        )
-                    }
-
                     // Temperature card - CONDITIONAL (with history navigation)
                     if featureFlags.showTemperatureCard {
                         NavigationLink(destination: LazyView(

@@ -32,23 +32,41 @@ struct PatientDashboardView: View {
                 } else if !viewModel.hasSensorData {
                     noDataView
                 } else {
-                    // Muscle Activity - Primary card (always visible)
-                    NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Muscle Activity")) {
+                    // View Historical Data - Single entry point with tabbed metrics
+                    NavigationLink(destination: PatientHistoricalView(patient: patient)) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("View Historical Data", systemImage: "chart.xyaxis.line")
+                                    .font(.headline)
+                                Text("EMG, IR, Movement, Temperature")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color(UIColor.systemBackground))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    // Quick stats cards
+                    HStack(spacing: 12) {
+                        // Muscle Activity
                         HealthMetricCard(
                             icon: "waveform.path.ecg",
-                            title: "Muscle Activity",
+                            title: "Activity",
                             value: viewModel.muscleActivity > 0 ? String(format: "%.0f", viewModel.muscleActivity) : "N/A",
                             unit: "",
                             color: .purple,
                             sparklineData: viewModel.muscleActivityHistory,
-                            showChevron: true
+                            showChevron: false
                         )
-                    }
-                    .buttonStyle(PlainButtonStyle())
 
-                    // Movement card (feature flagged)
-                    if featureFlags.showMovementCard {
-                        NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Movement")) {
+                        // Movement
+                        if featureFlags.showMovementCard {
                             HealthMetricCard(
                                 icon: "figure.walk",
                                 title: "Movement",
@@ -56,15 +74,14 @@ struct PatientDashboardView: View {
                                 unit: "",
                                 color: .blue,
                                 sparklineData: Array(viewModel.accelerometerHistory.suffix(20)),
-                                showChevron: true
+                                showChevron: false
                             )
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
 
-                    // Heart Rate card (feature flagged)
-                    if featureFlags.showHeartRateCard {
-                        NavigationLink(destination: PatientHistoricalView(patient: patient, metricType: "Heart Rate")) {
+                    HStack(spacing: 12) {
+                        // Heart Rate
+                        if featureFlags.showHeartRateCard {
                             HealthMetricCard(
                                 icon: "heart.fill",
                                 title: "Heart Rate",
@@ -72,23 +89,22 @@ struct PatientDashboardView: View {
                                 unit: viewModel.heartRate > 0 ? "BPM" : "",
                                 color: .red,
                                 sparklineData: Array(viewModel.heartRateHistory.suffix(20)),
-                                showChevron: true
+                                showChevron: false
                             )
                         }
-                        .buttonStyle(PlainButtonStyle())
-                    }
 
-                    // Temperature card (feature flagged)
-                    if featureFlags.showTemperatureCard {
-                        HealthMetricCard(
-                            icon: "thermometer",
-                            title: "Temperature",
-                            value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
-                            unit: viewModel.temperature > 0 ? "°C" : "",
-                            color: .orange,
-                            sparklineData: [],
-                            showChevron: false
-                        )
+                        // Temperature
+                        if featureFlags.showTemperatureCard {
+                            HealthMetricCard(
+                                icon: "thermometer",
+                                title: "Temp",
+                                value: viewModel.temperature > 0 ? String(format: "%.1f", viewModel.temperature) : "N/A",
+                                unit: viewModel.temperature > 0 ? "°C" : "",
+                                color: .orange,
+                                sparklineData: [],
+                                showChevron: false
+                            )
+                        }
                     }
 
                     // Last updated

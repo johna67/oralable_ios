@@ -30,13 +30,13 @@ struct PatientListView: View {
                     }
 
                     if viewModel.isLoading && viewModel.patients.isEmpty {
-                        LoadingView(message: "Loading patients...")
+                        LoadingView(message: "Loading participants...")
                     } else if viewModel.filteredPatients.isEmpty {
                         EmptyStateView(
                             icon: "person.2.slash",
-                            title: "No Patients Yet",
-                            message: "Add your first patient by entering their share code",
-                            buttonTitle: "Add Patient",
+                            title: "No Participants Yet",
+                            message: "Add your first participant by entering their share code",
+                            buttonTitle: "Add Participant",
                             buttonAction: { viewModel.showAddPatient() }
                         )
                     } else {
@@ -44,7 +44,7 @@ struct PatientListView: View {
                     }
                 }
             }
-            .navigationTitle("My Patients")
+            .navigationTitle("My Participants")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -54,18 +54,75 @@ struct PatientListView: View {
                     }
                 }
             }
-            .searchable(text: $viewModel.searchText, prompt: "Search patients")
+            .searchable(text: $viewModel.searchText, prompt: "Search participants")
             .sheet(isPresented: $viewModel.showingAddPatient) {
                 AddPatientView()
             }
             .sheet(item: $viewModel.selectedPatient) { patient in
-                PatientDetailView(patient: patient)
+                NavigationView {
+                    PatientHistoricalView(patient: patient)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Done") {
+                                    viewModel.selectedPatient = nil
+                                }
+                            }
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Menu {
+                                    Button(role: .destructive) {
+                                        viewModel.selectedPatient = nil
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            viewModel.confirmRemovePatient(patient)
+                                        }
+                                    } label: {
+                                        Label("Remove Participant", systemImage: "person.badge.minus")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                }
+                            }
+                        }
+                }
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") { viewModel.clearError() }
             } message: {
                 if let error = viewModel.errorMessage {
                     Text(error)
+                }
+            }
+            .alert("Remove Participant", isPresented: $viewModel.showingRemoveConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelRemove()
+                }
+                Button("Remove", role: .destructive) {
+                    Task {
+                        await viewModel.removePatient()
+                    }
+                }
+            } message: {
+                if let patient = viewModel.patientToRemove {
+                    Text("Are you sure you want to remove \(patient.displayName)?\n\nYou will no longer have access to their data. The participant can share a new code if they want to reconnect.")
+                }
+            }
+            .overlay {
+                if viewModel.isRemoving {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("Removing participant...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(24)
+                        .background(Color(UIColor.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                    }
                 }
             }
             .onAppear {
@@ -76,26 +133,33 @@ struct PatientListView: View {
     }
 
     private var patientList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.filteredPatients) { patient in
-                    PatientRowCard(patient: patient)
-                        .onTapGesture {
-                            viewModel.selectPatient(patient)
+        List {
+            ForEach(viewModel.filteredPatients) { patient in
+                PatientRowCard(patient: patient)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .onTapGesture {
+                        viewModel.selectPatient(patient)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            viewModel.confirmRemovePatient(patient)
+                        } label: {
+                            Label("Remove", systemImage: "person.badge.minus")
                         }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                viewModel.removePatient(patient)
-                            } label: {
-                                Label("Remove Patient", systemImage: "trash")
-                            }
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            viewModel.confirmRemovePatient(patient)
+                        } label: {
+                            Label("Remove Participant", systemImage: "person.badge.minus")
                         }
-                }
+                    }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .refreshable {
             await viewModel.refreshPatients()
         }
@@ -112,7 +176,7 @@ struct PatientListView: View {
                         Text("Approaching Limit")
                             .font(.subheadline.weight(.semibold))
 
-                        Text("\(viewModel.patients.count)/\(viewModel.currentTier.maxPatients) patients")
+                        Text("\(viewModel.patients.count)/\(viewModel.currentTier.maxPatients) participants")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -147,7 +211,7 @@ struct PatientRowCard: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.blue)
 
-                    Text("Patient")
+                    Text("Participant")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.secondary)
                 }

@@ -12,6 +12,11 @@ class PatientListViewModel: ObservableObject {
     @Published var showingAddPatient: Bool = false
     @Published var selectedPatient: ProfessionalPatient?
 
+    // Remove patient confirmation
+    @Published var showingRemoveConfirmation: Bool = false
+    @Published var patientToRemove: ProfessionalPatient?
+    @Published var isRemoving: Bool = false
+
     // MARK: - Dependencies
 
     private let dataManager: ProfessionalDataManager
@@ -76,18 +81,42 @@ class PatientListViewModel: ObservableObject {
         if canAddMorePatients {
             showingAddPatient = true
         } else {
-            errorMessage = "You've reached your patient limit. Please upgrade your subscription."
+            errorMessage = "You've reached your participant limit. Please upgrade your subscription."
         }
     }
 
-    func removePatient(_ patient: ProfessionalPatient) {
-        Task {
-            do {
-                try await dataManager.removePatient(patient)
-            } catch {
-                errorMessage = "Failed to remove patient: \(error.localizedDescription)"
-            }
+    // MARK: - Remove Patient
+
+    func confirmRemovePatient(_ patient: ProfessionalPatient) {
+        patientToRemove = patient
+        showingRemoveConfirmation = true
+    }
+
+    func removePatient() async {
+        guard let patient = patientToRemove else { return }
+
+        isRemoving = true
+        errorMessage = nil
+
+        do {
+            try await dataManager.removePatient(patient)
+
+            isRemoving = false
+            patientToRemove = nil
+            showingRemoveConfirmation = false
+
+            Logger.shared.info("[PatientListViewModel] ✅ Patient removed successfully")
+
+        } catch {
+            isRemoving = false
+            errorMessage = "Failed to remove participant: \(error.localizedDescription)"
+            Logger.shared.error("[PatientListViewModel] ❌ Failed to remove patient: \(error)")
         }
+    }
+
+    func cancelRemove() {
+        patientToRemove = nil
+        showingRemoveConfirmation = false
     }
 
     func selectPatient(_ patient: ProfessionalPatient) {

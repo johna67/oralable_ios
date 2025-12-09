@@ -149,6 +149,44 @@
         nav a:hover {
             color: #007AFF;
         }
+        .apps {
+            padding: 60px 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .apps h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 40px;
+        }
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        .app-card {
+            background: #f5f5f7;
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+        }
+        .app-card h3 {
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+        .app-card p {
+            color: #86868b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .app-card .btn-secondary {
+            background-color: #fff;
+            color: #000;
+            border: 1px solid #000;
+        }
+        .app-card .btn-secondary:hover {
+            background-color: #f5f5f7;
+        }
         .links {
             padding: 60px 20px;
             text-align: center;
@@ -220,6 +258,7 @@
     <nav>
         <a href="index.html">Home</a>
         <a href="product.html">Product</a>
+        <a href="for-professionals.html">For Professionals</a>
         <a href="for-researchers.html">For Researchers</a>
         <a href="about.html">About</a>
         <a href="beta.html">Early Access</a>
@@ -258,6 +297,24 @@
                 <div class="feature-icon">&#x1F4F1;</div>
                 <h3>Simple Biofeedback</h3>
                 <p>Personal awareness tool, like a fitness tracker for your jaw muscles.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="apps">
+        <h2>Two Apps, One Platform</h2>
+        <div class="app-grid">
+            <div class="app-card">
+                <div class="feature-icon">📱</div>
+                <h3>Oralable</h3>
+                <p>Monitor your muscle activity patterns. Track trends over time. Share data securely with your healthcare provider.</p>
+                <a href="beta.html" class="btn btn-primary">Join Early Access</a>
+            </div>
+            <div class="app-card">
+                <div class="feature-icon">🩺</div>
+                <h3>Oralable for Professionals</h3>
+                <p>View participant wellness data. Track participant progress over time. Access detailed activity reports.</p>
+                <a href="for-professionals.html" class="btn btn-secondary">Learn More</a>
             </div>
         </div>
     </section>

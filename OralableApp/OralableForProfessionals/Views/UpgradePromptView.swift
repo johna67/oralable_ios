@@ -22,7 +22,7 @@ struct UpgradePromptView: View {
                     Text("Upgrade Your Plan")
                         .font(.title.bold())
 
-                    Text("Unlock more features and manage more patients")
+                    Text("Unlock more features and manage more participants")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -237,7 +237,7 @@ struct TierCard: View {
 
 struct FeatureComparisonTable: View {
     let features = [
-        ("Max Patients", ["5", "50", "Unlimited"]),
+        ("Max Participants", ["5", "50", "Unlimited"]),
         ("Data Export", ["CSV", "CSV", "All Formats"]),
         ("Analytics", ["Basic", "Advanced", "Practice-wide"]),
         ("Support", ["Email", "Priority", "Dedicated"]),

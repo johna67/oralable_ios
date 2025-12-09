@@ -779,10 +779,16 @@ struct BruxismSessionData: Codable {
 struct SerializableSensorData: Codable {
     let timestamp: Date
 
-    // PPG data
+    // Device identification
+    let deviceType: String  // "Oralable" or "ANR M40"
+
+    // PPG data (from Oralable device)
     let ppgRed: Int32
     let ppgIR: Int32
     let ppgGreen: Int32
+
+    // EMG data (from ANR M40 device)
+    let emg: Double?
 
     // Accelerometer data
     let accelX: Int16
@@ -805,10 +811,21 @@ struct SerializableSensorData: Codable {
     init(from sensorData: SensorData) {
         self.timestamp = sensorData.timestamp
 
-        // PPG data
+        // Device type
+        self.deviceType = sensorData.deviceType == .anr ? "ANR M40" : "Oralable"
+
+        // PPG data (only valid for Oralable device)
         self.ppgRed = sensorData.ppg.red
         self.ppgIR = sensorData.ppg.ir
         self.ppgGreen = sensorData.ppg.green
+
+        // EMG data - for ANR device, ppg.ir contains the EMG value
+        // (ANR firmware sends EMG as a single value mapped to IR channel)
+        if sensorData.deviceType == .anr && sensorData.ppg.ir > 0 {
+            self.emg = Double(sensorData.ppg.ir)
+        } else {
+            self.emg = nil
+        }
 
         // Accelerometer data
         self.accelX = sensorData.accelerometer.x
