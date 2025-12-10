@@ -271,7 +271,7 @@ class ProfessionalDataManager: ObservableObject {
                 } else {
                     Logger.shared.error("[ProfessionalDataManager] Failed to load patients: \(error)")
                     await MainActor.run {
-                        self.errorMessage = "Failed to load patients: \(error.localizedDescription)"
+                        self.errorMessage = "Failed to load participants: \(error.localizedDescription)"
                         self.isLoading = false
                     }
                 }

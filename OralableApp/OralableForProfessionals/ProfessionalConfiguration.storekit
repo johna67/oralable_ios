@@ -67,7 +67,7 @@
       "localizations" : [
 
       ],
-      "name" : "Oralable for Dentists",
+      "name" : "Oralable for Professionals",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -83,12 +83,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Professional plan for dentists - manage up to 50 patient connections",
+              "description" : "Professional plan - manage up to 50 participant connections",
               "displayName" : "Professional Monthly",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.jacdental.oralable.dentist.professional.monthly",
+          "productID" : "com.jacdental.oralable.professional.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Professional Monthly",
           "subscriptionGroupID" : "21509284",
@@ -108,12 +108,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Professional plan for dentists - manage up to 50 patient connections (Save 17% with annual billing)",
+              "description" : "Professional plan - manage up to 50 participant connections (Save 17% with annual billing)",
               "displayName" : "Professional Yearly",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.jacdental.oralable.dentist.professional.yearly",
+          "productID" : "com.jacdental.oralable.professional.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Professional Yearly",
           "subscriptionGroupID" : "21509284",
@@ -133,12 +133,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Practice plan for dentists - unlimited patient connections",
+              "description" : "Practice plan - unlimited participant connections",
               "displayName" : "Practice Monthly",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.jacdental.oralable.dentist.practice.monthly",
+          "productID" : "com.jacdental.oralable.practice.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Practice Monthly",
           "subscriptionGroupID" : "21509284",
@@ -158,12 +158,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Practice plan for dentists - unlimited patient connections (Save 17% with annual billing)",
+              "description" : "Practice plan - unlimited participant connections (Save 17% with annual billing)",
               "displayName" : "Practice Yearly",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.jacdental.oralable.dentist.practice.yearly",
+          "productID" : "com.jacdental.oralable.practice.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Practice Yearly",
           "subscriptionGroupID" : "21509284",
