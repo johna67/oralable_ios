@@ -32,19 +32,27 @@ class FeatureFlags: ObservableObject {
         static let showDetectionSettings = "feature.settings.showDetectionSettings"
     }
 
-    // MARK: - Pre-Launch Defaults (all advanced features OFF)
+    // MARK: - Default Configuration
+    // Default dashboard: EMG + PPG (always shown) + Heart Rate + Battery
     private enum Defaults {
+        // Dashboard Cards - Default ON
+        static let showHeartRateCard = true
+        static let showBatteryCard = true
+
+        // Dashboard Cards - Default OFF
         static let showMovementCard = false
         static let showTemperatureCard = false
-        static let showHeartRateCard = false
         static let showSpO2Card = false
-        static let showBatteryCard = false  // Hidden for pre-launch
+
+        // Share Features
         static let showShareWithProfessional = true
         static let showShareWithResearcher = false
+
+        // Settings Features
         static let showSubscription = true
         static let showHealthIntegration = false
         static let showAdvancedMetrics = false
-        static let showDetectionSettings = false  // Hidden for pre-launch
+        static let showDetectionSettings = false
     }
 
     // MARK: - Dashboard Features
@@ -114,20 +122,25 @@ class FeatureFlags: ObservableObject {
 
     // MARK: - Presets
 
-    /// Pre-launch configuration (minimal features for App Store approval)
+    /// Default configuration (EMG + PPG + Heart Rate + Battery)
     func applyPreLaunchConfig() {
+        // Dashboard Cards
+        showHeartRateCard = true
+        showBatteryCard = true
         showMovementCard = false
         showTemperatureCard = false
-        showHeartRateCard = false
         showSpO2Card = false
-        showBatteryCard = false
         showAdvancedMetrics = false
+
+        // Share Features
         showShareWithProfessional = true
         showShareWithResearcher = false
-        showSubscription = false
+
+        // Settings Features
+        showSubscription = true
         showHealthIntegration = false
         showDetectionSettings = false
-        Logger.shared.info("[FeatureFlags] Applied pre-launch config")
+        Logger.shared.info("[FeatureFlags] Applied default config (EMG + PPG + Heart Rate + Battery)")
     }
 
     /// Full feature configuration (all features enabled)

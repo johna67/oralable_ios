@@ -1,0 +1,210 @@
+//
+//  CSVParser.swift
+//  OralableForProfessionals
+//
+//  Created: December 10, 2025
+//  Purpose: Parse CSV files exported from Oralable app
+//
+
+import Foundation
+
+// MARK: - Imported Sensor Data Model
+
+/// Represents a single row of imported sensor data from CSV
+struct ImportedSensorData: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let deviceType: String
+    let emg: Double?
+    let ppgIR: Double?
+    let ppgRed: Double?
+    let ppgGreen: Double?
+    let accelX: Double?
+    let accelY: Double?
+    let accelZ: Double?
+    let temperature: Double?
+    let battery: Double?
+    let heartRate: Double?
+}
+
+// MARK: - CSV Parser
+
+/// Utility for parsing Oralable CSV export files
+struct CSVParser {
+
+    /// Parse CSV content into ImportedSensorData array
+    /// - Parameter content: Raw CSV string content
+    /// - Returns: Array of parsed sensor data points
+    static func parse(_ content: String) -> [ImportedSensorData] {
+        var result: [ImportedSensorData] = []
+        let lines = content.components(separatedBy: .newlines)
+
+        guard lines.count > 1 else { return result }
+
+        // Parse header to find column indices
+        let header = parseCSVLine(lines[0])
+        let columnMap = Dictionary(uniqueKeysWithValues: header.enumerated().map { ($1.trimmingCharacters(in: .whitespaces), $0) })
+
+        Logger.shared.info("[CSVParser] Parsing CSV with \(lines.count - 1) data rows")
+        Logger.shared.info("[CSVParser] Columns found: \(header.joined(separator: ", "))")
+
+        // Parse data rows
+        for i in 1..<lines.count {
+            let line = lines[i].trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { continue }
+
+            let values = parseCSVLine(line)
+
+            let data = ImportedSensorData(
+                timestamp: parseTimestamp(values, columnMap),
+                deviceType: getString(values, columnMap, "Device_Type") ?? "Oralable",
+                emg: getDouble(values, columnMap, "EMG"),
+                ppgIR: getDouble(values, columnMap, "PPG_IR"),
+                ppgRed: getDouble(values, columnMap, "PPG_Red"),
+                ppgGreen: getDouble(values, columnMap, "PPG_Green"),
+                accelX: getDouble(values, columnMap, "Accel_X"),
+                accelY: getDouble(values, columnMap, "Accel_Y"),
+                accelZ: getDouble(values, columnMap, "Accel_Z"),
+                temperature: getDouble(values, columnMap, "Temperature") ?? getDouble(values, columnMap, "Temp_C"),
+                battery: getDouble(values, columnMap, "Battery") ?? getDouble(values, columnMap, "Battery_%"),
+                heartRate: getDouble(values, columnMap, "Heart_Rate") ?? getDouble(values, columnMap, "HeartRate_BPM")
+            )
+
+            result.append(data)
+        }
+
+        Logger.shared.info("[CSVParser] Successfully parsed \(result.count) data points")
+        return result
+    }
+
+    /// Parse a CSV line handling quoted fields
+    private static func parseCSVLine(_ line: String) -> [String] {
+        var columns: [String] = []
+        var currentColumn = ""
+        var insideQuotes = false
+        var i = line.startIndex
+
+        while i < line.endIndex {
+            let char = line[i]
+
+            if char == "\"" {
+                if insideQuotes {
+                    // Check for escaped quote
+                    let nextIndex = line.index(after: i)
+                    if nextIndex < line.endIndex && line[nextIndex] == "\"" {
+                        currentColumn.append("\"")
+                        i = nextIndex
+                    } else {
+                        insideQuotes = false
+                    }
+                } else {
+                    insideQuotes = true
+                }
+            } else if char == "," && !insideQuotes {
+                columns.append(currentColumn.trimmingCharacters(in: .whitespaces))
+                currentColumn = ""
+            } else {
+                currentColumn.append(char)
+            }
+
+            i = line.index(after: i)
+        }
+
+        columns.append(currentColumn.trimmingCharacters(in: .whitespaces))
+        return columns
+    }
+
+    /// Parse timestamp from various formats
+    private static func parseTimestamp(_ values: [String], _ columnMap: [String: Int]) -> Date {
+        guard let index = columnMap["Timestamp"], index < values.count else {
+            return Date()
+        }
+
+        let timestampString = values[index].trimmingCharacters(in: .whitespaces)
+
+        // Try ISO8601 format first (from ShareView export)
+        let iso8601Formatter = ISO8601DateFormatter()
+        if let date = iso8601Formatter.date(from: timestampString) {
+            return date
+        }
+
+        // Try standard date-time format
+        let dateTimeFormatter = DateFormatter()
+        dateTimeFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        if let date = dateTimeFormatter.date(from: timestampString) {
+            return date
+        }
+
+        // Try without milliseconds
+        dateTimeFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        if let date = dateTimeFormatter.date(from: timestampString) {
+            return date
+        }
+
+        // Try time-only format (HH:mm:ss)
+        let timeOnlyFormatter = DateFormatter()
+        timeOnlyFormatter.dateFormat = "HH:mm:ss"
+        if let date = timeOnlyFormatter.date(from: timestampString) {
+            // Set to today's date with parsed time
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.hour, .minute, .second], from: date)
+            return calendar.date(bySettingHour: components.hour ?? 0,
+                                minute: components.minute ?? 0,
+                                second: components.second ?? 0,
+                                of: Date()) ?? Date()
+        }
+
+        return Date()
+    }
+
+    private static func getString(_ values: [String], _ columnMap: [String: Int], _ column: String) -> String? {
+        guard let index = columnMap[column], index < values.count else { return nil }
+        let value = values[index].trimmingCharacters(in: .whitespaces)
+        return value.isEmpty ? nil : value
+    }
+
+    private static func getDouble(_ values: [String], _ columnMap: [String: Int], _ column: String) -> Double? {
+        guard let index = columnMap[column], index < values.count else { return nil }
+        let value = values[index].trimmingCharacters(in: .whitespaces)
+        return Double(value)
+    }
+}
+
+// MARK: - CSV Import Result
+
+/// Result of a CSV import operation
+struct CSVImportPreview {
+    let fileName: String
+    let dataPoints: [ImportedSensorData]
+    let dateRange: String
+    let deviceTypes: Set<String>
+
+    var summary: String {
+        let types = deviceTypes.isEmpty ? "Unknown" : deviceTypes.joined(separator: ", ")
+        return "\(dataPoints.count) readings from \(types) device(s)"
+    }
+
+    init(fileName: String, dataPoints: [ImportedSensorData]) {
+        self.fileName = fileName
+        self.dataPoints = dataPoints
+
+        // Calculate date range
+        if let first = dataPoints.first?.timestamp, let last = dataPoints.last?.timestamp {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .short
+
+            if Calendar.current.isDate(first, inSameDayAs: last) {
+                formatter.timeStyle = .short
+                self.dateRange = formatter.string(from: first)
+            } else {
+                self.dateRange = "\(formatter.string(from: first)) - \(formatter.string(from: last))"
+            }
+        } else {
+            self.dateRange = "Unknown"
+        }
+
+        // Collect unique device types
+        self.deviceTypes = Set(dataPoints.compactMap { $0.deviceType })
+    }
+}

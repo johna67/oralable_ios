@@ -218,6 +218,22 @@ struct PatientRowCard: View {
 
                 Spacer()
 
+                // Connection type indicator
+                HStack(spacing: 4) {
+                    Image(systemName: patient.connectionIcon)
+                        .font(.system(size: 10))
+                        .foregroundColor(patient.isLocalImport ? .orange : .green)
+                    Text(patient.connectionType)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(patient.isLocalImport ? .orange : .green)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(patient.isLocalImport ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))
+                )
+
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(Color(UIColor.tertiaryLabel))
@@ -243,6 +259,18 @@ struct PatientRowCard: View {
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                         Text("Updated \(relativeDate(lastUpdate))")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                // Show data point count for CSV imports
+                if patient.isLocalImport, let count = patient.dataPointCount {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.bar")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Text("\(count) points")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                     }

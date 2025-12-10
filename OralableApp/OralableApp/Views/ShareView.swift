@@ -272,10 +272,11 @@ struct ShareView: View {
 
     /// Optimized CSV generation using array join instead of string concatenation
     /// This is O(n) instead of O(n²) for string operations
+    /// Only exports columns for metrics that have visible dashboard cards
     private func generateCSVFileOptimized() async -> URL? {
         let sensorData = sensorDataProcessor.sensorDataHistory
         let totalCount = sensorData.count
-        
+
         guard totalCount > 0 else {
             await MainActor.run {
                 errorMessage = "No data to export"
@@ -283,26 +284,44 @@ struct ShareView: View {
             }
             return nil
         }
-        
+
         Logger.shared.info("[ShareView] 📊 Starting optimized CSV export with \(totalCount) records")
         let startTime = Date()
-        
+
+        // Get current feature flag settings for conditional columns
+        let includeMovement = featureFlags.showMovementCard
+        let includeTemperature = featureFlags.showTemperatureCard
+        let includeHeartRate = featureFlags.showHeartRateCard
+        let includeBattery = featureFlags.showBatteryCard
+
         // Pre-allocate array capacity for performance
         var lines: [String] = []
         lines.reserveCapacity(totalCount + 1)
-        
-        // Header
-        lines.append("Timestamp,Device_Type,EMG,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate")
-        
+
+        // Build header based on enabled features
+        var headerParts = ["Timestamp", "Device_Type", "EMG", "PPG_IR", "PPG_Red", "PPG_Green"]
+        if includeMovement {
+            headerParts.append(contentsOf: ["Accel_X", "Accel_Y", "Accel_Z"])
+        }
+        if includeTemperature {
+            headerParts.append("Temperature")
+        }
+        if includeBattery {
+            headerParts.append("Battery")
+        }
+        if includeHeartRate {
+            headerParts.append("Heart_Rate")
+        }
+        lines.append(headerParts.joined(separator: ","))
+
         let dateFormatter = ISO8601DateFormatter()
-        
+
         // Process in batches for UI updates
         let batchSize = 1000
         var processedCount = 0
-        
+
         for data in sensorData {
             let timestamp = dateFormatter.string(from: data.timestamp)
-            let heartRate = data.heartRate?.bpm ?? 0
 
             // Device type determines which columns get data
             let deviceTypeName: String
@@ -324,12 +343,38 @@ struct ShareView: View {
                 ppgIRValue = data.ppg.ir
             }
 
-            // Build line using string interpolation (faster than repeated concatenation)
-            let line = "\(timestamp),\(deviceTypeName),\(emgValue),\(ppgIRValue),\(data.ppg.red),\(data.ppg.green),\(data.accelerometer.x),\(data.accelerometer.y),\(data.accelerometer.z),\(data.temperature.celsius),\(data.battery.percentage),\(heartRate)"
-            lines.append(line)
-            
+            // Build line with only enabled columns
+            var rowParts: [String] = [
+                timestamp,
+                deviceTypeName,
+                String(emgValue),
+                String(ppgIRValue),
+                String(data.ppg.red),
+                String(data.ppg.green)
+            ]
+
+            if includeMovement {
+                rowParts.append(contentsOf: [
+                    String(data.accelerometer.x),
+                    String(data.accelerometer.y),
+                    String(data.accelerometer.z)
+                ])
+            }
+            if includeTemperature {
+                rowParts.append(String(data.temperature.celsius))
+            }
+            if includeBattery {
+                rowParts.append(String(data.battery.percentage))
+            }
+            if includeHeartRate {
+                let heartRate = data.heartRate?.bpm ?? 0
+                rowParts.append(String(heartRate))
+            }
+
+            lines.append(rowParts.joined(separator: ","))
+
             processedCount += 1
-            
+
             // Update progress every batch
             if processedCount % batchSize == 0 {
                 let progress = Double(processedCount) / Double(totalCount) * 100
@@ -340,26 +385,27 @@ struct ShareView: View {
                 await Task.yield()
             }
         }
-        
+
         await MainActor.run {
             exportProgress = "Writing file..."
         }
-        
+
         // Join all lines at once (O(n) operation)
         let csvString = lines.joined(separator: "\n")
-        
+
         let fileName = "oralable_data_\(Int(Date().timeIntervalSince1970)).csv"
-        
+
         // Save to Documents directory (for History view to find)
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileURL = documentsURL.appendingPathComponent(fileName)
 
         do {
             try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
-            
+
             let elapsed = Date().timeIntervalSince(startTime)
-            Logger.shared.info("[ShareView] ✅ CSV export complete: \(fileName) | \(totalCount) records | \(String(format: "%.2f", elapsed))s")
-            
+            let columnCount = headerParts.count
+            Logger.shared.info("[ShareView] ✅ CSV export complete: \(fileName) | \(totalCount) records | \(columnCount) columns | \(String(format: "%.2f", elapsed))s")
+
             return fileURL
         } catch {
             Logger.shared.error("[ShareView] ❌ Failed to create CSV: \(error.localizedDescription)")

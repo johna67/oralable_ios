@@ -3,8 +3,10 @@ import Foundation
 // MARK: - CSV Export Manager
 
 /// Manager for exporting sensor data and logs to CSV format
+/// Only exports columns for metrics that have visible dashboard cards
 class CSVExportManager: ObservableObject {
     static let shared = CSVExportManager()
+    private let featureFlags = FeatureFlags.shared
 
     init() {}
     
@@ -53,116 +55,143 @@ class CSVExportManager: ObservableObject {
     }
     
     /// Generate CSV content from sensor data and logs
+    /// Only includes columns for metrics that have visible dashboard cards
     private func generateCSVContent(sensorData: [SensorData], logs: [String]) -> String {
         var csvLines: [String] = []
-        
-        // CSV Header
-        let header = [
-            "Timestamp",
-            "PPG_IR",
-            "PPG_Red", 
-            "PPG_Green",
-            "Accel_X",
-            "Accel_Y", 
-            "Accel_Z",
-            "Temp_C",
-            "Battery_%",
-            "HeartRate_BPM",
-            "HeartRate_Quality",
-            "SpO2_%",
-            "SpO2_Quality",
-            "Message"
-        ].joined(separator: ",")
-        
-        csvLines.append(header)
-        
+
+        // Get current feature flag settings for conditional columns
+        let includeMovement = featureFlags.showMovementCard
+        let includeTemperature = featureFlags.showTemperatureCard
+        let includeHeartRate = featureFlags.showHeartRateCard
+        let includeBattery = featureFlags.showBatteryCard
+        let includeSpO2 = featureFlags.showSpO2Card
+
+        // Build CSV Header based on enabled features
+        var headerParts = ["Timestamp", "PPG_IR", "PPG_Red", "PPG_Green"]
+        if includeMovement {
+            headerParts.append(contentsOf: ["Accel_X", "Accel_Y", "Accel_Z"])
+        }
+        if includeTemperature {
+            headerParts.append("Temp_C")
+        }
+        if includeBattery {
+            headerParts.append("Battery_%")
+        }
+        if includeHeartRate {
+            headerParts.append(contentsOf: ["HeartRate_BPM", "HeartRate_Quality"])
+        }
+        if includeSpO2 {
+            headerParts.append(contentsOf: ["SpO2_%", "SpO2_Quality"])
+        }
+        headerParts.append("Message")
+
+        csvLines.append(headerParts.joined(separator: ","))
+
         // Date formatter for timestamps
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        
+
         // Create a map of timestamps to log messages for efficient lookup
         var logMessagesByTimestamp: [String: String] = [:]
         for log in logs {
             let timestamp = dateFormatter.string(from: Date()) // In real scenario, logs would have timestamps
             logMessagesByTimestamp[timestamp] = log
         }
-        
+
         // Export each sensor data point
         for data in sensorData {
             let timestampString = dateFormatter.string(from: data.timestamp)
-            
+
             var row: [String] = []
-            
-            // Timestamp
+
+            // Timestamp (always included)
             row.append(timestampString)
-            
-            // PPG Data
+
+            // PPG Data (always included - core metric)
             row.append(String(data.ppg.ir))
             row.append(String(data.ppg.red))
             row.append(String(data.ppg.green))
-            
-            // Accelerometer Data
-            row.append(String(data.accelerometer.x))
-            row.append(String(data.accelerometer.y))
-            row.append(String(data.accelerometer.z))
-            
-            // Temperature Data
-            row.append(String(format: "%.2f", data.temperature.celsius))
-            
-            // Battery Data
-            row.append(String(data.battery.percentage))
-            
-            // Heart Rate Data
-            if let heartRate = data.heartRate {
-                row.append(String(format: "%.1f", heartRate.bpm))
-                row.append(String(format: "%.3f", heartRate.quality))
-            } else {
-                row.append("")
-                row.append("")
+
+            // Accelerometer Data (conditional)
+            if includeMovement {
+                row.append(String(data.accelerometer.x))
+                row.append(String(data.accelerometer.y))
+                row.append(String(data.accelerometer.z))
             }
-            
-            // SpO2 Data
-            if let spo2 = data.spo2 {
-                row.append(String(format: "%.1f", spo2.percentage))
-                row.append(String(format: "%.3f", spo2.quality))
-            } else {
-                row.append("")
-                row.append("")
+
+            // Temperature Data (conditional)
+            if includeTemperature {
+                row.append(String(format: "%.2f", data.temperature.celsius))
             }
-            
+
+            // Battery Data (conditional)
+            if includeBattery {
+                row.append(String(data.battery.percentage))
+            }
+
+            // Heart Rate Data (conditional)
+            if includeHeartRate {
+                if let heartRate = data.heartRate {
+                    row.append(String(format: "%.1f", heartRate.bpm))
+                    row.append(String(format: "%.3f", heartRate.quality))
+                } else {
+                    row.append("")
+                    row.append("")
+                }
+            }
+
+            // SpO2 Data (conditional)
+            if includeSpO2 {
+                if let spo2 = data.spo2 {
+                    row.append(String(format: "%.1f", spo2.percentage))
+                    row.append(String(format: "%.3f", spo2.quality))
+                } else {
+                    row.append("")
+                    row.append("")
+                }
+            }
+
             // Message (log entry for this timestamp if available)
             let message = logMessagesByTimestamp[timestampString] ?? ""
             row.append(escapeCSVField(message))
-            
+
             csvLines.append(row.joined(separator: ","))
         }
-        
+
         // If there are logs without corresponding sensor data, add them as separate rows
         let sensorTimestamps = Set(sensorData.map { dateFormatter.string(from: $0.timestamp) })
-        
+
+        // Calculate number of empty columns needed for log-only rows
+        var emptyColumnCount = 3 // PPG columns
+        if includeMovement { emptyColumnCount += 3 }
+        if includeTemperature { emptyColumnCount += 1 }
+        if includeBattery { emptyColumnCount += 1 }
+        if includeHeartRate { emptyColumnCount += 2 }
+        if includeSpO2 { emptyColumnCount += 2 }
+
         for log in logs {
             // For now, we'll add logs at the end with current timestamp
             // In a real implementation, logs would have their own timestamps
             let timestampString = dateFormatter.string(from: Date())
-            
+
             if !sensorTimestamps.contains(timestampString) {
                 var row: [String] = []
-                
+
                 // Timestamp
                 row.append(timestampString)
-                
+
                 // Empty sensor data fields
-                for _ in 1...12 { // All sensor fields
+                for _ in 0..<emptyColumnCount {
                     row.append("")
                 }
-                
+
                 // Message
                 row.append(escapeCSVField(log))
-                
+
                 csvLines.append(row.joined(separator: ","))
             }
         }
-        
+
         return csvLines.joined(separator: "\n")
     }
     

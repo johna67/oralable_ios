@@ -12,11 +12,28 @@ struct ProfessionalPatient: Identifiable, Codable {
     let accessGrantedDate: Date
     let lastDataUpdate: Date?
     let recordID: String  // CloudKit record ID
+    let isLocalImport: Bool  // true for CSV imports, false for CloudKit links
+    let dataPointCount: Int?  // Number of data points for imported participants
+
+    // Default initializer with isLocalImport = false for backwards compatibility
+    init(id: String, patientID: String, patientName: String?, shareCode: String,
+         accessGrantedDate: Date, lastDataUpdate: Date?, recordID: String,
+         isLocalImport: Bool = false, dataPointCount: Int? = nil) {
+        self.id = id
+        self.patientID = patientID
+        self.patientName = patientName
+        self.shareCode = shareCode
+        self.accessGrantedDate = accessGrantedDate
+        self.lastDataUpdate = lastDataUpdate
+        self.recordID = recordID
+        self.isLocalImport = isLocalImport
+        self.dataPointCount = dataPointCount
+    }
 
     var anonymizedID: String {
         // Show only last 4 characters of patient ID for privacy
         let suffix = String(patientID.suffix(4))
-        return "Patient-****\(suffix)"
+        return "Participant-****\(suffix)"
     }
 
     var displayName: String {
@@ -34,10 +51,20 @@ struct ProfessionalPatient: Identifiable, Codable {
                 return String(name.prefix(2)).uppercased()
             }
         } else {
-            // For anonymized patients, use "P" + last 2 digits
+            // For anonymized participants, use "P" + last 2 digits
             let suffix = String(patientID.suffix(2))
             return "P\(suffix)"
         }
+    }
+
+    /// Connection type description
+    var connectionType: String {
+        isLocalImport ? "CSV Import" : "Live Sync"
+    }
+
+    /// Icon for the connection type
+    var connectionIcon: String {
+        isLocalImport ? "doc.text" : "icloud"
     }
 }
 
@@ -214,7 +241,14 @@ class ProfessionalDataManager: ObservableObject {
     // MARK: - Patient Management
 
     func loadPatients() {
-        guard let professionalID = professionalID else { return }
+        guard let professionalID = professionalID else {
+            // Still load local participants even if not authenticated
+            let localParticipants = loadLocalParticipants()
+            if !localParticipants.isEmpty {
+                self.patients = localParticipants.sorted { $0.accessGrantedDate > $1.accessGrantedDate }
+            }
+            return
+        }
 
         Task {
             isLoading = true
@@ -243,7 +277,8 @@ class ProfessionalDataManager: ObservableObject {
                                 shareCode: shareCode,
                                 accessGrantedDate: accessDate,
                                 lastDataUpdate: record["lastDataUpdate"] as? Date,
-                                recordID: record.recordID.recordName
+                                recordID: record.recordID.recordName,
+                                isLocalImport: false
                             )
 
                             loadedPatients.append(patient)
@@ -252,6 +287,10 @@ class ProfessionalDataManager: ObservableObject {
                         Logger.shared.error("[ProfessionalDataManager] Error loading patient record: \(error)")
                     }
                 }
+
+                // Merge with local participants
+                let localParticipants = loadLocalParticipants()
+                loadedPatients.append(contentsOf: localParticipants)
 
                 await MainActor.run {
                     self.patients = loadedPatients.sorted { $0.accessGrantedDate > $1.accessGrantedDate }
@@ -263,14 +302,18 @@ class ProfessionalDataManager: ObservableObject {
                 // This happens when no patients have been added yet in Development mode
                 let nsError = error as NSError
                 if nsError.domain == CKErrorDomain && nsError.code == CKError.unknownItem.rawValue {
-                    Logger.shared.info("[ProfessionalDataManager] Record type doesn't exist yet - no patients have been added")
+                    Logger.shared.info("[ProfessionalDataManager] Record type doesn't exist yet - loading local participants only")
+                    let localParticipants = loadLocalParticipants()
                     await MainActor.run {
-                        self.patients = []
+                        self.patients = localParticipants.sorted { $0.accessGrantedDate > $1.accessGrantedDate }
                         self.isLoading = false
                     }
                 } else {
                     Logger.shared.error("[ProfessionalDataManager] Failed to load patients: \(error)")
+                    // Still load local participants on error
+                    let localParticipants = loadLocalParticipants()
                     await MainActor.run {
+                        self.patients = localParticipants.sorted { $0.accessGrantedDate > $1.accessGrantedDate }
                         self.errorMessage = "Failed to load participants: \(error.localizedDescription)"
                         self.isLoading = false
                     }
@@ -283,6 +326,17 @@ class ProfessionalDataManager: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // Handle local imports differently
+        if patient.isLocalImport {
+            removeLocalParticipant(patient)
+            await MainActor.run {
+                self.isLoading = false
+                self.successMessage = "Participant removed"
+            }
+            return
+        }
+
+        // CloudKit removal
         do {
             // Find and update the SharedPatientData record
             let recordID = CKRecord.ID(recordName: patient.recordID)
@@ -475,6 +529,123 @@ class ProfessionalDataManager: ObservableObject {
         }
     }
 
+    // MARK: - CSV Import
+
+    /// Import a participant from CSV data (local storage, not CloudKit)
+    func importParticipantFromCSV(name: String, data: [ImportedSensorData]) async throws {
+        isLoading = true
+        errorMessage = nil
+
+        // Generate unique IDs for local import
+        let participantID = UUID().uuidString
+        let recordID = "local_\(participantID)"
+
+        // Create participant record
+        let participant = ProfessionalPatient(
+            id: recordID,
+            patientID: participantID,
+            patientName: name,
+            shareCode: "CSV",  // Marker for CSV imports
+            accessGrantedDate: Date(),
+            lastDataUpdate: data.last?.timestamp,
+            recordID: recordID,
+            isLocalImport: true,
+            dataPointCount: data.count
+        )
+
+        // Save participant to local storage
+        saveLocalParticipant(participant)
+
+        // Save imported sensor data to local storage
+        saveImportedSensorData(data, forParticipantID: participantID)
+
+        await MainActor.run {
+            // Add to patients list
+            self.patients.append(participant)
+            self.patients.sort { $0.accessGrantedDate > $1.accessGrantedDate }
+            self.isLoading = false
+            self.successMessage = "Imported \(data.count) data points for \(name)"
+        }
+
+        Logger.shared.info("[ProfessionalDataManager] ✅ CSV import complete: \(name) with \(data.count) data points")
+    }
+
+    /// Fetch sensor data for a locally imported participant
+    func fetchImportedSensorData(for patient: ProfessionalPatient) -> [SerializableSensorData] {
+        guard patient.isLocalImport else { return [] }
+
+        let key = "importedData_\(patient.patientID)"
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+
+        do {
+            let importedData = try JSONDecoder().decode([ImportedSensorDataCodable].self, from: data)
+            return importedData.map { $0.toSerializableSensorData() }
+        } catch {
+            Logger.shared.error("[ProfessionalDataManager] Failed to decode imported data: \(error)")
+            return []
+        }
+    }
+
+    // MARK: - Local Storage
+
+    private let localParticipantsKey = "localImportedParticipants"
+
+    /// Save a locally imported participant to UserDefaults
+    private func saveLocalParticipant(_ participant: ProfessionalPatient) {
+        var localParticipants = loadLocalParticipants()
+        localParticipants.removeAll { $0.id == participant.id }
+        localParticipants.append(participant)
+
+        if let data = try? JSONEncoder().encode(localParticipants) {
+            UserDefaults.standard.set(data, forKey: localParticipantsKey)
+        }
+    }
+
+    /// Load locally imported participants from UserDefaults
+    private func loadLocalParticipants() -> [ProfessionalPatient] {
+        guard let data = UserDefaults.standard.data(forKey: localParticipantsKey) else {
+            return []
+        }
+
+        do {
+            return try JSONDecoder().decode([ProfessionalPatient].self, from: data)
+        } catch {
+            Logger.shared.error("[ProfessionalDataManager] Failed to decode local participants: \(error)")
+            return []
+        }
+    }
+
+    /// Save imported sensor data to UserDefaults
+    private func saveImportedSensorData(_ data: [ImportedSensorData], forParticipantID participantID: String) {
+        let codableData = data.map { ImportedSensorDataCodable(from: $0) }
+        let key = "importedData_\(participantID)"
+
+        if let encoded = try? JSONEncoder().encode(codableData) {
+            UserDefaults.standard.set(encoded, forKey: key)
+            Logger.shared.info("[ProfessionalDataManager] Saved \(data.count) data points for participant \(participantID)")
+        }
+    }
+
+    /// Remove locally imported participant
+    func removeLocalParticipant(_ patient: ProfessionalPatient) {
+        // Remove from local storage
+        var localParticipants = loadLocalParticipants()
+        localParticipants.removeAll { $0.id == patient.id }
+
+        if let data = try? JSONEncoder().encode(localParticipants) {
+            UserDefaults.standard.set(data, forKey: localParticipantsKey)
+        }
+
+        // Remove sensor data
+        let dataKey = "importedData_\(patient.patientID)"
+        UserDefaults.standard.removeObject(forKey: dataKey)
+
+        // Remove from patients list
+        patients.removeAll { $0.id == patient.id }
+
+        Logger.shared.info("[ProfessionalDataManager] Removed local participant: \(patient.displayName)")
+    }
+
     // MARK: - Helper Methods
 
     private func getCurrentProfessionalID() -> String? {
@@ -558,6 +729,68 @@ class ProfessionalDataManager: ObservableObject {
                 throw error
             }
         }
+    }
+}
+
+// MARK: - Codable Helper for ImportedSensorData
+
+/// Codable wrapper for ImportedSensorData (for UserDefaults storage)
+struct ImportedSensorDataCodable: Codable {
+    let timestamp: Date
+    let deviceType: String
+    let emg: Double?
+    let ppgIR: Double?
+    let ppgRed: Double?
+    let ppgGreen: Double?
+    let accelX: Double?
+    let accelY: Double?
+    let accelZ: Double?
+    let temperature: Double?
+    let battery: Double?
+    let heartRate: Double?
+
+    init(from imported: ImportedSensorData) {
+        self.timestamp = imported.timestamp
+        self.deviceType = imported.deviceType
+        self.emg = imported.emg
+        self.ppgIR = imported.ppgIR
+        self.ppgRed = imported.ppgRed
+        self.ppgGreen = imported.ppgGreen
+        self.accelX = imported.accelX
+        self.accelY = imported.accelY
+        self.accelZ = imported.accelZ
+        self.temperature = imported.temperature
+        self.battery = imported.battery
+        self.heartRate = imported.heartRate
+    }
+
+    /// Convert to SerializableSensorData for chart display
+    func toSerializableSensorData() -> SerializableSensorData {
+        // Pre-calculate values to help compiler type-check
+        let aX: Double = accelX ?? 0
+        let aY: Double = accelY ?? 0
+        let aZ: Double = accelZ ?? 0
+        let magnitude: Double = sqrt(aX * aX + aY * aY + aZ * aZ)
+        let hrQuality: Double? = heartRate != nil ? 1.0 : nil
+
+        return SerializableSensorData(
+            timestamp: timestamp,
+            deviceType: deviceType,
+            ppgRed: Int32(ppgRed ?? 0),
+            ppgIR: Int32(ppgIR ?? 0),
+            ppgGreen: Int32(ppgGreen ?? 0),
+            emg: emg,
+            accelX: Int16(aX),
+            accelY: Int16(aY),
+            accelZ: Int16(aZ),
+            accelMagnitude: magnitude,
+            temperatureCelsius: temperature ?? 0,
+            batteryPercentage: Int(battery ?? 0),
+            heartRateBPM: heartRate,
+            heartRateQuality: hrQuality,
+            spo2Percentage: nil,
+            spo2Quality: nil
+        )
     }
 }
 
