@@ -13,8 +13,7 @@ import Combine
 class SettingsViewModel: ObservableObject {
     
     // MARK: - Published Properties (Observable by View)
-    
-    @Published var ppgChannelOrder: PPGChannelOrder = .standard
+
     @Published var notificationsEnabled: Bool = true
     @Published var dataRetentionDays: Int = 30
     @Published var autoConnectEnabled: Bool = true
@@ -46,7 +45,6 @@ class SettingsViewModel: ObservableObject {
     
     // UserDefaults Keys
     private enum Keys {
-        static let ppgChannelOrder = "ppgChannelOrder"
         static let notificationsEnabled = "notificationsEnabled"
         static let dataRetentionDays = "dataRetentionDays"
         static let autoConnectEnabled = "autoConnectEnabled"
@@ -88,13 +86,6 @@ class SettingsViewModel: ObservableObject {
     
     private func setupBindings() {
         // Save settings when they change
-        $ppgChannelOrder
-            .dropFirst()
-            .sink { [weak self] value in
-                self?.saveSetting(Keys.ppgChannelOrder, value: value.rawValue)
-            }
-            .store(in: &cancellables)
-        
         $notificationsEnabled
             .dropFirst()
             .sink { [weak self] value in
@@ -127,7 +118,6 @@ class SettingsViewModel: ObservableObject {
     // MARK: - Settings Management
     
     func loadSettings() {
-        ppgChannelOrder = PPGChannelOrder(rawValue: userDefaults.string(forKey: Keys.ppgChannelOrder) ?? "") ?? .standard
         notificationsEnabled = userDefaults.bool(forKey: Keys.notificationsEnabled, defaultValue: true)
         dataRetentionDays = userDefaults.integer(forKey: Keys.dataRetentionDays, defaultValue: 30)
         autoConnectEnabled = userDefaults.bool(forKey: Keys.autoConnectEnabled, defaultValue: true)
@@ -151,7 +141,6 @@ class SettingsViewModel: ObservableObject {
     }
     
     func resetToDefaults() {
-        ppgChannelOrder = .standard
         notificationsEnabled = true
         dataRetentionDays = 30
         autoConnectEnabled = true
@@ -167,7 +156,7 @@ class SettingsViewModel: ObservableObject {
         
         // Remove all saved settings
         let allKeys = [
-            Keys.ppgChannelOrder, Keys.notificationsEnabled, Keys.dataRetentionDays,
+            Keys.notificationsEnabled, Keys.dataRetentionDays,
             Keys.autoConnectEnabled, Keys.showDebugInfo, Keys.connectionAlerts,
             Keys.batteryAlerts, Keys.lowBatteryThreshold, Keys.useMetricUnits,
             Keys.show24HourTime, Keys.chartRefreshRate, Keys.shareAnalytics,
@@ -190,7 +179,6 @@ class SettingsViewModel: ObservableObject {
     
     func exportSettings() -> [String: Any] {
         return [
-            Keys.ppgChannelOrder: ppgChannelOrder.rawValue,
             Keys.notificationsEnabled: notificationsEnabled,
             Keys.dataRetentionDays: dataRetentionDays,
             Keys.autoConnectEnabled: autoConnectEnabled,
@@ -207,9 +195,6 @@ class SettingsViewModel: ObservableObject {
     }
     
     func importSettings(from dictionary: [String: Any]) {
-        if let value = dictionary[Keys.ppgChannelOrder] as? String {
-            ppgChannelOrder = PPGChannelOrder(rawValue: value) ?? .standard
-        }
         if let value = dictionary[Keys.notificationsEnabled] as? Bool {
             notificationsEnabled = value
         }

@@ -47,7 +47,6 @@ class BLEDataPublisher: ObservableObject {
     // MARK: - Device State
 
     @Published var deviceState: DeviceStateResult?
-    @Published var ppgChannelOrder: PPGChannelOrder = .standard
 
     // MARK: - Recording State
 

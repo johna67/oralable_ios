@@ -18,9 +18,6 @@ protocol DeviceStatusProvider: AnyObject {
     /// Current device operational state
     var deviceState: DeviceStateResult? { get }
 
-    /// Order of PPG channels (standard or reversed)
-    var ppgChannelOrder: PPGChannelOrder { get }
-
     /// List of discovered BLE services
     var discoveredServices: [String] { get }
 
@@ -43,7 +40,6 @@ protocol DeviceStatusProvider: AnyObject {
     // MARK: - Publishers for Reactive UI
 
     var deviceStatePublisher: Published<DeviceStateResult?>.Publisher { get }
-    var ppgChannelOrderPublisher: Published<PPGChannelOrder>.Publisher { get }
     var discoveredServicesPublisher: Published<[String]>.Publisher { get }
     var isRecordingPublisher: Published<Bool>.Publisher { get }
     var packetsReceivedPublisher: Published<Int>.Publisher { get }

@@ -24,7 +24,6 @@ class SettingsViewModelTests: XCTestCase {
 
         // Clear UserDefaults for clean state
         let userDefaults = UserDefaults.standard
-        userDefaults.removeObject(forKey: "ppgChannelOrder")
         userDefaults.removeObject(forKey: "notificationsEnabled")
         userDefaults.removeObject(forKey: "dataRetentionDays")
         userDefaults.removeObject(forKey: "autoConnectEnabled")
@@ -39,7 +38,6 @@ class SettingsViewModelTests: XCTestCase {
     // MARK: - Initial State Tests
 
     func testInitialState() {
-        XCTAssertEqual(viewModel.ppgChannelOrder, .standard)
         XCTAssertTrue(viewModel.notificationsEnabled)
         XCTAssertEqual(viewModel.dataRetentionDays, 30)
         XCTAssertTrue(viewModel.autoConnectEnabled)
@@ -55,18 +53,6 @@ class SettingsViewModelTests: XCTestCase {
     }
 
     // MARK: - Settings Persistence Tests
-
-    func testPPGChannelOrderPersistence() {
-        // Given
-        let newOrder = PPGChannelOrder.alternate1
-
-        // When
-        viewModel.ppgChannelOrder = newOrder
-
-        // Then
-        let saved = UserDefaults.standard.string(forKey: "ppgChannelOrder")
-        XCTAssertEqual(saved, newOrder.rawValue)
-    }
 
     func testNotificationsEnabledPersistence() {
         // When
@@ -136,7 +122,6 @@ class SettingsViewModelTests: XCTestCase {
 
     func testResetToDefaults() {
         // Given - change some settings
-        viewModel.ppgChannelOrder = .alternate1
         viewModel.notificationsEnabled = false
         viewModel.dataRetentionDays = 60
         viewModel.autoConnectEnabled = false
@@ -146,7 +131,6 @@ class SettingsViewModelTests: XCTestCase {
         viewModel.resetToDefaults()
 
         // Then
-        XCTAssertEqual(viewModel.ppgChannelOrder, .standard)
         XCTAssertTrue(viewModel.notificationsEnabled)
         XCTAssertEqual(viewModel.dataRetentionDays, 30)
         XCTAssertTrue(viewModel.autoConnectEnabled)
@@ -157,21 +141,18 @@ class SettingsViewModelTests: XCTestCase {
 
     func testExportSettings() {
         // Given
-        viewModel.ppgChannelOrder = .alternate2
         viewModel.dataRetentionDays = 90
 
         // When
         let exported = viewModel.exportSettings()
 
         // Then
-        XCTAssertEqual(exported["ppgChannelOrder"] as? String, PPGChannelOrder.alternate2.rawValue)
         XCTAssertEqual(exported["dataRetentionDays"] as? Int, 90)
     }
 
     func testImportSettings() {
         // Given
         let settings: [String: Any] = [
-            "ppgChannelOrder": PPGChannelOrder.alternate3.rawValue,
             "dataRetentionDays": 120,
             "notificationsEnabled": false,
             "useMetricUnits": false
@@ -181,7 +162,6 @@ class SettingsViewModelTests: XCTestCase {
         viewModel.importSettings(from: settings)
 
         // Then
-        XCTAssertEqual(viewModel.ppgChannelOrder, .alternate3)
         XCTAssertEqual(viewModel.dataRetentionDays, 120)
         XCTAssertFalse(viewModel.notificationsEnabled)
         XCTAssertFalse(viewModel.useMetricUnits)

@@ -42,11 +42,11 @@
 		26FE17D62EE6D9CC00026648 /* PatientHistoricalViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE17802EE6D0D200026648 /* PatientHistoricalViewModel.swift */; };
 		26FE17D72EE6D9D900026648 /* SharedSensorModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE177B2EE6D0D200026648 /* SharedSensorModels.swift */; };
 		26FE17D82EE6D9D900026648 /* ProfessionalHistoricalDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE177A2EE6D0D200026648 /* ProfessionalHistoricalDataModels.swift */; };
-		26FE17E02EE8A00000026648 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE17DF2EE8A00000026648 /* CSVParser.swift */; };
 		26FE17D92EE6DA0400026648 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE176F2EE6D0D200026648 /* SharedComponents.swift */; };
 		26FE17DC2EE6DC9000026648 /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26FE17DB2EE6DC9000026648 /* AsyncAlgorithms */; };
 		26FE17DD2EE6DCE900026648 /* OralableForProfessionalsUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE17B42EE6D0FE00026648 /* OralableForProfessionalsUITestsLaunchTests.swift */; };
 		26FE17DE2EE6DCF200026648 /* OralableForProfessionalsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE17B32EE6D0FE00026648 /* OralableForProfessionalsUITests.swift */; };
+		26FE17E02EE8A00000026648 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FE17DF2EE8A00000026648 /* CSVParser.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -98,7 +98,6 @@
 		26FE17782EE6D0D200026648 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		26FE177A2EE6D0D200026648 /* ProfessionalHistoricalDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfessionalHistoricalDataModels.swift; sourceTree = "<group>"; };
 		26FE177B2EE6D0D200026648 /* SharedSensorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSensorModels.swift; sourceTree = "<group>"; };
-		26FE17DF2EE8A00000026648 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 		26FE177D2EE6D0D200026648 /* AddPatientViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPatientViewModel.swift; sourceTree = "<group>"; };
 		26FE177E2EE6D0D200026648 /* ProfessionalSettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfessionalSettingsViewModel.swift; sourceTree = "<group>"; };
 		26FE177F2EE6D0D200026648 /* PatientDashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatientDashboardViewModel.swift; sourceTree = "<group>"; };
@@ -122,6 +121,7 @@
 		26FE17932EE6D0D200026648 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		26FE17B32EE6D0FE00026648 /* OralableForProfessionalsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OralableForProfessionalsUITests.swift; sourceTree = "<group>"; };
 		26FE17B42EE6D0FE00026648 /* OralableForProfessionalsUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OralableForProfessionalsUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		26FE17DF2EE8A00000026648 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */

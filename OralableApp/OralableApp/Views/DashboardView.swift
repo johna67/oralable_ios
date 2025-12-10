@@ -363,6 +363,7 @@ struct DashboardView: View {
     
     private func batteryIcon(level: Double, charging: Bool) -> String {
         if charging { return "battery.100.bolt" }
+        if level <= 0 { return "battery.0" }  // N/A or unavailable
         if level > 75 { return "battery.100" }
         if level > 50 { return "battery.75" }
         if level > 25 { return "battery.50" }
@@ -370,6 +371,7 @@ struct DashboardView: View {
     }
 
     private func batteryColor(level: Double) -> Color {
+        if level <= 0 { return .gray }  // N/A or unavailable
         if level < 20 { return .red }
         if level < 50 { return .orange }
         return .green

@@ -453,15 +453,29 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         Logger.shared.info("[OralableDevice] Device info update requested")
     }
 
-    // MARK: - Data Parsing (Fix 2: Proper timestamps)
-    
+    // MARK: - Data Parsing (Fix 2: Proper timestamps, Fix 6: Fixed firmware byte order)
+
+    /// Maps byte offset index (0, 1, 2) to SensorType based on firmware struct order
+    /// Firmware sends: struct { uint32_t red, uint32_t ir, uint32_t green }
+    /// - Parameter offsetIndex: 0 = first uint32, 1 = second uint32, 2 = third uint32
+    /// - Returns: The correct SensorType for that byte position
+    private func sensorTypeForOffset(_ offsetIndex: Int) -> SensorType {
+        // Firmware struct order is fixed: Red, IR, Green
+        switch offsetIndex {
+        case 0: return .ppgRed      // First uint32 = Red
+        case 1: return .ppgInfrared // Second uint32 = IR
+        case 2: return .ppgGreen    // Third uint32 = Green
+        default: return .ppgInfrared
+        }
+    }
+
     private func parseSensorData(_ data: Data) {
         // Update packet statistics
         packetsReceived += 1
         bytesReceived += data.count
 
         let notificationTime = Date()
-        
+
         if let lastTime = lastPacketTime {
             let interval = notificationTime.timeIntervalSince(lastTime)
             #if DEBUG
@@ -482,7 +496,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 
         // PPG packet format (from firmware tgm_service.h):
         // Bytes 0-3: Frame counter (uint32_t)
-        // Bytes 4+: 20 samples, each 12 bytes (Red, IR, Green as uint32_t)
+        // Bytes 4+: 20 samples, each 12 bytes (3 × uint32_t PPG values)
+        // The order of the 3 values depends on firmware config - use ppgChannelOrder setting
         let frameCounter = readUInt32(at: 0) ?? 0
         let samplesPerFrame = ppgSamplesPerPacket  // 20
         let sampleSizeBytes = 12  // 3 × uint32_t per sample
@@ -518,41 +533,43 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             let sampleAge = Double(samplesPerFrame - 1 - i) * sampleInterval
             let sampleTimestamp = notificationTime.addingTimeInterval(-sampleAge)
 
-            // PPG Red (bytes 0-3 of sample)
-            if let ppgRed = readUInt32(at: sampleOffset) {
+            // Fix 5: Apply channel order mapping for correct PPG assignment
+            // Read the 3 uint32 values and assign based on channel order setting
+            if let value0 = readUInt32(at: sampleOffset) {
+                let sensorType = sensorTypeForOffset(0)
                 readings.append(SensorReading(
-                    sensorType: .ppgRed,
-                    value: Double(ppgRed),
+                    sensorType: sensorType,
+                    value: Double(value0),
                     timestamp: sampleTimestamp,
                     deviceId: peripheral?.identifier.uuidString,
-                    quality: ppgRed > 10000 ? 0.9 : 0.1
+                    quality: value0 > 10000 ? 0.9 : 0.1
                 ))
             }
 
-            // PPG IR (bytes 4-7 of sample)
-            if let ppgIR = readUInt32(at: sampleOffset + 4) {
+            if let value1 = readUInt32(at: sampleOffset + 4) {
+                let sensorType = sensorTypeForOffset(1)
                 readings.append(SensorReading(
-                    sensorType: .ppgInfrared,
-                    value: Double(ppgIR),
+                    sensorType: sensorType,
+                    value: Double(value1),
                     timestamp: sampleTimestamp,
                     deviceId: peripheral?.identifier.uuidString,
-                    quality: ppgIR > 10000 ? 0.9 : 0.1
+                    quality: value1 > 10000 ? 0.9 : 0.1
                 ))
-                
+
                 // Log PPG IR periodically for heart rate debugging
-                if i == 0 && ppgFrameCount % 50 == 0 {
-                    Logger.shared.info("[OralableDevice] 💓 PPG IR sample: \(ppgIR) (frame #\(ppgFrameCount))")
+                if sensorType == .ppgInfrared && i == 0 && ppgFrameCount % 50 == 0 {
+                    Logger.shared.info("[OralableDevice] 💓 PPG IR sample: \(value1) (frame #\(ppgFrameCount))")
                 }
             }
 
-            // PPG Green (bytes 8-11 of sample)
-            if let ppgGreen = readUInt32(at: sampleOffset + 8) {
+            if let value2 = readUInt32(at: sampleOffset + 8) {
+                let sensorType = sensorTypeForOffset(2)
                 readings.append(SensorReading(
-                    sensorType: .ppgGreen,
-                    value: Double(ppgGreen),
+                    sensorType: sensorType,
+                    value: Double(value2),
                     timestamp: sampleTimestamp,
                     deviceId: peripheral?.identifier.uuidString,
-                    quality: ppgGreen > 10000 ? 0.9 : 0.1
+                    quality: value2 > 10000 ? 0.9 : 0.1
                 ))
             }
         }
@@ -570,7 +587,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         // Emit batch for downstream consumers
         if !readings.isEmpty {
             readingsBatchSubject.send(readings)
-            
+
             ppgFrameCount += 1
 
             #if DEBUG
