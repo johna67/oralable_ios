@@ -376,7 +376,8 @@ struct AddPatientView: View {
     }
 
     private var canImport: Bool {
-        !participantName.isEmpty && importPreview != nil && !(importPreview?.dataPoints.isEmpty ?? true)
+        // Name is optional - will generate default if empty
+        importPreview != nil && !(importPreview?.dataPoints.isEmpty ?? true)
     }
 
     // MARK: - Actions
@@ -444,6 +445,9 @@ struct AddPatientView: View {
             }
 
             Logger.shared.info("[AddPatientView] CSV parsed: \(dataPoints.count) data points")
+            Logger.shared.info("[AddPatientView] participantName: '\(participantName)'")
+            Logger.shared.info("[AddPatientView] importPreview set with \(importPreview?.dataPoints.count ?? 0) points")
+            Logger.shared.info("[AddPatientView] canImport: \(canImport)")
 
         } catch {
             errorMessage = "Failed to read CSV file: \(error.localizedDescription)"
@@ -451,7 +455,17 @@ struct AddPatientView: View {
     }
 
     private func importCSVData() {
-        guard let preview = importPreview, !participantName.isEmpty else { return }
+        guard let preview = importPreview else {
+            Logger.shared.warning("[AddPatientView] importCSVData called but no preview")
+            return
+        }
+
+        // Generate default name if empty
+        let nameToUse = participantName.isEmpty
+            ? "Import \(Date().formatted(date: .abbreviated, time: .shortened))"
+            : participantName
+
+        Logger.shared.info("[AddPatientView] Importing CSV with name: '\(nameToUse)', dataPoints: \(preview.dataPoints.count)")
 
         isLoading = true
         errorMessage = nil
@@ -459,11 +473,13 @@ struct AddPatientView: View {
         Task {
             do {
                 try await dataManager.importParticipantFromCSV(
-                    name: participantName,
+                    name: nameToUse,
                     data: preview.dataPoints
                 )
+                Logger.shared.info("[AddPatientView] CSV import successful")
                 showImportSuccess = true
             } catch {
+                Logger.shared.error("[AddPatientView] CSV import failed: \(error)")
                 errorMessage = "Failed to import: \(error.localizedDescription)"
             }
             isLoading = false

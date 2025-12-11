@@ -74,19 +74,37 @@ class PatientHistoricalViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        Logger.shared.info("[PatientHistoricalViewModel] Loading data for patient: \(patient.patientID)")
+        Logger.shared.info("[PatientHistoricalViewModel] isLocalImport: \(patient.isLocalImport), connectionType: \(patient.connectionType)")
+
         // Load all data from the past month (sufficient for max 10-hour sessions)
         // This ensures professionals can always see the most recent patient data
         let endDate = Date()
         let startDate = Calendar.current.date(byAdding: .month, value: -1, to: endDate) ?? endDate
 
         do {
-            allSensorData = try await dataManager.fetchAllPatientSensorData(
-                for: patient,
-                from: startDate,
-                to: endDate
-            )
+            // Check if this is a local CSV import vs CloudKit sync
+            if patient.isLocalImport {
+                // Load from local storage
+                allSensorData = dataManager.fetchImportedSensorData(for: patient)
+                Logger.shared.info("[PatientHistoricalViewModel] Loaded \(allSensorData.count) data points from local storage (CSV import)")
+            } else {
+                // Load from CloudKit
+                allSensorData = try await dataManager.fetchAllPatientSensorData(
+                    for: patient,
+                    from: startDate,
+                    to: endDate
+                )
+                Logger.shared.info("[PatientHistoricalViewModel] Fetched \(allSensorData.count) data points from CloudKit")
+            }
 
-            Logger.shared.info("[PatientHistoricalViewModel] Fetched \(allSensorData.count) raw sensor data points")
+            // Log date range of data
+            if let first = allSensorData.first {
+                Logger.shared.info("[PatientHistoricalViewModel] First record date: \(first.timestamp)")
+            }
+            if let last = allSensorData.last {
+                Logger.shared.info("[PatientHistoricalViewModel] Last record date: \(last.timestamp)")
+            }
 
             // Process data based on current metric type
             updateDataPointsForMetricType()

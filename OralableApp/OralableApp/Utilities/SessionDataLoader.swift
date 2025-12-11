@@ -163,25 +163,73 @@ class SessionDataLoader {
     }
     
     // MARK: - Private Methods - ShareView Export Parsing
-    
-    /// Parse ShareView export CSV format
-    /// Header: Timestamp,Device_Type,EMG,PPG_IR,PPG_Red,PPG_Green,Accel_X,Accel_Y,Accel_Z,Temperature,Battery,Heart_Rate
+
+    /// Helper to get Double value by column name
+    private func getDouble(_ columns: [String], _ columnMap: [String: Int], _ columnName: String) -> Double? {
+        guard let index = columnMap[columnName], index < columns.count else { return nil }
+        let value = columns[index].trimmingCharacters(in: .whitespaces)
+        return Double(value)
+    }
+
+    /// Helper to get Int value by column name
+    private func getInt(_ columns: [String], _ columnMap: [String: Int], _ columnName: String) -> Int? {
+        guard let index = columnMap[columnName], index < columns.count else { return nil }
+        let value = columns[index].trimmingCharacters(in: .whitespaces)
+        if let doubleValue = Double(value) {
+            return Int(doubleValue)
+        }
+        return Int(value)
+    }
+
+    /// Helper to get String value by column name
+    private func getString(_ columns: [String], _ columnMap: [String: Int], _ columnName: String) -> String? {
+        guard let index = columnMap[columnName], index < columns.count else { return nil }
+        return columns[index].trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Parse ShareView export CSV format with dynamic column detection
+    /// Supports variable column formats based on FeatureFlags settings
     private func parseShareViewExport(content: String, metricType: String) -> [HistoricalDataPoint] {
         let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
         guard lines.count > 1 else {
             Logger.shared.warning("[SessionDataLoader] Empty CSV file")
             return []
         }
-        
-        // Verify header
-        let header = lines[0].lowercased()
-        guard header.contains("device_type") && header.contains("timestamp") else {
-            Logger.shared.warning("[SessionDataLoader] Invalid export format - missing expected headers")
+
+        // Parse header to build column map
+        let headerColumns = lines[0].components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let columnMap = Dictionary(uniqueKeysWithValues: headerColumns.enumerated().map { ($1, $0) })
+
+        Logger.shared.info("[SessionDataLoader] 📄 CSV columns found: \(headerColumns.joined(separator: ", "))")
+
+        // Verify minimum required columns
+        guard columnMap["Timestamp"] != nil else {
+            Logger.shared.warning("[SessionDataLoader] Invalid export format - missing Timestamp column")
             return []
         }
-        
+
+        // Check if required columns exist for the requested metric
+        let hasRequiredColumns: Bool
+        switch metricType {
+        case "EMG Activity":
+            hasRequiredColumns = columnMap["EMG"] != nil || columnMap["PPG_IR"] != nil
+        case "IR Activity", "Muscle Activity":
+            hasRequiredColumns = columnMap["PPG_IR"] != nil
+        case "Movement":
+            hasRequiredColumns = columnMap["Accel_X"] != nil && columnMap["Accel_Y"] != nil && columnMap["Accel_Z"] != nil
+        case "Temperature":
+            hasRequiredColumns = columnMap["Temperature"] != nil || columnMap["Temp_C"] != nil
+        default:
+            hasRequiredColumns = true
+        }
+
+        if !hasRequiredColumns {
+            Logger.shared.warning("[SessionDataLoader] ⚠️ Required columns not found for metric: \(metricType)")
+            return []
+        }
+
         Logger.shared.info("[SessionDataLoader] 📄 Parsing \(lines.count - 1) CSV rows for metric: \(metricType)")
-        
+
         // Determine which device type to filter for based on metric
         let targetDeviceType: String?
         switch metricType {
@@ -196,63 +244,93 @@ class SessionDataLoader {
         default:
             targetDeviceType = nil
         }
-        
+
+        // Set up date formatters
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime]
-        
+
+        let dateFormatterWithFrac = ISO8601DateFormatter()
+        dateFormatterWithFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        // Alternative date formatter for "yyyy-MM-dd HH:mm:ss.SSS" format
+        let altDateFormatter = DateFormatter()
+        altDateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        altDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
         // Group by timestamp for aggregation
         var groupedData: [Date: [(emg: Double, ir: Double, red: Double, green: Double, accelX: Double, accelY: Double, accelZ: Double, temp: Double, battery: Int, hr: Double, deviceType: String)]] = [:]
-        
+
         var rowsProcessed = 0
+        var rowsSkipped = 0
         var rowsWithAccel = 0
-        
+
         for line in lines.dropFirst() {
             let columns = line.components(separatedBy: ",")
-            guard columns.count >= 12 else { continue }
-            
-            guard let timestamp = dateFormatter.date(from: columns[0]) else { continue }
-            
-            let deviceType = columns[1]
-            
+
+            // Get timestamp
+            guard let timestampStr = getString(columns, columnMap, "Timestamp") else {
+                rowsSkipped += 1
+                continue
+            }
+
+            // Try multiple date formats
+            var timestamp: Date?
+            timestamp = dateFormatterWithFrac.date(from: timestampStr)
+            if timestamp == nil {
+                timestamp = dateFormatter.date(from: timestampStr)
+            }
+            if timestamp == nil {
+                timestamp = altDateFormatter.date(from: timestampStr)
+            }
+
+            guard let ts = timestamp else {
+                rowsSkipped += 1
+                continue
+            }
+
+            // Get device type (may not exist in older exports)
+            let deviceType = getString(columns, columnMap, "Device_Type") ?? "Oralable"
+
             // Filter by device type if specified
             if let target = targetDeviceType, deviceType != target {
                 continue
             }
-            
-            let emg = Double(columns[2]) ?? 0
-            let ir = Double(columns[3]) ?? 0
-            let red = Double(columns[4]) ?? 0
-            let green = Double(columns[5]) ?? 0
-            let accelX = Double(columns[6]) ?? 0
-            let accelY = Double(columns[7]) ?? 0
-            let accelZ = Double(columns[8]) ?? 0
-            let temp = Double(columns[9]) ?? 0
-            let battery = Int(Double(columns[10]) ?? 0)
-            let hr = Double(columns[11]) ?? 0
-            
+
+            // Get values using dynamic column lookup
+            let emg = getDouble(columns, columnMap, "EMG") ?? 0
+            let ir = getDouble(columns, columnMap, "PPG_IR") ?? 0
+            let red = getDouble(columns, columnMap, "PPG_Red") ?? 0
+            let green = getDouble(columns, columnMap, "PPG_Green") ?? 0
+            let accelX = getDouble(columns, columnMap, "Accel_X") ?? 0
+            let accelY = getDouble(columns, columnMap, "Accel_Y") ?? 0
+            let accelZ = getDouble(columns, columnMap, "Accel_Z") ?? 0
+            let temp = getDouble(columns, columnMap, "Temperature") ?? getDouble(columns, columnMap, "Temp_C") ?? 0
+            let battery = getInt(columns, columnMap, "Battery") ?? getInt(columns, columnMap, "Battery_%") ?? 0
+            let hr = getDouble(columns, columnMap, "Heart_Rate") ?? getDouble(columns, columnMap, "HeartRate_BPM") ?? 0
+
             rowsProcessed += 1
             if accelX != 0 || accelY != 0 || accelZ != 0 {
                 rowsWithAccel += 1
             }
-            
+
             // Round timestamp to nearest second for grouping
-            let roundedTimestamp = Date(timeIntervalSince1970: floor(timestamp.timeIntervalSince1970))
-            
+            let roundedTimestamp = Date(timeIntervalSince1970: floor(ts.timeIntervalSince1970))
+
             if groupedData[roundedTimestamp] == nil {
                 groupedData[roundedTimestamp] = []
             }
             groupedData[roundedTimestamp]?.append((emg, ir, red, green, accelX, accelY, accelZ, temp, battery, hr, deviceType))
         }
-        
-        Logger.shared.info("[SessionDataLoader] 📊 Processed \(rowsProcessed) rows, \(rowsWithAccel) with accelerometer data, \(groupedData.count) unique timestamps")
-        
+
+        Logger.shared.info("[SessionDataLoader] 📊 Processed \(rowsProcessed) rows, skipped \(rowsSkipped), \(rowsWithAccel) with accelerometer data, \(groupedData.count) unique timestamps")
+
         // Convert grouped data to HistoricalDataPoints
         var dataPoints: [HistoricalDataPoint] = []
         for (timestamp, readings) in groupedData.sorted(by: { $0.key < $1.key }) {
             let point = createDataPointFromExport(timestamp: timestamp, readings: readings, metricType: metricType)
             dataPoints.append(point)
         }
-        
+
         Logger.shared.info("[SessionDataLoader] ✅ Created \(dataPoints.count) data points for \(metricType)")
         return dataPoints
     }
