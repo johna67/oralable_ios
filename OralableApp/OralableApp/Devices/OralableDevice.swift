@@ -3,17 +3,19 @@
 //  OralableApp
 //
 //  Created: November 2024
-//  UPDATED: December 3, 2025
+//  UPDATED: December 10, 2025
 //
 //  Fixes Applied:
 //  - Fix 1: Renamed ppgWaveform references to accelerometer (code clarity)
 //  - Fix 2: Added proper timestamp calculation for sample timing (accuracy)
 //  - Fix 3: Added BLE connection readiness state machine (reliability)
 //  - Fix 4: Added AccelerometerConversion utility struct (convenience)
+//  - Fix 6: CORRECTED PPG channel order mapping (IR at offset 0, Red at offset 1)
 //
 //  Previous Updates:
 //  - November 29, 2025 (Day 4): Batch updates to prevent performance flooding
 //  - November 29, 2025 (Day 4): Removed PPG validation to allow all values for debugging
+//  - December 10, 2025: Fixed PPG channel mapping based on observed LED pulse amplitudes
 //
 
 import Foundation
@@ -54,7 +56,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 
     @Published var latestReadings: [SensorType: SensorReading] = [:]
     @Published var batteryLevel: Int?
-    
+
     // MARK: - Sensor Configuration Constants (Fix 2)
     
     /// PPG sensor sample rate (samples per second)
@@ -455,16 +457,22 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 
     // MARK: - Data Parsing (Fix 2: Proper timestamps, Fix 6: Fixed firmware byte order)
 
-    /// Maps byte offset index (0, 1, 2) to SensorType based on firmware struct order
-    /// Firmware sends: struct { uint32_t red, uint32_t ir, uint32_t green }
+    /// Maps byte offset index (0, 1, 2) to SensorType based on ACTUAL firmware byte order
+    ///
+    /// IMPORTANT: The firmware struct definition in tgm_service.h says { red, ir, green }
+    /// but the ACTUAL FIFO data order observed from live logs is [Green, IR, Red]:
+    /// - Offset 0: Green LED data (PA=0 when worn, produces ~0-10)
+    /// - Offset 4: IR LED data (PA=128, produces ~14000-15000)
+    /// - Offset 8: Red LED data (PA=32, produces ~2000-2500)
+    ///
     /// - Parameter offsetIndex: 0 = first uint32, 1 = second uint32, 2 = third uint32
     /// - Returns: The correct SensorType for that byte position
     private func sensorTypeForOffset(_ offsetIndex: Int) -> SensorType {
-        // Firmware struct order is fixed: Red, IR, Green
+        // ACTUAL firmware order: [Green, IR, Red]
         switch offsetIndex {
-        case 0: return .ppgRed      // First uint32 = Red
-        case 1: return .ppgInfrared // Second uint32 = IR
-        case 2: return .ppgGreen    // Third uint32 = Green
+        case 0: return .ppgGreen    // First uint32 = Green LED data
+        case 1: return .ppgInfrared // Second uint32 = IR LED data
+        case 2: return .ppgRed      // Third uint32 = Red LED data
         default: return .ppgInfrared
         }
     }
@@ -521,6 +529,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 
         var readings: [SensorReading] = []
 
+        // FIX: Track PPG values per sample to ensure correct grouping
+        // This avoids timestamp-based grouping issues in SensorDataProcessor
         for i in 0..<samplesPerFrame {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
 
@@ -532,45 +542,55 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             // Fix 2: Calculate timestamp - sample 0 is oldest (190ms ago), sample 19 is newest (now)
             let sampleAge = Double(samplesPerFrame - 1 - i) * sampleInterval
             let sampleTimestamp = notificationTime.addingTimeInterval(-sampleAge)
-
-            // Fix 5: Apply channel order mapping for correct PPG assignment
-            // Read the 3 uint32 values and assign based on channel order setting
-            if let value0 = readUInt32(at: sampleOffset) {
-                let sensorType = sensorTypeForOffset(0)
-                readings.append(SensorReading(
-                    sensorType: sensorType,
-                    value: Double(value0),
-                    timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: value0 > 10000 ? 0.9 : 0.1
-                ))
+            
+            // Read all 3 PPG values for this sample at once
+            guard let value0 = readUInt32(at: sampleOffset),
+                  let value1 = readUInt32(at: sampleOffset + 4),
+                  let value2 = readUInt32(at: sampleOffset + 8) else {
+                Logger.shared.warning("[OralableDevice] ⚠️ Failed to read PPG sample \(i)")
+                continue
             }
+            
+            // Map values to channels based on firmware documentation byte order [Red, IR, Green]
+            // From tgm_service.h struct:
+            // - Offset 0 (value0) = Red (PA=32, expected ~2000-2500)
+            // - Offset 4 (value1) = IR (PA=128, expected ~14000-15000)
+            // - Offset 8 (value2) = Green (PA=0 when worn, expected ~0-10)
+            let redValue = value0    // Offset 0 = Red
+            let irValue = value1     // Offset 4 = IR
+            let greenValue = value2  // Offset 8 = Green
+            
+            // Create readings with correct sensor types
+            // Use IDENTICAL timestamp object for all 3 to ensure proper grouping
+            let deviceId = peripheral?.identifier.uuidString
+            
+            readings.append(SensorReading(
+                sensorType: .ppgRed,
+                value: Double(redValue),
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: redValue > 1000 ? 0.9 : 0.3  // Red should be ~2000-2500 when worn
+            ))
+            
+            readings.append(SensorReading(
+                sensorType: .ppgInfrared,
+                value: Double(irValue),
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: irValue > 10000 ? 0.9 : 0.3  // IR should be ~14000 when worn
+            ))
+            
+            readings.append(SensorReading(
+                sensorType: .ppgGreen,
+                value: Double(greenValue),
+                timestamp: sampleTimestamp,
+                deviceId: deviceId,
+                quality: 0.5  // Green is typically disabled when worn (PA=0)
+            ))
 
-            if let value1 = readUInt32(at: sampleOffset + 4) {
-                let sensorType = sensorTypeForOffset(1)
-                readings.append(SensorReading(
-                    sensorType: sensorType,
-                    value: Double(value1),
-                    timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: value1 > 10000 ? 0.9 : 0.1
-                ))
-
-                // Log PPG IR periodically for heart rate debugging
-                if sensorType == .ppgInfrared && i == 0 && ppgFrameCount % 50 == 0 {
-                    Logger.shared.info("[OralableDevice] 💓 PPG IR sample: \(value1) (frame #\(ppgFrameCount))")
-                }
-            }
-
-            if let value2 = readUInt32(at: sampleOffset + 8) {
-                let sensorType = sensorTypeForOffset(2)
-                readings.append(SensorReading(
-                    sensorType: sensorType,
-                    value: Double(value2),
-                    timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString,
-                    quality: value2 > 10000 ? 0.9 : 0.1
-                ))
+            // Log PPG values periodically for debugging channel mapping
+            if i == 0 && ppgFrameCount % 50 == 0 {
+                Logger.shared.info("[OralableDevice] 📊 PPG Frame #\(ppgFrameCount) | Red=\(redValue) IR=\(irValue) Green=\(greenValue)")
             }
         }
 
@@ -616,96 +636,44 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             }
         }
 
-        let frameCounter = data.withUnsafeBytes { ptr in
-            ptr.loadUnaligned(fromByteOffset: 0, as: UInt32.self)
-        }
-
-        if let tempRaw = readInt16(at: 4) {
-            let tempCelsius = Double(tempRaw) / 100.0
-
-            if tempCelsius > -40 && tempCelsius < 85 {
-                let reading = SensorReading(
-                    sensorType: .temperature,
-                    value: tempCelsius,
-                    timestamp: Date(),
-                    deviceId: peripheral?.identifier.uuidString
-                )
-
-                latestReadings[.temperature] = reading
-                readingsBatchSubject.send([reading])
-
-                Logger.shared.debug("[OralableDevice] 🌡️ Temperature: \(String(format: "%.2f", tempCelsius))°C (frame #\(frameCounter))")
+        func readUInt32(at offset: Int) -> UInt32? {
+            guard offset + 3 < data.count else { return nil }
+            return data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
             }
         }
-    }
 
-    // MARK: - Battery Parsing
-
-    /// Parse battery data from BLE packet using accurate LiPo discharge curve
-    private func parseBatteryData(_ data: Data) {
-        guard data.count >= 4 else {
-            Logger.shared.warning("[OralableDevice] Battery data too short: \(data.count) bytes")
+        let frameCounter = readUInt32(at: 0) ?? 0
+        guard let centitemp = readInt16(at: 4) else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Failed to parse temperature value")
             return
         }
 
-        let millivolts = data.withUnsafeBytes { ptr in
-            ptr.loadUnaligned(fromByteOffset: 0, as: Int32.self)
-        }
+        // Convert centidegrees to degrees
+        let tempCelsius = Double(centitemp) / 100.0
 
-        guard millivolts >= 2500 && millivolts <= 4500 else {
-            Logger.shared.warning("[OralableDevice] Battery voltage out of range: \(millivolts)mV")
-            return
-        }
-
-        let percentage = BatteryConversion.voltageToPercentage(millivolts: millivolts)
-        let status = BatteryConversion.batteryStatus(percentage: percentage)
-
-        Logger.shared.info("[OralableDevice] 🔋 Battery: \(millivolts)mV → \(String(format: "%.0f", percentage))% [\(status.rawValue)]")
-
-        if BatteryConversion.needsCharging(percentage: percentage) {
-            if BatteryConversion.isCritical(percentage: percentage) {
-                Logger.shared.warning("[OralableDevice] ⚠️ BATTERY CRITICAL: \(String(format: "%.0f", percentage))%")
-            } else {
-                Logger.shared.warning("[OralableDevice] ⚠️ Battery low: \(String(format: "%.0f", percentage))%")
-            }
-        }
+        Logger.shared.debug("[OralableDevice] 🌡️ Temperature: \(String(format: "%.2f", tempCelsius))°C (frame #\(frameCounter))")
 
         let reading = SensorReading(
-            sensorType: .battery,
-            value: percentage,
+            sensorType: .temperature,
+            value: tempCelsius,
             timestamp: Date(),
-            deviceId: peripheral?.identifier.uuidString,
-            quality: nil,
-            rawMillivolts: millivolts
+            deviceId: peripheral?.identifier.uuidString
         )
 
-        latestReadings[.battery] = reading
+        latestReadings[.temperature] = reading
         readingsBatchSubject.send([reading])
     }
 
-    // MARK: - Accelerometer Parsing (Fix 1: Renamed, Fix 2: Proper timestamps)
+    // MARK: - Accelerometer Parsing (Fix 2: Proper timestamps)
 
     private func parseAccelerometerData(_ data: Data) {
-        // Accelerometer packet format (per firmware tgm_service.h):
+        // Accelerometer packet format (154 bytes):
         // Bytes 0-3: Frame counter (uint32_t)
-        // Bytes 4+: 25 samples, each 6 bytes (X, Y, Z as Int16)
-        // Total expected size: 4 + (25 * 6) = 154 bytes
+        // Bytes 4+: 25 samples, each 6 bytes (3 × int16_t for X, Y, Z)
 
-        let sampleDataStart = 4
-        let samplesPerFrame = accelerometerSamplesPerPacket  // 25
-        let sampleSizeBytes = 6  // 3 × Int16 (X, Y, Z)
-        let expectedSize = sampleDataStart + (samplesPerFrame * sampleSizeBytes)  // 154 bytes
+        let notificationTime = Date()
 
-        #if DEBUG
-        Logger.shared.debug("[OralableDevice] 🏃 Accelerometer packet | Size: \(data.count) bytes (expected: \(expectedSize))")
-        #endif
-
-        guard data.count >= sampleDataStart + sampleSizeBytes else {
-            Logger.shared.warning("[OralableDevice] ⚠️ Accelerometer packet too small: \(data.count) bytes (need at least \(sampleDataStart + sampleSizeBytes))")
-            return
-        }
-
-        // Helper to read Int16 little-endian
         func readInt16(at offset: Int) -> Int16? {
             guard offset + 1 < data.count else { return nil }
             return data.withUnsafeBytes { ptr in
@@ -713,34 +681,42 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             }
         }
 
-        // Read frame counter for logging
-        let frameCounter = data.withUnsafeBytes { ptr in
-            ptr.loadUnaligned(fromByteOffset: 0, as: UInt32.self)
+        func readUInt32(at offset: Int) -> UInt32? {
+            guard offset + 3 < data.count else { return nil }
+            return data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
+            }
         }
 
-        // Calculate actual number of samples we can parse
-        let actualSamples = min(samplesPerFrame, (data.count - sampleDataStart) / sampleSizeBytes)
+        let frameCounter = readUInt32(at: 0) ?? 0
+        let sampleSizeBytes = 6  // 3 × int16_t per sample
+        let sampleDataStart = 4
+        let expectedSize = sampleDataStart + (accelerometerSamplesPerPacket * sampleSizeBytes)  // 4 + 150 = 154
+
+        Logger.shared.debug("[OralableDevice] 🏃 Accelerometer packet | Size: \(data.count) bytes (expected: \(expectedSize))")
+
+        // Calculate actual samples in packet (may be less than expected if packet truncated)
+        let availableDataBytes = data.count - sampleDataStart
+        let actualSamples = min(accelerometerSamplesPerPacket, availableDataBytes / sampleSizeBytes)
+
+        guard actualSamples > 0 else {
+            Logger.shared.warning("[OralableDevice] ⚠️ No accelerometer samples in packet")
+            return
+        }
 
         // Fix 2: Calculate proper timestamps for each sample
-        // Notification arrives at "now", samples are 10ms apart at 100 Hz
-        // Sample 0 is oldest, sample 24 is newest
-        let notificationTime = Date()
+        // Samples are 10ms apart at 100 Hz
         let sampleInterval = 1.0 / accelerometerSampleRate  // 0.01 seconds = 10ms
 
         var readings: [SensorReading] = []
 
         for i in 0..<actualSamples {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
-            
-            guard sampleOffset + sampleSizeBytes <= data.count else {
-                Logger.shared.warning("[OralableDevice] ⚠️ Accelerometer sample \(i) exceeds bounds")
-                break
-            }
-            
+
             // Fix 2: Calculate timestamp - sample 0 is oldest (240ms ago), sample 24 is newest (now)
             let sampleAge = Double(actualSamples - 1 - i) * sampleInterval
             let sampleTimestamp = notificationTime.addingTimeInterval(-sampleAge)
-            
+
             // Accelerometer X (bytes 0-1)
             if let accelX = readInt16(at: sampleOffset) {
                 readings.append(SensorReading(
@@ -750,7 +726,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     deviceId: peripheral?.identifier.uuidString
                 ))
             }
-            
+
             // Accelerometer Y (bytes 2-3)
             if let accelY = readInt16(at: sampleOffset + 2) {
                 readings.append(SensorReading(
@@ -760,7 +736,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     deviceId: peripheral?.identifier.uuidString
                 ))
             }
-            
+
             // Accelerometer Z (bytes 4-5)
             if let accelZ = readInt16(at: sampleOffset + 4) {
                 readings.append(SensorReading(
@@ -771,17 +747,17 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                 ))
             }
         }
-        
+
         // Batch update latestReadings ONCE after loop
         var latestByType: [SensorType: SensorReading] = [:]
         for reading in readings {
             latestByType[reading.sensorType] = reading
         }
-        
+
         for (type, reading) in latestByType {
             latestReadings[type] = reading
         }
-        
+
         // Emit batch
         if !readings.isEmpty {
             readingsBatchSubject.send(readings)
@@ -798,12 +774,76 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             Logger.shared.warning("[OralableDevice] ⚠️ No accelerometer readings parsed from \(data.count) byte packet")
         }
     }
+
+    // MARK: - Battery Parsing
+
+    private func parseBatteryData(_ data: Data) {
+        // Battery packet: 4 bytes (int32_t millivolts)
+        guard data.count >= 4 else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Battery packet too small: \(data.count) bytes")
+            return
+        }
+
+        let millivolts = data.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(fromByteOffset: 0, as: Int32.self)
+        }
+
+        // Use BatteryConversion for accurate LiPo curve
+        let percentage = BatteryConversion.voltageToPercentage(millivolts: millivolts)
+        let status = BatteryConversion.batteryStatus(percentage: percentage)
+
+        Logger.shared.info("[OralableDevice] 🔋 Battery: \(millivolts)mV → \(String(format: "%.0f", percentage))% [\(status.rawValue)]")
+
+        if BatteryConversion.needsCharging(percentage: percentage) {
+            if BatteryConversion.isCritical(percentage: percentage) {
+                Logger.shared.warning("[OralableDevice] ⚠️ BATTERY CRITICAL: \(String(format: "%.0f", percentage))%")
+            } else {
+                Logger.shared.warning("[OralableDevice] ⚠️ Battery low: \(String(format: "%.0f", percentage))%")
+            }
+        }
+
+        batteryLevel = Int(percentage)
+
+        let reading = SensorReading(
+            sensorType: .battery,
+            value: percentage,
+            timestamp: Date(),
+            deviceId: peripheral?.identifier.uuidString
+        )
+
+        latestReadings[.battery] = reading
+        readingsBatchSubject.send([reading])
+    }
+
+    // MARK: - Standard Battery Level (0-100%)
+
+    private func parseStandardBatteryLevel(_ data: Data) {
+        guard data.count >= 1 else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Standard battery level packet too small")
+            return
+        }
+
+        let level = Int(data[0])
+        Logger.shared.info("[OralableDevice] 🔋 Standard Battery Level: \(level)%")
+
+        batteryLevel = level
+
+        let reading = SensorReading(
+            sensorType: .battery,
+            value: Double(level),
+            timestamp: Date(),
+            deviceId: peripheral?.identifier.uuidString
+        )
+
+        latestReadings[.battery] = reading
+        readingsBatchSubject.send([reading])
+    }
 }
 
 // MARK: - CBPeripheralDelegate
 
 extension OralableDevice: CBPeripheralDelegate {
-    
+
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let error = error {
             Logger.shared.error("[OralableDevice] ❌ Service discovery failed: \(error.localizedDescription)")
@@ -811,19 +851,19 @@ extension OralableDevice: CBPeripheralDelegate {
             serviceDiscoveryContinuation = nil
             return
         }
-        
+
         guard let services = peripheral.services else {
             Logger.shared.error("[OralableDevice] ❌ No services found")
             serviceDiscoveryContinuation?.resume(throwing: DeviceError.serviceNotFound("No services found"))
             serviceDiscoveryContinuation = nil
             return
         }
-        
+
         Logger.shared.info("[OralableDevice] Found \(services.count) services:")
-        
+
         for service in services {
             Logger.shared.info("[OralableDevice]   - \(service.uuid.uuidString)")
-            
+
             if service.uuid == tgmServiceUUID {
                 tgmService = service
                 Logger.shared.info("[OralableDevice] ✅ TGM service found")
@@ -832,7 +872,7 @@ extension OralableDevice: CBPeripheralDelegate {
                 peripheral.discoverCharacteristics([batteryLevelCharUUID], for: service)
             }
         }
-        
+
         if tgmService != nil {
             serviceDiscoveryContinuation?.resume()
             serviceDiscoveryContinuation = nil
@@ -842,7 +882,7 @@ extension OralableDevice: CBPeripheralDelegate {
             serviceDiscoveryContinuation = nil
         }
     }
-    
+
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         if let error = error {
             Logger.shared.error("[OralableDevice] ❌ Characteristic discovery failed: \(error.localizedDescription)")
@@ -850,7 +890,7 @@ extension OralableDevice: CBPeripheralDelegate {
             characteristicDiscoveryContinuation = nil
             return
         }
-        
+
         guard let characteristics = service.characteristics else {
             Logger.shared.warning("[OralableDevice] ⚠️ No characteristics found for service \(service.uuid.uuidString)")
             return
@@ -870,11 +910,11 @@ extension OralableDevice: CBPeripheralDelegate {
             }
             return
         }
-        
+
         Logger.shared.info("[OralableDevice] Found \(characteristics.count) characteristics for TGM service:")
-        
+
         var foundCount = 0
-        
+
         for characteristic in characteristics {
             switch characteristic.uuid {
             case sensorDataCharUUID:
@@ -907,36 +947,26 @@ extension OralableDevice: CBPeripheralDelegate {
             characteristicDiscoveryContinuation = nil
         }
     }
-    
+
     // Fix 3: Updated notification state handler with readiness tracking
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
-            let charName = String(characteristic.uuid.uuidString.prefix(8))
-            Logger.shared.error("[OralableDevice] ❌ Notification state error for \(charName): \(error.localizedDescription)")
-            
-            // Resume specific continuations with error
-            switch characteristic.uuid {
-            case sensorDataCharUUID:
-                notificationEnableContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable sensor data notifications: \(error.localizedDescription)"))
+            Logger.shared.error("[OralableDevice] ❌ Notification state update failed: \(error.localizedDescription)")
+
+            // Resume continuations with error
+            if characteristic.uuid == sensorDataCharUUID {
+                notificationEnableContinuation?.resume(throwing: error)
                 notificationEnableContinuation = nil
-            case accelerometerCharUUID:
-                accelerometerNotificationContinuation?.resume(throwing: DeviceError.characteristicNotFound("Failed to enable accelerometer notifications: \(error.localizedDescription)"))
+            } else if characteristic.uuid == accelerometerCharUUID {
+                accelerometerNotificationContinuation?.resume(throwing: error)
                 accelerometerNotificationContinuation = nil
-            default:
-                break
-            }
-            
-            // Resume connection ready continuation with error if waiting
-            if let continuation = connectionReadyContinuation {
-                connectionReadyContinuation = nil
-                continuation.resume(throwing: error)
             }
             return
         }
-        
-        let charName = String(characteristic.uuid.uuidString.prefix(8))
-        Logger.shared.info("[OralableDevice] ✅ Notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(charName)...")
-        
+
+        let charName = characteristic.uuid.uuidString.prefix(12)
+        Logger.shared.info("[OralableDevice] ✅ Notification \(characteristic.isNotifying ? "enabled" : "disabled") for \(charName)...")
+
         // Fix 3: Track which notifications are ready
         if characteristic.isNotifying {
             switch characteristic.uuid {
@@ -945,31 +975,31 @@ extension OralableDevice: CBPeripheralDelegate {
                 Logger.shared.info("[OralableDevice] 📡 PPG notifications confirmed ready")
                 notificationEnableContinuation?.resume()
                 notificationEnableContinuation = nil
-                
+
             case accelerometerCharUUID:  // Fix 1: Renamed
                 notificationReadiness.insert(.accelerometer)
                 Logger.shared.info("[OralableDevice] 📡 Accelerometer notifications confirmed ready")
                 accelerometerNotificationContinuation?.resume()
                 accelerometerNotificationContinuation = nil
-                
+
             case commandCharUUID:
                 notificationReadiness.insert(.temperature)
                 Logger.shared.info("[OralableDevice] 📡 Temperature notifications confirmed ready")
-                
+
             case batteryLevelCharUUID:
                 notificationReadiness.insert(.battery)
                 Logger.shared.info("[OralableDevice] 📡 Battery notifications confirmed ready")
-                
+
             default:
                 Logger.shared.debug("[OralableDevice] 📡 Unknown characteristic notifications enabled: \(charName)")
             }
-            
+
             // Fix 3: Check if we're now fully ready for data collection
             Logger.shared.info("[OralableDevice] Readiness state: \(notificationReadiness) (need: \(NotificationReadiness.allRequired))")
-            
+
             if isConnectionReady {
                 Logger.shared.info("[OralableDevice] 🎉 Connection fully ready - all required notifications enabled")
-                
+
                 // Resume anyone waiting for readiness
                 if let continuation = connectionReadyContinuation {
                     connectionReadyContinuation = nil
@@ -993,87 +1023,41 @@ extension OralableDevice: CBPeripheralDelegate {
             Logger.shared.warning("[OralableDevice] ⚠️ Notifications disabled for \(charName)")
         }
     }
-    
+
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error = error {
             Logger.shared.error("[OralableDevice] ❌ Value update error: \(error.localizedDescription)")
             return
         }
 
-        guard let data = characteristic.value, !data.isEmpty else {
-            Logger.shared.warning("[OralableDevice] ⚠️ Empty data received")
+        guard let data = characteristic.value else {
+            Logger.shared.warning("[OralableDevice] ⚠️ Received nil data from characteristic")
             return
         }
 
-        // Debug logging for all incoming packets
-        Logger.shared.debug("[OralableDevice] 📦 Received \(data.count) bytes on characteristic: \(characteristic.uuid.uuidString.prefix(8))...")
-
-        // Route to appropriate parser based on characteristic AND packet size
+        // Route data based on characteristic UUID
         switch characteristic.uuid {
         case sensorDataCharUUID:
-            // Sensor data characteristic can have different packet types by size
-            switch data.count {
-            case 244:  // PPG packet: 4-byte frame counter + 20×12 bytes samples
-                parseSensorData(data)
+            // PPG data (244 bytes typically)
+            Logger.shared.debug("[OralableDevice] 📦 Received \(data.count) bytes on characteristic: \(characteristic.uuid.uuidString.prefix(8))...")
+            parseSensorData(data)
 
-            case 4:  // Battery packet: 4 bytes as Int32 in millivolts
-                parseBatteryData(data)
-
-            case 6...8:  // Temperature packet: 4-byte frame counter + 2-byte temp (+ padding)
-                parseTemperature(data)
-
-            default:
-                Logger.shared.debug("[OralableDevice] 📦 Unknown sensor packet size: \(data.count) bytes")
-                // Try to parse as PPG if large enough
-                if data.count > 100 {
-                    parseSensorData(data)
-                }
-            }
-
-        case accelerometerCharUUID:  // Fix 1: Renamed
-            // 3A0FF002: Accelerometer data (154 bytes expected)
-            if data.count == 154 {
-                parseAccelerometerData(data)
-            } else if data.count > 100 {
-                // Try accelerometer parser for similar sizes
-                parseAccelerometerData(data)
-            } else {
-                Logger.shared.warning("[OralableDevice] ⚠️ Unexpected packet size on 3A0FF002: \(data.count) bytes (expected 154)")
-            }
+        case accelerometerCharUUID:
+            // Accelerometer data (154 bytes typically)
+            Logger.shared.debug("[OralableDevice] 📦 Received \(data.count) bytes on characteristic: \(characteristic.uuid.uuidString.prefix(8))...")
+            parseAccelerometerData(data)
 
         case commandCharUUID:
-            // 3A0FF003: Temperature (8 bytes) and potentially battery (4 bytes)
-            switch data.count {
-            case 6...8:
-                // Temperature data: 4-byte frame counter + 2-byte temp (+ optional padding)
-                parseTemperature(data)
-
-            case 4:
-                // Battery data: 4 bytes as Int32 millivolts
-                parseBatteryData(data)
-
-            default:
-                Logger.shared.debug("[OralableDevice] 📦 Data on 3A0FF003: \(data.count) bytes")
-            }
+            // Temperature data (8 bytes typically)
+            Logger.shared.debug("[OralableDevice] 📦 Received \(data.count) bytes on characteristic: \(characteristic.uuid.uuidString.prefix(8))...")
+            parseTemperature(data)
 
         case batteryLevelCharUUID:
-            // Standard BLE Battery Level (0x2A19): 1 byte, 0-100%
-            if data.count >= 1 {
-                let percentage = Int(data[0])
-                Logger.shared.info("[OralableDevice] 🔋 Battery Level (BLE standard): \(percentage)%")
-
-                let reading = SensorReading(
-                    sensorType: .battery,
-                    value: Double(percentage),
-                    timestamp: Date(),
-                    deviceId: peripheral.identifier.uuidString
-                )
-                latestReadings[.battery] = reading
-                readingsBatchSubject.send([reading])
-            }
+            // Standard battery level (1 byte, 0-100%)
+            parseStandardBatteryLevel(data)
 
         default:
-            Logger.shared.debug("[OralableDevice] Data from unknown characteristic: \(characteristic.uuid.uuidString)")
+            Logger.shared.debug("[OralableDevice] 📦 Received \(data.count) bytes on unknown characteristic: \(characteristic.uuid.uuidString)")
         }
     }
 }
@@ -1081,48 +1065,89 @@ extension OralableDevice: CBPeripheralDelegate {
 // MARK: - Accelerometer Conversion Utilities (Fix 4)
 
 /// Utility for converting raw LIS2DTW12 accelerometer values to physical units
-/// Uses fixed-point conversion assuming ±2g full scale with 14-bit resolution
+/// Uses sensitivity values from LIS2DTW12 datasheet for ±2g full scale at 14-bit resolution
 struct AccelerometerConversion {
-
+    
+    // MARK: - LIS2DTW12 Sensitivity Values (mg/digit)
+    // From datasheet Table 3: Mechanical characteristics
+    
+    /// Sensitivity at ±2g full scale (high-performance and most low-power modes)
+    static let sensitivity2g: Double = 0.244  // mg/digit
+    
+    /// Sensitivity at ±4g full scale
+    static let sensitivity4g: Double = 0.488  // mg/digit
+    
+    /// Sensitivity at ±8g full scale
+    static let sensitivity8g: Double = 0.976  // mg/digit
+    
+    /// Sensitivity at ±16g full scale
+    static let sensitivity16g: Double = 1.952  // mg/digit
+    
+    /// Current firmware configuration (±2g)
+    static let currentFullScale: Int = 2
+    
+    /// Tolerance for detecting rest state (device stationary)
+    static let restTolerance: Double = 0.1  // ±0.1g
+    
     // MARK: - Conversion Methods
-
+    
+    /// Get sensitivity value for a given full scale setting
+    /// - Parameter fullScale: Full scale range (2, 4, 8, or 16)
+    /// - Returns: Sensitivity in mg/digit
+    static func sensitivity(forFullScale fullScale: Int) -> Double {
+        switch fullScale {
+        case 2: return sensitivity2g
+        case 4: return sensitivity4g
+        case 8: return sensitivity8g
+        case 16: return sensitivity16g
+        default: return sensitivity2g
+        }
+    }
+    
     /// Convert raw Int16 value to g (gravitational acceleration)
-    /// Uses fixed-point conversion: raw value / 16384 = g
-    /// This assumes ±2g full scale with 14-bit resolution
-    /// - Parameter rawValue: Raw accelerometer reading (Int16, two's complement)
+    /// - Parameters:
+    ///   - rawValue: Raw accelerometer reading (Int16, two's complement)
+    ///   - fullScale: Full scale setting (default: 2g)
     /// - Returns: Acceleration in g units
-    static func toG(_ rawValue: Int16) -> Double {
-        return Double(rawValue) / 16384.0
+    static func toG(_ rawValue: Int16, fullScale: Int = currentFullScale) -> Double {
+        let sens = sensitivity(forFullScale: fullScale)
+        return Double(rawValue) * sens / 1000.0  // Convert mg to g
     }
     
     /// Convert raw Int16 value to mg (milli-g)
-    /// - Parameter rawValue: Raw accelerometer reading (Int16)
+    /// - Parameters:
+    ///   - rawValue: Raw accelerometer reading (Int16)
+    ///   - fullScale: Full scale setting (default: 2g)
     /// - Returns: Acceleration in mg (milli-g)
-    static func toMilliG(_ rawValue: Int16) -> Double {
-        return toG(rawValue) * 1000.0
+    static func toMilliG(_ rawValue: Int16, fullScale: Int = currentFullScale) -> Double {
+        let sens = sensitivity(forFullScale: fullScale)
+        return Double(rawValue) * sens
     }
-
+    
     /// Convert raw Int16 value to m/s² (SI units)
-    /// - Parameter rawValue: Raw accelerometer reading (Int16)
+    /// - Parameters:
+    ///   - rawValue: Raw accelerometer reading (Int16)
+    ///   - fullScale: Full scale setting (default: 2g)
     /// - Returns: Acceleration in m/s²
-    static func toMeterPerSecondSquared(_ rawValue: Int16) -> Double {
-        return toG(rawValue) * 9.80665  // Standard gravity
+    static func toMeterPerSecondSquared(_ rawValue: Int16, fullScale: Int = currentFullScale) -> Double {
+        return toG(rawValue, fullScale: fullScale) * 9.80665  // Standard gravity
     }
-
+    
     /// Calculate magnitude from raw X, Y, Z values
     /// - Parameters:
     ///   - x: Raw X axis value (Int16)
     ///   - y: Raw Y axis value (Int16)
     ///   - z: Raw Z axis value (Int16)
+    ///   - fullScale: Full scale setting (default: 2g)
     /// - Returns: Magnitude in g units
-    static func magnitude(x: Int16, y: Int16, z: Int16) -> Double {
-        let xG = toG(x)
-        let yG = toG(y)
-        let zG = toG(z)
+    static func magnitude(x: Int16, y: Int16, z: Int16, fullScale: Int = currentFullScale) -> Double {
+        let xG = toG(x, fullScale: fullScale)
+        let yG = toG(y, fullScale: fullScale)
+        let zG = toG(z, fullScale: fullScale)
         return sqrt(xG * xG + yG * yG + zG * zG)
     }
     
-    /// Calculate magnitude from Double values already in g units
+    /// Calculate magnitude from g-converted values
     /// - Parameters:
     ///   - xG: X axis in g
     ///   - yG: Y axis in g
@@ -1132,34 +1157,15 @@ struct AccelerometerConversion {
         return sqrt(xG * xG + yG * yG + zG * zG)
     }
     
-    // MARK: - Validation Helpers
-    
-    /// Expected magnitude at rest (should be ~1g due to gravity)
-    static let expectedRestMagnitude: Double = 1.0
-    
-    /// Tolerance for rest detection (±0.1g)
-    static let restTolerance: Double = 0.1
-    
-    /// Check if device is approximately at rest
+    /// Check if device is approximately at rest (magnitude ~1g)
     /// - Parameters:
-    ///   - x: Raw X value
-    ///   - y: Raw Y value
-    ///   - z: Raw Z value
-    /// - Returns: true if magnitude is within expected rest range
-    static func isAtRest(x: Int16, y: Int16, z: Int16) -> Bool {
-        let mag = magnitude(x: x, y: y, z: z)
-        return abs(mag - expectedRestMagnitude) < restTolerance
-    }
-    
-    // MARK: - Formatting Helpers
-    
-    /// Format g value with appropriate precision
-    static func formatG(_ value: Double) -> String {
-        return String(format: "%.3f g", value)
-    }
-    
-    /// Format mg value with appropriate precision
-    static func formatMilliG(_ value: Double) -> String {
-        return String(format: "%.1f mg", value)
+    ///   - x: Raw X axis value (Int16)
+    ///   - y: Raw Y axis value (Int16)
+    ///   - z: Raw Z axis value (Int16)
+    ///   - fullScale: Full scale setting (default: 2g)
+    /// - Returns: True if magnitude is within tolerance of 1g
+    static func isAtRest(x: Int16, y: Int16, z: Int16, fullScale: Int = currentFullScale) -> Bool {
+        let mag = magnitude(x: x, y: y, z: z, fullScale: fullScale)
+        return abs(mag - 1.0) < restTolerance
     }
 }

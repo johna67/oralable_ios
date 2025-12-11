@@ -6,6 +6,7 @@
 //  FIXED: November 28, 2025 - Removed * 1000 multiplication causing Int16 overflow
 //  FIXED: December 5, 2025 - Added EMG support for ANR M40 device (treat .emg like .ppgInfrared)
 //  FIXED: December 8, 2025 - Per-device battery tracking to fix dual-device battery export
+//  FIXED: December 10, 2025 - Timestamp grouping bug fix (use Int64 ms instead of Date as key)
 //  Responsibility: Process and aggregate raw sensor readings from BLE devices
 //  - PPG data processing (Red, IR, Green channels)
 //  - EMG data processing (ANR M40 - treated as ppgInfrared equivalent)
@@ -42,94 +43,159 @@ class SensorDataProcessor: ObservableObject {
     @Published var accelY: Double = 0.0
     @Published var accelZ: Double = 0.0
     @Published var temperature: Double = 0.0
+    @Published var batteryLevel: Double = 0.0
     @Published var ppgRedValue: Double = 0.0
     @Published var ppgIRValue: Double = 0.0
     @Published var ppgGreenValue: Double = 0.0
+
+    // MARK: - Per-Device Battery Levels
     
-    // ✅ FIXED: Per-device battery tracking
-    @Published var batteryLevel: Double = 0.0  // Legacy: used by DeviceManagerAdapter for UI display
-    private var batteryLevelOralable: Double = 0.0  // Battery for Oralable device
-    private var batteryLevelANR: Double = -1.0      // Battery for ANR M40 device (-1 = N/A, device doesn't report battery)
+    /// Battery level from Oralable hardware (0-100%)
+    @Published var batteryLevelOralable: Double = 0.0
+    
+    /// Battery level from ANR M40 (-1 = N/A, ANR doesn't report battery)
+    @Published var batteryLevelANR: Double = -1.0
 
-    // MARK: - Private Properties
-
-    private let maxHistoryCount = 100
-    private var ppgIRBuffer: [UInt32] = []  // Buffer for HR calculation
-
-    #if DEBUG
-    private var readingsCounter = 0  // Counter for debug logging
-    #endif
+    // MARK: - PPG Buffer for Heart Rate Calculation
+    
+    var ppgIRBuffer: [UInt32] = []
 
     // MARK: - Initialization
 
     init() {
-        Logger.shared.info("[SensorDataProcessor] Initialized with per-device battery tracking")
+        Logger.shared.info("[SensorDataProcessor] Initialized with circular buffers")
     }
-    
-    // MARK: - Per-Device Battery Methods
-    
-    /// Update battery level for a specific device type
-    func updateBatteryLevel(_ level: Double, for deviceType: DeviceType) {
+
+    // MARK: - Battery Level Helpers
+
+    /// Update battery level for a specific device
+    /// - Parameters:
+    ///   - value: Battery percentage (0-100)
+    ///   - deviceType: The device type (.oralable or .anr)
+    func updateBatteryLevel(_ value: Double, for deviceType: DeviceType) {
         switch deviceType {
         case .oralable:
-            batteryLevelOralable = level
-            Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery: \(Int(level))%")
-            // Update legacy batteryLevel for UI display
-            batteryLevel = level
+            batteryLevelOralable = value
+            batteryLevel = value
+            Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery: \(Int(value))%")
         case .anr:
-            batteryLevelANR = level
-            // Don't log percentage if N/A (-1)
-            if level >= 0 {
-                Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: \(Int(level))%")
-            } else {
-                Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: N/A")
-            }
-            // Don't update legacy batteryLevel for ANR (would be misleading if -1)
+            batteryLevelANR = value
+            Logger.shared.debug("[SensorDataProcessor] 🔋 ANR M40 battery: N/A")
         case .demo:
-            batteryLevelOralable = level  // Demo uses Oralable slot
-            batteryLevel = level
+            batteryLevel = value
+            Logger.shared.debug("[SensorDataProcessor] 🔋 Demo battery: \(Int(value))%")
         }
     }
     
-    /// Get cached battery level for a specific device type
+    /// Get cached battery level for Oralable device (for CSV export)
+    func getCachedOralableBattery() -> Int {
+        return Int(batteryLevelOralable)
+    }
+
+    /// Get battery level for a specific device type
+    /// - Parameter deviceType: The device type to get battery level for
+    /// - Returns: Battery percentage (0-100), or -1 for ANR (no battery reporting)
     func getBatteryLevel(for deviceType: DeviceType) -> Double {
         switch deviceType {
-        case .oralable, .demo:
+        case .oralable:
             return batteryLevelOralable
         case .anr:
             return batteryLevelANR
+        case .demo:
+            return batteryLevel
         }
     }
 
-    // MARK: - Public Processing Methods
+    // MARK: - Main Processing Method
 
-    /// Process a batch of sensor readings (called from background queue)
-    func processBatch(_ readings: [SensorReading]) async {
-        #if DEBUG
-        readingsCounter += readings.count
-        if readingsCounter >= 100 {
-            let count = readingsCounter
-            readingsCounter = 0
-            Logger.shared.debug("[SensorDataProcessor] Processed \(count) readings in batch")
-        }
-        #endif
+    /// Process a batch of sensor readings from BLE devices
+    /// - Parameter readings: Array of SensorReading objects from OralableDevice or ANRMuscleSenseDevice
+    func processSensorReadings(_ readings: [SensorReading]) async {
+        guard !readings.isEmpty else { return }
 
-        // Track which types of data we have to avoid redundant processing
-        var hasPPGData = false
-        var hasAccelData = false
-
-        // Prepare batched updates
+        // Categorize readings for efficient processing
         var batteryUpdates: [(BatteryData, Int)] = []
         var hrUpdates: [HeartRateData] = []
         var spo2Updates: [SpO2Data] = []
         var tempUpdates: [(Double, TemperatureData)] = []
+        var hasPPGData = false
+        var hasAccelData = false
 
-        // Process each reading
+        // Check if this batch is from Oralable (has PPG Red/Green) or ANR M40 (EMG only)
+        let isFromOralable = readings.contains { $0.sensorType == .ppgRed || $0.sensorType == .ppgGreen }
+        
+        // Update per-device battery levels
+        // NOTE: Battery readings ONLY come from Oralable hardware
+        // ANR M40 does NOT have a battery characteristic
+        if let batteryReading = readings.first(where: { $0.sensorType == .battery }) {
+            await MainActor.run {
+                let batteryValue = batteryReading.value
+                
+                // Battery ALWAYS comes from Oralable (ANR M40 doesn't report battery)
+                // Even if the batch contains EMG data, the battery is from Oralable
+                self.batteryLevelOralable = batteryValue
+                Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery from batch: \(Int(batteryValue))%")
+                
+                // Also update legacy fallback
+                self.batteryLevel = batteryValue
+            }
+        }
+
+        // FIX: Group readings by 10ms buckets (100 Hz sampling = 10ms between samples)
+        // This ensures all 3 PPG channels from the same sample end up in the same group
+        // even if there are tiny floating-point timestamp differences
+        var groupedReadings: [Int64: [SensorReading]] = [:]
+        for reading in readings {
+            // Round to nearest 10ms boundary to handle floating-point imprecision
+            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
+            groupedReadings[tenMsKey, default: []].append(reading)
+        }
+
+        // Build the new SensorData objects off the main actor
+        let sortedKeys = groupedReadings.keys.sorted()
+        var newSensorData: [SensorData] = []
+        newSensorData.reserveCapacity(sortedKeys.count)
+
+        for tenMsKey in sortedKeys {
+            guard let group = groupedReadings[tenMsKey] else { continue }
+            // Convert 10ms key back to Date for the SensorData timestamp
+            let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
+            let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
+            newSensorData.append(sensorData)
+        }
+
+        // Publish/append to sensorDataHistory in one go on the main actor
+        await MainActor.run {
+            let beforeCount = self.sensorDataHistory.count
+            if !newSensorData.isEmpty {
+                // Append all new items once
+                self.sensorDataHistory.append(contentsOf: newSensorData)
+
+                // Trim to cap (keep last 10000 for ~40 seconds of history at 250Hz)
+                if self.sensorDataHistory.count > 10000 {
+                    self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
+                }
+
+                let addedCount = newSensorData.count
+                Logger.shared.debug("[SensorDataProcessor] ✅ Processed \(addedCount) entries, buffer: \(self.sensorDataHistory.count)/10000")
+
+                if let oldest = self.sensorDataHistory.first?.timestamp,
+                   let newest = self.sensorDataHistory.last?.timestamp {
+                    Logger.shared.debug("[SensorDataProcessor] 📅 Data range: \(oldest) to \(newest)")
+                }
+            }
+        }
+
+        // Process individual reading types for legacy buffers
         for reading in readings {
             switch reading.sensorType {
             case .battery:
-                let batteryData = BatteryData(percentage: Int(reading.value), timestamp: reading.timestamp)
-                batteryUpdates.append((batteryData, Int(reading.value)))
+                let value = Int(reading.value)
+                let data = BatteryData(percentage: value, timestamp: reading.timestamp)
+                batteryUpdates.append((data, value))
+                // Log which device the battery came from
+                Logger.shared.debug("[SensorDataProcessor] Battery from Oralable cache: \(value)%")
 
             case .heartRate:
                 let hrData = HeartRateData(bpm: reading.value, quality: reading.quality ?? 0.8, timestamp: reading.timestamp)
@@ -199,14 +265,16 @@ class SensorDataProcessor: ObservableObject {
     }
 
     /// Update PPG history and extract IR samples for heart rate calculation
+    @discardableResult
     func updatePPGHistory(from readings: [SensorReading]) async -> [UInt32] {
-        var grouped: [Date: (red: Int32, ir: Int32, green: Int32)] = [:]
+        // Use 10ms buckets to ensure all PPG channels from same sample are grouped together
+        var grouped: [Int64: (red: Int32, ir: Int32, green: Int32)] = [:]
         var irSamples: [UInt32] = []
 
         for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen, .emg].contains(reading.sensorType) {
-            // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
-            let timestamp = reading.timestamp
-            var current = grouped[timestamp] ?? (0, 0, 0)
+            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
+            var current = grouped[tenMsKey] ?? (0, 0, 0)
 
             switch reading.sensorType {
             case .ppgRed:
@@ -226,12 +294,15 @@ class SensorDataProcessor: ObservableObject {
                 break
             }
 
-            grouped[timestamp] = current
+            grouped[tenMsKey] = current
         }
 
         // Update PPG history on main thread
         await MainActor.run {
-            for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
+            let sortedKeys = grouped.keys.sorted()
+            for tenMsKey in sortedKeys {
+                guard let values = grouped[tenMsKey] else { continue }
+                let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
                 let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
                 self.ppgHistory.append(ppgData)
 
@@ -270,105 +341,42 @@ class SensorDataProcessor: ObservableObject {
 
     /// Update accelerometer history
     func updateAccelHistory(from readings: [SensorReading]) async {
-        var grouped: [Date: (x: Int16, y: Int16, z: Int16)] = [:]
+        // Use 10ms buckets to ensure all accel axes from same sample are grouped together
+        var grouped: [Int64: (x: Int16, y: Int16, z: Int16)] = [:]
 
         for reading in readings where [.accelerometerX, .accelerometerY, .accelerometerZ].contains(reading.sensorType) {
-            // Use exact timestamp - DO NOT ROUND to preserve 20ms sample offsets
-            let timestamp = reading.timestamp
-            var current = grouped[timestamp] ?? (0, 0, 0)
+            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
+            var current = grouped[tenMsKey] ?? (0, 0, 0)
+
+            // Values come as raw Int16 from OralableDevice (already correct units)
+            let rawValue = Int16(clamping: Int(reading.value))
 
             switch reading.sensorType {
             case .accelerometerX:
-                // ✅ FIXED: Removed * 1000 - raw values are already in correct Int16 range
-                current.x = Int16(reading.value)
+                current.x = rawValue
                 await MainActor.run { self.accelX = reading.value }
             case .accelerometerY:
-                // ✅ FIXED: Removed * 1000 - raw values are already in correct Int16 range
-                current.y = Int16(reading.value)
+                current.y = rawValue
                 await MainActor.run { self.accelY = reading.value }
             case .accelerometerZ:
-                // ✅ FIXED: Removed * 1000 - raw values are already in correct Int16 range
-                current.z = Int16(reading.value)
+                current.z = rawValue
                 await MainActor.run { self.accelZ = reading.value }
             default:
                 break
             }
 
-            grouped[timestamp] = current
+            grouped[tenMsKey] = current
         }
 
         // Update accelerometer history on main thread
         await MainActor.run {
-            for (timestamp, values) in grouped.sorted(by: { $0.key < $1.key }) {
+            let sortedKeys = grouped.keys.sorted()
+            for tenMsKey in sortedKeys {
+                guard let values = grouped[tenMsKey] else { continue }
+                let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
                 let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
                 self.accelerometerHistory.append(accelData)
-            }
-        }
-    }
-
-    /// Update legacy sensor data history (for backward compatibility)
-    func updateLegacySensorData(with readings: [SensorReading]) async {
-        // ✅ FIXED: Extract battery readings and determine device type FIRST
-        // Battery readings often have different timestamps than PPG/accel readings
-        // We need to detect device type from the readings to store battery per-device
-        
-        // Detect if this batch contains EMG (ANR M40) or PPG (Oralable) data
-        let hasEMG = readings.contains { $0.sensorType == .emg || $0.sensorType == .muscleActivity }
-        let hasPPG = readings.contains { $0.sensorType == .ppgRed || $0.sensorType == .ppgGreen }
-        
-        // Update per-device battery levels
-        // NOTE: Battery readings ONLY come from Oralable hardware
-        // ANR M40 does NOT have a battery characteristic
-        if let batteryReading = readings.first(where: { $0.sensorType == .battery }) {
-            await MainActor.run {
-                let batteryValue = batteryReading.value
-                
-                // Battery ALWAYS comes from Oralable (ANR M40 doesn't report battery)
-                // Even if the batch contains EMG data, the battery is from Oralable
-                self.batteryLevelOralable = batteryValue
-                Logger.shared.debug("[SensorDataProcessor] 🔋 Oralable battery from batch: \(Int(batteryValue))%")
-                
-                // Also update legacy fallback
-                self.batteryLevel = batteryValue
-            }
-        }
-
-        // Group readings by exact timestamp (preserve offsets)
-        var groupedReadings: [Date: [SensorReading]] = [:]
-        for reading in readings {
-            groupedReadings[reading.timestamp, default: []].append(reading)
-        }
-
-        // Build the new SensorData objects off the main actor
-        let sortedTimestamps = groupedReadings.keys.sorted()
-        var newSensorData: [SensorData] = []
-        newSensorData.reserveCapacity(sortedTimestamps.count)
-
-        for timestamp in sortedTimestamps {
-            guard let group = groupedReadings[timestamp] else { continue }
-            let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
-            newSensorData.append(sensorData)
-        }
-
-        // Publish/append to sensorDataHistory in one go on the main actor
-        await MainActor.run {
-            let beforeCount = self.sensorDataHistory.count
-            if !newSensorData.isEmpty {
-                // Append all new items once
-                self.sensorDataHistory.append(contentsOf: newSensorData)
-
-                // Trim to cap (keep last 10000 for ~40 seconds of history at 250Hz)
-                if self.sensorDataHistory.count > 10000 {
-                    self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
-                }
-
-                let addedCount = newSensorData.count
-                Logger.shared.debug("[SensorDataProcessor] ✅ Processed \(addedCount) entries, buffer: \(self.sensorDataHistory.count)/10000")
-
-                if let oldest = self.sensorDataHistory.first?.timestamp,
-                   let newest = self.sensorDataHistory.last?.timestamp {
-                    Logger.shared.debug("[SensorDataProcessor] 📅 Data range: \(oldest) to \(newest)")
-                }
             }
         }
     }
@@ -386,7 +394,7 @@ class SensorDataProcessor: ObservableObject {
         ppgIRBuffer.removeAll()
         logMessages.removeAll()
         
-        // ✅ Also clear per-device battery levels
+        // Also clear per-device battery levels
         batteryLevelOralable = 0.0
         batteryLevelANR = -1.0  // ANR doesn't report battery, keep as N/A
         batteryLevel = 0.0
@@ -431,9 +439,6 @@ class SensorDataProcessor: ObservableObject {
             return (timestamp: sample.timestamp, x: xG, y: yG, z: zG, magnitude: mag)
         }
     }
-    
-    
-    
 
     // MARK: - Private Helper Methods
 
@@ -445,58 +450,47 @@ class SensorDataProcessor: ObservableObject {
         var heartRate: Double? = nil, heartRateQuality: Double? = nil
         var spo2: Double? = nil, spo2Quality: Double? = nil
         var detectedDeviceType: DeviceType = .oralable
-        var hasEMG = false
 
         for reading in readings {
             switch reading.sensorType {
-            case .ppgRed: ppgRed = Int32(reading.value)
-            case .ppgInfrared: ppgIR = Int32(reading.value)
-            case .emg:
-                // EMG data indicates ANR M40 device
+            case .ppgRed:
+                ppgRed = Int32(reading.value)
+            case .ppgInfrared:
                 ppgIR = Int32(reading.value)
-                hasEMG = true
+            case .ppgGreen:
+                ppgGreen = Int32(reading.value)
+            case .emg:
+                // EMG from ANR M40 is stored in IR channel
+                ppgIR = Int32(reading.value)
                 detectedDeviceType = .anr
-            case .ppgGreen: ppgGreen = Int32(reading.value)
-            case .accelerometerX: accelX = Int16(reading.value)  // ✅ FIXED: Removed * 1000
-            case .accelerometerY: accelY = Int16(reading.value)  // ✅ FIXED: Removed * 1000
-            case .accelerometerZ: accelZ = Int16(reading.value)  // ✅ FIXED: Removed * 1000
-            case .temperature: temperature = reading.value
-            case .battery: batteryFromReading = Int(reading.value)
-            case .heartRate: heartRate = reading.value; heartRateQuality = reading.quality ?? 0.8
-            case .spo2: spo2 = reading.value; spo2Quality = reading.quality ?? 0.8
-            case .muscleActivity:
-                // Muscle activity also indicates ANR M40 device
-                hasEMG = true
-                detectedDeviceType = .anr
-            default: break
+            case .accelerometerX:
+                accelX = Int16(clamping: Int(reading.value))
+            case .accelerometerY:
+                accelY = Int16(clamping: Int(reading.value))
+            case .accelerometerZ:
+                accelZ = Int16(clamping: Int(reading.value))
+            case .temperature:
+                temperature = reading.value
+            case .battery:
+                batteryFromReading = Int(reading.value)
+            case .heartRate:
+                heartRate = reading.value
+                heartRateQuality = reading.quality
+            case .spo2:
+                spo2 = reading.value
+                spo2Quality = reading.quality
+            default:
+                break
             }
         }
 
-        // ✅ FIXED: Use per-device cached battery level based on detected device type
-        let battery: Int
-        if let fromReading = batteryFromReading {
-            battery = fromReading
-            Logger.shared.debug("[SensorDataProcessor] Battery from reading: \(battery)% for \(detectedDeviceType)")
-        } else {
-            // Use cached battery for this specific device type
-            switch detectedDeviceType {
-            case .anr:
-                battery = Int(self.batteryLevelANR)
-                if battery > 0 {
-                    Logger.shared.debug("[SensorDataProcessor] Battery from ANR cache: \(battery)%")
-                }
-            case .oralable, .demo:
-                battery = Int(self.batteryLevelOralable)
-                if battery > 0 {
-                    Logger.shared.debug("[SensorDataProcessor] Battery from Oralable cache: \(battery)%")
-                }
-            }
-        }
+        // Use battery from reading if available, otherwise use cached Oralable battery
+        let batteryValue = batteryFromReading ?? Int(batteryLevelOralable)
 
         let ppgData = PPGData(red: ppgRed, ir: ppgIR, green: ppgGreen, timestamp: timestamp)
         let accelData = AccelerometerData(x: accelX, y: accelY, z: accelZ, timestamp: timestamp)
         let tempData = TemperatureData(celsius: temperature, timestamp: timestamp)
-        let batteryData = BatteryData(percentage: battery, timestamp: timestamp)
+        let batteryData = BatteryData(percentage: batteryValue, timestamp: timestamp)
         let heartRateData = heartRate.map { HeartRateData(bpm: $0, quality: heartRateQuality ?? 0.8, timestamp: timestamp) }
         let spo2Data = spo2.map { SpO2Data(percentage: $0, quality: spo2Quality ?? 0.8, timestamp: timestamp) }
 
@@ -512,6 +506,52 @@ class SensorDataProcessor: ObservableObject {
         )
     }
     
+    func updateLegacySensorData(with readings: [SensorReading]) async {
+        let hasEMG = readings.contains { $0.sensorType == .emg || $0.sensorType == .muscleActivity }
+        let hasPPG = readings.contains { $0.sensorType == .ppgRed || $0.sensorType == .ppgGreen }
+
+        if let batteryReading = readings.first(where: { $0.sensorType == .battery }) {
+            let batteryValue = batteryReading.value
+            batteryLevelOralable = batteryValue
+            Logger.shared.debug("[SensorDataProcessor] Battery from Oralable cache: \(Int(batteryValue))%")
+            batteryLevel = batteryValue
+        }
+
+        // Group readings by 10ms buckets (100 Hz sampling = 10ms between samples)
+        // This ensures all 3 PPG channels from the same sample end up in the same group
+        // even if there are tiny floating-point timestamp differences
+        var groupedReadings: [Int64: [SensorReading]] = [:]
+        for reading in readings {
+            // Round to nearest 10ms boundary to handle floating-point imprecision
+            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
+            groupedReadings[tenMsKey, default: []].append(reading)
+        }
+
+        let sortedKeys = groupedReadings.keys.sorted()
+        var newSensorData: [SensorData] = []
+        newSensorData.reserveCapacity(sortedKeys.count)
+
+        for tenMsKey in sortedKeys {
+            guard let group = groupedReadings[tenMsKey] else { continue }
+            let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
+            let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
+            newSensorData.append(sensorData)
+        }
+
+        if !newSensorData.isEmpty {
+            self.sensorDataHistory.append(contentsOf: newSensorData)
+            if self.sensorDataHistory.count > 10000 {
+                self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
+            }
+            Logger.shared.debug("[SensorDataProcessor] ✅ Processed \(newSensorData.count) entries, buffer: \(self.sensorDataHistory.count)/10000")
+            if let oldest = self.sensorDataHistory.first?.timestamp,
+               let newest = self.sensorDataHistory.last?.timestamp {
+                Logger.shared.debug("[SensorDataProcessor] 📅 Data range: \(oldest) to \(newest)")
+            }
+        }
+    }
+
     // MARK: - Log Management
 
     func addLog(_ message: String) {
