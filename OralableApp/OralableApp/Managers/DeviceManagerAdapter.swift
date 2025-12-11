@@ -90,23 +90,24 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
             }
             .store(in: &cancellables)
 
-        // Subscribe to BATCH publisher for history storage
-        // COLLECT all readings over 3 second intervals instead of just taking latest
-        // This ensures we don't miss any readings while reducing processing frequency
-        deviceManager.readingsBatchPublisher
-            .collect(.byTime(DispatchQueue.main, .seconds(3)))
-            .sink { [weak self] batchesOfReadings in
-                guard let self = self else { return }
-                let allReadings = batchesOfReadings.flatMap { $0 }
-                if !allReadings.isEmpty {
-                    Task {
-                        await self.sensorDataProcessor.updateLegacySensorData(with: allReadings)
-                    }
-                }
-            }
-            .store(in: &cancellables)
+        // DISABLED: Batch publisher subscription caused PPG rotation bugs in CSV export
+        // The batch grouping by timestamp had floating-point precision issues
+        // Now using direct SensorData creation in updateSensorValues() instead
+        //
+        // deviceManager.readingsBatchPublisher
+        //     .collect(.byTime(DispatchQueue.main, .seconds(3)))
+        //     .sink { [weak self] batchesOfReadings in
+        //         guard let self = self else { return }
+        //         let allReadings = batchesOfReadings.flatMap { $0 }
+        //         if !allReadings.isEmpty {
+        //             Task {
+        //                 await self.sensorDataProcessor.updateLegacySensorData(with: allReadings)
+        //             }
+        //         }
+        //     }
+        //     .store(in: &cancellables)
 
-        Logger.shared.info("[DeviceManagerAdapter] Bindings configured with throttled batch publisher")
+        Logger.shared.info("[DeviceManagerAdapter] Bindings configured - direct history storage enabled")
     }
 
     private func updateSensorValues(from readings: [SensorType: SensorReading]) {
@@ -232,6 +233,94 @@ final class DeviceManagerAdapter: ObservableObject, BLEManagerProtocol {
         if let reading = readings[.accelerometerZ] {
             accelZ = reading.value
             Logger.shared.debug("[DeviceManagerAdapter] 📊 Accel Z: \(Int(accelZ))")
+        }
+
+        // === Create separate SensorData entries for each device type ===
+        // The latestReadings dictionary merges data from ALL connected devices,
+        // so we need to create separate entries for Oralable and ANR M40
+        let timestamp = Date()
+
+        // Check what we received
+        let hasEMG = readings[.emg] != nil || readings[.muscleActivity] != nil
+        let hasPPGIR = readings[.ppgInfrared] != nil
+
+        // Create Oralable entry if we have PPG data
+        if hasPPGIR && ppgIRValue > 100 {
+            let ppgData = PPGData(
+                red: Int32(ppgRedValue),
+                ir: Int32(ppgIRValue),
+                green: Int32(ppgGreenValue),
+                timestamp: timestamp
+            )
+
+            let accelData = AccelerometerData(
+                x: Int16(clamping: Int(accelX)),
+                y: Int16(clamping: Int(accelY)),
+                z: Int16(clamping: Int(accelZ)),
+                timestamp: timestamp
+            )
+
+            let tempData = TemperatureData(
+                celsius: temperature,
+                timestamp: timestamp
+            )
+
+            let batteryData = BatteryData(
+                percentage: Int(batteryLevel),
+                timestamp: timestamp
+            )
+
+            let hrData: HeartRateData? = heartRate > 0 ? HeartRateData(
+                bpm: Double(heartRate),
+                quality: heartRateQuality,
+                timestamp: timestamp
+            ) : nil
+
+            let oralableSensorData = SensorData(
+                timestamp: timestamp,
+                ppg: ppgData,
+                accelerometer: accelData,
+                temperature: tempData,
+                battery: batteryData,
+                heartRate: hrData,
+                spo2: nil,
+                deviceType: .oralable
+            )
+
+            sensorDataProcessor.sensorDataHistory.append(oralableSensorData)
+        }
+
+        // Create ANR M40 entry if we have EMG data
+        if hasEMG && emgValue > 0 {
+            // ANR M40: EMG stored in ppg.ir field, everything else zero
+            let emgPPGData = PPGData(
+                red: 0,
+                ir: Int32(emgValue),
+                green: 0,
+                timestamp: timestamp
+            )
+
+            let zeroAccel = AccelerometerData(x: 0, y: 0, z: 0, timestamp: timestamp)
+            let zeroTemp = TemperatureData(celsius: 0, timestamp: timestamp)
+            let zeroBattery = BatteryData(percentage: 0, timestamp: timestamp)  // ANR doesn't report battery
+
+            let anrSensorData = SensorData(
+                timestamp: timestamp,
+                ppg: emgPPGData,
+                accelerometer: zeroAccel,
+                temperature: zeroTemp,
+                battery: zeroBattery,
+                heartRate: nil,
+                spo2: nil,
+                deviceType: .anr
+            )
+
+            sensorDataProcessor.sensorDataHistory.append(anrSensorData)
+        }
+
+        // Trim history to cap
+        if sensorDataProcessor.sensorDataHistory.count > 10000 {
+            sensorDataProcessor.sensorDataHistory.removeFirst(sensorDataProcessor.sensorDataHistory.count - 10000)
         }
     }
 

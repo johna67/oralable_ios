@@ -141,15 +141,21 @@ class SensorDataProcessor: ObservableObject {
             }
         }
 
-        // FIX: Group readings by 10ms buckets (100 Hz sampling = 10ms between samples)
-        // This ensures all 3 PPG channels from the same sample end up in the same group
-        // even if there are tiny floating-point timestamp differences
+        // FIX: Group readings by hardware frame number for deterministic grouping
+        // PPG/accelerometer readings have frameNumber set by OralableDevice
+        // Other readings (battery, temp) fall back to timestamp-based grouping
         var groupedReadings: [Int64: [SensorReading]] = [:]
         for reading in readings {
-            // Round to nearest 10ms boundary to handle floating-point imprecision
-            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
-            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
-            groupedReadings[tenMsKey, default: []].append(reading)
+            let groupKey: Int64
+            if let frameNum = reading.frameNumber {
+                // PPG/accelerometer readings: group by hardware frame number
+                groupKey = Int64(frameNum)
+            } else {
+                // Non-framed readings (battery, temp, heart rate): use 25ms timestamp buckets
+                let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+                groupKey = (milliseconds / 25) * 25
+            }
+            groupedReadings[groupKey, default: []].append(reading)
         }
 
         // Build the new SensorData objects off the main actor
@@ -157,10 +163,10 @@ class SensorDataProcessor: ObservableObject {
         var newSensorData: [SensorData] = []
         newSensorData.reserveCapacity(sortedKeys.count)
 
-        for tenMsKey in sortedKeys {
-            guard let group = groupedReadings[tenMsKey] else { continue }
-            // Convert 10ms key back to Date for the SensorData timestamp
-            let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
+        for groupKey in sortedKeys {
+            guard let group = groupedReadings[groupKey] else { continue }
+            // Use timestamp from first reading in group
+            let timestamp = group.first?.timestamp ?? Date()
             let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
             newSensorData.append(sensorData)
         }
@@ -267,14 +273,19 @@ class SensorDataProcessor: ObservableObject {
     /// Update PPG history and extract IR samples for heart rate calculation
     @discardableResult
     func updatePPGHistory(from readings: [SensorReading]) async -> [UInt32] {
-        // Use 10ms buckets to ensure all PPG channels from same sample are grouped together
-        var grouped: [Int64: (red: Int32, ir: Int32, green: Int32)] = [:]
+        // FIX: Group by hardware frame number for deterministic grouping
+        var grouped: [Int64: (red: Int32, ir: Int32, green: Int32, timestamp: Date)] = [:]
         var irSamples: [UInt32] = []
 
         for reading in readings where [.ppgRed, .ppgInfrared, .ppgGreen, .emg].contains(reading.sensorType) {
-            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
-            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
-            var current = grouped[tenMsKey] ?? (0, 0, 0)
+            let groupKey: Int64
+            if let frameNum = reading.frameNumber {
+                groupKey = Int64(frameNum)
+            } else {
+                let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+                groupKey = (milliseconds / 25) * 25
+            }
+            var current = grouped[groupKey] ?? (0, 0, 0, reading.timestamp)
 
             switch reading.sensorType {
             case .ppgRed:
@@ -294,16 +305,15 @@ class SensorDataProcessor: ObservableObject {
                 break
             }
 
-            grouped[tenMsKey] = current
+            grouped[groupKey] = current
         }
 
         // Update PPG history on main thread
         await MainActor.run {
             let sortedKeys = grouped.keys.sorted()
-            for tenMsKey in sortedKeys {
-                guard let values = grouped[tenMsKey] else { continue }
-                let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
-                let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: timestamp)
+            for groupKey in sortedKeys {
+                guard let values = grouped[groupKey] else { continue }
+                let ppgData = PPGData(red: values.red, ir: values.ir, green: values.green, timestamp: values.timestamp)
                 self.ppgHistory.append(ppgData)
 
                 // Collect IR samples for HR calculation
@@ -341,13 +351,18 @@ class SensorDataProcessor: ObservableObject {
 
     /// Update accelerometer history
     func updateAccelHistory(from readings: [SensorReading]) async {
-        // Use 10ms buckets to ensure all accel axes from same sample are grouped together
-        var grouped: [Int64: (x: Int16, y: Int16, z: Int16)] = [:]
+        // FIX: Group by hardware frame number for deterministic grouping
+        var grouped: [Int64: (x: Int16, y: Int16, z: Int16, timestamp: Date)] = [:]
 
         for reading in readings where [.accelerometerX, .accelerometerY, .accelerometerZ].contains(reading.sensorType) {
-            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
-            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
-            var current = grouped[tenMsKey] ?? (0, 0, 0)
+            let groupKey: Int64
+            if let frameNum = reading.frameNumber {
+                groupKey = Int64(frameNum)
+            } else {
+                let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+                groupKey = (milliseconds / 25) * 25
+            }
+            var current = grouped[groupKey] ?? (0, 0, 0, reading.timestamp)
 
             // Values come as raw Int16 from OralableDevice (already correct units)
             let rawValue = Int16(clamping: Int(reading.value))
@@ -366,16 +381,15 @@ class SensorDataProcessor: ObservableObject {
                 break
             }
 
-            grouped[tenMsKey] = current
+            grouped[groupKey] = current
         }
 
         // Update accelerometer history on main thread
         await MainActor.run {
             let sortedKeys = grouped.keys.sorted()
-            for tenMsKey in sortedKeys {
-                guard let values = grouped[tenMsKey] else { continue }
-                let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
-                let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: timestamp)
+            for groupKey in sortedKeys {
+                guard let values = grouped[groupKey] else { continue }
+                let accelData = AccelerometerData(x: values.x, y: values.y, z: values.z, timestamp: values.timestamp)
                 self.accelerometerHistory.append(accelData)
             }
         }
@@ -517,24 +531,31 @@ class SensorDataProcessor: ObservableObject {
             batteryLevel = batteryValue
         }
 
-        // Group readings by 10ms buckets (100 Hz sampling = 10ms between samples)
-        // This ensures all 3 PPG channels from the same sample end up in the same group
-        // even if there are tiny floating-point timestamp differences
+        // FIX: Group readings by hardware frame number for deterministic grouping
+        // PPG/accelerometer readings have frameNumber set by OralableDevice
+        // Other readings (battery, temp) fall back to timestamp-based grouping
         var groupedReadings: [Int64: [SensorReading]] = [:]
         for reading in readings {
-            // Round to nearest 10ms boundary to handle floating-point imprecision
-            let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
-            let tenMsKey = (milliseconds / 10) * 10  // Round down to 10ms boundary
-            groupedReadings[tenMsKey, default: []].append(reading)
+            let groupKey: Int64
+            if let frameNum = reading.frameNumber {
+                // PPG/accelerometer readings: group by hardware frame number
+                groupKey = Int64(frameNum)
+            } else {
+                // Non-framed readings (battery, temp, heart rate): use 25ms timestamp buckets
+                let milliseconds = Int64(reading.timestamp.timeIntervalSince1970 * 1000)
+                groupKey = (milliseconds / 25) * 25
+            }
+            groupedReadings[groupKey, default: []].append(reading)
         }
 
         let sortedKeys = groupedReadings.keys.sorted()
         var newSensorData: [SensorData] = []
         newSensorData.reserveCapacity(sortedKeys.count)
 
-        for tenMsKey in sortedKeys {
-            guard let group = groupedReadings[tenMsKey] else { continue }
-            let timestamp = Date(timeIntervalSince1970: Double(tenMsKey) / 1000.0)
+        for groupKey in sortedKeys {
+            guard let group = groupedReadings[groupKey] else { continue }
+            // Use timestamp from first reading in group
+            let timestamp = group.first?.timestamp ?? Date()
             let sensorData = self.convertToSensorData(readings: group, timestamp: timestamp)
             newSensorData.append(sensorData)
         }

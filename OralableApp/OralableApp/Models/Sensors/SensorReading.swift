@@ -33,9 +33,13 @@ struct SensorReading: Codable, Identifiable, Equatable {
 
     /// Raw battery voltage in millivolts (only for battery readings)
     let rawMillivolts: Int32?
-    
+
+    /// Hardware frame number for deterministic grouping (PPG/accelerometer readings)
+    /// This ensures readings from the same hardware sample are grouped together
+    let frameNumber: UInt32?
+
     // MARK: - Initialization
-    
+
     init(
         id: UUID = UUID(),
         sensorType: SensorType,
@@ -43,7 +47,8 @@ struct SensorReading: Codable, Identifiable, Equatable {
         timestamp: Date = Date(),
         deviceId: String? = nil,
         quality: Double? = nil,
-        rawMillivolts: Int32? = nil
+        rawMillivolts: Int32? = nil,
+        frameNumber: UInt32? = nil
     ) {
         self.id = id
         self.sensorType = sensorType
@@ -52,6 +57,7 @@ struct SensorReading: Codable, Identifiable, Equatable {
         self.deviceId = deviceId
         self.quality = quality
         self.rawMillivolts = rawMillivolts
+        self.frameNumber = frameNumber
     }
     
     // MARK: - Computed Properties

@@ -529,8 +529,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
 
         var readings: [SensorReading] = []
 
-        // FIX: Track PPG values per sample to ensure correct grouping
-        // This avoids timestamp-based grouping issues in SensorDataProcessor
+        // FIX: Use hardware frame number for deterministic grouping
+        // This eliminates timestamp-based grouping issues in SensorDataProcessor
         for i in 0..<samplesPerFrame {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
 
@@ -539,10 +539,14 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                 break
             }
 
-            // Fix 2: Calculate timestamp - sample 0 is oldest (190ms ago), sample 19 is newest (now)
+            // Calculate timestamp - sample 0 is oldest (190ms ago), sample 19 is newest (now)
             let sampleAge = Double(samplesPerFrame - 1 - i) * sampleInterval
             let sampleTimestamp = notificationTime.addingTimeInterval(-sampleAge)
-            
+
+            // Calculate per-sample frame number for deterministic grouping
+            // Each packet has 20 samples, so multiply packet frame by 20 and add sample index
+            let sampleFrameNumber = frameCounter * UInt32(samplesPerFrame) + UInt32(i)
+
             // Read all 3 PPG values for this sample at once
             guard let value0 = readUInt32(at: sampleOffset),
                   let value1 = readUInt32(at: sampleOffset + 4),
@@ -550,7 +554,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                 Logger.shared.warning("[OralableDevice] ⚠️ Failed to read PPG sample \(i)")
                 continue
             }
-            
+
             // Map values to channels based on firmware documentation byte order [Red, IR, Green]
             // From tgm_service.h struct:
             // - Offset 0 (value0) = Red (PA=32, expected ~2000-2500)
@@ -559,38 +563,41 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
             let redValue = value0    // Offset 0 = Red
             let irValue = value1     // Offset 4 = IR
             let greenValue = value2  // Offset 8 = Green
-            
+
             // Create readings with correct sensor types
-            // Use IDENTICAL timestamp object for all 3 to ensure proper grouping
+            // All 3 channels share the same frameNumber for deterministic grouping
             let deviceId = peripheral?.identifier.uuidString
-            
+
             readings.append(SensorReading(
                 sensorType: .ppgRed,
                 value: Double(redValue),
                 timestamp: sampleTimestamp,
                 deviceId: deviceId,
-                quality: redValue > 1000 ? 0.9 : 0.3  // Red should be ~2000-2500 when worn
+                quality: redValue > 1000 ? 0.9 : 0.3,
+                frameNumber: sampleFrameNumber
             ))
-            
+
             readings.append(SensorReading(
                 sensorType: .ppgInfrared,
                 value: Double(irValue),
                 timestamp: sampleTimestamp,
                 deviceId: deviceId,
-                quality: irValue > 10000 ? 0.9 : 0.3  // IR should be ~14000 when worn
+                quality: irValue > 10000 ? 0.9 : 0.3,
+                frameNumber: sampleFrameNumber
             ))
-            
+
             readings.append(SensorReading(
                 sensorType: .ppgGreen,
                 value: Double(greenValue),
                 timestamp: sampleTimestamp,
                 deviceId: deviceId,
-                quality: 0.5  // Green is typically disabled when worn (PA=0)
+                quality: 0.5,
+                frameNumber: sampleFrameNumber
             ))
 
             // Log PPG values periodically for debugging channel mapping
             if i == 0 && ppgFrameCount % 50 == 0 {
-                Logger.shared.info("[OralableDevice] 📊 PPG Frame #\(ppgFrameCount) | Red=\(redValue) IR=\(irValue) Green=\(greenValue)")
+                Logger.shared.info("[OralableDevice] 📊 PPG Frame #\(ppgFrameCount) sample #\(sampleFrameNumber) | Red=\(redValue) IR=\(irValue) Green=\(greenValue)")
             }
         }
 
@@ -713,9 +720,16 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         for i in 0..<actualSamples {
             let sampleOffset = sampleDataStart + (i * sampleSizeBytes)
 
-            // Fix 2: Calculate timestamp - sample 0 is oldest (240ms ago), sample 24 is newest (now)
+            // Calculate timestamp - sample 0 is oldest (240ms ago), sample 24 is newest (now)
             let sampleAge = Double(actualSamples - 1 - i) * sampleInterval
             let sampleTimestamp = notificationTime.addingTimeInterval(-sampleAge)
+
+            // Calculate per-sample frame number for deterministic grouping
+            // Each packet has 25 samples, so multiply packet frame by 25 and add sample index
+            // Use high bit to distinguish accel frames from PPG frames
+            let sampleFrameNumber = (frameCounter * UInt32(accelerometerSamplesPerPacket) + UInt32(i)) | 0x80000000
+
+            let deviceId = peripheral?.identifier.uuidString
 
             // Accelerometer X (bytes 0-1)
             if let accelX = readInt16(at: sampleOffset) {
@@ -723,7 +737,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     sensorType: .accelerometerX,
                     value: Double(accelX),
                     timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString
+                    deviceId: deviceId,
+                    frameNumber: sampleFrameNumber
                 ))
             }
 
@@ -733,7 +748,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     sensorType: .accelerometerY,
                     value: Double(accelY),
                     timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString
+                    deviceId: deviceId,
+                    frameNumber: sampleFrameNumber
                 ))
             }
 
@@ -743,7 +759,8 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
                     sensorType: .accelerometerZ,
                     value: Double(accelZ),
                     timestamp: sampleTimestamp,
-                    deviceId: peripheral?.identifier.uuidString
+                    deviceId: deviceId,
+                    frameNumber: sampleFrameNumber
                 ))
             }
         }
