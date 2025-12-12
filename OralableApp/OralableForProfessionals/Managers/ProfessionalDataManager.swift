@@ -484,6 +484,13 @@ class ProfessionalDataManager: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // CloudKit verification logging
+        Logger.shared.info("[ProfessionalDataManager] 📥 Fetching sensor data from CloudKit")
+        Logger.shared.info("[ProfessionalDataManager] 📥 Patient ID: \(patient.patientID)")
+        Logger.shared.info("[ProfessionalDataManager] 📥 Date range: \(startDate) to \(endDate)")
+        Logger.shared.info("[ProfessionalDataManager] 📥 Database scope: \(publicDatabase.databaseScope == .public ? "PUBLIC" : "PRIVATE")")
+        Logger.shared.info("[ProfessionalDataManager] 📥 Container: \(container.containerIdentifier ?? "unknown")")
+
         var allSensorData: [SerializableSensorData] = []
 
         do {
@@ -496,7 +503,9 @@ class ProfessionalDataManager: ObservableObject {
             let query = CKQuery(recordType: "HealthDataRecord", predicate: predicate)
             query.sortDescriptors = [NSSortDescriptor(key: "recordingDate", ascending: true)]
 
+            Logger.shared.info("[ProfessionalDataManager] 📥 Querying HealthDataRecord...")
             let (matchResults, _) = try await publicDatabase.records(matching: query)
+            Logger.shared.info("[ProfessionalDataManager] 📥 Found \(matchResults.count) HealthDataRecord records")
 
             for (_, result) in matchResults {
                 switch result {

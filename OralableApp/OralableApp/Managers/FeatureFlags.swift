@@ -30,6 +30,7 @@ class FeatureFlags: ObservableObject {
         static let showHealthIntegration = "feature.settings.showHealthIntegration"
         static let showAdvancedMetrics = "feature.dashboard.showAdvancedMetrics"
         static let showDetectionSettings = "feature.settings.showDetectionSettings"
+        static let showCloudKitShare = "feature.share.showCloudKitShare"
     }
 
     // MARK: - Default Configuration
@@ -53,6 +54,7 @@ class FeatureFlags: ObservableObject {
         static let showHealthIntegration = false
         static let showAdvancedMetrics = false
         static let showDetectionSettings = false
+        static let showCloudKitShare = false
     }
 
     // MARK: - Dashboard Features
@@ -102,6 +104,10 @@ class FeatureFlags: ObservableObject {
         didSet { defaults.set(showDetectionSettings, forKey: Keys.showDetectionSettings) }
     }
 
+    @Published var showCloudKitShare: Bool {
+        didSet { defaults.set(showCloudKitShare, forKey: Keys.showCloudKitShare) }
+    }
+
     // MARK: - Initialization
     init() {
         // Load saved values or use pre-launch defaults
@@ -116,6 +122,7 @@ class FeatureFlags: ObservableObject {
         self.showSubscription = defaults.object(forKey: Keys.showSubscription) as? Bool ?? Defaults.showSubscription
         self.showHealthIntegration = defaults.object(forKey: Keys.showHealthIntegration) as? Bool ?? Defaults.showHealthIntegration
         self.showDetectionSettings = defaults.object(forKey: Keys.showDetectionSettings) as? Bool ?? Defaults.showDetectionSettings
+        self.showCloudKitShare = defaults.object(forKey: Keys.showCloudKitShare) as? Bool ?? Defaults.showCloudKitShare
 
         Logger.shared.info("[FeatureFlags] Initialized with pre-launch configuration")
     }
@@ -140,6 +147,7 @@ class FeatureFlags: ObservableObject {
         showSubscription = true
         showHealthIntegration = false
         showDetectionSettings = false
+        showCloudKitShare = false
         Logger.shared.info("[FeatureFlags] Applied default config (EMG + PPG + Heart Rate + Battery)")
     }
 
@@ -156,6 +164,7 @@ class FeatureFlags: ObservableObject {
         showSubscription = true
         showHealthIntegration = true
         showDetectionSettings = true
+        showCloudKitShare = true
         Logger.shared.info("[FeatureFlags] Applied full config")
     }
 
@@ -172,7 +181,25 @@ class FeatureFlags: ObservableObject {
         showSubscription = true
         showHealthIntegration = true
         showDetectionSettings = true
+        showCloudKitShare = true
         Logger.shared.info("[FeatureFlags] Applied wellness config")
+    }
+
+    /// App Store Minimal - CSV only, no CloudKit, minimal metrics for initial submission
+    func applyAppStoreMinimalConfig() {
+        showMovementCard = false
+        showTemperatureCard = false
+        showHeartRateCard = false
+        showSpO2Card = false
+        showBatteryCard = true
+        showAdvancedMetrics = false
+        showShareWithProfessional = true
+        showShareWithResearcher = false
+        showCloudKitShare = false
+        showSubscription = true
+        showHealthIntegration = false
+        showDetectionSettings = false
+        Logger.shared.info("[FeatureFlags] Applied App Store Minimal config (CSV only, PPG+EMG+Battery)")
     }
 
     /// Research release configuration
@@ -188,6 +215,7 @@ class FeatureFlags: ObservableObject {
         showSubscription = true
         showHealthIntegration = true
         showDetectionSettings = true
+        showCloudKitShare = true
         Logger.shared.info("[FeatureFlags] Applied research config")
     }
 
@@ -211,6 +239,7 @@ class FeatureFlags: ObservableObject {
         - Subscription: \(showSubscription)
         - Health Integration: \(showHealthIntegration)
         - Detection Settings: \(showDetectionSettings)
+        - CloudKit Share: \(showCloudKitShare)
         """
     }
 }

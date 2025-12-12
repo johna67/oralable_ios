@@ -272,21 +272,25 @@ class SharedDataManager: ObservableObject {
             Logger.shared.warning("[SharedDataManager] Cannot sync - not authenticated")
             return
         }
-        
+
         guard let processor = sensorDataProcessor else {
             Logger.shared.warning("[SharedDataManager] Cannot sync - no sensor data processor")
             return
         }
-        
+
         let sensorData = processor.sensorDataHistory
         guard !sensorData.isEmpty else {
             Logger.shared.info("[SharedDataManager] No sensor data to sync")
             return
         }
-        
+
         await MainActor.run { self.isSyncing = true }
-        
+
+        // CloudKit verification logging
         Logger.shared.info("[SharedDataManager] 📤 Syncing \(sensorData.count) sensor readings to CloudKit")
+        Logger.shared.info("[SharedDataManager] 📤 Patient ID: \(patientID)")
+        Logger.shared.info("[SharedDataManager] 📤 Database scope: \(publicDatabase.databaseScope == .public ? "PUBLIC" : "PRIVATE")")
+        Logger.shared.info("[SharedDataManager] 📤 Container: \(container.containerIdentifier ?? "unknown")")
         
         // Group data by day for manageable record sizes
         let calendar = Calendar.current
