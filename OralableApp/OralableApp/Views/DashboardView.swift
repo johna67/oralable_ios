@@ -80,23 +80,25 @@ struct DashboardView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    // EMG Card (ANR M40) - Shows EMG muscle activity
-                    NavigationLink(destination: LazyView(
-                        HistoricalView(metricType: "EMG Activity")
-                            .environmentObject(designSystem)
-                            .environmentObject(dependencies.recordingSessionManager)
-                    )) {
-                        HealthMetricCard(
-                            icon: "bolt.fill",
-                            title: "EMG Sensor",
-                            value: viewModel.anrConnected ? String(format: "%.0f", max(0, viewModel.emgValue)) : "N/A",
-                            unit: viewModel.anrConnected ? "ANR M40 µV" : "Not Connected",
-                            color: .blue,
-                            sparklineData: viewModel.emgHistory,
-                            showChevron: true
-                        )
+                    // EMG Card (ANR M40) - CONDITIONAL
+                    if featureFlags.showEMGCard {
+                        NavigationLink(destination: LazyView(
+                            HistoricalView(metricType: "EMG Activity")
+                                .environmentObject(designSystem)
+                                .environmentObject(dependencies.recordingSessionManager)
+                        )) {
+                            HealthMetricCard(
+                                icon: "bolt.fill",
+                                title: "EMG Sensor",
+                                value: viewModel.anrConnected ? String(format: "%.0f", max(0, viewModel.emgValue)) : "N/A",
+                                unit: viewModel.anrConnected ? "ANR M40 µV" : "Not Connected",
+                                color: .blue,
+                                sparklineData: viewModel.emgHistory,
+                                showChevron: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
 
                     // Movement card - CONDITIONAL - Now shows g-units
                     if featureFlags.showMovementCard {

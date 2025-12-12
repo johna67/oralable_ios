@@ -21,6 +21,7 @@ struct DeveloperSettingsView: View {
             }
 
             Section(header: Text("Dashboard Features")) {
+                Toggle("EMG Card", isOn: $featureFlags.showEMGCard)
                 Toggle("Movement Card", isOn: $featureFlags.showMovementCard)
                 Toggle("Temperature Card", isOn: $featureFlags.showTemperatureCard)
                 Toggle("Heart Rate Card", isOn: $featureFlags.showHeartRateCard)
@@ -108,6 +109,7 @@ struct DeveloperSettingsView: View {
 
             Section(header: Text("Current Configuration")) {
                 VStack(alignment: .leading, spacing: 8) {
+                    configRow("EMG", featureFlags.showEMGCard)
                     configRow("Movement", featureFlags.showMovementCard)
                     configRow("Temperature", featureFlags.showTemperatureCard)
                     configRow("Heart Rate", featureFlags.showHeartRateCard)

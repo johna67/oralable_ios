@@ -19,6 +19,7 @@ class FeatureFlags: ObservableObject {
 
     // MARK: - Keys
     private enum Keys {
+        static let showEMGCard = "feature.dashboard.showEMG"
         static let showMovementCard = "feature.dashboard.showMovement"
         static let showTemperatureCard = "feature.dashboard.showTemperature"
         static let showHeartRateCard = "feature.dashboard.showHeartRate"
@@ -32,6 +33,7 @@ class FeatureFlags: ObservableObject {
 
     // MARK: - Pre-Launch Defaults (all advanced features OFF)
     private enum Defaults {
+        static let showEMGCard = false
         static let showMovementCard = false
         static let showTemperatureCard = false
         static let showHeartRateCard = false
@@ -44,6 +46,10 @@ class FeatureFlags: ObservableObject {
     }
 
     // MARK: - Dashboard Features
+    @Published var showEMGCard: Bool {
+        didSet { defaults.set(showEMGCard, forKey: Keys.showEMGCard) }
+    }
+
     @Published var showMovementCard: Bool {
         didSet { defaults.set(showMovementCard, forKey: Keys.showMovementCard) }
     }
@@ -84,6 +90,7 @@ class FeatureFlags: ObservableObject {
 
     // MARK: - Initialization
     init() {
+        self.showEMGCard = defaults.object(forKey: Keys.showEMGCard) as? Bool ?? Defaults.showEMGCard
         self.showMovementCard = defaults.object(forKey: Keys.showMovementCard) as? Bool ?? Defaults.showMovementCard
         self.showTemperatureCard = defaults.object(forKey: Keys.showTemperatureCard) as? Bool ?? Defaults.showTemperatureCard
         self.showHeartRateCard = defaults.object(forKey: Keys.showHeartRateCard) as? Bool ?? Defaults.showHeartRateCard
@@ -101,6 +108,7 @@ class FeatureFlags: ObservableObject {
 
     /// Pre-launch configuration (minimal features for App Store approval)
     func applyPreLaunchConfig() {
+        showEMGCard = false
         showMovementCard = false
         showTemperatureCard = false
         showHeartRateCard = false
@@ -115,6 +123,7 @@ class FeatureFlags: ObservableObject {
 
     /// Wellness release configuration (consumer features)
     func applyWellnessConfig() {
+        showEMGCard = true
         showMovementCard = true
         showTemperatureCard = true
         showHeartRateCard = false
@@ -129,6 +138,7 @@ class FeatureFlags: ObservableObject {
 
     /// Research release configuration
     func applyResearchConfig() {
+        showEMGCard = true
         showMovementCard = true
         showTemperatureCard = true
         showHeartRateCard = true
@@ -143,6 +153,7 @@ class FeatureFlags: ObservableObject {
 
     /// Full feature configuration
     func applyFullConfig() {
+        showEMGCard = true
         showMovementCard = true
         showTemperatureCard = true
         showHeartRateCard = true
@@ -155,8 +166,9 @@ class FeatureFlags: ObservableObject {
         Logger.shared.info("[FeatureFlags] Applied full config")
     }
 
-    /// App Store Minimal - CSV only, no CloudKit, minimal metrics for initial submission
+    /// App Store Minimal - PPG IR only, CSV export, no CloudKit
     func applyAppStoreMinimalConfig() {
+        showEMGCard = false
         showMovementCard = false
         showTemperatureCard = false
         showHeartRateCard = false
@@ -166,7 +178,7 @@ class FeatureFlags: ObservableObject {
         showDataExport = true
         showANRComparison = false
         showCloudKitShare = false
-        Logger.shared.info("[FeatureFlags] Applied App Store Minimal config (CSV only)")
+        Logger.shared.info("[FeatureFlags] Applied App Store Minimal config (PPG IR only, CSV export)")
     }
 
     /// Reset to defaults
@@ -178,6 +190,7 @@ class FeatureFlags: ObservableObject {
     var currentConfigDescription: String {
         """
         FeatureFlags Configuration:
+        - EMG Card: \(showEMGCard)
         - Movement Card: \(showMovementCard)
         - Temperature Card: \(showTemperatureCard)
         - Heart Rate Card: \(showHeartRateCard)
