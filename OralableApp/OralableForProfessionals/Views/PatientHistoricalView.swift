@@ -62,6 +62,30 @@ struct PatientHistoricalView: View {
     // Selected metric tab - matches patient app
     @State private var selectedTab: PatientHistoryMetricTab = .ir
 
+    /// Tabs that have data available - only show tabs with actual recorded data
+    private var availableTabs: [PatientHistoryMetricTab] {
+        var tabs: [PatientHistoryMetricTab] = []
+
+        // Check EMG data - from ANR M40 device
+        let hasEMGData = viewModel.allSensorData.contains { $0.isANRDevice && ($0.emgValue ?? 0) > 0 }
+        if hasEMGData { tabs.append(.emg) }
+
+        // Check IR data - from Oralable device
+        let hasIRData = viewModel.allSensorData.contains { $0.isOralableDevice && ($0.ppgIRValue ?? 0) > 0 }
+        if hasIRData { tabs.append(.ir) }
+
+        // Check Movement data - from Oralable device
+        let hasMovementData = viewModel.allSensorData.contains { $0.isOralableDevice && $0.accelMagnitude > 0.001 }
+        if hasMovementData { tabs.append(.move) }
+
+        // Check Temperature data - from Oralable device
+        let hasTempData = viewModel.allSensorData.contains { $0.isOralableDevice && $0.temperatureCelsius > 0 }
+        if hasTempData { tabs.append(.temp) }
+
+        // If no data for any tab, return all tabs (show empty states)
+        return tabs.isEmpty ? PatientHistoryMetricTab.allCases : tabs
+    }
+
     init(patient: ProfessionalPatient) {
         self.patient = patient
         _viewModel = StateObject(wrappedValue: PatientHistoricalViewModel(patient: patient))
@@ -129,10 +153,19 @@ struct PatientHistoricalView: View {
             // Set initial metric type before loading
             viewModel.updateMetricType(selectedTab.metricType)
             await viewModel.loadAllData()
+
+            // After data loads, set initial tab to first available if current is invalid
+            if !availableTabs.contains(selectedTab), let firstTab = availableTabs.first {
+                selectedTab = firstTab
+            }
         }
         .onChange(of: selectedTab) { _, newTab in
-            // Update data filtering when tab changes
-            viewModel.updateMetricType(newTab.metricType)
+            // Validate tab is still available
+            if availableTabs.contains(newTab) {
+                viewModel.updateMetricType(newTab.metricType)
+            } else if let firstTab = availableTabs.first {
+                selectedTab = firstTab
+            }
         }
     }
 
@@ -140,7 +173,7 @@ struct PatientHistoricalView: View {
 
     private var metricTabSelector: some View {
         HStack(spacing: 0) {
-            ForEach(PatientHistoryMetricTab.allCases, id: \.self) { tab in
+            ForEach(availableTabs, id: \.self) { tab in
                 Button(action: { selectedTab = tab }) {
                     VStack(spacing: 4) {
                         Image(systemName: tab.icon)

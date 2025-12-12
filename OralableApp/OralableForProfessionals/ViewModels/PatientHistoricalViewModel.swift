@@ -23,7 +23,10 @@ class PatientHistoricalViewModel: ObservableObject {
 
     private let patient: ProfessionalPatient
     private let dataManager: ProfessionalDataManager
-    private var allSensorData: [SerializableSensorData] = []
+
+    /// All sensor data loaded from source (CloudKit or local CSV)
+    /// Made internal for tab availability checking in the view
+    private(set) var allSensorData: [SerializableSensorData] = []
 
     // MARK: - Constants
 

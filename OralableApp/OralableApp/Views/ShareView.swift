@@ -393,7 +393,18 @@ struct ShareView: View {
         // Join all lines at once (O(n) operation)
         let csvString = lines.joined(separator: "\n")
 
-        let fileName = "oralable_data_\(Int(Date().timeIntervalSince1970)).csv"
+        // Get user identifier (first 8 chars of Apple ID for brevity)
+        // User ID is persisted in UserDefaults by AuthenticationManager
+        let userIdentifier: String
+        if let userID = UserDefaults.standard.string(forKey: "userID"), !userID.isEmpty {
+            // Use first 8 characters of the Apple ID user identifier
+            userIdentifier = String(userID.prefix(8))
+        } else {
+            // Fallback for guest users or unauthenticated state
+            userIdentifier = "guest"
+        }
+
+        let fileName = "oralable_data_\(userIdentifier)_\(Int(Date().timeIntervalSince1970)).csv"
 
         // Save to Documents directory (for History view to find)
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

@@ -18,11 +18,23 @@ class CSVExportManager: ObservableObject {
     func exportData(sensorData: [SensorData], logs: [String]) -> URL? {
         let csvContent = generateCSVContent(sensorData: sensorData, logs: logs)
         
-        // Create filename with current timestamp
+        // Create filename with current timestamp and user identifier
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
         let timestamp = dateFormatter.string(from: Date())
-        let filename = "oralable_data_\(timestamp).csv"
+
+        // Get user identifier (first 8 chars of Apple ID for brevity)
+        // User ID is persisted in UserDefaults by AuthenticationManager
+        let userIdentifier: String
+        if let userID = UserDefaults.standard.string(forKey: "userID"), !userID.isEmpty {
+            // Use first 8 characters of the Apple ID user identifier
+            userIdentifier = String(userID.prefix(8))
+        } else {
+            // Fallback for guest users or unauthenticated state
+            userIdentifier = "guest"
+        }
+
+        let filename = "oralable_data_\(userIdentifier)_\(timestamp).csv"
         
         // Use the cache directory for temporary files that need to be shared
         // This is accessible by the share sheet and gets cleaned up automatically

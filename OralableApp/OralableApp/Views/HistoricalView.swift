@@ -85,7 +85,41 @@ struct HistoricalView: View {
     private var hasExportFiles: Bool {
         loadedExportFile != nil || SessionDataLoader.shared.getMostRecentExportFile() != nil
     }
-    
+
+    /// Tabs that have data available - only show tabs with actual recorded data
+    private var availableTabs: [HistoryMetricTab] {
+        var tabs: [HistoryMetricTab] = []
+
+        // Check EMG data - uses averagePPGIR field when device is ANR
+        // EMG data comes from ANR M40 device (no temperature, no PPG colors)
+        let hasEMGData = dataPoints.contains { point in
+            point.averagePPGIR != nil && point.averageTemperature == 0 && point.averagePPGRed == nil
+        }
+        if hasEMGData { tabs.append(.emg) }
+
+        // Check IR data - uses averagePPGIR field when device is Oralable
+        // IR/PPG data comes from Oralable device (has temperature or PPG colors)
+        let hasIRData = dataPoints.contains { point in
+            point.averagePPGIR != nil && (point.averageTemperature > 0 || point.averagePPGRed != nil || point.averagePPGGreen != nil)
+        }
+        if hasIRData { tabs.append(.ir) }
+
+        // Check Movement data - movementIntensity > 0
+        let hasMovementData = dataPoints.contains { point in
+            point.movementIntensity > 0.001  // Small threshold to filter out noise
+        }
+        if hasMovementData { tabs.append(.move) }
+
+        // Check Temperature data - averageTemperature > 0
+        let hasTempData = dataPoints.contains { point in
+            point.averageTemperature > 0
+        }
+        if hasTempData { tabs.append(.temp) }
+
+        // If no data for any tab, return all tabs (show empty states)
+        return tabs.isEmpty ? HistoryMetricTab.allCases : tabs
+    }
+
     /// Date format for x-axis labels
     private var xAxisDateFormat: Date.FormatStyle {
         guard let exportFile = loadedExportFile else {
@@ -138,8 +172,13 @@ struct HistoricalView: View {
             setInitialTab()
             loadExportData()
         }
-        .onChange(of: selectedTab) { _ in
-            loadExportData()
+        .onChange(of: selectedTab) { _, newTab in
+            // Validate tab is still available
+            if availableTabs.contains(newTab) {
+                loadExportData()
+            } else if let firstTab = availableTabs.first {
+                selectedTab = firstTab
+            }
         }
     }
     
@@ -147,7 +186,7 @@ struct HistoricalView: View {
     
     private var metricTabSelector: some View {
         HStack(spacing: 0) {
-            ForEach(HistoryMetricTab.allCases, id: \.self) { tab in
+            ForEach(availableTabs, id: \.self) { tab in
                 Button(action: { selectedTab = tab }) {
                     VStack(spacing: 4) {
                         Image(systemName: tab.icon)
@@ -435,19 +474,37 @@ struct HistoricalView: View {
     // MARK: - Helper Methods
     
     private func setInitialTab() {
-        guard let initial = initialMetricType else { return }
-        
-        switch initial {
-        case "EMG Activity":
-            selectedTab = .emg
-        case "IR Activity", "Muscle Activity", "PPG":
-            selectedTab = .ir
-        case "Movement":
-            selectedTab = .move
-        case "Temperature":
-            selectedTab = .temp
-        default:
-            break
+        // If initial metric type specified, try to use it
+        if let initial = initialMetricType {
+            switch initial {
+            case "EMG Activity":
+                if availableTabs.contains(.emg) {
+                    selectedTab = .emg
+                    return
+                }
+            case "IR Activity", "Muscle Activity", "PPG":
+                if availableTabs.contains(.ir) {
+                    selectedTab = .ir
+                    return
+                }
+            case "Movement":
+                if availableTabs.contains(.move) {
+                    selectedTab = .move
+                    return
+                }
+            case "Temperature":
+                if availableTabs.contains(.temp) {
+                    selectedTab = .temp
+                    return
+                }
+            default:
+                break
+            }
+        }
+
+        // Default to first available tab
+        if let firstTab = availableTabs.first {
+            selectedTab = firstTab
         }
     }
     
@@ -497,10 +554,15 @@ struct HistoricalView: View {
             }
             
             dataPoints = points
+
+            // Update selected tab if current selection has no data
+            if !availableTabs.contains(selectedTab), let firstTab = availableTabs.first {
+                selectedTab = firstTab
+            }
         } else {
             Logger.shared.warning("[HistoricalView] ⚠️ No export files found")
         }
-        
+
         isLoading = false
     }
     
