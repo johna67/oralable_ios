@@ -12,9 +12,10 @@ struct AddPatientView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var dataManager: ProfessionalDataManager
     @EnvironmentObject var designSystem: DesignSystem
+    @ObservedObject private var featureFlags = FeatureFlags.shared
 
-    // Add method selection
-    @State private var addMethod: AddMethod = .shareCode
+    // Add method selection - default to CSV if CloudKit is disabled
+    @State private var addMethod: AddMethod = .csvUpload
 
     // Share code states
     @State private var shareCode = ""
@@ -127,12 +128,15 @@ struct AddPatientView: View {
 
     private var methodPicker: some View {
         VStack(spacing: 16) {
-            Picker("Add Method", selection: $addMethod) {
-                ForEach(AddMethod.allCases, id: \.self) { method in
-                    Text(method.rawValue).tag(method)
+            // Only show picker if CloudKit sharing is enabled
+            if featureFlags.showCloudKitShare {
+                Picker("Add Method", selection: $addMethod) {
+                    ForEach(AddMethod.allCases, id: \.self) { method in
+                        Text(method.rawValue).tag(method)
+                    }
                 }
+                .pickerStyle(.segmented)
             }
-            .pickerStyle(.segmented)
 
             // Method description
             HStack(spacing: 8) {
@@ -141,6 +145,12 @@ struct AddPatientView: View {
                 Text(addMethod.description)
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+        }
+        .onAppear {
+            // Force CSV mode if CloudKit is disabled
+            if !featureFlags.showCloudKitShare {
+                addMethod = .csvUpload
             }
         }
     }

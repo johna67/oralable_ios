@@ -33,8 +33,8 @@ struct ShareView: View {
                 // Export section - ALWAYS SHOWN
                 exportSection
 
-                // Share with Professional section - CONDITIONAL
-                if featureFlags.showShareWithProfessional {
+                // Share with Professional section - CONDITIONAL (CloudKit sharing)
+                if featureFlags.showCloudKitShare {
                     shareCodeSection
                     sharedWithSection
                 }
@@ -55,8 +55,8 @@ struct ShareView: View {
         }
         .navigationViewStyle(.stack)
         .task {
-            // Only generate share code if feature is enabled
-            if featureFlags.showShareWithProfessional {
+            // Only generate share code if CloudKit sharing is enabled
+            if featureFlags.showCloudKitShare {
                 if shareCode.isEmpty {
                     await generateAndSaveShareCode()
                 }

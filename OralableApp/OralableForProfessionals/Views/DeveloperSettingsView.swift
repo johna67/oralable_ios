@@ -31,6 +31,8 @@ struct DeveloperSettingsView: View {
                 Toggle("Multi-Participant", isOn: $featureFlags.showMultiParticipant)
                 Toggle("Data Export", isOn: $featureFlags.showDataExport)
                 Toggle("ANR Comparison", isOn: $featureFlags.showANRComparison)
+                Toggle("CloudKit Sharing", isOn: $featureFlags.showCloudKitShare)
+                    .tint(.blue)
             }
 
             Section(header: Text("Settings Features")) {
@@ -38,6 +40,20 @@ struct DeveloperSettingsView: View {
             }
 
             Section(header: Text("Presets")) {
+                Button {
+                    featureFlags.applyAppStoreMinimalConfig()
+                } label: {
+                    HStack {
+                        Image(systemName: "app.badge")
+                            .foregroundColor(.blue)
+                        Text("Apply App Store Minimal")
+                        Spacer()
+                        Text("CSV Only")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
                 Button {
                     featureFlags.applyPreLaunchConfig()
                 } label: {
@@ -100,6 +116,7 @@ struct DeveloperSettingsView: View {
                     configRow("Multi-Participant", featureFlags.showMultiParticipant)
                     configRow("Data Export", featureFlags.showDataExport)
                     configRow("ANR Comparison", featureFlags.showANRComparison)
+                    configRow("CloudKit Share", featureFlags.showCloudKitShare)
                 }
                 .font(.caption)
             }

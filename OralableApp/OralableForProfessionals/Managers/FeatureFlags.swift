@@ -27,6 +27,7 @@ class FeatureFlags: ObservableObject {
         static let showMultiParticipant = "feature.showMultiParticipant"
         static let showDataExport = "feature.showDataExport"
         static let showANRComparison = "feature.showANRComparison"
+        static let showCloudKitShare = "feature.share.showCloudKitShare"
     }
 
     // MARK: - Pre-Launch Defaults (all advanced features OFF)
@@ -39,6 +40,7 @@ class FeatureFlags: ObservableObject {
         static let showMultiParticipant = true  // Basic participant list always on
         static let showDataExport = true        // Basic export always on
         static let showANRComparison = false
+        static let showCloudKitShare = false
     }
 
     // MARK: - Dashboard Features
@@ -76,6 +78,10 @@ class FeatureFlags: ObservableObject {
         didSet { defaults.set(showANRComparison, forKey: Keys.showANRComparison) }
     }
 
+    @Published var showCloudKitShare: Bool {
+        didSet { defaults.set(showCloudKitShare, forKey: Keys.showCloudKitShare) }
+    }
+
     // MARK: - Initialization
     init() {
         self.showMovementCard = defaults.object(forKey: Keys.showMovementCard) as? Bool ?? Defaults.showMovementCard
@@ -86,6 +92,7 @@ class FeatureFlags: ObservableObject {
         self.showMultiParticipant = defaults.object(forKey: Keys.showMultiParticipant) as? Bool ?? Defaults.showMultiParticipant
         self.showDataExport = defaults.object(forKey: Keys.showDataExport) as? Bool ?? Defaults.showDataExport
         self.showANRComparison = defaults.object(forKey: Keys.showANRComparison) as? Bool ?? Defaults.showANRComparison
+        self.showCloudKitShare = defaults.object(forKey: Keys.showCloudKitShare) as? Bool ?? Defaults.showCloudKitShare
 
         Logger.shared.info("[FeatureFlags] Initialized with pre-launch configuration")
     }
@@ -102,6 +109,7 @@ class FeatureFlags: ObservableObject {
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = false
+        showCloudKitShare = false
         Logger.shared.info("[FeatureFlags] Applied pre-launch config")
     }
 
@@ -115,6 +123,7 @@ class FeatureFlags: ObservableObject {
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = false
+        showCloudKitShare = true
         Logger.shared.info("[FeatureFlags] Applied wellness config")
     }
 
@@ -128,6 +137,7 @@ class FeatureFlags: ObservableObject {
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = true
+        showCloudKitShare = true
         Logger.shared.info("[FeatureFlags] Applied research config")
     }
 
@@ -141,7 +151,22 @@ class FeatureFlags: ObservableObject {
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = true
+        showCloudKitShare = true
         Logger.shared.info("[FeatureFlags] Applied full config")
+    }
+
+    /// App Store Minimal - CSV only, no CloudKit, minimal metrics for initial submission
+    func applyAppStoreMinimalConfig() {
+        showMovementCard = false
+        showTemperatureCard = false
+        showHeartRateCard = false
+        showAdvancedAnalytics = false
+        showSubscription = true
+        showMultiParticipant = true
+        showDataExport = true
+        showANRComparison = false
+        showCloudKitShare = false
+        Logger.shared.info("[FeatureFlags] Applied App Store Minimal config (CSV only)")
     }
 
     /// Reset to defaults
@@ -161,6 +186,7 @@ class FeatureFlags: ObservableObject {
         - Multi-Participant: \(showMultiParticipant)
         - Data Export: \(showDataExport)
         - ANR Comparison: \(showANRComparison)
+        - CloudKit Share: \(showCloudKitShare)
         """
     }
 }
