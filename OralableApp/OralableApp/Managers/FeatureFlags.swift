@@ -50,7 +50,7 @@ class FeatureFlags: ObservableObject {
         static let showShareWithResearcher = false
 
         // Settings Features
-        static let showSubscription = true
+        static let showSubscription = false  // Hidden by default for pre-launch
         static let showHealthIntegration = false
         static let showAdvancedMetrics = false
         static let showDetectionSettings = false
@@ -151,7 +151,7 @@ class FeatureFlags: ObservableObject {
         showCloudKitShare = false
 
         // Settings Features
-        showSubscription = true
+        showSubscription = false  // Hidden for pre-launch
         showHealthIntegration = false
         showDetectionSettings = false
         Logger.shared.info("[FeatureFlags] Applied pre-launch config (PPG IR only)")
@@ -210,7 +210,7 @@ class FeatureFlags: ObservableObject {
         showCloudKitShare = false
 
         // Settings Features
-        showSubscription = true
+        showSubscription = false  // Hidden for App Store submission
         showHealthIntegration = false
         showDetectionSettings = false
         Logger.shared.info("[FeatureFlags] Applied App Store Minimal config (PPG IR only, CSV export)")

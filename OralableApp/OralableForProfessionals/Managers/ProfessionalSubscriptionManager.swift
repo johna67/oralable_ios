@@ -99,9 +99,8 @@ class ProfessionalSubscriptionManager: ObservableObject {
     private var updateListenerTask: Task<Void, Never>?
     private let productIDs: Set<String> = [
         ProductIdentifier.professionalMonthly,
-        ProductIdentifier.professionalYearly,
-        ProductIdentifier.practiceMonthly,
-        ProductIdentifier.practiceYearly
+        ProductIdentifier.professionalYearly
+        // Practice tier deferred to post-launch
     ]
 
     // MARK: - Product Identifiers
@@ -109,8 +108,9 @@ class ProfessionalSubscriptionManager: ObservableObject {
     private enum ProductIdentifier {
         static let professionalMonthly = "com.jacdental.oralable.professional.monthly"
         static let professionalYearly = "com.jacdental.oralable.professional.yearly"
-        static let practiceMonthly = "com.jacdental.oralable.practice.monthly"
-        static let practiceYearly = "com.jacdental.oralable.practice.yearly"
+        // Practice tier deferred to post-launch:
+        // static let practiceMonthly = "com.jacdental.oralable.practice.monthly"
+        // static let practiceYearly = "com.jacdental.oralable.practice.yearly"
     }
 
     // MARK: - Initialization
@@ -287,9 +287,10 @@ class ProfessionalSubscriptionManager: ObservableObject {
         case ProductIdentifier.professionalMonthly,
              ProductIdentifier.professionalYearly:
             return .professional
-        case ProductIdentifier.practiceMonthly,
-             ProductIdentifier.practiceYearly:
-            return .practice
+        // Practice tier deferred to post-launch
+        // case ProductIdentifier.practiceMonthly,
+        //      ProductIdentifier.practiceYearly:
+        //     return .practice
         default:
             return nil
         }

@@ -38,7 +38,7 @@ class FeatureFlags: ObservableObject {
         static let showTemperatureCard = false
         static let showHeartRateCard = false
         static let showAdvancedAnalytics = false
-        static let showSubscription = true
+        static let showSubscription = false  // Hidden by default for pre-launch
         static let showMultiParticipant = true  // Basic participant list always on
         static let showDataExport = true        // Basic export always on
         static let showANRComparison = false
@@ -113,7 +113,7 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = false
         showHeartRateCard = false
         showAdvancedAnalytics = false
-        showSubscription = true
+        showSubscription = false  // Hidden for pre-launch
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = false
@@ -173,7 +173,7 @@ class FeatureFlags: ObservableObject {
         showTemperatureCard = false
         showHeartRateCard = false
         showAdvancedAnalytics = false
-        showSubscription = true
+        showSubscription = false  // Hidden for App Store submission
         showMultiParticipant = true
         showDataExport = true
         showANRComparison = false

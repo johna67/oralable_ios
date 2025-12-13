@@ -442,13 +442,24 @@ struct AddPatientView: View {
                 dataPoints: dataPoints
             )
 
-            // Auto-fill name from filename if empty
+            // Auto-fill name from filename - extract Apple ID
             if participantName.isEmpty {
                 let filename = url.deletingPathExtension().lastPathComponent
                 if filename.hasPrefix("oralable_data_") {
-                    // Extract timestamp portion for a cleaner name
                     let suffix = String(filename.dropFirst("oralable_data_".count))
-                    participantName = "Import \(suffix.prefix(10))"
+                    let components = suffix.components(separatedBy: "_")
+
+                    if components.count >= 1 {
+                        let userID = components[0]
+                        // Check if first component looks like user ID (not a number/timestamp)
+                        if !userID.isEmpty && !userID.first!.isNumber {
+                            participantName = userID
+                        } else {
+                            participantName = "Import \(suffix.prefix(10))"
+                        }
+                    } else {
+                        participantName = "Import \(suffix.prefix(10))"
+                    }
                 } else {
                     participantName = filename
                 }
