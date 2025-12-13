@@ -3,6 +3,7 @@
 //  OralableApp
 //
 //  Welcome screen with direct Apple Sign In
+//  Updated: December 13, 2025 - New tagline and broader description
 //
 
 import SwiftUI
@@ -15,25 +16,29 @@ struct OnboardingView: View {
 
     private let onboardingPages = [
         OnboardingPage(
-            icon: "waveform.path.ecg",
+            icon: nil,  // No icon - uses tagline instead
+            tagline: "Word of mouth",
             title: "Muscle Activity Monitor",
-            description: "Track teeth grinding and jaw clenching with precision PPG sensor technology",
+            description: "Monitor muscle activity for wellness, therapy, sports, and research",
             color: .black
         ),
         OnboardingPage(
             icon: "heart.fill",
+            tagline: nil,
             title: "Integrate with Apple Health",
             description: "Sync heart rate and SpO2 data with Apple Health for comprehensive health tracking",
             color: .black
         ),
         OnboardingPage(
             icon: "chart.line.uptrend.xyaxis",
+            tagline: nil,
             title: "Understand Your Patterns",
-            description: "Gain insights into when and why grinding occurs with detailed analytics",
+            description: "Gain insights into your muscle activity with detailed analytics",
             color: .black
         ),
         OnboardingPage(
             icon: "person.2.fill",
+            tagline: nil,
             title: "Share with Your Provider",
             description: "Collaborate with your healthcare professional by securely sharing your data",
             color: .black
@@ -111,7 +116,8 @@ struct OnboardingView: View {
 }
 
 struct OnboardingPage {
-    let icon: String
+    let icon: String?  // Optional - nil when using tagline
+    let tagline: String?  // Optional - shown instead of icon on first page
     let title: String
     let description: String
     let color: Color
@@ -123,9 +129,19 @@ struct OnboardingPageView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Image(systemName: page.icon)
-                .font(.system(size: 80))
-                .foregroundColor(page.color)
+            // Show tagline OR icon (tagline takes precedence)
+            if let tagline = page.tagline {
+                Text(tagline)
+                    .font(.title2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                    .italic()
+                    .frame(height: 80)  // Match icon height for consistency
+            } else if let icon = page.icon {
+                Image(systemName: icon)
+                    .font(.system(size: 80))
+                    .foregroundColor(page.color)
+            }
 
             Text(page.title)
                 .font(designSystem.typography.largeTitle)

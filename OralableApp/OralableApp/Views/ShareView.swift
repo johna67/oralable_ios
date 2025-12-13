@@ -3,7 +3,7 @@
 //  OralableApp
 //
 //  Share screen - Share code and connections management
-//  Updated: December 8, 2025 - Optimized CSV export performance
+//  Updated: December 13, 2025 - Changed Export to Share terminology
 //
 
 import SwiftUI
@@ -20,18 +20,18 @@ struct ShareView: View {
     @State private var shareCode: String = ""
     @State private var isGeneratingCode = false
     @State private var showCopiedFeedback = false
-    @State private var showingExportSheet = false
-    @State private var exportURL: URL? = nil
+    @State private var showingShareSheet = false
+    @State private var shareURL: URL? = nil
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var isExporting = false
-    @State private var exportProgress: String = ""
+    @State private var isSharing = false
+    @State private var shareProgress: String = ""
 
     var body: some View {
         NavigationView {
             List {
-                // Export section - ALWAYS SHOWN
-                exportSection
+                // Share CSV section - ALWAYS SHOWN
+                shareCSVSection
 
                 // Share with Professional section - CONDITIONAL (CloudKit sharing)
                 if featureFlags.showCloudKitShare {
@@ -40,10 +40,10 @@ struct ShareView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Export")
+            .navigationTitle("Share")
             .navigationBarTitleDisplayMode(.large)
-            .sheet(isPresented: $showingExportSheet) {
-                if let url = exportURL {
+            .sheet(isPresented: $showingShareSheet) {
+                if let url = shareURL {
                     ShareSheet(items: [url])
                 }
             }
@@ -69,12 +69,12 @@ struct ShareView: View {
         }
     }
 
-    // MARK: - Export Section
-    private var exportSection: some View {
+    // MARK: - Share CSV Section
+    private var shareCSVSection: some View {
         Section {
-            Button(action: exportCSV) {
+            Button(action: shareCSV) {
                 HStack {
-                    if isExporting {
+                    if isSharing {
                         ProgressView()
                             .frame(width: 20, height: 20)
                             .frame(width: 32)
@@ -86,12 +86,12 @@ struct ShareView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(isExporting ? "Exporting..." : "Export Data as CSV")
+                        Text(isSharing ? "Sharing..." : "Share Data as CSV")
                             .font(.system(size: 17))
                             .foregroundColor(.primary)
-                        
-                        if isExporting && !exportProgress.isEmpty {
-                            Text(exportProgress)
+
+                        if isSharing && !shareProgress.isEmpty {
+                            Text(shareProgress)
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
@@ -99,7 +99,7 @@ struct ShareView: View {
 
                     Spacer()
 
-                    if !isExporting {
+                    if !isSharing {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(Color(UIColor.tertiaryLabel))
@@ -107,12 +107,12 @@ struct ShareView: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(isExporting)
+            .disabled(isSharing)
         } header: {
-            Text("Export")
+            Text("Share")
         } footer: {
             let recordCount = sensorDataProcessor.sensorDataHistory.count
-            Text("Export your sensor data for use in other applications (\(recordCount) records)")
+            Text("Share your sensor data for use in other applications (\(recordCount) records)")
         }
     }
 
@@ -246,25 +246,25 @@ struct ShareView: View {
         }
     }
 
-    // MARK: - Export CSV (Optimized)
-    private func exportCSV() {
+    // MARK: - Share CSV (Optimized)
+    private func shareCSV() {
         Task {
             await MainActor.run {
-                isExporting = true
-                exportProgress = "Preparing..."
+                isSharing = true
+                shareProgress = "Preparing..."
             }
-            
+
             if let url = await generateCSVFileOptimized() {
                 await MainActor.run {
-                    isExporting = false
-                    exportProgress = ""
-                    exportURL = url
-                    showingExportSheet = true
+                    isSharing = false
+                    shareProgress = ""
+                    shareURL = url
+                    showingShareSheet = true
                 }
             } else {
                 await MainActor.run {
-                    isExporting = false
-                    exportProgress = ""
+                    isSharing = false
+                    shareProgress = ""
                 }
             }
         }
@@ -279,13 +279,13 @@ struct ShareView: View {
 
         guard totalCount > 0 else {
             await MainActor.run {
-                errorMessage = "No data to export"
+                errorMessage = "No data to share"
                 showError = true
             }
             return nil
         }
 
-        Logger.shared.info("[ShareView] 📊 Starting optimized CSV export with \(totalCount) records")
+        Logger.shared.info("[ShareView] 📊 Starting CSV share with \(totalCount) records")
         let startTime = Date()
 
         // Get current feature flag settings for conditional columns
@@ -379,7 +379,7 @@ struct ShareView: View {
             if processedCount % batchSize == 0 {
                 let progress = Double(processedCount) / Double(totalCount) * 100
                 await MainActor.run {
-                    exportProgress = "Processing \(processedCount)/\(totalCount) (\(Int(progress))%)"
+                    shareProgress = "Processing \(processedCount)/\(totalCount) (\(Int(progress))%)"
                 }
                 // Yield to allow UI updates
                 await Task.yield()
@@ -387,7 +387,7 @@ struct ShareView: View {
         }
 
         await MainActor.run {
-            exportProgress = "Writing file..."
+            shareProgress = "Writing file..."
         }
 
         // Join all lines at once (O(n) operation)
@@ -415,7 +415,7 @@ struct ShareView: View {
 
             let elapsed = Date().timeIntervalSince(startTime)
             let columnCount = headerParts.count
-            Logger.shared.info("[ShareView] ✅ CSV export complete: \(fileName) | \(totalCount) records | \(columnCount) columns | \(String(format: "%.2f", elapsed))s")
+            Logger.shared.info("[ShareView] ✅ CSV share complete: \(fileName) | \(totalCount) records | \(columnCount) columns | \(String(format: "%.2f", elapsed))s")
 
             return fileURL
         } catch {

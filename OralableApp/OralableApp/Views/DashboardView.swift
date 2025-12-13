@@ -221,144 +221,51 @@ struct DashboardView: View {
         .onDisappear { viewModel.stopMonitoring() }
     }
 
-    // MARK: - Device Status Indicator (PPG, EMG, Movement)
+    // MARK: - Device Status Indicator (Simplified - matches Devices screen)
     private func deviceStatusIndicator(viewModel: DashboardViewModel) -> some View {
-        // Get per-device battery levels
-        let oralableBattery = SensorDataProcessor.shared.getBatteryLevel(for: .oralable)
-        let anrBattery = SensorDataProcessor.shared.getBatteryLevel(for: .anr)
-        
-        return VStack(spacing: 6) {
-            // Oralable (PPG) status row with battery
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(viewModel.oralableConnected ? Color.green : Color.gray)
-                    .frame(width: 10, height: 10)
-                
-                Text("PPG")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.purple)
-                    .cornerRadius(4)
-                
-                Text("Oralable")
-                    .font(.system(size: 14))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Battery indicator for Oralable
-                if viewModel.oralableConnected && oralableBattery >= 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: batteryIconSmall(level: oralableBattery))
-                            .font(.system(size: 12))
-                            .foregroundColor(batteryColor(level: oralableBattery))
-                        Text("\(Int(oralableBattery))%")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
+        let persistenceManager = DevicePersistenceManager.shared
+
+        return VStack(spacing: 8) {
+            // Oralable Device - show if connected OR previously paired
+            if viewModel.oralableConnected || persistenceManager.hasOralableDevicePaired() {
+                HStack {
+                    Circle()
+                        .fill(viewModel.oralableConnected ? Color.green : Color.gray)
+                        .frame(width: 10, height: 10)
+
+                    Text("Oralable")
+                        .font(.subheadline)
+
+                    Spacer()
+
+                    Text(viewModel.oralableConnected ? "Ready" : "Not Connected")
+                        .font(.subheadline)
+                        .foregroundColor(viewModel.oralableConnected ? .green : .secondary)
                 }
-                
-                Text(viewModel.oralableConnected ? "Ready" : "Not Connected")
-                    .font(.system(size: 12))
-                    .foregroundColor(viewModel.oralableConnected ? .green : .secondary)
             }
-            
-            // ANR M40 (EMG) status row with battery (N/A)
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(viewModel.anrConnected ? Color.green : (viewModel.anrFailed ? Color.red : Color.gray))
-                    .frame(width: 10, height: 10)
-                
-                Text("EMG")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.blue)
-                    .cornerRadius(4)
-                
-                Text("ANR M40")
-                    .font(.system(size: 14))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Battery indicator for ANR - show N/A (battery < 0 means not available)
-                if viewModel.anrConnected {
-                    HStack(spacing: 2) {
-                        Image(systemName: "battery.0")
-                            .font(.system(size: 12))
-                            .foregroundColor(.gray)
-                        Text(anrBattery >= 0 ? "\(Int(anrBattery))%" : "N/A")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
+
+            // ANR M40 Device - only show if previously paired
+            if persistenceManager.hasANRDevicePaired() {
+                HStack {
+                    Circle()
+                        .fill(viewModel.anrConnected ? Color.green : Color.gray)
+                        .frame(width: 10, height: 10)
+
+                    Text("ANR M40")
+                        .font(.subheadline)
+
+                    Spacer()
+
+                    Text(viewModel.anrConnected ? "Ready" : "Not Connected")
+                        .font(.subheadline)
+                        .foregroundColor(viewModel.anrConnected ? .green : .secondary)
                 }
-                
-                Text(viewModel.anrConnected ? "Ready" : (viewModel.anrFailed ? "Failed" : "Not Connected"))
-                    .font(.system(size: 12))
-                    .foregroundColor(viewModel.anrConnected ? .green : (viewModel.anrFailed ? .red : .secondary))
-            }
-            
-            // Movement (Accelerometer) status row - data from Oralable device
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(hasAccelerometerData(viewModel: viewModel) ? Color.green : Color.gray)
-                    .frame(width: 10, height: 10)
-                
-                Text("MOVE")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.green)
-                    .cornerRadius(4)
-                
-                Text("Oralable")
-                    .font(.system(size: 14))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Battery indicator for Oralable (same device as PPG)
-                if viewModel.oralableConnected && oralableBattery >= 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: batteryIconSmall(level: oralableBattery))
-                            .font(.system(size: 12))
-                            .foregroundColor(batteryColor(level: oralableBattery))
-                        Text("\(Int(oralableBattery))%")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Status: Match PPG row logic - "Not Connected" when Oralable disconnected
-                Text(viewModel.oralableConnected ? (hasAccelerometerData(viewModel: viewModel) ? "Ready" : "No Data") : "Not Connected")
-                    .font(.system(size: 12))
-                    .foregroundColor(hasAccelerometerData(viewModel: viewModel) ? .green : .secondary)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.white)
+        .padding()
+        .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 1)
-    }
-    
-    /// Small battery icon for status indicator
-    private func batteryIconSmall(level: Double) -> String {
-        if level > 75 { return "battery.100" }
-        if level > 50 { return "battery.75" }
-        if level > 25 { return "battery.50" }
-        if level > 0 { return "battery.25" }
-        return "battery.0"
-    }
-    
-    /// Check if we have accelerometer data (any axis non-zero)
-    private func hasAccelerometerData(viewModel: DashboardViewModel) -> Bool {
-        return viewModel.isConnected && (viewModel.accelXRaw != 0 || viewModel.accelYRaw != 0 || viewModel.accelZRaw != 0)
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 
     // MARK: - Helper Functions
