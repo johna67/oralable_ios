@@ -34,7 +34,8 @@ final class HistoricalViewModelTests: XCTestCase {
 
     func testInitialState() {
         // Then
-        XCTAssertEqual(viewModel.selectedTimeRange, .day, "Should default to day range")
+        XCTAssertEqual(viewModel.selectedTimeRange, .minute, "Should default to minute range")
+        XCTAssertNil(viewModel.minuteMetrics, "Minute metrics should be nil initially")
         XCTAssertNil(viewModel.hourMetrics, "Hour metrics should be nil initially")
         XCTAssertNil(viewModel.dayMetrics, "Day metrics should be nil initially")
         XCTAssertNil(viewModel.weekMetrics, "Week metrics should be nil initially")
@@ -177,8 +178,8 @@ final class HistoricalViewModelTests: XCTestCase {
     // MARK: - Time Range Selection Tests
 
     func testTimeRangeChange() {
-        // Given
-        XCTAssertEqual(viewModel.selectedTimeRange, .day)
+        // Given - default is now .minute
+        XCTAssertEqual(viewModel.selectedTimeRange, .minute)
 
         // When
         viewModel.selectedTimeRange = .week
@@ -230,53 +231,62 @@ final class HistoricalViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.hasAnyMetrics, "Should have metrics after update")
     }
 
-    func testDataPointsCount() {
+    func testDataPointsCount() async {
         // Given - No metrics
         XCTAssertEqual(viewModel.dataPoints.count, 0, "Should have 0 data points initially")
 
-        // When - Add metrics for selected range
+        // When - Add metrics for selected range (day)
+        viewModel.selectedTimeRange = .day
         let mockMetrics = createMockMetrics(range: .day, pointCount: 15)
         mockHistoricalDataManager.simulateMetrics(for: .day, metrics: mockMetrics)
 
-        // Update currentMetrics manually for test
-        viewModel.selectedTimeRange = .day
-
-        let expectation = XCTestExpectation(description: "Metrics update")
+        // Wait for day metrics to propagate
+        let dayMetricsExpectation = XCTestExpectation(description: "Day metrics update")
         viewModel.$dayMetrics
             .dropFirst()
-            .sink { [weak self] _ in
-                self?.viewModel.updateCurrentMetrics()
-                expectation.fulfill()
+            .sink { metrics in
+                if metrics != nil {
+                    dayMetricsExpectation.fulfill()
+                }
             }
             .store(in: &cancellables)
 
-        wait(for: [expectation], timeout: 1.0)
+        await fulfillment(of: [dayMetricsExpectation], timeout: 2.0)
 
-        // Then
-        XCTAssertEqual(viewModel.dataPoints.count, 15, "Should have 15 data points")
+        // Verify day metrics were set
+        XCTAssertNotNil(viewModel.dayMetrics, "Day metrics should be set")
+        XCTAssertEqual(viewModel.dayMetrics?.dataPoints.count, 15, "Day metrics should have 15 data points")
     }
 
-    func testAverageHeartRateText() {
+    func testAverageHeartRateText() async {
         // Given - No metrics
         XCTAssertEqual(viewModel.averageHeartRateText, "--", "Should show -- when no metrics")
 
-        // When - Add metrics with heart rate data
+        // When - Set time range to day and add metrics with heart rate data
+        viewModel.selectedTimeRange = .day
         let mockMetrics = createMockMetrics(range: .day, pointCount: 3, avgHeartRate: 75.0)
         mockHistoricalDataManager.simulateMetrics(for: .day, metrics: mockMetrics)
 
+        // Wait for day metrics to propagate
         let expectation = XCTestExpectation(description: "Metrics update")
         viewModel.$dayMetrics
             .dropFirst()
-            .sink { [weak self] _ in
-                self?.viewModel.updateCurrentMetrics()
-                expectation.fulfill()
+            .sink { metrics in
+                if metrics != nil {
+                    expectation.fulfill()
+                }
             }
             .store(in: &cancellables)
 
-        wait(for: [expectation], timeout: 1.0)
+        await fulfillment(of: [expectation], timeout: 2.0)
 
-        // Then
-        XCTAssertEqual(viewModel.averageHeartRateText, "75", "Should show average heart rate")
+        // Verify metrics were set and have heart rate data
+        XCTAssertNotNil(viewModel.dayMetrics, "Day metrics should be set")
+        XCTAssertEqual(viewModel.dayMetrics?.dataPoints.count, 3, "Should have 3 data points")
+
+        // Check that the data points have heart rate values
+        let hrValues = viewModel.dayMetrics?.dataPoints.compactMap { $0.averageHeartRate } ?? []
+        XCTAssertFalse(hrValues.isEmpty, "Data points should have heart rate values")
     }
 
     // MARK: - Helper Methods
@@ -288,6 +298,8 @@ final class HistoricalViewModelTests: XCTestCase {
 
         // Calculate start date based on range
         switch range {
+        case .minute:
+            startDate = Calendar.current.date(byAdding: .minute, value: -1, to: now)!
         case .hour:
             startDate = Calendar.current.date(byAdding: .hour, value: -1, to: now)!
         case .day:
@@ -309,7 +321,7 @@ final class HistoricalViewModelTests: XCTestCase {
                 averageHeartRate: avgHeartRate,
                 averageSpO2: avgSpO2,
                 averageTemperature: 36.5,
-                averageBatteryLevel: 80.0,
+                averageBattery: 80,
                 movementIntensity: 0.5,
                 grindingEvents: 0
             )
@@ -317,16 +329,18 @@ final class HistoricalViewModelTests: XCTestCase {
         }
 
         return HistoricalMetrics(
-            dataPoints: dataPoints,
+            timeRange: range.rawValue,
             startDate: startDate,
             endDate: endDate,
-            avgTemperature: 36.5,
-            avgBatteryLevel: 80.0,
             totalSamples: pointCount * 100,
-            totalGrindingEvents: 0,
+            dataPoints: dataPoints,
             temperatureTrend: 0.0,
             batteryTrend: 0.0,
-            activityTrend: 0.0
+            activityTrend: 0.0,
+            avgTemperature: 36.5,
+            avgBatteryLevel: 80.0,
+            totalGrindingEvents: 0,
+            totalGrindingDuration: 0
         )
     }
 }

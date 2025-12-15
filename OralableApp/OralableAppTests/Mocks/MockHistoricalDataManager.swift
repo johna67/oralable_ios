@@ -15,6 +15,7 @@ import Combine
 @MainActor
 class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     // MARK: - Metrics State
+    @Published var minuteMetrics: HistoricalMetrics? = nil
     @Published var hourMetrics: HistoricalMetrics? = nil
     @Published var dayMetrics: HistoricalMetrics? = nil
     @Published var weekMetrics: HistoricalMetrics? = nil
@@ -63,6 +64,7 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     func getMetrics(for range: TimeRange) -> HistoricalMetrics? {
         getMetricsCalled.append(range)
         switch range {
+        case .minute: return minuteMetrics
         case .hour: return hourMetrics
         case .day: return dayMetrics
         case .week: return weekMetrics
@@ -77,6 +79,7 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
 
     func clearAllMetrics() {
         clearAllMetricsCalled = true
+        minuteMetrics = nil
         hourMetrics = nil
         dayMetrics = nil
         weekMetrics = nil
@@ -87,6 +90,7 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     func clearMetrics(for range: TimeRange) {
         clearMetricsCalled.append(range)
         switch range {
+        case .minute: minuteMetrics = nil
         case .hour: hourMetrics = nil
         case .day: dayMetrics = nil
         case .week: weekMetrics = nil
@@ -109,11 +113,12 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
 
     // MARK: - Computed Properties
     var hasAnyMetrics: Bool {
-        return hourMetrics != nil || dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
+        return minuteMetrics != nil || hourMetrics != nil || dayMetrics != nil || weekMetrics != nil || monthMetrics != nil
     }
 
     var availabilityDescription: String {
         var available: [String] = []
+        if minuteMetrics != nil { available.append("Minute") }
         if hourMetrics != nil { available.append("Hour") }
         if dayMetrics != nil { available.append("Day") }
         if weekMetrics != nil { available.append("Week") }
@@ -127,6 +132,7 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     }
 
     // MARK: - Publishers
+    var minuteMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $minuteMetrics }
     var hourMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $hourMetrics }
     var dayMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $dayMetrics }
     var weekMetricsPublisher: Published<HistoricalMetrics?>.Publisher { $weekMetrics }
@@ -139,6 +145,7 @@ class MockHistoricalDataManager: HistoricalDataManagerProtocol {
     /// Simulate metrics for a specific time range
     func simulateMetrics(for range: TimeRange, metrics: HistoricalMetrics) {
         switch range {
+        case .minute: minuteMetrics = metrics
         case .hour: hourMetrics = metrics
         case .day: dayMetrics = metrics
         case .week: weekMetrics = metrics

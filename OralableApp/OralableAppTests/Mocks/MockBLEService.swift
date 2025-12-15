@@ -236,7 +236,7 @@ class MockBLEService: BLEService {
 
     /// Add a mock peripheral that will be "discovered" during scanning
     func addDiscoverableDevice(id: UUID, name: String, rssi: Int = -50) {
-        let peripheral = MockPeripheral(identifier: id, name: name)
+        let peripheral = MockPeripheralFactory.create(identifier: id, name: name)
         discoveredPeripherals[id] = peripheral
     }
 
@@ -264,6 +264,19 @@ class MockBLEService: BLEService {
         eventSubject.send(.characteristicUpdated(peripheral: peripheral, characteristic: characteristic, data: data))
     }
 
+    /// Simulate a BLE error event
+    func simulateError(_ error: BLEError) {
+        eventSubject.send(.error(error))
+    }
+
+    /// Simulate connection failure with BLEError
+    func simulateConnectionFailure(for peripheralId: UUID, error: BLEError) {
+        guard let peripheral = discoveredPeripherals[peripheralId] else { return }
+        connectedPeripherals.remove(peripheralId)
+        eventSubject.send(.error(error))
+        eventSubject.send(.deviceDisconnected(peripheral: peripheral, error: error))
+    }
+
     /// Internal helper to discover pre-configured devices
     private func simulateDiscoveryOfConfiguredDevices() {
         guard isScanning else { return }
@@ -278,75 +291,98 @@ class MockBLEService: BLEService {
     }
 }
 
-// MARK: - Mock Peripheral
+// MARK: - Mock Peripheral Factory
 
-/// Mock CBPeripheral subclass for testing
-/// Note: CBPeripheral cannot be instantiated directly, so we use a class cluster approach
-class MockPeripheral: CBPeripheral {
+/// Factory for creating mock CBPeripheral instances using Objective-C runtime
+/// CoreBluetooth classes can't be directly subclassed, so we use runtime allocation
+enum MockPeripheralFactory {
+    /// Storage for mock peripheral properties (keyed by identifier)
+    private static var mockIdentifiers: [ObjectIdentifier: UUID] = [:]
+    private static var mockNames: [ObjectIdentifier: String?] = [:]
+    private static var mockStates: [ObjectIdentifier: CBPeripheralState] = [:]
 
-    private let _identifier: UUID
-    private let _name: String?
+    /// Create a mock peripheral for testing
+    static func create(identifier: UUID, name: String?) -> CBPeripheral {
+        // Allocate CBPeripheral without calling init using runtime
+        guard let instance = class_createInstance(CBPeripheral.self, 0) as? CBPeripheral else {
+            fatalError("Failed to create mock peripheral")
+        }
 
-    init(identifier: UUID, name: String?) {
-        self._identifier = identifier
-        self._name = name
-        // Note: We can't call super.init() as CBPeripheral has no public initializers
-        // This is a limitation of mocking CoreBluetooth
+        // Store mock values in static dictionaries
+        let objectId = ObjectIdentifier(instance)
+        mockIdentifiers[objectId] = identifier
+        mockNames[objectId] = name
+        mockStates[objectId] = .disconnected
+
+        return instance
     }
 
-    override var identifier: UUID {
-        return _identifier
+    /// Get stored identifier for a mock peripheral
+    static func getIdentifier(for peripheral: CBPeripheral) -> UUID? {
+        return mockIdentifiers[ObjectIdentifier(peripheral)]
     }
 
-    override var name: String? {
-        return _name
+    /// Get stored name for a mock peripheral
+    static func getName(for peripheral: CBPeripheral) -> String? {
+        return mockNames[ObjectIdentifier(peripheral)] ?? nil
     }
 
-    override var state: CBPeripheralState {
-        return .disconnected
+    /// Set state for a mock peripheral
+    static func setState(_ state: CBPeripheralState, for peripheral: CBPeripheral) {
+        mockStates[ObjectIdentifier(peripheral)] = state
+    }
+
+    /// Clean up mock peripheral data
+    static func cleanup(peripheral: CBPeripheral) {
+        let objectId = ObjectIdentifier(peripheral)
+        mockIdentifiers.removeValue(forKey: objectId)
+        mockNames.removeValue(forKey: objectId)
+        mockStates.removeValue(forKey: objectId)
+    }
+
+    /// Reset all mock data
+    static func reset() {
+        mockIdentifiers.removeAll()
+        mockNames.removeAll()
+        mockStates.removeAll()
+    }
+}
+
+/// Type alias for compatibility with existing code
+typealias MockPeripheral = CBPeripheral
+
+/// Extension to make mock peripheral creation easier
+extension CBPeripheral {
+    /// Create a mock peripheral for testing
+    static func mock(identifier: UUID, name: String?) -> CBPeripheral {
+        return MockPeripheralFactory.create(identifier: identifier, name: name)
     }
 }
 
 // MARK: - Mock Characteristic
 
 /// Mock CBCharacteristic for testing
-class MockCharacteristic: CBCharacteristic {
-
-    private let _uuid: CBUUID
-    private let _properties: CBCharacteristicProperties
+/// Note: CBCharacteristic can't be directly instantiated, use MockCharacteristicData instead
+struct MockCharacteristicData {
+    let uuid: CBUUID
+    let properties: CBCharacteristicProperties
 
     init(uuid: CBUUID, properties: CBCharacteristicProperties = [.read, .write, .notify]) {
-        self._uuid = uuid
-        self._properties = properties
-    }
-
-    override var uuid: CBUUID {
-        return _uuid
-    }
-
-    override var properties: CBCharacteristicProperties {
-        return _properties
+        self.uuid = uuid
+        self.properties = properties
     }
 }
 
 // MARK: - Mock Service
 
 /// Mock CBService for testing
-class MockService: CBService {
+/// Note: CBService can't be directly instantiated, use MockServiceData instead
+struct MockServiceData {
+    let uuid: CBUUID
+    let characteristics: [MockCharacteristicData]
 
-    private let _uuid: CBUUID
-    private let _characteristics: [CBCharacteristic]
-
-    init(uuid: CBUUID, characteristics: [CBCharacteristic] = []) {
-        self._uuid = uuid
-        self._characteristics = characteristics
-    }
-
-    override var uuid: CBUUID {
-        return _uuid
-    }
-
-    override var characteristics: [CBCharacteristic]? {
-        return _characteristics
+    init(uuid: CBUUID, characteristics: [MockCharacteristicData] = []) {
+        self.uuid = uuid
+        self.characteristics = characteristics
     }
 }

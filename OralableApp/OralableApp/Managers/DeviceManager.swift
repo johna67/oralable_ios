@@ -325,6 +325,131 @@ class DeviceManager: ObservableObject {
         case .characteristicWritten(_, _, _):
             // Handled by individual device implementations
             break
+
+        case .servicesDiscovered(_, _, _):
+            // Handled by individual device implementations
+            break
+
+        case .characteristicsDiscovered(_, _, _, _):
+            // Handled by individual device implementations
+            break
+
+        case .error(let bleError):
+            handleBLEError(bleError)
+        }
+    }
+
+    /// Handle BLEError events from the BLE service
+    private func handleBLEError(_ error: BLEError) {
+        // Log based on severity
+        logBLEError(error)
+
+        // Convert to DeviceError for UI display and update lastError
+        lastError = convertToDeviceError(error)
+
+        // Handle specific error types
+        switch error {
+        case .bluetoothNotReady, .bluetoothUnauthorized, .bluetoothUnsupported:
+            // Stop scanning if Bluetooth issue
+            if isScanning {
+                isScanning = false
+            }
+            isConnecting = false
+
+        case .connectionFailed(let peripheralId, _),
+             .connectionTimeout(let peripheralId, _):
+            // Update device state to disconnected
+            updateDeviceReadiness(peripheralId, to: .failed(error.errorDescription ?? "Connection failed"))
+            isConnecting = false
+
+        case .unexpectedDisconnection(let peripheralId, _):
+            // Already handled by handleDeviceDisconnected, but ensure state is updated
+            updateDeviceReadiness(peripheralId, to: .disconnected)
+
+        case .maxReconnectionAttemptsExceeded(let peripheralId, let attempts):
+            Logger.shared.error("[DeviceManager] Max reconnection attempts (\(attempts)) exceeded for device \(peripheralId)")
+            updateDeviceReadiness(peripheralId, to: .failed("Reconnection failed after \(attempts) attempts"))
+
+        default:
+            // Other errors are logged but don't require special handling
+            break
+        }
+    }
+
+    /// Convert BLEError to DeviceError for UI display
+    private func convertToDeviceError(_ bleError: BLEError) -> DeviceError {
+        switch bleError {
+        case .bluetoothNotReady, .bluetoothResetting:
+            return .bluetoothUnavailable
+        case .bluetoothUnauthorized:
+            return .bluetoothUnauthorized
+        case .bluetoothUnsupported:
+            return .bluetoothUnavailable
+        case .connectionFailed(_, let reason):
+            return .connectionFailed(reason ?? "Unknown reason")
+        case .connectionTimeout(_, let timeout):
+            return .connectionFailed("Connection timed out after \(Int(timeout)) seconds")
+        case .unexpectedDisconnection:
+            return .connectionLost
+        case .peripheralNotConnected(let id):
+            return .notConnected("Device \(id) is not connected")
+        case .peripheralNotFound(let id):
+            return .invalidPeripheral("Device \(id) not found")
+        case .maxReconnectionAttemptsExceeded(_, let attempts):
+            return .connectionFailed("Max reconnection attempts (\(attempts)) exceeded")
+        case .serviceNotFound(let uuid, _):
+            return .serviceNotFound(uuid.uuidString)
+        case .characteristicNotFound(let uuid, _):
+            return .characteristicNotFound(uuid.uuidString)
+        case .serviceDiscoveryFailed(_, let reason):
+            return .serviceNotFound(reason ?? "Discovery failed")
+        case .characteristicDiscoveryFailed(_, let reason):
+            return .characteristicNotFound(reason ?? "Discovery failed")
+        case .timeout:
+            return .timeout
+        case .dataCorrupted(let description):
+            return .parsingError(description)
+        case .dataValidationFailed(let expected, let received):
+            return .parsingError("Expected: \(expected), Received: \(received)")
+        case .invalidDataFormat(let description):
+            return .parsingError(description)
+        case .writeFailed:
+            return .characteristicWriteFailed
+        case .readFailed:
+            return .characteristicReadFailed
+        case .notificationSetupFailed:
+            return .characteristicWriteFailed
+        case .cancelled:
+            return .timeout
+        case .operationNotPermitted:
+            return .operationNotSupported
+        case .alreadyScanning, .notScanning:
+            return .deviceBusy
+        case .internalError(let reason, _):
+            return .unknownError(reason)
+        case .unknown(let description):
+            return .unknownError(description)
+        }
+    }
+
+    /// Log BLEError with appropriate severity
+    private func logBLEError(_ error: BLEError) {
+        let message = "[DeviceManager] BLE Error: \(error.errorDescription ?? "Unknown error")"
+
+        switch error.severity {
+        case .info:
+            Logger.shared.info(message)
+        case .warning:
+            Logger.shared.warning(message)
+        case .error:
+            Logger.shared.error(message)
+        case .critical:
+            Logger.shared.error("⚠️ CRITICAL: \(message)")
+        }
+
+        // Log recovery suggestion if available
+        if let suggestion = error.recoverySuggestion {
+            Logger.shared.info("  ↳ Recovery suggestion: \(suggestion)")
         }
     }
     

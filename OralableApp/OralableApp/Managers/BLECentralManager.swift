@@ -116,15 +116,19 @@ final class BLECentralManager: NSObject, BLEService {
         }
 
         guard central.state == .poweredOn else {
+            let error = createBluetoothStateError(central.state)
             Task { @MainActor in
-                Logger.shared.error("Cannot start scan - Bluetooth not powered on (state: \(self.stateDescription(self.central.state)))")
+                self.logBLEError(error, context: "startScanning")
             }
+            eventSubject.send(.error(error))
             return
         }
         guard !central.isScanning else {
+            let error = BLEError.alreadyScanning
             Task { @MainActor in
-                Logger.shared.warning("Already scanning, ignoring start request")
+                self.logBLEError(error, context: "startScanning")
             }
+            eventSubject.send(.error(error))
             return
         }
 
@@ -202,6 +206,83 @@ final class BLECentralManager: NSObject, BLEService {
         case .poweredOff: return "Powered Off"
         case .poweredOn: return "Powered On"
         @unknown default: return "Unknown State (\(state.rawValue))"
+        }
+    }
+
+    // MARK: - Error Handling Helpers
+
+    /// Create appropriate BLEError for the current Bluetooth state
+    private func createBluetoothStateError(_ state: CBManagerState) -> BLEError {
+        switch state {
+        case .poweredOff:
+            return .bluetoothNotReady(state: state)
+        case .unauthorized:
+            return .bluetoothUnauthorized
+        case .unsupported:
+            return .bluetoothUnsupported
+        case .resetting:
+            return .bluetoothResetting
+        default:
+            return .bluetoothNotReady(state: state)
+        }
+    }
+
+    /// Convert a CoreBluetooth error to a BLEError
+    private func convertToBLEError(_ error: Error?, for peripheral: CBPeripheral, isConnection: Bool) -> BLEError {
+        let peripheralId = peripheral.identifier
+
+        if let cbError = error as? CBError {
+            switch cbError.code {
+            case .connectionFailed:
+                return .connectionFailed(peripheralId: peripheralId, reason: cbError.localizedDescription)
+            case .peripheralDisconnected:
+                return .unexpectedDisconnection(peripheralId: peripheralId, reason: cbError.localizedDescription)
+            case .connectionTimeout:
+                return .connectionTimeout(peripheralId: peripheralId, timeoutSeconds: 30)
+            case .notConnected:
+                return .peripheralNotConnected(peripheralId: peripheralId)
+            case .invalidHandle:
+                return .characteristicNotFound(characteristicUUID: CBUUID(), serviceUUID: CBUUID())
+            default:
+                if isConnection {
+                    return .connectionFailed(peripheralId: peripheralId, reason: cbError.localizedDescription)
+                } else {
+                    return .unexpectedDisconnection(peripheralId: peripheralId, reason: cbError.localizedDescription)
+                }
+            }
+        }
+
+        if let error = error {
+            if isConnection {
+                return .connectionFailed(peripheralId: peripheralId, reason: error.localizedDescription)
+            } else {
+                return .unexpectedDisconnection(peripheralId: peripheralId, reason: error.localizedDescription)
+            }
+        }
+
+        // No error - intentional disconnection
+        return .unexpectedDisconnection(peripheralId: peripheralId, reason: nil)
+    }
+
+    /// Log a BLEError with appropriate severity
+    @MainActor
+    private func logBLEError(_ error: BLEError, context: String) {
+        let message = "[BLECentralManager] [\(context)] \(error.errorDescription ?? "Unknown error")"
+
+        switch error.severity {
+        case .info:
+            Logger.shared.info(message)
+        case .warning:
+            Logger.shared.warning(message)
+        case .error:
+            Logger.shared.error(message)
+        case .critical:
+            Logger.shared.error("⚠️ CRITICAL: \(message)")
+        }
+
+        // Log recovery suggestion if available
+        if let suggestion = error.recoverySuggestion {
+            Logger.shared.info("  ↳ Suggestion: \(suggestion)")
         }
     }
 }
@@ -303,13 +384,18 @@ extension BLECentralManager: CBCentralManagerDelegate {
         didFailToConnect peripheral: CBPeripheral,
         error: Error?
     ) {
+        let bleError = convertToBLEError(error, for: peripheral, isConnection: true)
+
         Task { @MainActor in
-            Logger.shared.error("Connection failed: \(error?.localizedDescription ?? "Unknown error")")
+            self.logBLEError(bleError, context: "didFailToConnect")
         }
 
         pendingConnections.remove(peripheral.identifier)
 
-        // Emit event via publisher (new)
+        // Emit error event
+        eventSubject.send(.error(bleError))
+
+        // Emit disconnection event via publisher
         eventSubject.send(.deviceDisconnected(peripheral: peripheral, error: error))
 
         // Legacy callback (backward compatibility)
@@ -321,17 +407,23 @@ extension BLECentralManager: CBCentralManagerDelegate {
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: Error?
     ) {
-        Task { @MainActor in
-            if let error = error {
-                Logger.shared.error("Disconnection error: \(error.localizedDescription)")
-            } else {
+        connectedPeripherals.remove(peripheral.identifier)
+
+        if let error = error {
+            // Unexpected disconnection - convert to BLEError
+            let bleError = convertToBLEError(error, for: peripheral, isConnection: false)
+            Task { @MainActor in
+                self.logBLEError(bleError, context: "didDisconnect")
+            }
+            eventSubject.send(.error(bleError))
+        } else {
+            // Intentional disconnection
+            Task { @MainActor in
                 Logger.shared.info("Disconnected from device: \(peripheral.name ?? "Unknown")")
             }
         }
 
-        connectedPeripherals.remove(peripheral.identifier)
-
-        // Emit event via publisher (new)
+        // Emit disconnection event via publisher
         eventSubject.send(.deviceDisconnected(peripheral: peripheral, error: error))
 
         // Legacy callback (backward compatibility)

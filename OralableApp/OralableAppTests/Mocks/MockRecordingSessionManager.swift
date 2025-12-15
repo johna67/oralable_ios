@@ -25,6 +25,7 @@ class MockRecordingSessionManager: RecordingSessionManagerProtocol {
     var resumeSessionCalled = false
     var recordSensorDataCalled: [String] = []
     var deleteSessionCalled: [RecordingSession] = []
+    var lastStartSessionDeviceType: DeviceType?
 
     var startSessionError: Error?
     var stopSessionError: Error?
@@ -34,8 +35,9 @@ class MockRecordingSessionManager: RecordingSessionManagerProtocol {
     var mockSession: RecordingSession?
 
     // MARK: - Session Management
-    func startSession(deviceID: String?, deviceName: String?) throws -> RecordingSession {
+    func startSession(deviceID: String?, deviceName: String?, deviceType: DeviceType?) throws -> RecordingSession {
         startSessionCalled = true
+        lastStartSessionDeviceType = deviceType
 
         if let error = startSessionError {
             throw error
@@ -43,7 +45,8 @@ class MockRecordingSessionManager: RecordingSessionManagerProtocol {
 
         let session = mockSession ?? RecordingSession(
             deviceID: deviceID,
-            deviceName: deviceName
+            deviceName: deviceName,
+            deviceType: deviceType
         )
 
         currentSession = session
@@ -169,6 +172,7 @@ class MockRecordingSessionManager: RecordingSessionManagerProtocol {
         resumeSessionCalled = false
         recordSensorDataCalled = []
         deleteSessionCalled = []
+        lastStartSessionDeviceType = nil
         startSessionError = nil
         stopSessionError = nil
         pauseSessionError = nil
