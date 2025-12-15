@@ -78,38 +78,47 @@ struct ColorSystem {
 }
 
 struct TypographySystem {
-    let fontFamily = "Open Sans"
+    // Using iOS system fonts (SF Pro) for better integration and no missing font errors
 
-    var h1: Font { Font.custom(fontFamily, size: 34).weight(.bold) }
-    var h2: Font { Font.custom(fontFamily, size: 28).weight(.semibold) }
-    var h3: Font { Font.custom(fontFamily, size: 22).weight(.semibold) }
-    var h4: Font { Font.custom(fontFamily, size: 18).weight(.medium) }
+    // Headings
+    var h1: Font { .system(size: 34, weight: .bold) }
+    var h2: Font { .system(size: 28, weight: .semibold) }
+    var h3: Font { .system(size: 22, weight: .semibold) }
+    var h4: Font { .system(size: 18, weight: .medium) }
 
-    var largeTitle: Font { Font.custom(fontFamily, size: 34).weight(.bold) }
-    var headline: Font { Font.custom(fontFamily, size: 17).weight(.semibold) }
+    // Large title and headline
+    var largeTitle: Font { .system(size: 34, weight: .bold) }
+    var headline: Font { .system(size: 17, weight: .semibold) }
 
-    var body: Font { Font.custom(fontFamily, size: 16).weight(.regular) }
-    var bodyBold: Font { Font.custom(fontFamily, size: 16).weight(.bold) }
-    var bodyMedium: Font { Font.custom(fontFamily, size: 16).weight(.medium) }
-    var bodyLarge: Font { Font.custom(fontFamily, size: 18).weight(.regular) }
-    var bodySmall: Font { Font.custom(fontFamily, size: 14).weight(.regular) }
+    // Body variants
+    var body: Font { .system(size: 16, weight: .regular) }
+    var bodyBold: Font { .system(size: 16, weight: .bold) }
+    var bodyMedium: Font { .system(size: 16, weight: .medium) }
+    var bodyLarge: Font { .system(size: 18, weight: .regular) }
+    var bodySmall: Font { .system(size: 14, weight: .regular) }
 
-    var labelLarge: Font { Font.custom(fontFamily, size: 16).weight(.medium) }
-    var labelMedium: Font { Font.custom(fontFamily, size: 14).weight(.medium) }
-    var labelSmall: Font { Font.custom(fontFamily, size: 12).weight(.medium) }
+    // Label variants
+    var labelLarge: Font { .system(size: 16, weight: .medium) }
+    var labelMedium: Font { .system(size: 14, weight: .medium) }
+    var labelSmall: Font { .system(size: 12, weight: .medium) }
 
-    var caption: Font { Font.custom(fontFamily, size: 14).weight(.regular) }
-    var caption2: Font { Font.custom(fontFamily, size: 11).weight(.regular) }
-    var captionBold: Font { Font.custom(fontFamily, size: 14).weight(.semibold) }
-    var footnote: Font { Font.custom(fontFamily, size: 12).weight(.regular) }
+    // Small text
+    var caption: Font { .system(size: 14, weight: .regular) }
+    var caption2: Font { .system(size: 11, weight: .regular) }
+    var captionBold: Font { .system(size: 14, weight: .semibold) }
+    var footnote: Font { .system(size: 12, weight: .regular) }
 
-    var displaySmall: Font { Font.custom(fontFamily, size: 24).weight(.bold) }
-    var title: Font { Font.custom(fontFamily, size: 20).weight(.semibold) }
+    // Display variants
+    var displaySmall: Font { .system(size: 24, weight: .bold) }
 
-    var button: Font { Font.custom(fontFamily, size: 16).weight(.semibold) }
-    var buttonLarge: Font { Font.custom(fontFamily, size: 18).weight(.semibold) }
-    var buttonSmall: Font { Font.custom(fontFamily, size: 14).weight(.semibold) }
-    var link: Font { Font.custom(fontFamily, size: 16).weight(.medium) }
+    // Title variant
+    var title: Font { .system(size: 20, weight: .semibold) }
+
+    // Interactive
+    var button: Font { .system(size: 16, weight: .semibold) }
+    var buttonLarge: Font { .system(size: 18, weight: .semibold) }
+    var buttonSmall: Font { .system(size: 14, weight: .semibold) }
+    var link: Font { .system(size: 16, weight: .medium) }
 }
 
 struct SpacingSystem {

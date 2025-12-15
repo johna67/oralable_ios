@@ -90,120 +90,49 @@ struct ColorSystem {
 // MARK: - Typography System
 
 struct TypographySystem {
-    // Open Sans font with fallbacks
-    let fontFamily = "Open Sans"
-    
+    // Using iOS system fonts (SF Pro) for better integration and no missing font errors
+
     // Headings
-    var h1: Font {
-        Font.custom(fontFamily, size: 34).weight(.bold)
-    }
-    
-    var h2: Font {
-        Font.custom(fontFamily, size: 28).weight(.semibold)
-    }
-    
-    var h3: Font {
-        Font.custom(fontFamily, size: 22).weight(.semibold)
-    }
-    
-    var h4: Font {
-        Font.custom(fontFamily, size: 18).weight(.medium)
-    }
-    
+    var h1: Font { .system(size: 34, weight: .bold) }
+    var h2: Font { .system(size: 28, weight: .semibold) }
+    var h3: Font { .system(size: 22, weight: .semibold) }
+    var h4: Font { .system(size: 18, weight: .medium) }
+
     // Large title and headline
-    var largeTitle: Font {
-        Font.custom(fontFamily, size: 34).weight(.bold)
-    }
-    
-    var headline: Font {
-        Font.custom(fontFamily, size: 17).weight(.semibold)
-    }
-    
+    var largeTitle: Font { .system(size: 34, weight: .bold) }
+    var headline: Font { .system(size: 17, weight: .semibold) }
+
     // Body variants
-    var body: Font {
-        Font.custom(fontFamily, size: 16).weight(.regular)
-    }
-    
-    var bodyBold: Font {
-        Font.custom(fontFamily, size: 16).weight(.bold)
-    }
-    
-    var bodyMedium: Font {  // ADDED THIS - FIXES THE LAST 2 ERRORS!
-        Font.custom(fontFamily, size: 16).weight(.medium)
-    }
-    
-    var bodyLarge: Font {
-        Font.custom(fontFamily, size: 18).weight(.regular)
-    }
-    
-    var bodySmall: Font {
-        Font.custom(fontFamily, size: 14).weight(.regular)
-    }
-    
+    var body: Font { .system(size: 16, weight: .regular) }
+    var bodyBold: Font { .system(size: 16, weight: .bold) }
+    var bodyMedium: Font { .system(size: 16, weight: .medium) }
+    var bodyLarge: Font { .system(size: 18, weight: .regular) }
+    var bodySmall: Font { .system(size: 14, weight: .regular) }
+
     // Label variants
-    var labelLarge: Font {
-        Font.custom(fontFamily, size: 16).weight(.medium)
-    }
-    
-    var labelMedium: Font {
-        Font.custom(fontFamily, size: 14).weight(.medium)
-    }
-    
-    var labelSmall: Font {
-        Font.custom(fontFamily, size: 12).weight(.medium)
-    }
-    
+    var labelLarge: Font { .system(size: 16, weight: .medium) }
+    var labelMedium: Font { .system(size: 14, weight: .medium) }
+    var labelSmall: Font { .system(size: 12, weight: .medium) }
+
     // Small text
-    var caption: Font {
-        Font.custom(fontFamily, size: 14).weight(.regular)
-    }
-    
-    var caption2: Font {
-        Font.custom(fontFamily, size: 11).weight(.regular)
-    }
-    
-    var captionBold: Font {
-        Font.custom(fontFamily, size: 14).weight(.semibold)
-    }
-    
-    var captionSmall: Font {  // Added
-        Font.custom(fontFamily, size: 12).weight(.regular)
-    }
-    
-    var footnote: Font {
-        Font.custom(fontFamily, size: 12).weight(.regular)
-    }
-    
+    var caption: Font { .system(size: 14, weight: .regular) }
+    var caption2: Font { .system(size: 11, weight: .regular) }
+    var captionBold: Font { .system(size: 14, weight: .semibold) }
+    var captionSmall: Font { .system(size: 12, weight: .regular) }
+    var footnote: Font { .system(size: 12, weight: .regular) }
+
     // Display variants
-    var displaySmall: Font {  // Added
-        Font.custom(fontFamily, size: 24).weight(.bold)
-    }
-    
+    var displaySmall: Font { .system(size: 24, weight: .bold) }
+
     // Title variant
-    var title: Font {  // Added
-        Font.custom(fontFamily, size: 20).weight(.semibold)
-    }
-    
+    var title: Font { .system(size: 20, weight: .semibold) }
+
     // Interactive
-    var button: Font {
-        Font.custom(fontFamily, size: 16).weight(.semibold)
-    }
-
-    var buttonLarge: Font {  // Added
-        Font.custom(fontFamily, size: 18).weight(.semibold)
-    }
-
-    var buttonMedium: Font {  // Added
-        Font.custom(fontFamily, size: 16).weight(.medium)
-    }
-
-    var buttonSmall: Font {  // Added
-        Font.custom(fontFamily, size: 14).weight(.semibold)
-    }
-
-    var link: Font {
-        Font.custom(fontFamily, size: 16).weight(.medium)
-    }
+    var button: Font { .system(size: 16, weight: .semibold) }
+    var buttonLarge: Font { .system(size: 18, weight: .semibold) }
+    var buttonMedium: Font { .system(size: 16, weight: .medium) }
+    var buttonSmall: Font { .system(size: 14, weight: .semibold) }
+    var link: Font { .system(size: 16, weight: .medium) }
 }
 
 // MARK: - Spacing System
