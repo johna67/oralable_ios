@@ -28,6 +28,21 @@ struct ProfessionalSettingsView: View {
     var body: some View {
         NavigationView {
             List {
+                // Demo Mode Section - ALWAYS VISIBLE
+                Section {
+                    Toggle("Demo Mode", isOn: $featureFlags.demoModeEnabled)
+
+                    if featureFlags.demoModeEnabled {
+                        Text("Shows a sample participant with 3 recorded sessions. No imported data required.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("Testing")
+                } footer: {
+                    Text("Enable to explore the app with sample participant data.")
+                }
+
                 Section {
                     accountRow
                 } header: {

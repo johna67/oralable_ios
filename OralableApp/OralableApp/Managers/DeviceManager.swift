@@ -108,9 +108,66 @@ class DeviceManager: ObservableObject {
     
     var primaryDeviceReadiness: ConnectionReadiness {
         guard let primaryId = primaryDevice?.peripheralIdentifier else {
+            // Check if demo device is connected
+            if DemoDataProvider.shared.isConnected {
+                return .ready
+            }
             return .disconnected
         }
         return deviceReadiness[primaryId] ?? .disconnected
+    }
+
+    // MARK: - Demo Device Integration
+
+    /// All discovered devices including demo device if enabled
+    var allDiscoveredDevices: [DeviceInfo] {
+        var devices = discoveredDevices
+
+        // Add demo device if demo mode enabled and discovered
+        if FeatureFlags.shared.demoModeEnabled && DemoDataProvider.shared.isDiscovered {
+            // Check if demo device isn't already in the list
+            let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
+            if !devices.contains(where: { $0.peripheralIdentifier == demoID }) {
+                var demoDevice = DeviceInfo(
+                    type: .demo,
+                    name: DemoDataProvider.shared.deviceName,
+                    peripheralIdentifier: demoID,
+                    connectionState: DemoDataProvider.shared.isConnected ? .connected : .disconnected,
+                    signalStrength: -50
+                )
+                demoDevice.connectionReadiness = DemoDataProvider.shared.isConnected ? .ready : .disconnected
+                devices.insert(demoDevice, at: 0)  // Show at top
+            }
+        }
+
+        return devices
+    }
+
+    /// All connected devices including demo device if connected
+    var allConnectedDevices: [DeviceInfo] {
+        var devices = connectedDevices
+
+        if DemoDataProvider.shared.isConnected {
+            let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
+            if !devices.contains(where: { $0.peripheralIdentifier == demoID }) {
+                var demoDevice = DeviceInfo(
+                    type: .demo,
+                    name: DemoDataProvider.shared.deviceName,
+                    peripheralIdentifier: demoID,
+                    connectionState: .connected,
+                    signalStrength: -50
+                )
+                demoDevice.connectionReadiness = .ready
+                devices.append(demoDevice)
+            }
+        }
+
+        return devices
+    }
+
+    /// Check if any device is connected (real or demo)
+    var isAnyDeviceConnected: Bool {
+        return !connectedDevices.isEmpty || DemoDataProvider.shared.isConnected
     }
     
     // MARK: - Private Properties
@@ -552,19 +609,19 @@ class DeviceManager: ObservableObject {
     func startScanning() async {
         Logger.shared.info("[DeviceManager] 🔍 startScanning() called")
         Logger.shared.info("[DeviceManager] Current state - discoveredDevices: \(discoveredDevices.count), devices: \(devices.count)")
-        
-        // Day 4 Fix: Don't scan if we already have a ready device
-        if deviceReadiness.values.contains(.ready) {
+
+        // Day 4 Fix: Don't scan if we already have a ready device (but allow demo device discovery)
+        if deviceReadiness.values.contains(.ready) && !FeatureFlags.shared.demoModeEnabled {
             Logger.shared.info("[DeviceManager] 🛑 Already have ready device - skipping scan")
             return
         }
-        
+
         // Don't restart if already scanning
         if isScanning {
             Logger.shared.info("[DeviceManager] 🛑 Already scanning - skipping")
             return
         }
-        
+
         Logger.shared.info("[DeviceManager] Starting device scan")
 
         scanStartTime = Date()
@@ -572,17 +629,23 @@ class DeviceManager: ObservableObject {
         discoveredDevices.removeAll()
         deviceReadiness.removeAll()
         isScanning = true
-        
+
         Logger.shared.info("[DeviceManager] ✅ Scan started - discoveredDevices cleared, isScanning = true")
 
         bleManager?.startScanning()
+
+        // If demo mode enabled, also "discover" the demo device
+        if FeatureFlags.shared.demoModeEnabled {
+            Logger.shared.info("[DeviceManager] 🎭 Demo mode enabled - triggering demo device discovery")
+            DemoDataProvider.shared.simulateDiscovery()
+        }
     }
 
     /// Stop scanning for devices
     func stopScanning() {
         Logger.shared.info("[DeviceManager] 🛑 stopScanning() called")
         Logger.shared.info("[DeviceManager] Discovered devices at stop time: \(discoveredDevices.count)")
-        
+
         #if DEBUG
         if let scanStart = scanStartTime {
             let elapsed = Date().timeIntervalSince(scanStart)
@@ -593,7 +656,10 @@ class DeviceManager: ObservableObject {
         isScanning = false
         bleManager?.stopScanning()
         scanStartTime = nil
-        
+
+        // Note: Don't reset demo discovery state here - we want to keep the demo device
+        // visible after scanning stops so user can still connect to it
+
         Logger.shared.info("[DeviceManager] ✅ Scan stopped - isScanning = false")
     }
     
@@ -602,6 +668,19 @@ class DeviceManager: ObservableObject {
     // ✅ CORRECTED METHOD - Using peripheralIdentifier as dictionary key
     func connect(to deviceInfo: DeviceInfo) async throws {
         Logger.shared.info("[DeviceManager] Connecting to device: \(deviceInfo.name)")
+
+        // Check if this is the demo device
+        let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
+        if deviceInfo.peripheralIdentifier == demoID || deviceInfo.type == .demo {
+            Logger.shared.info("[DeviceManager] 🎭 Connecting to demo device")
+            isConnecting = true
+            DemoDataProvider.shared.simulateConnect()
+
+            // Wait for connection to complete
+            try await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
+            isConnecting = false
+            return
+        }
 
         // CRITICAL FIX: Use peripheralIdentifier, not deviceInfo.id
         guard let peripheralId = deviceInfo.peripheralIdentifier else {
@@ -623,7 +702,7 @@ class DeviceManager: ObservableObject {
         if let index = discoveredDevices.firstIndex(where: { $0.peripheralIdentifier == peripheralId }) {
             discoveredDevices[index].connectionState = .connecting
         }
-        
+
         updateDeviceReadiness(peripheralId, to: .connecting)
 
         // Reset reconnection attempts on manual connect
@@ -635,6 +714,14 @@ class DeviceManager: ObservableObject {
     
     func disconnect(from deviceInfo: DeviceInfo) async {
         Logger.shared.info("[DeviceManager] Disconnecting from device: \(deviceInfo.name)")
+
+        // Check if this is the demo device
+        let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
+        if deviceInfo.peripheralIdentifier == demoID || deviceInfo.type == .demo {
+            Logger.shared.info("[DeviceManager] 🎭 Disconnecting from demo device")
+            DemoDataProvider.shared.disconnect()
+            return
+        }
 
         guard let peripheralId = deviceInfo.peripheralIdentifier,
               let device = devices[peripheralId],
@@ -668,8 +755,24 @@ class DeviceManager: ObservableObject {
             }
         }
 
+        // Also disconnect demo device if connected
+        if DemoDataProvider.shared.isConnected {
+            Logger.shared.info("[DeviceManager] 🎭 Also disconnecting demo device")
+            DemoDataProvider.shared.disconnect()
+            DemoDataProvider.shared.resetDiscovery()
+        }
+
         // Cancel all reconnection attempts
         cancelAllReconnections()
+    }
+
+    /// Disconnect demo device and reset its state (called when demo mode is disabled)
+    func disconnectDemoDevice() {
+        if DemoDataProvider.shared.isConnected {
+            Logger.shared.info("[DeviceManager] 🎭 Disconnecting demo device (demo mode disabled)")
+            DemoDataProvider.shared.disconnect()
+        }
+        DemoDataProvider.shared.resetDiscovery()
     }
     
     // MARK: - Sensor Data Management

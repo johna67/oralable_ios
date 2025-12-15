@@ -9,6 +9,12 @@
 /* Begin PBXBuildFile section */
 		2671AFEA2EE7BDE700A5D229 /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 2671AFE92EE7BDE700A5D229 /* AsyncAlgorithms */; };
 		26785D372ED6C96A004BA1A3 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26785D362ED6C96A004BA1A3 /* Algorithms */; };
+		26917C362EED552800B25687 /* DemoDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26917C352EED552800B25687 /* DemoDataManager.swift */; };
+		26917C382EED554000B25687 /* DemoParticipantDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26917C372EED554000B25687 /* DemoParticipantDetailView.swift */; };
+		26917C402EED577900B25687 /* demo_participant_all_sessions.csv in Resources */ = {isa = PBXBuildFile; fileRef = 26917C3C2EED577900B25687 /* demo_participant_all_sessions.csv */; };
+		26917C412EED577900B25687 /* demo_participant_session_2.csv in Resources */ = {isa = PBXBuildFile; fileRef = 26917C3D2EED577900B25687 /* demo_participant_session_2.csv */; };
+		26917C422EED577900B25687 /* demo_participant_session_1.csv in Resources */ = {isa = PBXBuildFile; fileRef = 26917C3E2EED577900B25687 /* demo_participant_session_1.csv */; };
+		26917C432EED577900B25687 /* demo_participant_session_3.csv in Resources */ = {isa = PBXBuildFile; fileRef = 26917C3F2EED577900B25687 /* demo_participant_session_3.csv */; };
 		26992C5F2ED6C28A00D9993D /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26992C5E2ED6C28A00D9993D /* AsyncAlgorithms */; };
 		26A0F47C2EBAE8C00054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47B2EBAE8C00054C5FC /* AsyncAlgorithms */; };
 		26A0F47E2EBAE8D80054C5FC /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 26A0F47D2EBAE8D80054C5FC /* AsyncAlgorithms */; };
@@ -81,6 +87,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		26917C352EED552800B25687 /* DemoDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDataManager.swift; sourceTree = "<group>"; };
+		26917C372EED554000B25687 /* DemoParticipantDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoParticipantDetailView.swift; sourceTree = "<group>"; };
+		26917C3C2EED577900B25687 /* demo_participant_all_sessions.csv */ = {isa = PBXFileReference; lastKnownFileType = text; name = demo_participant_all_sessions.csv; path = OralableForProfessionals/Resources/DemoData/demo_participant_all_sessions.csv; sourceTree = "<group>"; };
+		26917C3D2EED577900B25687 /* demo_participant_session_2.csv */ = {isa = PBXFileReference; lastKnownFileType = text; name = demo_participant_session_2.csv; path = OralableForProfessionals/Resources/DemoData/demo_participant_session_2.csv; sourceTree = "<group>"; };
+		26917C3E2EED577900B25687 /* demo_participant_session_1.csv */ = {isa = PBXFileReference; lastKnownFileType = text; name = demo_participant_session_1.csv; path = OralableForProfessionals/Resources/DemoData/demo_participant_session_1.csv; sourceTree = "<group>"; };
+		26917C3F2EED577900B25687 /* demo_participant_session_3.csv */ = {isa = PBXFileReference; lastKnownFileType = text; name = demo_participant_session_3.csv; path = OralableForProfessionals/Resources/DemoData/demo_participant_session_3.csv; sourceTree = "<group>"; };
 		26CAF25E2E781EFB003FE378 /* OralableApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OralableApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		26CAF26F2E781EFE003FE378 /* OralableAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		26CAF2792E781EFE003FE378 /* OralableAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OralableAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -135,6 +147,21 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		26917C392EED555E00B25687 /* New Folder */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "New Folder";
+			sourceTree = "<group>";
+		};
+		26917C3A2EED556D00B25687 /* New Folder */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "New Folder";
+			sourceTree = "<group>";
+		};
+		26917C3B2EED557D00B25687 /* New Folder 2 */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "New Folder 2";
+			sourceTree = "<group>";
+		};
 		26B2FED92EB999C100E0F7B1 /* OralableApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -212,6 +239,10 @@
 		26CAF2552E781EFB003FE378 = {
 			isa = PBXGroup;
 			children = (
+				26917C3C2EED577900B25687 /* demo_participant_all_sessions.csv */,
+				26917C3E2EED577900B25687 /* demo_participant_session_1.csv */,
+				26917C3D2EED577900B25687 /* demo_participant_session_2.csv */,
+				26917C3F2EED577900B25687 /* demo_participant_session_3.csv */,
 				26FE17B52EE6D0FE00026648 /* OralableForProfessionalsUITests */,
 				26FE17942EE6D0D200026648 /* OralableForProfessionals */,
 				26FE16E52EE6CE7300026648 /* OralableForProfessionalsTests */,
@@ -253,6 +284,8 @@
 		26FE17792EE6D0D200026648 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				26917C3A2EED556D00B25687 /* New Folder */,
+				26917C352EED552800B25687 /* DemoDataManager.swift */,
 				26FE17712EE6D0D200026648 /* BaseAuthenticationManager.swift */,
 				26FE17722EE6D0D200026648 /* ProfessionaltAppDependencies.swift */,
 				26FE17732EE6D0D200026648 /* ProfessionalAuthenticationManager.swift */,
@@ -290,6 +323,7 @@
 		26FE178C2EE6D0D200026648 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				26917C372EED554000B25687 /* DemoParticipantDetailView.swift */,
 				26FE17832EE6D0D200026648 /* AddPatientView.swift */,
 				26FE17842EE6D0D200026648 /* ProfessionalsSettingsView.swift */,
 				26FE17852EE6D0D200026648 /* DeveloperSettingsView.swift */,
@@ -306,6 +340,8 @@
 		26FE17942EE6D0D200026648 /* OralableForProfessionals */ = {
 			isa = PBXGroup;
 			children = (
+				26917C3B2EED557D00B25687 /* New Folder 2 */,
+				26917C392EED555E00B25687 /* New Folder */,
 				26FE17702EE6D0D200026648 /* Components */,
 				26FE17792EE6D0D200026648 /* Managers */,
 				26FE177C2EE6D0D200026648 /* Models */,
@@ -418,6 +454,11 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				26917C392EED555E00B25687 /* New Folder */,
+				26917C3A2EED556D00B25687 /* New Folder */,
+				26917C3B2EED557D00B25687 /* New Folder 2 */,
 			);
 			name = OralableForProfessionals;
 			packageProductDependencies = (
@@ -558,6 +599,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26917C402EED577900B25687 /* demo_participant_all_sessions.csv in Resources */,
+				26917C412EED577900B25687 /* demo_participant_session_2.csv in Resources */,
+				26917C422EED577900B25687 /* demo_participant_session_1.csv in Resources */,
+				26917C432EED577900B25687 /* demo_participant_session_3.csv in Resources */,
 				26FE17BF2EE6D96A00026648 /* ProfessionalConfiguration.storekit in Resources */,
 				26FE17B92EE6D6AF00026648 /* PrivacyInfo.xcprivacy in Resources */,
 				26FE17C02EE6D97500026648 /* Assets.xcassets in Resources */,
@@ -608,6 +653,7 @@
 			files = (
 				26FE17BE2EE6D93400026648 /* OralableForProfessionals.swift in Sources */,
 				26FE17C12EE6D99300026648 /* ProfessionalDataManager.swift in Sources */,
+				26917C362EED552800B25687 /* DemoDataManager.swift in Sources */,
 				26FE17C22EE6D99300026648 /* ProfessionalAuthenticationManager.swift in Sources */,
 				26FE17C32EE6D99300026648 /* Logger.swift in Sources */,
 				26FE17C42EE6D99300026648 /* ProfessionalSubscriptionManager.swift in Sources */,
@@ -629,6 +675,7 @@
 				26FE17CE2EE6D9B300026648 /* DeveloperSettingsView.swift in Sources */,
 				26FE17CF2EE6D9B300026648 /* PatientDetailView.swift in Sources */,
 				26FE17D02EE6D9B300026648 /* UpgradePromptView.swift in Sources */,
+				26917C382EED554000B25687 /* DemoParticipantDetailView.swift in Sources */,
 				26FE17D12EE6D9B300026648 /* PatientHealthDataView.swift in Sources */,
 				26FE17C62EE6D99300026648 /* DesignSystem.swift in Sources */,
 				26FE17C72EE6D99300026648 /* ProfessionaltAppDependencies.swift in Sources */,
@@ -953,7 +1000,7 @@
 				CODE_SIGN_ENTITLEMENTS = OralableForProfessionals/OralableForProfessionals.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = THKF822TTP;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -974,7 +1021,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.oralable.professionals;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -996,7 +1043,7 @@
 				CODE_SIGN_ENTITLEMENTS = OralableForProfessionals/OralableForProfessionals.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = THKF822TTP;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1017,7 +1064,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacdental.oralable.professionals;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

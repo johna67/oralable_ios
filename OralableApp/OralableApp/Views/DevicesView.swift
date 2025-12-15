@@ -111,7 +111,8 @@ struct DevicesView: View {
     // MARK: - Other Devices Section (Discovered)
     private var otherDevicesSection: some View {
         Section {
-            let discoveredDevices = deviceManager.discoveredDevices.filter { discovered in
+            // Use allDiscoveredDevices to include demo device when demo mode is enabled
+            let discoveredDevices = deviceManager.allDiscoveredDevices.filter { discovered in
                 guard let peripheralId = discovered.peripheralIdentifier else { return true }
                 return !persistenceManager.isDeviceRemembered(id: peripheralId.uuidString)
             }
@@ -184,18 +185,28 @@ struct DevicesView: View {
 
     /// Get device readiness state with fallback for devices that show "failed" but are actually working
     private func getDeviceReadiness(id: String) -> ConnectionReadiness {
+        // Check if this is the demo device
+        if id == DemoDataProvider.shared.deviceID {
+            if DemoDataProvider.shared.isConnected {
+                return .ready
+            } else if DemoDataProvider.shared.isDiscovered {
+                return .disconnected
+            }
+            return .disconnected
+        }
+
         // Check if device is in connected devices list
         if let device = deviceManager.connectedDevices.first(where: { $0.peripheralIdentifier?.uuidString == id }) {
             if let peripheralId = device.peripheralIdentifier {
                 let readiness = deviceManager.deviceReadiness[peripheralId] ?? .disconnected
-                
+
                 // FIX: If discovery failed but device is still connected, treat as Ready
                 // This handles ANR M40 devices that work but fail the standard discovery flow
                 if case .failed = readiness {
                     // Device is in connectedDevices, so it's actually connected
                     // Check if we're receiving data from this device type
                     let deviceName = device.name.lowercased()
-                    
+
                     if deviceName.contains("anr") || deviceName.contains("m40") {
                         // ANR device - check if we have EMG data
                         if deviceManagerAdapter.emgValue > 0 {
@@ -209,14 +220,14 @@ struct DevicesView: View {
                             return .ready
                         }
                     }
-                    
+
                     // If we're connected but no data yet, show as connected rather than failed
                     if device.connectionState == .connected {
                         Logger.shared.debug("[DevicesView] Device shows failed but is connected - treating as Connected")
                         return .connected
                     }
                 }
-                
+
                 return readiness
             }
         }
@@ -224,6 +235,10 @@ struct DevicesView: View {
     }
     
     private func isDeviceConnected(id: String) -> Bool {
+        // Check demo device
+        if id == DemoDataProvider.shared.deviceID {
+            return DemoDataProvider.shared.isConnected
+        }
         return deviceManager.connectedDevices.contains { $0.peripheralIdentifier?.uuidString == id }
     }
 

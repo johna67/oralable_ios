@@ -132,6 +132,11 @@ class DashboardViewModel: ObservableObject {
     private let recordingStateCoordinator: RecordingStateCoordinator
     private var cancellables = Set<AnyCancellable>()
 
+    // MARK: - Demo Mode Properties
+    private let featureFlags = FeatureFlags.shared
+    private let demoDataProvider = DemoDataProvider.shared
+    private var demoCancellables = Set<AnyCancellable>()
+
     // MARK: - Initialization
 
     init(deviceManagerAdapter: DeviceManagerAdapter,
@@ -190,6 +195,9 @@ class DashboardViewModel: ObservableObject {
 
     // MARK: - Private Methods
     private func setupBindings() {
+        // Setup demo mode subscription
+        setupDemoModeSubscription()
+
         // Subscribe to threshold changes for live UI updates
         ThresholdSettings.shared.$movementThreshold
             .sink { [weak self] newThreshold in
@@ -478,6 +486,130 @@ class DashboardViewModel: ObservableObject {
         oralableConnected = false
         anrConnected = false
         anrFailed = false
+    }
+
+    // MARK: - Demo Mode
+    private func setupDemoModeSubscription() {
+        // Watch for demo device connection state changes (primary trigger for demo data flow)
+        demoDataProvider.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                Logger.shared.info("[DashboardViewModel] Demo device connection changed: \(isConnected)")
+                if isConnected {
+                    self?.startDemoMode()
+                } else {
+                    self?.stopDemoMode()
+                }
+            }
+            .store(in: &demoCancellables)
+
+        // Also watch for demo mode toggle to disconnect if disabled
+        featureFlags.$demoModeEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                Logger.shared.info("[DashboardViewModel] Demo mode flag changed: \(enabled)")
+                if !enabled {
+                    // Demo mode disabled - disconnect demo device
+                    DemoDataProvider.shared.disconnect()
+                    DemoDataProvider.shared.resetDiscovery()
+                    self?.stopDemoMode()
+                }
+            }
+            .store(in: &demoCancellables)
+
+        // Subscribe to demo PPG data
+        // Use dropFirst to skip initial value, then receive on main thread
+        demoDataProvider.$currentPPGIR
+            .dropFirst() // Skip initial 0 value
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] value in
+                guard let self = self else { return }
+                guard FeatureFlags.shared.demoModeEnabled else { return }
+                Logger.shared.debug("[DashboardViewModel] Demo PPG IR received: \(Int(value))")
+                self.processPPGIRData(value)
+            }
+            .store(in: &demoCancellables)
+
+        // Subscribe to demo accelerometer data (already in raw LSB units from CSV)
+        demoDataProvider.$currentAccelX
+            .combineLatest(demoDataProvider.$currentAccelY, demoDataProvider.$currentAccelZ)
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] x, y, z in
+                guard let self = self else { return }
+                guard FeatureFlags.shared.demoModeEnabled else { return }
+                // CSV data is already in raw accelerometer values (LSB)
+                self.processAccelerometerData(x: x, y: y, z: z)
+            }
+            .store(in: &demoCancellables)
+
+        // Subscribe to demo temperature
+        demoDataProvider.$currentTemperature
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] temp in
+                guard let self = self else { return }
+                guard FeatureFlags.shared.demoModeEnabled else { return }
+                self.temperature = temp
+            }
+            .store(in: &demoCancellables)
+
+        // Subscribe to demo heart rate
+        demoDataProvider.$currentHeartRate
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] hr in
+                guard let self = self else { return }
+                guard FeatureFlags.shared.demoModeEnabled else { return }
+                self.heartRate = hr
+            }
+            .store(in: &demoCancellables)
+
+        // Subscribe to demo SpO2
+        demoDataProvider.$currentSpO2
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] spo2 in
+                guard let self = self else { return }
+                guard FeatureFlags.shared.demoModeEnabled else { return }
+                self.spO2 = Int(spo2)
+            }
+            .store(in: &demoCancellables)
+
+        // Subscribe to demo battery
+        demoDataProvider.$currentBattery
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] battery in
+                guard let self = self else { return }
+                guard FeatureFlags.shared.demoModeEnabled else { return }
+                self.batteryLevel = Double(battery)
+            }
+            .store(in: &demoCancellables)
+    }
+
+    private func startDemoMode() {
+        // Set demo device as connected (playback is already started by simulateConnect)
+        oralableConnected = true
+        isConnected = true
+        connectedDeviceType = .demo
+        deviceName = demoDataProvider.deviceName
+
+        Logger.shared.info("[DashboardViewModel] Demo mode started - device connected")
+    }
+
+    private func stopDemoMode() {
+        // Playback is stopped by disconnect() method
+
+        // Only reset connection state if no real device is connected
+        if deviceManager.connectedDevices.isEmpty {
+            oralableConnected = false
+            isConnected = false
+            connectedDeviceType = nil
+            deviceName = ""
+        }
+
+        Logger.shared.info("[DashboardViewModel] Demo mode stopped - device disconnected")
     }
 }
 

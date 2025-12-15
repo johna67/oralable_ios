@@ -32,6 +32,7 @@ class FeatureFlags: ObservableObject {
         static let showAdvancedMetrics = "feature.dashboard.showAdvancedMetrics"
         static let showDetectionSettings = "feature.settings.showDetectionSettings"
         static let showCloudKitShare = "feature.share.showCloudKitShare"
+        static let demoModeEnabled = "feature.demo.enabled"
     }
 
     // MARK: - Default Configuration
@@ -55,6 +56,9 @@ class FeatureFlags: ObservableObject {
         static let showAdvancedMetrics = false
         static let showDetectionSettings = false
         static let showCloudKitShare = false
+
+        // Demo Mode
+        static let demoModeEnabled = false
     }
 
     // MARK: - Dashboard Features
@@ -112,6 +116,11 @@ class FeatureFlags: ObservableObject {
         didSet { defaults.set(showCloudKitShare, forKey: Keys.showCloudKitShare) }
     }
 
+    // MARK: - Demo Mode
+    @Published var demoModeEnabled: Bool {
+        didSet { defaults.set(demoModeEnabled, forKey: Keys.demoModeEnabled) }
+    }
+
     // MARK: - Initialization
     init() {
         // Load saved values or use pre-launch defaults
@@ -128,6 +137,7 @@ class FeatureFlags: ObservableObject {
         self.showHealthIntegration = defaults.object(forKey: Keys.showHealthIntegration) as? Bool ?? Defaults.showHealthIntegration
         self.showDetectionSettings = defaults.object(forKey: Keys.showDetectionSettings) as? Bool ?? Defaults.showDetectionSettings
         self.showCloudKitShare = defaults.object(forKey: Keys.showCloudKitShare) as? Bool ?? Defaults.showCloudKitShare
+        self.demoModeEnabled = defaults.object(forKey: Keys.demoModeEnabled) as? Bool ?? Defaults.demoModeEnabled
 
         Logger.shared.info("[FeatureFlags] Initialized with pre-launch configuration")
     }
@@ -237,6 +247,7 @@ class FeatureFlags: ObservableObject {
     /// Reset to defaults
     func resetToDefaults() {
         applyPreLaunchConfig()
+        demoModeEnabled = false
     }
 
     // MARK: - Debug Description
@@ -256,6 +267,7 @@ class FeatureFlags: ObservableObject {
         - Health Integration: \(showHealthIntegration)
         - Detection Settings: \(showDetectionSettings)
         - CloudKit Share: \(showCloudKitShare)
+        - Demo Mode: \(demoModeEnabled)
         """
     }
 }

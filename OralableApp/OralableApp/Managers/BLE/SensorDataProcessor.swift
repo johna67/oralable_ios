@@ -578,4 +578,87 @@ class SensorDataProcessor: ObservableObject {
     func addLog(_ message: String) {
         logMessages.append(LogMessage(message: message))
     }
+
+    // MARK: - Demo Data Injection
+
+    /// Inject PPG reading from demo device (same pipeline as real BLE data)
+    /// - Parameters:
+    ///   - ir: PPG IR value
+    ///   - red: PPG Red value
+    ///   - green: PPG Green value
+    func injectDemoReading(ir: Double, red: Double, green: Double) {
+        let timestamp = Date()
+
+        // Update current values (same as real device)
+        self.ppgIRValue = ir
+        self.ppgRedValue = red
+        self.ppgGreenValue = green
+
+        // Create PPG data
+        let ppgData = PPGData(
+            red: Int32(red),
+            ir: Int32(ir),
+            green: Int32(green),
+            timestamp: timestamp
+        )
+
+        // Add to PPG history
+        self.ppgHistory.append(ppgData)
+
+        // Add IR to buffer for heart rate calculation
+        if ir > 0 {
+            self.ppgIRBuffer.append(UInt32(ir))
+        }
+
+        // Create full SensorData for recording/export
+        // Use static values for non-PPG fields (accelerometer, temp, battery)
+        let accelData = AccelerometerData(
+            x: 0,
+            y: 0,
+            z: 16384,  // ~1g at rest
+            timestamp: timestamp
+        )
+
+        let tempData = TemperatureData(
+            celsius: 36.5,
+            timestamp: timestamp
+        )
+
+        let batteryData = BatteryData(
+            percentage: 85,
+            timestamp: timestamp
+        )
+
+        let hrData = HeartRateData(
+            bpm: 70,
+            quality: 0.8,
+            timestamp: timestamp
+        )
+
+        let spo2Data = SpO2Data(
+            percentage: 98.0,
+            quality: 0.8,
+            timestamp: timestamp
+        )
+
+        let sensorData = SensorData(
+            timestamp: timestamp,
+            ppg: ppgData,
+            accelerometer: accelData,
+            temperature: tempData,
+            battery: batteryData,
+            heartRate: hrData,
+            spo2: spo2Data,
+            deviceType: .demo
+        )
+
+        // Append to history (for recording/export)
+        self.sensorDataHistory.append(sensorData)
+
+        // Trim history to prevent memory issues (keep ~40 seconds at 1200Hz = ~48000 samples)
+        // But cap at 10000 to match real device behavior
+        if self.sensorDataHistory.count > 10000 {
+            self.sensorDataHistory.removeFirst(self.sensorDataHistory.count - 10000)
+        }
+    }
 }

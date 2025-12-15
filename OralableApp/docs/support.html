@@ -1,19 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8KS53K3LST"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-8KS53K3LST');
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Support - Oralable</title>
-    <link rel="icon" type="image/png" href="images/oralable-icon.png">
-    <link rel="apple-touch-icon" href="images/oralable-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -23,309 +15,213 @@
         }
         body {
             font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #ffffff;
-            color: #1a1a1a;
+            background: #ffffff;
+            color: #000000;
             line-height: 1.7;
-            padding: 20px;
-            max-width: 800px;
+        }
+        .container {
+            max-width: 700px;
             margin: 0 auto;
+            padding: 0 24px;
+        }
+        header {
+            padding: 40px 0;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            text-decoration: none;
+            color: #000000;
+        }
+        main {
+            padding: 60px 0;
         }
         h1 {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 700;
-            margin-bottom: 10px;
-            color: #000;
+            margin-bottom: 16px;
+        }
+        .intro {
+            font-size: 18px;
+            color: #666666;
+            margin-bottom: 40px;
         }
         h2 {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 600;
-            margin-top: 30px;
-            margin-bottom: 15px;
-            color: #000;
+            margin-top: 48px;
+            margin-bottom: 24px;
         }
-        h3 {
+        .faq-item {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .faq-item:last-child {
+            border-bottom: none;
+        }
+        .faq-question {
             font-size: 16px;
             font-weight: 600;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        p {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        ul {
-            margin-bottom: 15px;
-            padding-left: 25px;
-        }
-        li {
             margin-bottom: 8px;
-            color: #333;
         }
-        .subtitle {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 30px;
+        .faq-answer {
+            font-size: 15px;
+            color: #333333;
         }
         .contact-box {
-            background-color: #007AFF;
-            color: white;
-            padding: 25px;
+            background: #f5f5f5;
+            padding: 32px;
             border-radius: 12px;
-            margin: 30px 0;
+            margin-top: 48px;
             text-align: center;
         }
         .contact-box h2 {
-            color: white;
             margin-top: 0;
+            margin-bottom: 16px;
+        }
+        .contact-box p {
+            margin-bottom: 8px;
+            color: #333333;
         }
         .contact-box a {
-            color: white;
-            font-size: 20px;
+            color: #000000;
             font-weight: 600;
         }
-        .faq-item {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+        footer {
+            padding: 40px 0;
+            border-top: 1px solid #e5e5e5;
+            text-align: center;
         }
-        .faq-question {
-            font-weight: 600;
-            color: #000;
-            margin-bottom: 10px;
-        }
-        .faq-answer {
-            color: #333;
-            margin: 0;
-        }
-        a {
-            color: #007AFF;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .troubleshooting {
-            background-color: #fff3cd;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #ffc107;
-            margin: 20px 0;
-        }
-        .troubleshooting h3 {
-            color: #856404;
-            margin-top: 0;
-        }
-        .step {
+        .footer-links {
             display: flex;
-            margin-bottom: 15px;
-        }
-        .step-number {
-            background-color: #007AFF;
-            color: white;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
             justify-content: center;
-            font-weight: 600;
-            margin-right: 15px;
-            flex-shrink: 0;
+            gap: 32px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
         }
-        .step-content {
-            flex: 1;
-        }
-        .back-link {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #007AFF;
+        .footer-links a {
+            color: #000000;
             text-decoration: none;
+            font-size: 14px;
         }
-        .back-link:hover {
+        .footer-links a:hover {
             text-decoration: underline;
         }
-        @media (max-width: 600px) {
-            body {
-                padding: 15px;
-            }
-            h1 {
-                font-size: 24px;
-            }
-            h2 {
-                font-size: 18px;
-            }
+        .copyright {
+            font-size: 13px;
+            color: #666666;
         }
     </style>
 </head>
 <body>
-    <div class="disclaimer-banner" style="background: #fff3cd; padding: 15px 20px; text-align: center; font-size: 14px; border-bottom: 1px solid #ffc107; margin: -20px -20px 20px -20px; width: calc(100% + 40px);">
-        <strong style="color: #856404;">WELLNESS DEVICE</strong> - Oralable is a muscle activity monitor for personal awareness. Not a medical device.
-    </div>
+    <nav style="display: flex; justify-content: center; gap: 30px; padding: 20px; border-bottom: 1px solid #e5e5e5;">
+        <a href="index.html" style="color: #000; text-decoration: none; font-size: 14px;">Home</a>
+        <a href="user-guide.html" style="color: #000; text-decoration: none; font-size: 14px;">User Guide</a>
+        <a href="support.html" style="color: #000; text-decoration: none; font-size: 14px;">Support</a>
+        <a href="privacy.html" style="color: #000; text-decoration: none; font-size: 14px;">Privacy</a>
+        <a href="terms.html" style="color: #000; text-decoration: none; font-size: 14px;">Terms</a>
+    </nav>
 
-    <a href="index.html" class="back-link">&larr; Back to Home</a>
-
-    <h1>Support Center</h1>
-    <p class="subtitle">Get help with Oralable</p>
-
-    <div class="contact-box">
-        <h2>Need Help?</h2>
-        <p>Our support team is here to assist you</p>
-        <a href="mailto:support@oralable.com">support@oralable.com</a>
-    </div>
-
-    <h2>Getting Started</h2>
-
-    <div class="step">
-        <div class="step-number">1</div>
-        <div class="step-content">
-            <strong>Download the App</strong><br>
-            Get Oralable from the App Store on your iPhone or iPad.
+    <header>
+        <div class="container">
+            <a href="index.html" class="logo">Oralable</a>
         </div>
-    </div>
-    <div class="step">
-        <div class="step-number">2</div>
-        <div class="step-content">
-            <strong>Sign In</strong><br>
-            Use Sign in with Apple for secure, private authentication.
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Support</h1>
+            <p class="intro">Find answers to common questions or contact us for help.</p>
+
+            <h2>Frequently Asked Questions</h2>
+
+            <div class="faq-item">
+                <p class="faq-question">How do I connect the sensor to my iPhone?</p>
+                <p class="faq-answer">Open the Oralable app and go to the Devices tab. Make sure your sensor is powered on (blue LED blinking). Tap "Scan for Devices" and select your Oralable sensor from the list. The connection will be established automatically.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">Why isn't my sensor connecting?</p>
+                <p class="faq-answer">First, ensure Bluetooth is enabled on your iPhone (Settings → Bluetooth). Make sure the sensor is charged and powered on. If the sensor still doesn't appear, try restarting both the sensor and your iPhone. Move closer to the sensor as Bluetooth range is approximately 10 meters.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How do I export my data?</p>
+                <p class="faq-answer">Go to the History tab and select the session you want to export. Tap the Share button and choose "Export as CSV". You can then save the file, email it, or share it via any app that accepts files.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">Where is my data stored?</p>
+                <p class="faq-answer">All your monitoring data is stored locally on your iPhone. We do not automatically upload your data to any external servers. You have full control over your data and can export or delete it at any time.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How do I delete my data?</p>
+                <p class="faq-answer">Go to the History tab, swipe left on any session, and tap Delete. To delete all data, go to Settings → Data Management → Delete All Data.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">Is Oralable a medical device?</p>
+                <p class="faq-answer">No. Oralable is a wellness monitoring tool designed for personal tracking and is not intended to diagnose, treat, cure, or prevent any disease. Always consult a healthcare provider for medical advice.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">What do the readings mean?</p>
+                <p class="faq-answer">The PPG sensor measures changes in blood volume in the tissue, which correlates with muscle activity. Higher values indicate more activity. Use the data to observe your personal patterns over time.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How long does the sensor battery last?</p>
+                <p class="faq-answer">The sensor battery provides approximately 8-10 hours of continuous monitoring on a full charge. Charging takes about 2 hours via the included USB cable.</p>
+            </div>
+
+            <h2 id="demo-mode">Demo Mode</h2>
+
+            <div class="faq-item">
+                <p class="faq-question">What is Demo Mode?</p>
+                <p class="faq-answer">Demo Mode simulates a connected Oralable device with realistic muscle activity data. It allows you to explore the full app without hardware.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How do I enable Demo Mode?</p>
+                <p class="faq-answer">Go to Settings and toggle "Demo Mode" on. Return to the Dashboard to see simulated sensor data.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">What can I do in Demo Mode?</p>
+                <p class="faq-answer">Everything except connect to a real device. You can view real-time waveforms, record sessions, review history, and share data as CSV.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">Are Demo Mode recordings saved?</p>
+                <p class="faq-answer">Yes. Recordings made in Demo Mode are saved like normal sessions and appear in your History.</p>
+            </div>
+
+            <div class="faq-item">
+                <p class="faq-question">How do I disable Demo Mode?</p>
+                <p class="faq-answer">Go to Settings and toggle "Demo Mode" off. The app will return to waiting for a real device connection.</p>
+            </div>
+
+            <div class="contact-box">
+                <h2>Need More Help?</h2>
+                <p>Contact our support team and we'll get back to you within 24 hours.</p>
+                <p><a href="mailto:support@oralable.com">support@oralable.com</a></p>
+            </div>
         </div>
-    </div>
-    <div class="step">
-        <div class="step-number">3</div>
-        <div class="step-content">
-            <strong>Connect Your Device</strong><br>
-            The app will scan for your Oralable sensor. Tap "Connect" when it appears.
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="user-guide.html">User Guide</a>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="terms.html">Terms of Service</a>
+            </div>
+            <p class="copyright">&copy; 2025 JAC Dental Solutions Limited. All rights reserved.</p>
         </div>
-    </div>
-    <div class="step">
-        <div class="step-number">4</div>
-        <div class="step-content">
-            <strong>View Your Dashboard</strong><br>
-            Once connected, you'll see real-time muscle activity on your dashboard.
-        </div>
-    </div>
-    <div class="step">
-        <div class="step-number">5</div>
-        <div class="step-content">
-            <strong>Record Sessions</strong><br>
-            Tap the record button to save a session for later review.
-        </div>
-    </div>
-
-    <h2>Frequently Asked Questions</h2>
-
-    <div class="faq-item">
-        <p class="faq-question">Is Oralable a medical device?</p>
-        <p class="faq-answer"><strong>No.</strong> Oralable is a consumer wellness device for personal awareness of muscle activity patterns. It is NOT a medical device and does NOT diagnose, treat, or cure any medical condition. It is similar to a fitness tracker &mdash; useful for personal awareness but not for medical purposes. If you have health concerns, please consult a qualified healthcare provider.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">What devices are compatible with Oralable?</p>
-        <p class="faq-answer">Oralable works with the Oralable sensor device and ANR MuscleSeñse devices. Both connect via Bluetooth Low Energy (BLE) 4.0 or later. Your iPhone or iPad must be running iOS 18.0 or later.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">How do I connect my device?</p>
-        <p class="faq-answer">Open the Oralable app and tap "Connect" on the dashboard. The app will scan for nearby devices. When your Oralable sensor appears, tap it to connect. The status will show "Ready" when connected.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">How do I record a session?</p>
-        <p class="faq-answer">Once connected to your device, tap the record button on the dashboard. The app will record your muscle activity until you tap stop. You can review recorded sessions later.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">How do I export my data?</p>
-        <p class="faq-answer">Go to the Export tab in the app and tap "Export Data as CSV". You can then share the CSV file via email, AirDrop, or save it to Files.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">Is my data secure?</p>
-        <p class="faq-answer">Yes. All data is stored locally on your device. If you choose to share data, it's encrypted and transmitted via Apple's secure CloudKit infrastructure. We never sell your data or share it without your explicit consent. See our <a href="privacy.html">Privacy Policy</a> for details.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">How do I share data with my healthcare professional?</p>
-        <p class="faq-answer">In the Oralable app, go to the Share tab and tap "Generate Share Code". You'll receive a 6-digit code that's valid for 48 hours. Give this code to your healthcare professional, who enters it in the <a href="for-professionals.html">Oralable for Professionals</a> app to view your data. You can revoke access at any time from the Share tab.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">What is Oralable for Professionals?</p>
-        <p class="faq-answer">Oralable for Professionals is a companion app for researchers, therapists, and clinicians. It allows healthcare providers to view muscle activity data shared by their participants. Learn more on our <a href="for-professionals.html">For Professionals</a> page.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">Who is Oralable for?</p>
-        <p class="faq-answer">Oralable is designed for researchers conducting studies on muscle activity, speech-language pathologists working on oral motor therapy, and dental professionals monitoring bruxism and TMJ conditions. Anyone interested in tracking their jaw muscle activity patterns can use the Oralable app.</p>
-    </div>
-
-    <div class="faq-item">
-        <p class="faq-question">What's the difference between a participant and a professional?</p>
-        <p class="faq-answer">Participants wear the Oralable sensor and use the Oralable app to monitor their own muscle activity. Professionals (researchers, therapists, dentists) use Oralable for Professionals to view and analyze participant data that has been shared with them.</p>
-    </div>
-
-    <h2>Troubleshooting</h2>
-
-    <div class="troubleshooting">
-        <h3>Device Won't Connect</h3>
-        <ol>
-            <li><strong>Check Bluetooth is enabled</strong> - Go to iPhone Settings > Bluetooth and ensure it's turned on</li>
-            <li><strong>Restart the Oralable device</strong> - Turn it off and on again, or place it on the charger briefly</li>
-            <li><strong>Restart the app</strong> - Force close Oralable and reopen it</li>
-            <li><strong>Restart your iPhone</strong> - Sometimes a full restart resolves Bluetooth issues</li>
-            <li><strong>Check battery</strong> - Ensure your Oralable device is charged</li>
-        </ol>
-    </div>
-
-    <div class="troubleshooting">
-        <h3>Data Not Appearing on Dashboard</h3>
-        <ol>
-            <li><strong>Verify connection</strong> - Check that the device shows "Ready" (green status)</li>
-            <li><strong>Wait for data</strong> - It may take a few seconds after connection for data to appear</li>
-            <li><strong>Check device placement</strong> - Ensure the sensor is making good contact</li>
-        </ol>
-    </div>
-
-    <div class="troubleshooting">
-        <h3>App Crashes or Freezes</h3>
-        <ol>
-            <li><strong>Update the app</strong> - Ensure you have the latest version from the App Store</li>
-            <li><strong>Restart the app</strong> - Force close and reopen</li>
-            <li><strong>Restart your device</strong> - A fresh start often resolves issues</li>
-            <li><strong>Reinstall</strong> - Delete and reinstall the app</li>
-        </ol>
-    </div>
-
-    <h2>Contact Us</h2>
-
-    <p>We're here to help! Reach out through any of these channels:</p>
-
-    <ul>
-        <li><strong>Email:</strong> <a href="mailto:support@oralable.com">support@oralable.com</a></li>
-        <li><strong>Response Time:</strong> We aim to respond within 24-48 hours on business days</li>
-    </ul>
-
-    <h3>When Contacting Support</h3>
-    <p>To help us resolve your issue quickly, please include:</p>
-    <ul>
-        <li>Your device model (e.g., iPhone 15 Pro)</li>
-        <li>iOS version (Settings > General > About)</li>
-        <li>Oralable app version</li>
-        <li>A description of the issue</li>
-        <li>Screenshots if applicable</li>
-    </ul>
-
-    <h2>Additional Resources</h2>
-
-    <ul>
-        <li><a href="privacy.html">Privacy Policy</a></li>
-        <li><a href="terms.html">Terms of Service</a></li>
-        <li><a href="about.html">About Oralable</a></li>
-    </ul>
-
-    <p style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
-        &copy; 2025 JAC Dental Solutions Limited. All rights reserved.
-    </p>
+    </footer>
 </body>
 </html>

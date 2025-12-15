@@ -1,20 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8KS53K3LST"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-8KS53K3LST');
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oralable - Muscle Activity Monitor</title>
-    <link rel="icon" type="image/png" href="images/oralable-icon.png">
-    <link rel="apple-touch-icon" href="images/oralable-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -24,386 +15,316 @@
         }
         body {
             font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #ffffff;
-            color: #1d1d1f;
+            background: #ffffff;
+            color: #000000;
             line-height: 1.6;
         }
-        .hero {
-            min-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 60px 20px;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        header {
+            padding: 60px 0 40px;
             text-align: center;
-            background: linear-gradient(180deg, #f5f5f7 0%, #ffffff 100%);
+            border-bottom: 1px solid #e5e5e5;
         }
         .logo {
-            width: 120px;
-            height: 120px;
-            border-radius: 24px;
-            margin-bottom: 30px;
-            overflow: hidden;
-        }
-        .logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        h1 {
-            font-size: 48px;
+            font-size: 32px;
             font-weight: 700;
-            margin-bottom: 10px;
-            color: #000;
+            margin-bottom: 8px;
         }
         .tagline {
-            font-size: 24px;
-            color: #86868b;
-            margin-bottom: 20px;
-            font-style: italic;
-        }
-        .subtitle {
             font-size: 18px;
-            color: #1d1d1f;
-            max-width: 500px;
+            color: #666666;
+        }
+        .hero {
+            padding: 60px 0;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .hero p {
+            font-size: 18px;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto 32px;
+        }
+        .badge {
+            display: inline-block;
+            background: #000000;
+            color: #ffffff;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
             margin-bottom: 40px;
         }
-        .btn {
+        .app-store-btn {
             display: inline-block;
-            padding: 16px 40px;
-            border-radius: 12px;
-            font-weight: 600;
+            background: #000000;
+            color: #ffffff;
+            padding: 14px 32px;
+            border-radius: 8px;
             text-decoration: none;
-            transition: all 0.2s;
-            font-size: 18px;
+            font-weight: 600;
+            font-size: 16px;
         }
-        .btn-primary {
-            background-color: #000;
-            color: #fff;
-        }
-        .btn-primary:hover {
-            background-color: #333;
-        }
-        .note {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #86868b;
+        .app-store-btn:hover {
+            background: #333333;
         }
         .features {
-            padding: 80px 20px;
-            max-width: 1000px;
-            margin: 0 auto;
+            padding: 60px 0;
+            border-top: 1px solid #e5e5e5;
         }
         .features h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 40px;
             text-align: center;
-            font-size: 32px;
-            margin-bottom: 50px;
         }
         .feature-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 32px;
         }
-        .feature-card {
-            padding: 30px;
-            background: #f5f5f7;
-            border-radius: 16px;
-            text-align: center;
+        .feature {
+            padding: 24px;
+            border: 1px solid #e5e5e5;
+            border-radius: 12px;
         }
-        .feature-icon {
-            font-size: 40px;
-            margin-bottom: 15px;
-        }
-        .feature-card h3 {
+        .feature h3 {
             font-size: 18px;
-            margin-bottom: 10px;
-        }
-        .feature-card p {
-            color: #86868b;
-            font-size: 14px;
-        }
-        .disclaimer-banner {
-            background: #fff3cd;
-            padding: 15px 20px;
-            text-align: center;
-            font-size: 14px;
-            border-bottom: 1px solid #ffc107;
-        }
-        .disclaimer-banner strong {
-            color: #856404;
-        }
-        nav {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            padding: 20px;
-            background: #fff;
-            border-bottom: 1px solid #e8e8ed;
-        }
-        nav a {
-            color: #1d1d1f;
-            text-decoration: none;
-            font-size: 14px;
             font-weight: 600;
+            margin-bottom: 8px;
         }
-        nav a:hover {
-            color: #007AFF;
+        .feature p {
+            font-size: 14px;
+            color: #666666;
         }
-        .apps {
-            padding: 60px 20px;
-            max-width: 900px;
-            margin: 0 auto;
+        .how-it-works {
+            padding: 60px 0;
+            border-top: 1px solid #e5e5e5;
         }
-        .apps h2 {
-            text-align: center;
-            font-size: 32px;
+        .how-it-works h2 {
+            font-size: 28px;
+            font-weight: 700;
             margin-bottom: 40px;
+            text-align: center;
         }
-        .app-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        .steps {
+            display: flex;
+            flex-direction: column;
             gap: 24px;
         }
-        .app-card {
-            background: #f5f5f7;
-            border-radius: 16px;
-            padding: 32px;
-            text-align: center;
-        }
-        .app-card h3 {
-            font-size: 22px;
-            margin-bottom: 12px;
-        }
-        .app-card p {
-            color: #86868b;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        .app-card .btn-secondary {
-            background-color: #fff;
-            color: #000;
-            border: 1px solid #000;
-        }
-        .app-card .btn-secondary:hover {
-            background-color: #f5f5f7;
-        }
-        .links {
-            padding: 60px 20px;
-            text-align: center;
-            background: #f5f5f7;
-        }
-        .links h2 {
-            margin-bottom: 30px;
-        }
-        .links-grid {
+        .step {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
+            align-items: flex-start;
             gap: 16px;
+        }
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: #000000;
+            color: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .step-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .step-content p {
+            font-size: 14px;
+            color: #666666;
+        }
+        .disclaimer {
+            padding: 40px 0;
+            border-top: 1px solid #e5e5e5;
+            text-align: center;
+        }
+        .disclaimer-box {
+            background: #f5f5f5;
+            padding: 24px;
+            border-radius: 8px;
             max-width: 600px;
             margin: 0 auto;
         }
-        .links-grid a {
-            display: block;
-            padding: 16px 32px;
-            background-color: #fff;
-            color: #1d1d1f;
-            text-decoration: none;
-            border-radius: 12px;
-            font-weight: 600;
-            transition: background-color 0.2s;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .links-grid a:hover {
-            background-color: #e8e8ed;
-        }
-        .use-cases {
-            padding: 80px 20px;
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-        .use-cases h2 {
-            text-align: center;
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-        .use-cases .section-subtitle {
-            text-align: center;
-            color: #86868b;
-            font-size: 18px;
-            margin-bottom: 50px;
-        }
-        .use-case-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 30px;
-        }
-        .use-case-card {
-            padding: 30px;
-            background: #f5f5f7;
-            border-radius: 16px;
-            text-align: center;
-            border: 2px solid transparent;
-            transition: border-color 0.2s;
-        }
-        .use-case-card:hover {
-            border-color: #007AFF;
-        }
-        .use-case-card .icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-        .use-case-card h3 {
-            font-size: 20px;
-            margin-bottom: 12px;
-            color: #000;
-        }
-        .use-case-card p {
-            color: #86868b;
+        .disclaimer-box h3 {
             font-size: 14px;
-            line-height: 1.6;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .disclaimer-box p {
+            font-size: 13px;
+            color: #666666;
         }
         footer {
-            padding: 40px 20px;
+            padding: 40px 0;
+            border-top: 1px solid #e5e5e5;
             text-align: center;
-            color: #86868b;
-            font-size: 14px;
-        }
-        footer a {
-            color: #86868b;
-            text-decoration: none;
-        }
-        footer a:hover {
-            text-decoration: underline;
         }
         .footer-links {
-            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
         }
         .footer-links a {
-            margin: 0 15px;
+            color: #000000;
+            text-decoration: none;
+            font-size: 14px;
         }
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 32px;
-            }
-            .tagline {
-                font-size: 18px;
-            }
-            nav {
-                flex-wrap: wrap;
-                gap: 15px;
-            }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        .copyright {
+            font-size: 13px;
+            color: #666666;
         }
     </style>
 </head>
 <body>
-    <div class="disclaimer-banner">
-        <strong>WELLNESS DEVICE</strong> - Oralable is a muscle activity monitor for personal awareness. Not a medical device.
-    </div>
-
-    <nav>
-        <a href="index.html">Home</a>
-        <a href="product.html">Product</a>
-        <a href="for-professionals.html">For Professionals</a>
-        <a href="about.html">About</a>
-        <a href="beta.html">Early Access</a>
+    <nav style="display: flex; justify-content: center; gap: 30px; padding: 20px; border-bottom: 1px solid #e5e5e5;">
+        <a href="index.html" style="color: #000; text-decoration: none; font-size: 14px;">Home</a>
+        <a href="user-guide.html" style="color: #000; text-decoration: none; font-size: 14px;">User Guide</a>
+        <a href="support.html" style="color: #000; text-decoration: none; font-size: 14px;">Support</a>
+        <a href="privacy.html" style="color: #000; text-decoration: none; font-size: 14px;">Privacy</a>
+        <a href="terms.html" style="color: #000; text-decoration: none; font-size: 14px;">Terms</a>
     </nav>
 
-    <section class="hero">
-        <div class="logo">
-            <img src="images/oralable-icon.png" alt="Oralable Logo">
+    <header>
+        <div class="container">
+            <div class="logo">Oralable</div>
+            <div class="tagline">Muscle Activity Monitor</div>
         </div>
-        <h1>Muscle Activity Monitor</h1>
-        <p class="tagline">Word of Mouth</p>
-        <p class="subtitle">Track jaw muscle activity patterns. Simple biofeedback for personal awareness.</p>
-        <a href="beta.html" class="btn btn-primary">Join Early Access</a>
-        <p class="note">Launching January 2026 &bull; Not a medical device</p>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <span class="badge">Wellness Monitoring</span>
+            <h1>Track Your Muscle Activity</h1>
+            <p>Monitor jaw muscle activity with precision PPG sensor technology. Export your data for personal tracking or to share with healthcare providers.</p>
+            <a href="#" class="app-store-btn">Download on the App Store</a>
+        </div>
     </section>
 
     <section class="features">
-        <h2>What Oralable Does</h2>
-        <div class="feature-grid">
-            <div class="feature-card">
-                <div class="feature-icon">&#x1F4CA;</div>
-                <h3>Real-Time Display</h3>
-                <p>See your muscle activity as it happens. Simple visual feedback during sessions.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">&#x23FA;</div>
-                <h3>Session Recording</h3>
-                <p>Record sessions and review your activity patterns later.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">&#x1F4E4;</div>
-                <h3>Data Export</h3>
-                <p>Export your data as CSV for personal analysis or sharing.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">&#x1F4F1;</div>
-                <h3>Simple Biofeedback</h3>
-                <p>Personal awareness tool, like a fitness tracker for your jaw muscles.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="use-cases">
-        <h2>Built for Professionals</h2>
-        <p class="section-subtitle">One platform, multiple applications</p>
-        <div class="use-case-grid">
-            <div class="use-case-card">
-                <div class="icon">🔬</div>
-                <h3>Research</h3>
-                <p>Collect objective muscle activity data for academic studies, clinical trials, and sleep research. Export data in CSV format for analysis.</p>
-            </div>
-            <div class="use-case-card">
-                <div class="icon">🗣️</div>
-                <h3>Speech Therapy</h3>
-                <p>Monitor oral motor function, assess articulation patterns, and provide real-time biofeedback during therapy sessions.</p>
-            </div>
-            <div class="use-case-card">
-                <div class="icon">🦷</div>
-                <h3>Dentistry</h3>
-                <p>Track bruxism patterns, assess TMJ function, and evaluate nightguard effectiveness with objective measurements.</p>
+        <div class="container">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <h3>PPG Sensor Monitoring</h3>
+                    <p>Advanced photoplethysmography technology captures muscle activity data with precision.</p>
+                </div>
+                <div class="feature">
+                    <h3>Real-Time Dashboard</h3>
+                    <p>View your muscle activity metrics in real-time with an intuitive, easy-to-read interface.</p>
+                </div>
+                <div class="feature">
+                    <h3>CSV Data Export</h3>
+                    <p>Export your recorded sessions as CSV files to analyze or share with healthcare providers.</p>
+                </div>
+                <div class="feature">
+                    <h3>Session History</h3>
+                    <p>Review past monitoring sessions and track your patterns over time.</p>
+                </div>
+                <div class="feature">
+                    <h3>Bluetooth Connection</h3>
+                    <p>Seamlessly connect to the Oralable sensor via Bluetooth Low Energy.</p>
+                </div>
+                <div class="feature">
+                    <h3>Local Data Storage</h3>
+                    <p>Your data stays on your device. You control when and how to share it.</p>
+                </div>
             </div>
         </div>
     </section>
 
-    <section class="apps">
-        <h2>Two Apps, One Platform</h2>
-        <div class="app-grid">
-            <div class="app-card">
-                <div class="feature-icon">📱</div>
-                <h3>Oralable</h3>
-                <p>For participants. Monitor your muscle activity patterns. Track trends over time. Share data with your healthcare professional.</p>
-                <a href="beta.html" class="btn btn-primary">Join Early Access</a>
-            </div>
-            <div class="app-card">
-                <div class="feature-icon">🩺</div>
-                <h3>Oralable for Professionals</h3>
-                <p>For researchers, therapists, and clinicians. View participant wellness data. Track progress across sessions. Access detailed activity reports.</p>
-                <a href="for-professionals.html" class="btn btn-secondary">Learn More</a>
+    <section class="how-it-works">
+        <div class="container">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Connect Your Sensor</h3>
+                        <p>Pair the Oralable sensor with your iPhone via Bluetooth.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Start Monitoring</h3>
+                        <p>Begin a session and watch your muscle activity data in real-time.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Review Your Data</h3>
+                        <p>Analyze your sessions and identify patterns in your muscle activity.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h3>Export and Share</h3>
+                        <p>Export your data as CSV to share with healthcare providers or for personal records.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <section class="links">
-        <h2>Resources</h2>
-        <div class="links-grid">
-            <a href="privacy.html">Privacy Policy</a>
-            <a href="terms.html">Terms of Service</a>
-            <a href="support.html">Support Center</a>
-            <a href="about.html">About Us</a>
+    <section style="padding: 60px 0; background: #f5f5f7;">
+        <div class="container">
+            <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 12px; text-align: center;">Try Before You Buy</h2>
+            <p style="color: #666; font-size: 18px; margin-bottom: 30px; text-align: center;">No hardware? No problem.</p>
+            <div style="background: #fff; padding: 40px; border-radius: 16px;">
+                <h3 style="font-size: 24px; margin-bottom: 16px;">Demo Mode Included</h3>
+                <p style="margin-bottom: 16px;">Experience the full Oralable app without purchasing hardware. Demo Mode simulates a connected device with realistic muscle activity patterns.</p>
+                <ul style="margin: 20px 0; padding-left: 24px;">
+                    <li style="margin-bottom: 8px;">Explore the complete interface</li>
+                    <li style="margin-bottom: 8px;">See real-time waveform display</li>
+                    <li style="margin-bottom: 8px;">Test recording and playback</li>
+                    <li style="margin-bottom: 8px;">View historical charts</li>
+                </ul>
+                <p><strong>How to enable:</strong> Settings &rarr; Demo Mode &rarr; On</p>
+                <p style="margin-top: 20px;"><a href="user-guide.html#demo-mode" style="color: #000; text-decoration: underline;">Read the full User Guide &rarr;</a></p>
+            </div>
+        </div>
+    </section>
+
+    <section class="disclaimer">
+        <div class="container">
+            <div class="disclaimer-box">
+                <h3>Important Notice</h3>
+                <p>Oralable is a wellness monitoring tool and is NOT a medical device. It is not intended to diagnose, treat, cure, or prevent any disease or health condition. Always consult a qualified healthcare provider for medical advice.</p>
+            </div>
         </div>
     </section>
 
     <footer>
-        <div class="footer-links">
-            <a href="privacy.html">Privacy</a>
-            <a href="terms.html">Terms</a>
-            <a href="support.html">Support</a>
+        <div class="container">
+            <div class="footer-links">
+                <a href="user-guide.html">User Guide</a>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="terms.html">Terms of Service</a>
+                <a href="support.html">Support</a>
+            </div>
+            <p class="copyright">&copy; 2025 JAC Dental Solutions Limited. All rights reserved.</p>
         </div>
-        <p>&copy; 2025 JAC Dental Solutions Limited. All rights reserved.</p>
-        <p>Dublin, Ireland</p>
     </footer>
 </body>
 </html>

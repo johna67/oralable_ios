@@ -10,6 +10,8 @@ import SwiftUI
 struct PatientListView: View {
     @EnvironmentObject var dependencies: ProfessionalAppDependencies
     @StateObject private var viewModel: PatientListViewModel
+    @ObservedObject private var featureFlags = FeatureFlags.shared
+    @ObservedObject private var demoDataManager = DemoDataManager.shared
 
     init() {
         _viewModel = StateObject(wrappedValue: PatientListViewModel(
@@ -134,6 +136,20 @@ struct PatientListView: View {
 
     private var patientList: some View {
         List {
+            // Demo Participant Section (when demo mode enabled)
+            if featureFlags.demoModeEnabled, let demoParticipant = demoDataManager.demoParticipant {
+                Section {
+                    DemoParticipantRowCard(participant: demoParticipant)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                } header: {
+                    Text("Demo Participant")
+                        .foregroundColor(.orange)
+                }
+            }
+
+            // Regular participants
             ForEach(viewModel.filteredPatients) { patient in
                 PatientRowCard(patient: patient)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -294,5 +310,87 @@ struct PatientRowCard: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+// MARK: - Demo Participant Row Card
+
+struct DemoParticipantRowCard: View {
+    let participant: DemoDataManager.DemoParticipant
+    @State private var showingDemoDetail = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.orange)
+
+                    Text("Demo Participant")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // Demo badge
+                Text("DEMO")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.orange.opacity(0.1))
+                    )
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
+            }
+
+            Text(participant.name)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.primary)
+
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Text("\(participant.sessions.count) sessions")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Text("\(totalDurationMinutes) min total")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
+        .onTapGesture {
+            showingDemoDetail = true
+        }
+        .sheet(isPresented: $showingDemoDetail) {
+            DemoParticipantDetailView(participant: participant)
+        }
+    }
+
+    private var totalDurationMinutes: Int {
+        Int(participant.sessions.map { $0.duration }.reduce(0, +) / 60)
     }
 }

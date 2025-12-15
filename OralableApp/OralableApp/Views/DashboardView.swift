@@ -50,6 +50,27 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 12) {
+                    // Demo Mode Banner
+                    if featureFlags.demoModeEnabled {
+                        HStack {
+                            Image(systemName: "play.circle.fill")
+                                .foregroundColor(.orange)
+                            Text("Demo Mode Active")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Button("Disable") {
+                                featureFlags.demoModeEnabled = false
+                            }
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+
                     // Dual device connection status indicator (now includes Movement)
                     deviceStatusIndicator(viewModel: viewModel)
 
@@ -226,11 +247,12 @@ struct DashboardView: View {
         let persistenceManager = DevicePersistenceManager.shared
 
         return VStack(spacing: 8) {
-            // Oralable Device - show if connected OR previously paired
-            if viewModel.oralableConnected || persistenceManager.hasOralableDevicePaired() {
+            // Oralable Device - show if connected OR previously paired OR demo mode
+            // In demo mode, show as connected with green indicator (same as real device)
+            if viewModel.oralableConnected || persistenceManager.hasOralableDevicePaired() || featureFlags.demoModeEnabled {
                 HStack {
                     Circle()
-                        .fill(viewModel.oralableConnected ? Color.green : Color.gray)
+                        .fill((viewModel.oralableConnected || featureFlags.demoModeEnabled) ? Color.green : Color.gray)
                         .frame(width: 10, height: 10)
 
                     Text("Oralable")
@@ -238,14 +260,14 @@ struct DashboardView: View {
 
                     Spacer()
 
-                    Text(viewModel.oralableConnected ? "Ready" : "Not Connected")
+                    Text((viewModel.oralableConnected || featureFlags.demoModeEnabled) ? "Ready" : "Not Connected")
                         .font(.subheadline)
-                        .foregroundColor(viewModel.oralableConnected ? .green : .secondary)
+                        .foregroundColor((viewModel.oralableConnected || featureFlags.demoModeEnabled) ? .green : .secondary)
                 }
             }
 
-            // ANR M40 Device - only show if previously paired
-            if persistenceManager.hasANRDevicePaired() {
+            // ANR M40 Device - only show if previously paired (not in demo mode)
+            if persistenceManager.hasANRDevicePaired() && !featureFlags.demoModeEnabled {
                 HStack {
                     Circle()
                         .fill(viewModel.anrConnected ? Color.green : Color.gray)

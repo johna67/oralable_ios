@@ -10,6 +10,11 @@
 import Foundation
 import Combine
 
+// MARK: - Notification Names
+extension Notification.Name {
+    static let demoModeChanged = Notification.Name("demoModeChanged")
+}
+
 /// Feature flags for controlling OralableForProfessionals functionality
 /// Pre-launch release hides advanced features for simpler App Store approval
 class FeatureFlags: ObservableObject {
@@ -29,6 +34,7 @@ class FeatureFlags: ObservableObject {
         static let showDataExport = "feature.showDataExport"
         static let showANRComparison = "feature.showANRComparison"
         static let showCloudKitShare = "feature.share.showCloudKitShare"
+        static let demoModeEnabled = "feature.demo.enabled"
     }
 
     // MARK: - Pre-Launch Defaults (all advanced features OFF)
@@ -43,6 +49,7 @@ class FeatureFlags: ObservableObject {
         static let showDataExport = true        // Basic export always on
         static let showANRComparison = false
         static let showCloudKitShare = false
+        static let demoModeEnabled = false
     }
 
     // MARK: - Dashboard Features
@@ -88,6 +95,20 @@ class FeatureFlags: ObservableObject {
         didSet { defaults.set(showCloudKitShare, forKey: Keys.showCloudKitShare) }
     }
 
+    // MARK: - Demo Mode
+    @Published var demoModeEnabled: Bool {
+        didSet {
+            defaults.set(demoModeEnabled, forKey: Keys.demoModeEnabled)
+            // DemoDataManager is loaded/cleared in response to this flag change
+            // The manager observes this flag or is called from views
+            NotificationCenter.default.post(
+                name: .demoModeChanged,
+                object: nil,
+                userInfo: ["enabled": demoModeEnabled]
+            )
+        }
+    }
+
     // MARK: - Initialization
     init() {
         self.showEMGCard = defaults.object(forKey: Keys.showEMGCard) as? Bool ?? Defaults.showEMGCard
@@ -100,6 +121,7 @@ class FeatureFlags: ObservableObject {
         self.showDataExport = defaults.object(forKey: Keys.showDataExport) as? Bool ?? Defaults.showDataExport
         self.showANRComparison = defaults.object(forKey: Keys.showANRComparison) as? Bool ?? Defaults.showANRComparison
         self.showCloudKitShare = defaults.object(forKey: Keys.showCloudKitShare) as? Bool ?? Defaults.showCloudKitShare
+        self.demoModeEnabled = defaults.object(forKey: Keys.demoModeEnabled) as? Bool ?? Defaults.demoModeEnabled
 
         Logger.shared.info("[FeatureFlags] Initialized with pre-launch configuration")
     }
@@ -184,6 +206,7 @@ class FeatureFlags: ObservableObject {
     /// Reset to defaults
     func resetToDefaults() {
         applyPreLaunchConfig()
+        demoModeEnabled = false
     }
 
     // MARK: - Debug Description
@@ -200,6 +223,7 @@ class FeatureFlags: ObservableObject {
         - Data Export: \(showDataExport)
         - ANR Comparison: \(showANRComparison)
         - CloudKit Share: \(showCloudKitShare)
+        - Demo Mode: \(demoModeEnabled)
         """
     }
 }
