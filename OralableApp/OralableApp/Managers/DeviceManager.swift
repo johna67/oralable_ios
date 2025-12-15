@@ -637,7 +637,29 @@ class DeviceManager: ObservableObject {
         // If demo mode enabled, also "discover" the demo device
         if FeatureFlags.shared.demoModeEnabled {
             Logger.shared.info("[DeviceManager] 🎭 Demo mode enabled - triggering demo device discovery")
-            DemoDataProvider.shared.simulateDiscovery()
+
+            // Add demo device to discoveredDevices after short delay (simulates discovery)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+
+                // Create a demo device entry using the fixed UUID
+                let demoUUID = UUID(uuidString: "DEADBEEF-DEMO-0001-0000-000000000001") ?? UUID()
+
+                let demoDevice = DeviceInfo(
+                    type: .demo,
+                    name: DemoDataProvider.shared.deviceName,
+                    peripheralIdentifier: demoUUID,
+                    connectionState: .disconnected,
+                    signalStrength: -50
+                )
+
+                // Add to discovered devices list (same list the UI displays)
+                if !self.discoveredDevices.contains(where: { $0.type == .demo }) {
+                    self.discoveredDevices.append(demoDevice)
+                    DemoDataProvider.shared.isDiscovered = true
+                    Logger.shared.info("[DeviceManager] 🎭 Demo device added to discoveredDevices (count: \(self.discoveredDevices.count))")
+                }
+            }
         }
     }
 
@@ -670,15 +692,38 @@ class DeviceManager: ObservableObject {
         Logger.shared.info("[DeviceManager] Connecting to device: \(deviceInfo.name)")
 
         // Check if this is the demo device
-        let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
-        if deviceInfo.peripheralIdentifier == demoID || deviceInfo.type == .demo {
+        if deviceInfo.type == .demo {
             Logger.shared.info("[DeviceManager] 🎭 Connecting to demo device")
             isConnecting = true
+
+            // Update device state to connecting
+            if let index = discoveredDevices.firstIndex(where: { $0.type == .demo }) {
+                discoveredDevices[index].connectionState = .connecting
+            }
+
+            // Start playback (connection happens after delay in simulateConnect)
             DemoDataProvider.shared.simulateConnect()
 
             // Wait for connection to complete
             try await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
+
+            // Move demo device from discovered to connected
+            if let index = discoveredDevices.firstIndex(where: { $0.type == .demo }) {
+                var connectedDemo = discoveredDevices[index]
+                connectedDemo.connectionState = .connected
+                connectedDemo.connectionReadiness = .ready
+
+                // Add to connected devices
+                if !connectedDevices.contains(where: { $0.type == .demo }) {
+                    connectedDevices.append(connectedDemo)
+                }
+
+                // Remove from discovered
+                discoveredDevices.remove(at: index)
+            }
+
             isConnecting = false
+            Logger.shared.info("[DeviceManager] 🎭 Demo device connected and moved to connectedDevices")
             return
         }
 
@@ -716,10 +761,13 @@ class DeviceManager: ObservableObject {
         Logger.shared.info("[DeviceManager] Disconnecting from device: \(deviceInfo.name)")
 
         // Check if this is the demo device
-        let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
-        if deviceInfo.peripheralIdentifier == demoID || deviceInfo.type == .demo {
+        if deviceInfo.type == .demo {
             Logger.shared.info("[DeviceManager] 🎭 Disconnecting from demo device")
             DemoDataProvider.shared.disconnect()
+
+            // Remove from connected devices
+            connectedDevices.removeAll { $0.type == .demo }
+            Logger.shared.info("[DeviceManager] 🎭 Demo device removed from connectedDevices")
             return
         }
 
@@ -760,6 +808,8 @@ class DeviceManager: ObservableObject {
             Logger.shared.info("[DeviceManager] 🎭 Also disconnecting demo device")
             DemoDataProvider.shared.disconnect()
             DemoDataProvider.shared.resetDiscovery()
+            connectedDevices.removeAll { $0.type == .demo }
+            discoveredDevices.removeAll { $0.type == .demo }
         }
 
         // Cancel all reconnection attempts
@@ -773,6 +823,10 @@ class DeviceManager: ObservableObject {
             DemoDataProvider.shared.disconnect()
         }
         DemoDataProvider.shared.resetDiscovery()
+
+        // Remove demo device from both lists
+        connectedDevices.removeAll { $0.type == .demo }
+        discoveredDevices.removeAll { $0.type == .demo }
     }
     
     // MARK: - Sensor Data Management
