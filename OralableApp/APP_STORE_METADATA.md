@@ -6,7 +6,7 @@
 **Subtitle:** Oral Health Monitoring
 **Bundle ID:** com.jacdental.oralable
 **Primary Category:** Health & Fitness
-**Secondary Category:** Medical
+**Secondary Category:** Lifestyle
 
 ---
 

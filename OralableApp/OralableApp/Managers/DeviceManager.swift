@@ -130,21 +130,24 @@ class DeviceManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let maxDevices: Int = 5
 
-    // BLE Integration
-    private(set) var bleManager: BLECentralManager?
+    // BLE Integration - now using protocol for dependency injection
+    private(set) var bleService: BLEService?
+
+    // Legacy accessor for backward compatibility
+    var bleManager: BLECentralManager? {
+        bleService as? BLECentralManager
+    }
+
+    // Background worker for reconnection and polling
+    private let backgroundWorker: BLEBackgroundWorker
 
     // Discovery tracking
     private var discoveryCount: Int = 0
     private var scanStartTime: Date?
 
-    // Reconnection management
-    private var reconnectionAttempts: [UUID: Int] = [:]
-    private let maxReconnectionAttempts = 3
-    private var reconnectionTasks: [UUID: Task<Void, Never>] = [:]
-
     // Device persistence for auto-reconnect
     private let persistenceManager = DevicePersistenceManager.shared
-    
+
     // Per-reading publisher (legacy, prefer batch)
     private let readingsSubject = PassthroughSubject<SensorReading, Never>()
     var readingsPublisher: AnyPublisher<SensorReading, Never> {
@@ -156,74 +159,173 @@ class DeviceManager: ObservableObject {
     var readingsBatchPublisher: AnyPublisher<[SensorReading], Never> {
         readingsBatchSubject.eraseToAnyPublisher()
     }
-    
+
     // MARK: - Initialization
-    
+
+    /// Default initializer using concrete BLECentralManager
     init() {
-        Logger.shared.info("[DeviceManager] Initializing...")
-        bleManager = BLECentralManager()
+        Logger.shared.info("[DeviceManager] Initializing with default BLECentralManager...")
+        self.bleService = BLECentralManager()
+        self.backgroundWorker = BLEBackgroundWorker()
         setupBLECallbacks()
+        setupBackgroundWorker()
         Logger.shared.info("[DeviceManager] Initialization complete")
+    }
+
+    /// Dependency injection initializer for testing and flexibility
+    /// - Parameters:
+    ///   - bleService: Any BLEService conforming instance
+    ///   - backgroundWorker: Optional custom background worker (defaults to new instance)
+    init(bleService: BLEService, backgroundWorker: BLEBackgroundWorker? = nil) {
+        Logger.shared.info("[DeviceManager] Initializing with injected BLEService...")
+        self.bleService = bleService
+        self.backgroundWorker = backgroundWorker ?? BLEBackgroundWorker()
+        setupBLECallbacks()
+        setupBackgroundWorker()
+        Logger.shared.info("[DeviceManager] Initialization complete")
+    }
+
+    /// Setup background worker with BLE service and start
+    private func setupBackgroundWorker() {
+        if let service = bleService {
+            backgroundWorker.configure(bleService: service)
+        }
+        backgroundWorker.start()
+
+        // Subscribe to background worker events
+        backgroundWorker.eventPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                self?.handleBackgroundWorkerEvent(event)
+            }
+            .store(in: &cancellables)
+
+        Logger.shared.info("[DeviceManager] Background worker configured and started")
+    }
+
+    /// Handle events from background worker
+    private func handleBackgroundWorkerEvent(_ event: BLEBackgroundWorkerEvent) {
+        switch event {
+        case .reconnectionSucceeded(let peripheralId):
+            Logger.shared.info("[DeviceManager] Reconnection succeeded for \(peripheralId)")
+
+        case .reconnectionGaveUp(let peripheralId, let attempts):
+            Logger.shared.warning("[DeviceManager] Reconnection gave up for \(peripheralId) after \(attempts) attempts")
+            lastError = .connectionLost
+
+        case .connectionStale(let peripheralId):
+            Logger.shared.warning("[DeviceManager] Connection stale for \(peripheralId)")
+            // Optionally trigger UI update or notification
+
+        case .rssiUpdated(let peripheralId, let rssi):
+            // Update device signal strength
+            if let index = connectedDevices.firstIndex(where: { $0.peripheralIdentifier == peripheralId }) {
+                connectedDevices[index].signalStrength = rssi
+            }
+
+        default:
+            break
+        }
     }
     
     // MARK: - BLE Callbacks Setup
-    
+
     private func setupBLECallbacks() {
         Logger.shared.info("[DeviceManager] Setting up BLE callbacks...")
 
-        bleManager?.onDeviceDiscovered = { [weak self] peripheral, name, rssi in
-            Logger.shared.debug("[DeviceManager] onDeviceDiscovered callback received")
-            Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
-            Logger.shared.debug("[DeviceManager] Name: \(name)")
-            Logger.shared.debug("[DeviceManager] RSSI: \(rssi)")
-
-            Task { @MainActor [weak self] in
-                Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
-                self?.handleDeviceDiscovered(peripheral: peripheral, name: name, rssi: rssi)
+        // Subscribe to BLEService event publisher (new reactive approach)
+        bleService?.eventPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                self?.handleBLEServiceEvent(event)
             }
-        }
+            .store(in: &cancellables)
 
-        bleManager?.onDeviceConnected = { [weak self] peripheral in
-            Logger.shared.debug("[DeviceManager] onDeviceConnected callback received")
-            Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
+        // Also set up legacy callbacks for backward compatibility with BLECentralManager
+        if let centralManager = bleManager {
+            centralManager.onDeviceDiscovered = { [weak self] peripheral, name, rssi in
+                Logger.shared.debug("[DeviceManager] onDeviceDiscovered callback received")
+                Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
+                Logger.shared.debug("[DeviceManager] Name: \(name)")
+                Logger.shared.debug("[DeviceManager] RSSI: \(rssi)")
 
-            Task { @MainActor [weak self] in
-                Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
-                self?.handleDeviceConnected(peripheral: peripheral)
-            }
-        }
-
-        bleManager?.onDeviceDisconnected = { [weak self] peripheral, error in
-            Logger.shared.debug("[DeviceManager] onDeviceDisconnected callback received")
-            Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
-            if let error = error {
-                Logger.shared.error("[DeviceManager] Error: \(error.localizedDescription)")
+                Task { @MainActor [weak self] in
+                    Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
+                    self?.handleDeviceDiscovered(peripheral: peripheral, name: name, rssi: rssi)
+                }
             }
 
-            Task { @MainActor [weak self] in
-                Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
-                self?.handleDeviceDisconnected(peripheral: peripheral, error: error)
+            centralManager.onDeviceConnected = { [weak self] peripheral in
+                Logger.shared.debug("[DeviceManager] onDeviceConnected callback received")
+                Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
+
+                Task { @MainActor [weak self] in
+                    Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
+                    self?.handleDeviceConnected(peripheral: peripheral)
+                }
             }
-        }
 
-        bleManager?.onBluetoothStateChanged = { [weak self] state in
-            Logger.shared.debug("[DeviceManager] onBluetoothStateChanged callback received")
-            Logger.shared.debug("[DeviceManager] State: \(state.rawValue)")
+            centralManager.onDeviceDisconnected = { [weak self] peripheral, error in
+                Logger.shared.debug("[DeviceManager] onDeviceDisconnected callback received")
+                Logger.shared.debug("[DeviceManager] Peripheral: \(peripheral.identifier)")
+                if let error = error {
+                    Logger.shared.error("[DeviceManager] Error: \(error.localizedDescription)")
+                }
 
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
+                Task { @MainActor [weak self] in
+                    Logger.shared.debug("[DeviceManager] Dispatching to main actor...")
+                    self?.handleDeviceDisconnected(peripheral: peripheral, error: error)
+                }
+            }
 
-                // Update published state for UI
-                self.bluetoothState = state
+            centralManager.onBluetoothStateChanged = { [weak self] state in
+                Logger.shared.debug("[DeviceManager] onBluetoothStateChanged callback received")
+                Logger.shared.debug("[DeviceManager] State: \(state.rawValue)")
 
-                if state != .poweredOn && self.isScanning {
-                    Logger.shared.warning("[DeviceManager] Bluetooth not powered on, stopping scan")
-                    self.isScanning = false
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+
+                    // Update published state for UI
+                    self.bluetoothState = state
+
+                    if state != .poweredOn && self.isScanning {
+                        Logger.shared.warning("[DeviceManager] Bluetooth not powered on, stopping scan")
+                        self.isScanning = false
+                    }
                 }
             }
         }
 
         Logger.shared.info("[DeviceManager] BLE callbacks configured successfully")
+    }
+
+    /// Handle events from BLEService publisher
+    private func handleBLEServiceEvent(_ event: BLEServiceEvent) {
+        switch event {
+        case .deviceDiscovered(let peripheral, let name, let rssi):
+            handleDeviceDiscovered(peripheral: peripheral, name: name, rssi: rssi)
+
+        case .deviceConnected(let peripheral):
+            handleDeviceConnected(peripheral: peripheral)
+
+        case .deviceDisconnected(let peripheral, let error):
+            handleDeviceDisconnected(peripheral: peripheral, error: error)
+
+        case .bluetoothStateChanged(let state):
+            bluetoothState = state
+            if state != .poweredOn && isScanning {
+                Logger.shared.warning("[DeviceManager] Bluetooth not powered on, stopping scan")
+                isScanning = false
+            }
+
+        case .characteristicUpdated(_, _, _):
+            // Handled by individual device implementations
+            break
+
+        case .characteristicWritten(_, _, _):
+            // Handled by individual device implementations
+            break
+        }
     }
     
     // MARK: - Device Discovery Handlers
@@ -307,7 +409,10 @@ class DeviceManager: ObservableObject {
         Logger.shared.info("[DeviceManager] Device connected: \(peripheral.name ?? "Unknown")")
 
         isConnecting = false
-        
+
+        // Notify background worker of successful connection (clears reconnection state)
+        backgroundWorker.handleConnectionSuccess(for: peripheral.identifier)
+
         // Update connection readiness to .connected
         updateDeviceReadiness(peripheral.identifier, to: .connected)
 
@@ -331,6 +436,13 @@ class DeviceManager: ObservableObject {
                 name: discoveredDevices[index].name
             )
         }
+
+        // Start RSSI polling for connected peripherals
+        let connectedPeripherals = connectedDevices.compactMap { deviceInfo -> CBPeripheral? in
+            guard let peripheralId = deviceInfo.peripheralIdentifier else { return nil }
+            return devices[peripheralId]?.peripheral
+        }
+        backgroundWorker.startRSSIPolling(for: connectedPeripherals)
 
         // Start Day 2 async discovery flow
         Task {
@@ -453,7 +565,7 @@ class DeviceManager: ObservableObject {
         }
 
         isConnecting = false
-        
+
         // Update readiness state
         updateDeviceReadiness(peripheral.identifier, to: .disconnected)
 
@@ -468,70 +580,18 @@ class DeviceManager: ObservableObject {
             primaryDevice = connectedDevices.first
         }
 
-        // Attempt automatic reconnection if this was an unexpected disconnection
-        if wasUnexpectedDisconnection {
-            attemptReconnection(to: peripheral)
-        } else {
-            // Manual disconnection - reset reconnection attempts
-            reconnectionAttempts[peripheral.identifier] = nil
-            reconnectionTasks[peripheral.identifier]?.cancel()
-            reconnectionTasks[peripheral.identifier] = nil
-        }
-    }
-
-    // MARK: - Automatic Reconnection
-
-    private func attemptReconnection(to peripheral: CBPeripheral) {
-        let peripheralId = peripheral.identifier
-        let attempts = reconnectionAttempts[peripheralId] ?? 0
-
-        guard attempts < maxReconnectionAttempts else {
-            Logger.shared.warning("[DeviceManager] Max reconnection attempts reached for \(peripheral.name ?? "device")")
-            reconnectionAttempts[peripheralId] = nil
-            return
-        }
-
-        reconnectionAttempts[peripheralId] = attempts + 1
-
-        // Exponential backoff: 2^attempts seconds
-        let delay = pow(2.0, Double(attempts))
-        Logger.shared.info("[DeviceManager] Will attempt reconnection #\(attempts + 1) in \(Int(delay))s")
-
-        // Cancel any existing reconnection task for this device
-        reconnectionTasks[peripheralId]?.cancel()
-
-        // Create new reconnection task
-        let task = Task { @MainActor in
-            do {
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-
-                // Check if task was cancelled
-                guard !Task.isCancelled else {
-                    Logger.shared.debug("[DeviceManager] Reconnection cancelled for \(peripheral.name ?? "device")")
-                    return
-                }
-
-                // Attempt reconnection
-                if let deviceInfo = discoveredDevices.first(where: { $0.peripheralIdentifier == peripheralId }) {
-                    Logger.shared.info("[DeviceManager] Attempting reconnection #\(attempts + 1) to \(deviceInfo.name)")
-                    try await connect(to: deviceInfo)
-                }
-            } catch {
-                Logger.shared.error("[DeviceManager] Reconnection attempt failed: \(error.localizedDescription)")
-            }
-        }
-
-        reconnectionTasks[peripheralId] = task
+        // Delegate reconnection to background worker
+        backgroundWorker.handleDisconnection(
+            for: peripheral.identifier,
+            peripheral: peripheral,
+            wasUnexpected: wasUnexpectedDisconnection
+        )
     }
 
     /// Cancel all ongoing reconnection attempts
     func cancelAllReconnections() {
-        for (peripheralId, task) in reconnectionTasks {
-            task.cancel()
-            Logger.shared.debug("[DeviceManager] Cancelled reconnection for device: \(peripheralId)")
-        }
-        reconnectionTasks.removeAll()
-        reconnectionAttempts.removeAll()
+        backgroundWorker.cancelAllReconnections()
+        Logger.shared.debug("[DeviceManager] Cancelled all reconnection attempts via background worker")
     }
     
     // MARK: - Device Type Detection
@@ -586,7 +646,7 @@ class DeviceManager: ObservableObject {
 
         Logger.shared.info("[DeviceManager] ✅ Scan started - discoveredDevices cleared, isScanning = true")
 
-        bleManager?.startScanning()
+        bleService?.startScanning(services: nil)
 
         // If demo mode enabled, also "discover" the demo device
         if FeatureFlags.shared.demoModeEnabled {
@@ -630,7 +690,7 @@ class DeviceManager: ObservableObject {
         #endif
 
         isScanning = false
-        bleManager?.stopScanning()
+        bleService?.stopScanning()
         scanStartTime = nil
 
         // Note: Don't reset demo discovery state here - we want to keep the demo device
@@ -704,11 +764,11 @@ class DeviceManager: ObservableObject {
 
         updateDeviceReadiness(peripheralId, to: .connecting)
 
-        // Reset reconnection attempts on manual connect
-        reconnectionAttempts[peripheralId] = 0
+        // Cancel any existing reconnection attempts on manual connect
+        backgroundWorker.cancelReconnection(for: peripheralId)
 
         // Connect via BLE manager
-        bleManager?.connect(to: peripheral)
+        bleService?.connect(to: peripheral)
     }
     
     func disconnect(from deviceInfo: DeviceInfo) async {
@@ -732,17 +792,15 @@ class DeviceManager: ObservableObject {
             return
         }
 
-        // Cancel any pending reconnection attempts for this device
-        reconnectionTasks[peripheralId]?.cancel()
-        reconnectionTasks[peripheralId] = nil
-        reconnectionAttempts[peripheralId] = nil
+        // Cancel any pending reconnection attempts for this device via background worker
+        backgroundWorker.cancelReconnection(for: peripheralId)
 
         // Cancel pending continuations to prevent hangs
         if let oralableDevice = device as? OralableDevice {
             oralableDevice.cancelPendingContinuations()
         }
 
-        bleManager?.disconnect(from: peripheral)
+        bleService?.disconnect(from: peripheral)
 
         // Stop data collection
         try? await device.stopDataCollection()
@@ -892,7 +950,7 @@ class DeviceManager: ObservableObject {
         Logger.shared.info("[DeviceManager] Scheduling auto-reconnect to \(rememberedDevices.count) remembered device(s)")
 
         // Use whenReady to defer scanning until Bluetooth is powered on
-        bleManager?.whenReady { [weak self] in
+        bleService?.whenReady { [weak self] in
             guard let self = self else { return }
 
             Task { @MainActor in

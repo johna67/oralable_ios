@@ -186,7 +186,7 @@ struct PatientHealthDataView: View {
 
     private func correlationInsightsSection(healthKit: HealthKitDataForSharing) -> some View {
         VStack(alignment: .leading, spacing: designSystem.spacing.md) {
-            Text("Clinical Insights")
+            Text("Data Insights")
                 .font(designSystem.typography.h3)
                 .foregroundColor(designSystem.colors.textPrimary)
 

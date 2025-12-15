@@ -4,16 +4,19 @@
 //
 //  Created by John A Cogan on 03/11/2025.
 //  Updated: November 10, 2025 - nRF Connect Style Logging
+//  Updated: December 15, 2025 - Refactored to conform to BLEService protocol
 //  Comprehensive debug logging matching nRF Connect for Mobile
 //
 
 import Foundation
 import CoreBluetooth
+import Combine
 
-/// Centralized BLE manager that surfaces discovery/connection events via callbacks
-final class BLECentralManager: NSObject {
+/// Centralized BLE manager that conforms to BLEService protocol
+/// Surfaces discovery/connection events via Combine publishers
+final class BLECentralManager: NSObject, BLEService {
 
-    // MARK: - Callbacks
+    // MARK: - Legacy Callbacks (for backward compatibility)
 
     /// Called when a peripheral is discovered
     var onDeviceDiscovered: ((CBPeripheral, String, Int) -> Void)?
@@ -27,15 +30,25 @@ final class BLECentralManager: NSObject {
     /// Called when Bluetooth state changes
     var onBluetoothStateChanged: ((CBManagerState) -> Void)?
 
-    // MARK: - Public State
+    // MARK: - BLEService Protocol - State
 
     /// Current Bluetooth state - observable for UI updates
-    private(set) var state: CBManagerState = .unknown
+    var bluetoothState: CBManagerState { state }
 
     /// Whether Bluetooth is ready for scanning/connecting
     var isReady: Bool { state == .poweredOn }
 
-    // MARK: - Private
+    /// Whether currently scanning
+    var isScanning: Bool { central?.isScanning ?? false }
+
+    /// Event publisher for BLE service events
+    var eventPublisher: AnyPublisher<BLEServiceEvent, Never> {
+        eventSubject.eraseToAnyPublisher()
+    }
+
+    // MARK: - Private State
+
+    private(set) var state: CBManagerState = .unknown
 
     // EAGER INITIALIZATION: CBCentralManager created immediately to get early state updates
     // This triggers Bluetooth permission dialog on first app launch (required for BLE apps)
@@ -51,6 +64,9 @@ final class BLECentralManager: NSObject {
     // Pending operations to run when Bluetooth becomes ready
     private var pendingOperations: [() -> Void] = []
 
+    // Combine publisher for events
+    private let eventSubject = PassthroughSubject<BLEServiceEvent, Never>()
+
     // MARK: - Init
 
     override init() {
@@ -61,7 +77,7 @@ final class BLECentralManager: NSObject {
         Logger.shared.info("[BLECentralManager] ⚡️ Initialized - waiting for Bluetooth state...")
     }
 
-    // MARK: - Ready State Handling
+    // MARK: - BLEService Protocol - Utility
 
     /// Execute an operation when Bluetooth is ready, or queue it if not ready yet
     func whenReady(_ operation: @escaping () -> Void) {
@@ -83,9 +99,14 @@ final class BLECentralManager: NSObject {
             operation()
         }
     }
-    
-    // MARK: - Scanning
-    
+
+    /// Retrieve peripherals with the given identifiers
+    func retrievePeripherals(withIdentifiers identifiers: [UUID]) -> [CBPeripheral] {
+        return central.retrievePeripherals(withIdentifiers: identifiers)
+    }
+
+    // MARK: - BLEService Protocol - Scanning
+
     func startScanning(services: [CBUUID]? = nil) {
         serviceFilter = services
 
@@ -96,7 +117,7 @@ final class BLECentralManager: NSObject {
 
         guard central.state == .poweredOn else {
             Task { @MainActor in
-                Logger.shared.error("Cannot start scan - Bluetooth not powered on (state: \(self.stateDescription(central.state)))")
+                Logger.shared.error("Cannot start scan - Bluetooth not powered on (state: \(self.stateDescription(self.central.state)))")
             }
             return
         }
@@ -112,7 +133,7 @@ final class BLECentralManager: NSObject {
             Logger.shared.info("Scan started successfully")
         }
     }
-    
+
     func stopScanning() {
         guard central.isScanning else {
             Task { @MainActor in
@@ -125,18 +146,18 @@ final class BLECentralManager: NSObject {
         }
         central.stopScan()
     }
-    
-    // MARK: - Connections
-    
+
+    // MARK: - BLEService Protocol - Connection Management
+
     func connect(to peripheral: CBPeripheral) {
         pendingConnections.insert(peripheral.identifier)
         central.connect(peripheral, options: nil)
     }
-    
+
     func disconnect(from peripheral: CBPeripheral) {
         central.cancelPeripheralConnection(peripheral)
     }
-    
+
     func disconnectAll() {
         for uuid in connectedPeripherals {
             if let peripheral = central.retrievePeripherals(withIdentifiers: [uuid]).first {
@@ -145,7 +166,31 @@ final class BLECentralManager: NSObject {
         }
         connectedPeripherals.removeAll()
     }
-    
+
+    // MARK: - BLEService Protocol - Read/Write Operations
+
+    func readValue(from characteristic: CBCharacteristic, on peripheral: CBPeripheral) {
+        peripheral.readValue(for: characteristic)
+    }
+
+    func writeValue(_ data: Data, to characteristic: CBCharacteristic, on peripheral: CBPeripheral, type: CBCharacteristicWriteType) {
+        peripheral.writeValue(data, for: characteristic, type: type)
+    }
+
+    func setNotifyValue(_ enabled: Bool, for characteristic: CBCharacteristic, on peripheral: CBPeripheral) {
+        peripheral.setNotifyValue(enabled, for: characteristic)
+    }
+
+    // MARK: - BLEService Protocol - Service Discovery
+
+    func discoverServices(_ services: [CBUUID]?, on peripheral: CBPeripheral) {
+        peripheral.discoverServices(services)
+    }
+
+    func discoverCharacteristics(_ characteristics: [CBUUID]?, for service: CBService, on peripheral: CBPeripheral) {
+        peripheral.discoverCharacteristics(characteristics, for: service)
+    }
+
     // MARK: - Helper Methods
 
     private func stateDescription(_ state: CBManagerState) -> String {
@@ -164,7 +209,7 @@ final class BLECentralManager: NSObject {
 // MARK: - CBCentralManagerDelegate
 
 extension BLECentralManager: CBCentralManagerDelegate {
-    
+
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         let previousState = state
         state = central.state
@@ -181,9 +226,13 @@ extension BLECentralManager: CBCentralManagerDelegate {
             executePendingOperations()
         }
 
+        // Emit event via publisher (new)
+        eventSubject.send(.bluetoothStateChanged(state: central.state))
+
+        // Legacy callback (backward compatibility)
         onBluetoothStateChanged?(central.state)
     }
-    
+
     func centralManager(
         _ central: CBCentralManager,
         didDiscover peripheral: CBPeripheral,
@@ -227,10 +276,13 @@ extension BLECentralManager: CBCentralManagerDelegate {
             Logger.shared.debug(details)
         }
 
-        // Fire callback
+        // Emit event via publisher (new)
+        eventSubject.send(.deviceDiscovered(peripheral: peripheral, name: name, rssi: RSSI.intValue))
+
+        // Legacy callback (backward compatibility)
         onDeviceDiscovered?(peripheral, name, RSSI.intValue)
     }
-    
+
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         Task { @MainActor in
             Logger.shared.info("Connected to device: \(peripheral.name ?? "Unknown") (\(peripheral.identifier))")
@@ -238,6 +290,11 @@ extension BLECentralManager: CBCentralManagerDelegate {
 
         connectedPeripherals.insert(peripheral.identifier)
         pendingConnections.remove(peripheral.identifier)
+
+        // Emit event via publisher (new)
+        eventSubject.send(.deviceConnected(peripheral: peripheral))
+
+        // Legacy callback (backward compatibility)
         onDeviceConnected?(peripheral)
     }
 
@@ -251,6 +308,11 @@ extension BLECentralManager: CBCentralManagerDelegate {
         }
 
         pendingConnections.remove(peripheral.identifier)
+
+        // Emit event via publisher (new)
+        eventSubject.send(.deviceDisconnected(peripheral: peripheral, error: error))
+
+        // Legacy callback (backward compatibility)
         onDeviceDisconnected?(peripheral, error)
     }
 
@@ -268,6 +330,11 @@ extension BLECentralManager: CBCentralManagerDelegate {
         }
 
         connectedPeripherals.remove(peripheral.identifier)
+
+        // Emit event via publisher (new)
+        eventSubject.send(.deviceDisconnected(peripheral: peripheral, error: error))
+
+        // Legacy callback (backward compatibility)
         onDeviceDisconnected?(peripheral, error)
     }
 }

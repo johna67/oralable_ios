@@ -56,7 +56,7 @@ Oralable for Dentists is a professional monitoring application that:
 - Receives patient data shared via share codes
 - Displays patient bruxism patterns and analytics
 - Provides multi-patient management
-- Enables data export for clinical records
+- Enables data export for personal records
 - Offers practice-level insights
 
 ### 2.3 Not a Medical Device
@@ -406,7 +406,7 @@ We disclaim all warranties, express or implied, including:
 
 Healthcare professionals using Oralable for Dentists:
 - Retain full professional responsibility for patient care
-- Are solely responsible for clinical decisions
+- Are solely responsible for professional decisions
 - Must comply with applicable standards of care
 - Are liable for any professional misconduct
 

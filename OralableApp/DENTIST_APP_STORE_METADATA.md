@@ -5,8 +5,8 @@
 **App Name:** Oralable for Dentists
 **Subtitle:** Patient Bruxism Monitoring
 **Bundle ID:** com.jacdental.oralable.dentist
-**Primary Category:** Medical
-**Secondary Category:** Health & Fitness
+**Primary Category:** Health & Fitness
+**Secondary Category:** Lifestyle
 
 ---
 
@@ -103,13 +103,13 @@ Practice ($99.99/month or $999.99/year):
 • Dedicated account manager
 • White-label options
 
-**CLINICAL BENEFITS**
+**PROFESSIONAL BENEFITS**
 
 ✓ **Objective Data:** Replace subjective patient reports with hard data
-✓ **Treatment Validation:** Prove appliance effectiveness with before/after data
+✓ **Treatment Validation:** Track appliance effectiveness with before/after data
 ✓ **Early Detection:** Catch deteriorating conditions early
 ✓ **Patient Compliance:** Monitor if patients wear their appliances
-✓ **Remote Monitoring:** No need for in-office sleep studies
+✓ **Remote Monitoring:** View patient data without in-office visits
 ✓ **Better Outcomes:** Data-driven treatment decisions
 
 **PRACTICE INTEGRATION**
@@ -139,7 +139,7 @@ Dedicated professional support team available via email and phone. We understand
 
 Interested in research collaboration or custom features? Contact us at research@oralable.com
 
-**NOTE:** This app is for informational and monitoring purposes. It is not a medical device and should not replace clinical judgment. Always use in conjunction with proper examination and diagnosis.
+**NOTE:** This app is for informational and monitoring purposes. It is not a medical device and should not replace professional judgment. Always use in conjunction with proper examination.
 
 ---
 
@@ -415,7 +415,7 @@ This app requires patient data connections, but we've set up a demo environment.
 
 - American Dental Association guidelines on bruxism
 - Research on sleep bruxism prevalence (Lavigne et al.)
-- TMJ disorder clinical studies
+- TMJ disorder research studies
 - Oral appliance effectiveness data
 
 ### Professional Associations
@@ -430,10 +430,10 @@ Consider seeking endorsements from:
 ## Legal Disclaimers
 
 **Required in Description:**
-"This app is for informational and monitoring purposes. It is not a medical device and should not replace clinical judgment or proper examination."
+"This app is for informational and monitoring purposes. It is not a medical device and should not replace professional judgment or proper examination."
 
 **Recommended:**
-"Always consult with qualified healthcare providers. Data should supplement, not replace, professional diagnosis."
+"Always consult with qualified healthcare providers. Data should supplement, not replace, professional assessment."
 
 ---
 
