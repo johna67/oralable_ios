@@ -119,52 +119,6 @@ class DeviceManager: ObservableObject {
 
     // MARK: - Demo Device Integration
 
-    /// All discovered devices including demo device if enabled
-    var allDiscoveredDevices: [DeviceInfo] {
-        var devices = discoveredDevices
-
-        // Add demo device if demo mode enabled and discovered
-        if FeatureFlags.shared.demoModeEnabled && DemoDataProvider.shared.isDiscovered {
-            // Check if demo device isn't already in the list
-            let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
-            if !devices.contains(where: { $0.peripheralIdentifier == demoID }) {
-                var demoDevice = DeviceInfo(
-                    type: .demo,
-                    name: DemoDataProvider.shared.deviceName,
-                    peripheralIdentifier: demoID,
-                    connectionState: DemoDataProvider.shared.isConnected ? .connected : .disconnected,
-                    signalStrength: -50
-                )
-                demoDevice.connectionReadiness = DemoDataProvider.shared.isConnected ? .ready : .disconnected
-                devices.insert(demoDevice, at: 0)  // Show at top
-            }
-        }
-
-        return devices
-    }
-
-    /// All connected devices including demo device if connected
-    var allConnectedDevices: [DeviceInfo] {
-        var devices = connectedDevices
-
-        if DemoDataProvider.shared.isConnected {
-            let demoID = UUID(uuidString: DemoDataProvider.shared.deviceID) ?? UUID()
-            if !devices.contains(where: { $0.peripheralIdentifier == demoID }) {
-                var demoDevice = DeviceInfo(
-                    type: .demo,
-                    name: DemoDataProvider.shared.deviceName,
-                    peripheralIdentifier: demoID,
-                    connectionState: .connected,
-                    signalStrength: -50
-                )
-                demoDevice.connectionReadiness = .ready
-                devices.append(demoDevice)
-            }
-        }
-
-        return devices
-    }
-
     /// Check if any device is connected (real or demo)
     var isAnyDeviceConnected: Bool {
         return !connectedDevices.isEmpty || DemoDataProvider.shared.isConnected

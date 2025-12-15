@@ -111,8 +111,8 @@ struct DevicesView: View {
     // MARK: - Other Devices Section (Discovered)
     private var otherDevicesSection: some View {
         Section {
-            // Use allDiscoveredDevices to include demo device when demo mode is enabled
-            let discoveredDevices = deviceManager.allDiscoveredDevices.filter { discovered in
+            // Use discoveredDevices directly (demo device is added there when demo mode is enabled)
+            let discoveredDevices = deviceManager.discoveredDevices.filter { discovered in
                 guard let peripheralId = discovered.peripheralIdentifier else { return true }
                 return !persistenceManager.isDeviceRemembered(id: peripheralId.uuidString)
             }

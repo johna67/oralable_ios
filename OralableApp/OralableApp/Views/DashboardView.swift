@@ -247,12 +247,12 @@ struct DashboardView: View {
         let persistenceManager = DevicePersistenceManager.shared
 
         return VStack(spacing: 8) {
-            // Oralable Device - show if connected OR previously paired OR demo mode
-            // In demo mode, show as connected with green indicator (same as real device)
+            // Oralable Device - show if connected OR previously paired OR demo mode enabled
+            // Only show "Ready" when actually connected (not just when demo mode is enabled)
             if viewModel.oralableConnected || persistenceManager.hasOralableDevicePaired() || featureFlags.demoModeEnabled {
                 HStack {
                     Circle()
-                        .fill((viewModel.oralableConnected || featureFlags.demoModeEnabled) ? Color.green : Color.gray)
+                        .fill(viewModel.oralableConnected ? Color.green : Color.gray)
                         .frame(width: 10, height: 10)
 
                     Text("Oralable")
@@ -260,9 +260,9 @@ struct DashboardView: View {
 
                     Spacer()
 
-                    Text((viewModel.oralableConnected || featureFlags.demoModeEnabled) ? "Ready" : "Not Connected")
+                    Text(viewModel.oralableConnected ? "Ready" : "Not Connected")
                         .font(.subheadline)
-                        .foregroundColor((viewModel.oralableConnected || featureFlags.demoModeEnabled) ? .green : .secondary)
+                        .foregroundColor(viewModel.oralableConnected ? .green : .secondary)
                 }
             }
 
