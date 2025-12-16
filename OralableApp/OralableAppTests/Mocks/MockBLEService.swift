@@ -219,6 +219,7 @@ class MockBLEService: BLEService {
         connectedPeripherals.removeAll()
         isScanning = false
         bluetoothState = .poweredOn
+        simulatedAppState = .foreground
     }
 
     /// Simulate Bluetooth state change
@@ -275,6 +276,95 @@ class MockBLEService: BLEService {
         connectedPeripherals.remove(peripheralId)
         eventSubject.send(.error(error))
         eventSubject.send(.deviceDisconnected(peripheral: peripheral, error: error))
+    }
+
+    // MARK: - Multi-Device Simulation Helpers
+
+    /// Track simulated app state for testing background behavior
+    private(set) var simulatedAppState: AppState = .foreground
+
+    /// Simulated app states for testing
+    enum AppState {
+        case foreground
+        case background
+        case suspended
+        case terminating
+    }
+
+    /// Simulate app entering background mode
+    /// Maintains BLE connections but may affect operation timing
+    func simulateAppEnterBackground() {
+        simulatedAppState = .background
+        recordMethodCall("simulateAppEnterBackground", parameters: [])
+    }
+
+    /// Simulate app returning to foreground
+    func simulateAppEnterForeground() {
+        simulatedAppState = .foreground
+        recordMethodCall("simulateAppEnterForeground", parameters: [])
+    }
+
+    /// Simulate app suspension (for memory pressure, etc.)
+    func simulateAppSuspend() {
+        simulatedAppState = .suspended
+        recordMethodCall("simulateAppSuspend", parameters: [])
+    }
+
+    /// Simulate app termination
+    func simulateAppTermination() {
+        simulatedAppState = .terminating
+        recordMethodCall("simulateAppTermination", parameters: [])
+        // Terminate all connections
+        disconnectAll()
+    }
+
+    /// Simulate batch connection of multiple devices
+    func simulateBatchConnection(deviceIds: [UUID]) {
+        for deviceId in deviceIds {
+            simulateConnection(to: deviceId)
+        }
+    }
+
+    /// Simulate batch disconnection of multiple devices
+    func simulateBatchDisconnection(deviceIds: [UUID], error: Error? = nil) {
+        for deviceId in deviceIds {
+            simulateDisconnection(from: deviceId, error: error)
+        }
+    }
+
+    /// Simulate intermittent connectivity (connects then disconnects after delay)
+    func simulateIntermittentConnection(to peripheralId: UUID, disconnectAfter delay: TimeInterval, error: Error? = nil) {
+        simulateConnection(to: peripheralId)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.simulateDisconnection(from: peripheralId, error: error)
+        }
+    }
+
+    /// Simulate rapid data stream from a device
+    /// Note: Uses simulateCharacteristicDataReceived which doesn't require actual CBCharacteristic
+    func simulateRapidDataStream(from peripheralId: UUID, count: Int, interval: TimeInterval = 0.01) {
+        guard let peripheral = discoveredPeripherals[peripheralId] else { return }
+
+        for i in 0..<count {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (interval * Double(i))) { [weak self] in
+                let mockData = Data([UInt8(i & 0xFF), UInt8((i >> 8) & 0xFF)])
+                // Simulate data received event
+                self?.simulateCharacteristicDataReceived(peripheral: peripheral, data: mockData)
+            }
+        }
+    }
+
+    /// Simulate characteristic data received without requiring actual CBCharacteristic
+    /// Creates a mock characteristic using runtime allocation
+    func simulateCharacteristicDataReceived(peripheral: CBPeripheral, data: Data) {
+        // Create mock characteristic using runtime allocation (same pattern as MockPeripheralFactory)
+        if let mockCharacteristic = class_createInstance(CBCharacteristic.self, 0) as? CBCharacteristic {
+            eventSubject.send(.characteristicUpdated(
+                peripheral: peripheral,
+                characteristic: mockCharacteristic,
+                data: data
+            ))
+        }
     }
 
     /// Internal helper to discover pre-configured devices

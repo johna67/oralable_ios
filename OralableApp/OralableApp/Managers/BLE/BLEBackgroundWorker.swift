@@ -743,6 +743,41 @@ final class BLEBackgroundWorker: ObservableObject {
             connectionTimeoutTasks.removeAll()
         }
     }
+
+    // MARK: - App Lifecycle Handling
+
+    /// Handle app entering background mode
+    /// BLE operations continue in background for connected devices
+    func handleAppEnteredBackground() {
+        Logger.shared.info("[BLEBackgroundWorker] App entered background - BLE operations continue")
+        // BLE operations continue in background for connected devices
+        // No action needed - CoreBluetooth maintains connections in background
+    }
+
+    /// Handle app returning to foreground
+    func handleAppEnteredForeground() {
+        Logger.shared.info("[BLEBackgroundWorker] App entered foreground")
+        // No action needed - operations continue normally
+    }
+
+    /// Handle app about to suspend (low memory, system pressure)
+    func handleAppWillSuspend() {
+        Logger.shared.warning("[BLEBackgroundWorker] App will suspend - BLE operations may be interrupted")
+        // Note: We don't stop operations here as iOS manages BLE background execution
+    }
+
+    /// Handle app resuming from suspended state
+    func handleAppDidResume() {
+        Logger.shared.info("[BLEBackgroundWorker] App resumed from suspension")
+        // Verify connections are still active after resume
+        // The health check loop will detect any stale connections
+    }
+
+    /// Handle app termination - clean up all resources
+    func handleAppWillTerminate() {
+        Logger.shared.warning("[BLEBackgroundWorker] App will terminate - stopping worker")
+        stop()
+    }
 }
 
 // MARK: - Connection Health Status

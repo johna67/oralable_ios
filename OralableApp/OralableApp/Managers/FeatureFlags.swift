@@ -33,6 +33,7 @@ class FeatureFlags: ObservableObject {
         static let showDetectionSettings = "feature.settings.showDetectionSettings"
         static let showCloudKitShare = "feature.share.showCloudKitShare"
         static let demoModeEnabled = "feature.demo.enabled"
+        static let showPilotStudy = "feature.pilot.showStudy"
     }
 
     // MARK: - Default Configuration
@@ -59,6 +60,9 @@ class FeatureFlags: ObservableObject {
 
         // Demo Mode
         static let demoModeEnabled = false
+
+        // Pilot Study
+        static let showPilotStudy = false
     }
 
     // MARK: - Dashboard Features
@@ -121,6 +125,11 @@ class FeatureFlags: ObservableObject {
         didSet { defaults.set(demoModeEnabled, forKey: Keys.demoModeEnabled) }
     }
 
+    // MARK: - Pilot Study
+    @Published var showPilotStudy: Bool {
+        didSet { defaults.set(showPilotStudy, forKey: Keys.showPilotStudy) }
+    }
+
     // MARK: - Initialization
     init() {
         // Load saved values or use pre-launch defaults
@@ -138,6 +147,7 @@ class FeatureFlags: ObservableObject {
         self.showDetectionSettings = defaults.object(forKey: Keys.showDetectionSettings) as? Bool ?? Defaults.showDetectionSettings
         self.showCloudKitShare = defaults.object(forKey: Keys.showCloudKitShare) as? Bool ?? Defaults.showCloudKitShare
         self.demoModeEnabled = defaults.object(forKey: Keys.demoModeEnabled) as? Bool ?? Defaults.demoModeEnabled
+        self.showPilotStudy = defaults.object(forKey: Keys.showPilotStudy) as? Bool ?? Defaults.showPilotStudy
 
         Logger.shared.info("[FeatureFlags] Initialized with pre-launch configuration")
     }
@@ -268,6 +278,7 @@ class FeatureFlags: ObservableObject {
         - Detection Settings: \(showDetectionSettings)
         - CloudKit Share: \(showCloudKitShare)
         - Demo Mode: \(demoModeEnabled)
+        - Pilot Study: \(showPilotStudy)
         """
     }
 }

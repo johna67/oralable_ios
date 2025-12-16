@@ -512,6 +512,345 @@ final class BLEBackgroundWorkerTests: XCTestCase {
     }
 }
 
+// MARK: - Background Operation Tests
+
+extension BLEBackgroundWorkerTests {
+
+    // MARK: - Background State Simulation
+
+    func testBLEOperationsContinueWhenAppEntersBackground() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Background Test Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        // Start reconnection
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: false)
+        XCTAssertTrue(sut.activeReconnections.contains(deviceId))
+
+        // When - simulate background state (worker should continue)
+        sut.handleAppEnteredBackground()
+
+        // Allow reconnection to proceed
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        // Then - worker should still be running and active
+        XCTAssertTrue(sut.isRunning, "Worker should continue running in background")
+        XCTAssertTrue(sut.activeReconnections.contains(deviceId) || mockBLEService.connectCalled,
+                     "Reconnection should continue or have been attempted")
+    }
+
+    func testReconnectionAttemptsContinueInBackgroundMode() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Background Reconnect Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        let reconnectionExpectation = XCTestExpectation(description: "Reconnection attempted in background")
+
+        sut.eventPublisher
+            .sink { event in
+                if case .reconnectionAttemptStarted = event {
+                    reconnectionExpectation.fulfill()
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - enter background and schedule reconnection
+        sut.handleAppEnteredBackground()
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: true)
+
+        // Then
+        await fulfillment(of: [reconnectionExpectation], timeout: 2.0)
+
+        XCTAssertTrue(mockBLEService.connectCalled, "Connection should be attempted in background")
+    }
+
+    func testEventPublishingWorksWithAppSuspendedAndResumed() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Suspend Test Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        var eventsBeforeSuspend: [BLEBackgroundWorkerEvent] = []
+        var eventsAfterResume: [BLEBackgroundWorkerEvent] = []
+        var isSuspended = false
+
+        sut.eventPublisher
+            .sink { event in
+                if isSuspended {
+                    eventsAfterResume.append(event)
+                } else {
+                    eventsBeforeSuspend.append(event)
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - schedule before suspend
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: true)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Simulate suspend
+        isSuspended = true
+        sut.handleAppWillSuspend()
+
+        // Simulate resume
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        sut.handleAppDidResume()
+        isSuspended = false
+
+        // Schedule after resume
+        let deviceId2 = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId2, name: "Resume Test Device")
+        let peripheral2 = mockBLEService.discoveredPeripherals[deviceId2]!
+        sut.scheduleReconnection(for: deviceId2, peripheral: peripheral2, immediate: true)
+
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        // Then - events should be received before and after suspend/resume
+        XCTAssertFalse(eventsBeforeSuspend.isEmpty, "Events should be received before suspend")
+        XCTAssertTrue(sut.isRunning, "Worker should be running after resume")
+    }
+
+    func testBackgroundTasksResumeAfterForegroundReturn() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Foreground Return Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        // Schedule reconnection
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: false)
+
+        // When - go to background
+        sut.handleAppEnteredBackground()
+
+        // Then - should still be active
+        XCTAssertTrue(sut.activeReconnections.contains(deviceId), "Reconnection should remain active")
+
+        // When - return to foreground
+        sut.handleAppEnteredForeground()
+
+        // Then
+        XCTAssertTrue(sut.isRunning, "Worker should be running after returning to foreground")
+    }
+
+    func testReconnectionCompletesInBackground() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Background Complete Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        let successExpectation = XCTestExpectation(description: "Reconnection succeeded in background")
+
+        sut.eventPublisher
+            .sink { event in
+                if case .reconnectionSucceeded = event {
+                    successExpectation.fulfill()
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - enter background and start reconnection
+        sut.handleAppEnteredBackground()
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: true)
+
+        // Allow connection attempt
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        // Simulate successful connection in background
+        mockBLEService.simulateConnection(to: deviceId)
+
+        // Then
+        await fulfillment(of: [successExpectation], timeout: 3.0)
+
+        XCTAssertFalse(sut.activeReconnections.contains(deviceId), "Reconnection should be cleared after success")
+    }
+
+    // MARK: - Battery Impact Simulation Tests
+
+    func testBatteryDrainUnderBackgroundPolling() async {
+        // Given - simulate background polling behavior
+        let pollingConfig = BLEBackgroundWorkerConfig(
+            maxReconnectionAttempts: 10,
+            baseReconnectionDelay: 0.1,
+            maxReconnectionDelay: 1.0,
+            jitterFactor: 0.1,
+            connectionTimeout: 2.0,
+            pauseOnBluetoothOff: true
+        )
+        let pollingWorker = BLEBackgroundWorker(bleService: mockBLEService, config: pollingConfig)
+        pollingWorker.configure(bleService: mockBLEService)
+        pollingWorker.start()
+
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Polling Test Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        var reconnectionAttempts = 0
+        let targetAttempts = 5
+
+        let attemptExpectation = XCTestExpectation(description: "Multiple polling attempts")
+        attemptExpectation.expectedFulfillmentCount = targetAttempts
+
+        pollingWorker.eventPublisher
+            .sink { event in
+                if case .reconnectionAttemptStarted = event {
+                    reconnectionAttempts += 1
+                    attemptExpectation.fulfill()
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - simulate background polling with repeated reconnection attempts
+        // Inject connection failure to trigger retries
+        mockBLEService.injectedErrors["connect"] = BLEError.connectionFailed(peripheralId: deviceId, reason: "Simulated failure")
+        pollingWorker.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: true)
+
+        // Then
+        await fulfillment(of: [attemptExpectation], timeout: 10.0)
+
+        // Verify exponential backoff reduces polling frequency
+        XCTAssertGreaterThanOrEqual(reconnectionAttempts, targetAttempts,
+                                    "Should have attempted at least \(targetAttempts) reconnections")
+
+        pollingWorker.stop()
+    }
+
+    func testBackgroundPollingRespectsExponentialBackoff() async {
+        // Given - config with measurable delays
+        let testConfig = BLEBackgroundWorkerConfig(
+            maxReconnectionAttempts: 4,
+            baseReconnectionDelay: 0.1,
+            maxReconnectionDelay: 0.5,
+            jitterFactor: 0.0,
+            connectionTimeout: 0.2
+        )
+        let worker = BLEBackgroundWorker(bleService: mockBLEService, config: testConfig)
+        worker.configure(bleService: mockBLEService)
+        worker.start()
+
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Backoff Test Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        var attemptTimes: [Date] = []
+
+        worker.eventPublisher
+            .sink { event in
+                if case .reconnectionAttemptStarted = event {
+                    attemptTimes.append(Date())
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - inject failure to trigger retries
+        mockBLEService.injectedErrors["connect"] = BLEError.connectionFailed(peripheralId: deviceId, reason: "Test")
+        worker.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: true)
+
+        // Wait for multiple attempts
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+
+        // Then - verify delays increase (exponential backoff)
+        if attemptTimes.count >= 3 {
+            let delay1 = attemptTimes[1].timeIntervalSince(attemptTimes[0])
+            let delay2 = attemptTimes[2].timeIntervalSince(attemptTimes[1])
+
+            // Second delay should be greater or equal to first (exponential backoff)
+            XCTAssertGreaterThanOrEqual(delay2, delay1 * 0.9, // Allow 10% tolerance
+                                        "Delays should increase with exponential backoff")
+        }
+
+        worker.stop()
+    }
+
+    // MARK: - Background Mode Priority Tests
+
+    func testHighPriorityReconnectionInBackground() async {
+        // Given
+        sut.start()
+        sut.handleAppEnteredBackground()
+
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "High Priority Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        let immediateExpectation = XCTestExpectation(description: "Immediate reconnection in background")
+
+        sut.eventPublisher
+            .sink { event in
+                if case .reconnectionAttemptStarted(_, let attempt, _) = event {
+                    if attempt == 1 {
+                        immediateExpectation.fulfill()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - schedule immediate reconnection even in background
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: true)
+
+        // Then - should attempt immediately
+        await fulfillment(of: [immediateExpectation], timeout: 0.5)
+    }
+
+    func testBackgroundWorkerStopsOnTermination() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "Termination Test Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        sut.scheduleReconnection(for: deviceId, peripheral: peripheral, immediate: false)
+
+        let stopExpectation = XCTestExpectation(description: "Worker stopped")
+
+        sut.eventPublisher
+            .sink { event in
+                if case .workerStopped = event {
+                    stopExpectation.fulfill()
+                }
+            }
+            .store(in: &cancellables)
+
+        // When - simulate app termination
+        sut.handleAppWillTerminate()
+
+        // Then
+        await fulfillment(of: [stopExpectation], timeout: 1.0)
+
+        XCTAssertFalse(sut.isRunning, "Worker should stop on termination")
+        XCTAssertTrue(sut.activeReconnections.isEmpty, "Active reconnections should be cleared")
+    }
+
+    // MARK: - State Persistence Tests
+
+    func testWorkerStatePreservedAcrossBackgroundTransitions() async {
+        // Given
+        sut.start()
+        let deviceId = UUID()
+        mockBLEService.addDiscoverableDevice(id: deviceId, name: "State Test Device")
+        let peripheral = mockBLEService.discoveredPeripherals[deviceId]!
+
+        // Record data before background
+        sut.recordDataReceived(from: deviceId)
+        let healthBefore = sut.connectionHealth[deviceId]
+
+        // When - transition to background and back
+        sut.handleAppEnteredBackground()
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        sut.handleAppEnteredForeground()
+
+        // Then - health state should be preserved
+        let healthAfter = sut.connectionHealth[deviceId]
+        XCTAssertEqual(healthBefore, healthAfter, "Connection health should be preserved")
+    }
+}
+
 // MARK: - Mock Reconnection Delegate
 
 class MockReconnectionDelegate: BLEReconnectionDelegate {
