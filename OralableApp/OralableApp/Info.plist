@@ -31,10 +31,6 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Oralable would like to save your sleep and heart rate data to HealthKit for health tracking and integration with other health apps.</string>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Oralable would like to read your sleep and heart rate data from HealthKit for comprehensive health correlation and analysis.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Oralable uses Bluetooth to connect to your Oralable device for real-time health monitoring.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
