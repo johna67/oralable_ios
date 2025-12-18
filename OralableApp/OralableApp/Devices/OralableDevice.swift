@@ -60,7 +60,7 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     // MARK: - Sensor Configuration Constants (Fix 2)
     
     /// PPG sensor sample rate (samples per second)
-    private let ppgSampleRate: Double = 100.0
+    private let ppgSampleRate: Double = 50.0
     
     /// Accelerometer sample rate (Hz)
     private let accelerometerSampleRate: Double = 100.0
@@ -136,11 +136,88 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
     private var accelerometerNotificationContinuation: CheckedContinuation<Void, Error>?
     
     // MARK: - Statistics
-    
+
     private var packetsReceived: Int = 0
     private var bytesReceived: Int = 0
     private var lastPacketTime: Date?
     private var ppgFrameCount: Int = 0
+
+    // MARK: - Sample Rate Verification
+
+    private var sampleRateStats = SampleRateStats()
+
+    private struct SampleRateStats {
+        var firstPacketTime: Date?
+        var lastPacketTime: Date?
+        var packetCount: Int = 0
+        var frameCounterFirst: UInt32?
+        var frameCounterLast: UInt32?
+        var intervalSum: Double = 0
+        var intervalCount: Int = 0
+        var minInterval: Double = Double.greatestFiniteMagnitude
+        var maxInterval: Double = 0
+        var recentIntervals: [Double] = []
+        let maxRecentIntervals = 100
+
+        mutating func reset() {
+            firstPacketTime = nil
+            lastPacketTime = nil
+            packetCount = 0
+            frameCounterFirst = nil
+            frameCounterLast = nil
+            intervalSum = 0
+            intervalCount = 0
+            minInterval = Double.greatestFiniteMagnitude
+            maxInterval = 0
+            recentIntervals.removeAll()
+        }
+
+        mutating func recordPacket(time: Date, frameCounter: UInt32) {
+            if firstPacketTime == nil {
+                firstPacketTime = time
+                frameCounterFirst = frameCounter
+            }
+            if let lastTime = lastPacketTime {
+                let interval = time.timeIntervalSince(lastTime)
+                intervalSum += interval
+                intervalCount += 1
+                minInterval = min(minInterval, interval)
+                maxInterval = max(maxInterval, interval)
+                recentIntervals.append(interval)
+                if recentIntervals.count > maxRecentIntervals {
+                    recentIntervals.removeFirst()
+                }
+            }
+            lastPacketTime = time
+            frameCounterLast = frameCounter
+            packetCount += 1
+        }
+
+        var averageInterval: Double {
+            guard intervalCount > 0 else { return 0 }
+            return intervalSum / Double(intervalCount)
+        }
+
+        var recentAverageInterval: Double {
+            guard !recentIntervals.isEmpty else { return 0 }
+            return recentIntervals.reduce(0, +) / Double(recentIntervals.count)
+        }
+
+        var packetsPerSecond: Double {
+            guard averageInterval > 0 else { return 0 }
+            return 1.0 / averageInterval
+        }
+
+        var recentPacketsPerSecond: Double {
+            guard recentAverageInterval > 0 else { return 0 }
+            return 1.0 / recentAverageInterval
+        }
+
+        var totalDuration: Double {
+            guard let first = firstPacketTime, let last = lastPacketTime else { return 0 }
+            return last.timeIntervalSince(first)
+        }
+    }
     
     // MARK: - Initialization
     
@@ -343,13 +420,24 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         packetsReceived = 0
         bytesReceived = 0
         ppgFrameCount = 0
-        
+
+        // Reset sample rate stats for new session
+        sampleRateStats.reset()
+        Logger.shared.info("[SAMPLE_RATE_CHECK] Logging enabled - iOS assumes \(ppgSampleRate) Hz")
+
         Logger.shared.info("[OralableDevice] ✅ Data collection started (notifications confirmed ready)")
     }
     
     func stopDataCollection() async throws {
         Logger.shared.info("[OralableDevice] Stopping data collection...")
-        
+
+        // Log final sample rate statistics
+        let stats = sampleRateStats
+        if stats.packetCount > 10 {
+            let samplesPerSecond = stats.packetsPerSecond * Double(ppgSamplesPerPacket)
+            Logger.shared.info("[SAMPLE_RATE_CHECK] FINAL: \(stats.packetCount) packets over \(String(format: "%.2f", stats.totalDuration))s | Avg interval: \(String(format: "%.2f", stats.averageInterval * 1000))ms | SAMPLES/sec: \(String(format: "%.1f", samplesPerSecond)) | MISMATCH: \(String(format: "%.2f", samplesPerSecond / ppgSampleRate))x")
+        }
+
         isCollecting = false
         
         if let startTime = sessionStartTime {
@@ -507,9 +595,22 @@ class OralableDevice: NSObject, BLEDeviceProtocol {
         // Bytes 4+: 20 samples, each 12 bytes (3 × uint32_t PPG values)
         // The order of the 3 values depends on firmware config - use ppgChannelOrder setting
         let frameCounter = readUInt32(at: 0) ?? 0
+
+        // Log every packet for sample rate analysis
+        Logger.shared.info("[RATE] Frame \(frameCounter) at \(Date().timeIntervalSince1970)")
+
         let samplesPerFrame = ppgSamplesPerPacket  // 20
         let sampleSizeBytes = 12  // 3 × uint32_t per sample
         let sampleDataStart = 4
+
+        // Sample rate verification logging
+        sampleRateStats.recordPacket(time: notificationTime, frameCounter: frameCounter)
+
+        if sampleRateStats.packetCount % 50 == 0 && sampleRateStats.packetCount > 0 {
+            let stats = sampleRateStats
+            let samplesPerSecond = stats.recentPacketsPerSecond * Double(ppgSamplesPerPacket)
+            Logger.shared.info("[SAMPLE_RATE_CHECK] Packet #\(stats.packetCount) | Interval: \(String(format: "%.2f", stats.recentAverageInterval * 1000))ms | Packets/sec: \(String(format: "%.2f", stats.recentPacketsPerSecond)) | SAMPLES/sec: \(String(format: "%.1f", samplesPerSecond)) (iOS assumes \(ppgSampleRate))")
+        }
 
         #if DEBUG
         Logger.shared.debug("[OralableDevice] 📊 PPG Frame #\(frameCounter) | Samples: \(samplesPerFrame) | Size: \(data.count) bytes")
